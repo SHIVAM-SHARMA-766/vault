@@ -32,6 +32,27 @@ IAM identity and refuses it for both public callers and the CloudFront service p
 The account also shows `ConcurrentExecutions: 10` where the default is 1,000, which is
 what an unverified account looks like.
 
+Hardening added while the blocker stands, all of it free:
+
+- Four CloudWatch alarms on one SNS topic — unexpected invocation volume, API errors,
+  Lambda throttling, and table throttling. For a single-user vault, "is anyone else
+  calling this?" has a clear answer, and these are how it gets answered quickly.
+  **The email subscription is `PendingConfirmation` until the link in the first message
+  is clicked; until then no alarm is delivered.**
+- A concurrency ceiling was attempted and is not currently possible — see below.
+
+Two faults were found by reading the plan rather than the code, and both are now
+recorded rather than silently wrong:
+
+- **The distribution accepts TLS 1.0 and 1.1**, verified with `openssl s_client`.
+  `minimum_protocol_version` is only honoured for a custom ACM certificate; on the
+  default `*.cloudfront.net` certificate it is discarded, which also produced a diff on
+  every plan that could never converge. The setting has been removed and the consequence
+  written into [docs/threat-model.md](docs/threat-model.md). Browsers refuse those
+  versions themselves, so the Android client must require TLS 1.2+ on its own.
+- **Reserved concurrency cannot be set on this account.** AWS refuses any reservation
+  that would take unreserved concurrency below 10, and this account's total is 10.
+
 ## Two ways forward
 
 1. **Ask AWS to lift the account restrictions.** Account and billing support is free on the

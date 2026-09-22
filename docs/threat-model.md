@@ -5,7 +5,7 @@ which risks are accepted and why. It is written to be falsifiable: every control
 the threat it addresses, and every gap is listed rather than omitted.
 
 Reviewed whenever the cryptographic design, the storage model, or the hosting
-architecture changes. Last reviewed 2026-09-22.
+architecture changes. Last reviewed 2026-09-22, against the deployed system rather than the design.
 
 ## Assets, in priority order
 
@@ -45,6 +45,18 @@ Reads or modifies traffic between browser and API.
 Stopped by TLS everywhere, HSTS with a long max-age, and the fact that plaintext never
 crosses the boundary in the first place. Modification of the *application* is the more
 serious version of this threat — see A3.
+
+**The TLS floor cannot be raised on this deployment.** CloudFront only honours a
+`minimum_protocol_version` when the distribution uses a custom ACM or IAM certificate; on
+the default `*.cloudfront.net` certificate the setting is silently discarded and the
+value stays at TLSv1. Verified with `openssl s_client`: the distribution completes a
+handshake at TLS 1.0, 1.1, 1.2 and 1.3. Raising the floor requires a custom domain, which
+the placement decision rules out.
+
+Every current browser refuses TLS 1.0 and 1.1 outright, so a browser client negotiates
+1.2 or 1.3 regardless of what the server would accept. The exposure is therefore to
+non-browser clients, and the mitigation belongs there: **the Android client must require
+TLS 1.2 or better itself** rather than relying on the server to refuse anything less.
 
 ### A2 — Database or backup disclosure
 
@@ -161,3 +173,5 @@ mistakes silence for coverage.
 | PBKDF2 rather than Argon2id | Avoids a WASM dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |
 | Availability subordinated to cost | A personal vault with an export; downtime is an inconvenience, not data loss |
 | AES-GCM random-IV collision bound of roughly 2^32 encryptions | A personal vault performs on the order of 2^20; revisit if this ever becomes multi-tenant |
+| The distribution completes TLS 1.0 and 1.1 handshakes (A1) | The floor cannot be raised without a custom domain. Browsers refuse those versions on their own; the Android client must require 1.2+ itself |
+| The API's concurrency cannot be capped | AWS refuses any reservation that would take unreserved concurrency below 10, and this account's total limit *is* 10. The ceiling returns once that limit is raised |
