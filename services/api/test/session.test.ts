@@ -122,3 +122,18 @@ test('repeated login attempts are rate limited', async () => {
   }
   assert.ok(limited > 0, 'the limiter engaged')
 })
+
+test('the token is read from x-vault-auth, not Authorization', async () => {
+  // CloudFront must populate Authorization with its own SigV4 signature to
+  // reach the IAM-protected Function URL, so the viewer's value never arrives.
+  // A token sent that way has to be rejected rather than half-working.
+  const { h, tokens } = await registered()
+
+  const viaAuthorization = await h.request('GET', '/api/auth/me', {
+    rawHeaders: { authorization: `Bearer ${tokens.accessToken}` },
+  })
+  assert.equal(viaAuthorization.status, 401)
+
+  const viaCustomHeader = await h.request('GET', '/api/auth/me', { token: tokens.accessToken })
+  assert.equal(viaCustomHeader.status, 200)
+})

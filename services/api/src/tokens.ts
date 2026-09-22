@@ -91,9 +91,22 @@ export function verifyToken(
   return payload
 }
 
-/** `Authorization: Bearer <token>`, case-insensitively. */
+/** The header the access token arrives in.
+ *
+ *  Not `Authorization`. CloudFront must populate that header with its own SigV4
+ *  signature to satisfy the IAM-protected Function URL this service sits
+ *  behind, so an origin request policy cannot forward the viewer's value — and
+ *  one that tries produces a 403 with no invocation and no log line, which is
+ *  easily mistaken for the access control working.
+ *
+ *  Using a custom header has an incidental benefit: a cross-origin form cannot
+ *  set one, so the token cannot be replayed by a cross-site request the way a
+ *  cookie could. */
+export const AUTH_HEADER = 'x-vault-auth'
+
+/** `x-vault-auth: Bearer <token>`, case-insensitively. */
 export function bearerFrom(headers: Record<string, string | undefined>): string | null {
-  const raw = headers['authorization'] ?? headers['Authorization']
+  const raw = headers[AUTH_HEADER] ?? headers['X-Vault-Auth']
   if (!raw) return null
   const match = /^Bearer\s+(\S+)$/i.exec(raw.trim())
   return match?.[1] ?? null

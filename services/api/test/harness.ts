@@ -9,6 +9,7 @@ import { dispatch } from '../src/app.js'
 import type { App } from '../src/context.js'
 import type { LambdaEvent, LambdaResponse } from '../src/http.js'
 import { AlreadyExists, type Item, type Store } from '../src/store.js'
+import { AUTH_HEADER } from '../src/tokens.js'
 
 export class MemoryStore implements Store {
   private readonly items = new Map<string, Item>()
@@ -65,6 +66,9 @@ export interface RequestOptions {
   body?: unknown
   token?: string
   ip?: string
+  /** Headers set verbatim, for asserting what the service does with a header
+   *  it should ignore. */
+  rawHeaders?: Record<string, string>
 }
 
 export interface Parsed {
@@ -92,7 +96,10 @@ export function harness(options: { allowRegistration?: boolean } = {}): Harness 
   const request = async (method: string, path: string, opts: RequestOptions = {}): Promise<Parsed> => {
     const event: LambdaEvent = {
       rawPath: path,
-      headers: opts.token ? { authorization: `Bearer ${opts.token}` } : {},
+      headers: {
+        ...(opts.token ? { [AUTH_HEADER]: `Bearer ${opts.token}` } : {}),
+        ...(opts.rawHeaders ?? {}),
+      },
       requestContext: {
         http: { method, sourceIp: opts.ip ?? '203.0.113.7', userAgent: 'test-agent' },
       },

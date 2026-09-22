@@ -44,6 +44,15 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 
 ## Decisions worth knowing before changing anything
 
+**The access token arrives in `x-vault-auth`, not `Authorization`.** This is forced by
+the deployment: CloudFront reaches the Function URL through an Origin Access Control, and
+must populate `Authorization` with its own SigV4 signature to satisfy the URL's IAM auth.
+An origin request policy that forwards the viewer's `Authorization` leaves CloudFront's
+signature unset, and the Function URL then answers 403 *without invoking the function* —
+no log stream, no metric, and a status easily mistaken for the access control working
+correctly. The custom header has an incidental benefit: a cross-origin form cannot set
+one, so the token cannot be replayed by a cross-site request the way a cookie could.
+
 **Tokens are not JWTs.** A JWT names its own algorithm in a header the verifier is then
 expected to trust, which is the root of the "alg: none" and algorithm-confusion bugs.
 These tokens are `v1.<payload>.<HMAC-SHA256>` with one algorithm, named nowhere, and
