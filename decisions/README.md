@@ -27,6 +27,7 @@ someone who would otherwise assume it was an oversight.
 | [0001](0001-cryptography-and-key-hierarchy.md) | Cryptography and key hierarchy |
 | [0002](0002-storage-and-data-model.md) | Storage and data model |
 | [0003](0003-where-infrastructure-is-defined.md) | Where infrastructure is defined |
+| [0004](0004-the-access-token-header.md) | The access token header |
 
 Infrastructure decisions that span more than this project — provider placement, account
 layout — live in the `brain` repository instead.

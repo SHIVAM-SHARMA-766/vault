@@ -37,6 +37,7 @@ Three documents, in the order worth reading them:
 | [decisions/0001](decisions/0001-cryptography-and-key-hierarchy.md) | How keys are derived, what is encrypted, why the master password change is a single write |
 | [decisions/0002](decisions/0002-storage-and-data-model.md) | What the data looks like in DynamoDB and why there are no secondary indexes |
 | [decisions/0003](decisions/0003-where-infrastructure-is-defined.md) | Why Terraform lives in a different repository, and what the two share |
+| [decisions/0004](decisions/0004-the-access-token-header.md) | Why the access token is not in the `Authorization` header, and why that must not be "fixed" |
 | [docs/threat-model.md](docs/threat-model.md) | Who the adversaries are, what stops them, and what is explicitly not defended against |
 | [docs/runbook.md](docs/runbook.md) | Deploying, setting the server secrets, and what to do when the budget alert fires |
 

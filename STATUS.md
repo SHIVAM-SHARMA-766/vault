@@ -6,27 +6,45 @@ Last updated: 2026-09-22
 
 ## Right now
 
-**Phase 3 — the API is written and tested.** `services/api`, one Lambda handler, 47 tests
-against an in-memory store, 98% line and 99% function coverage. No AWS account is needed
-to run them.
+**The stack is applied and the API is deployed, but the browser cannot reach the API.**
+CloudFront cannot invoke the Lambda Function URL, and the cause is outside this project's
+configuration.
 
-What it enforces, each covered by a test:
+Working and verified against the live system:
 
-- The master password never arrives; only an Auth Key, and only its scrypt verifier is
-  stored. A test asserts the address and the auth key appear nowhere in the table.
-- An unknown address and a wrong password return the same status and the same body, and
-  the verifier runs against a dummy so the timing matches. `prelogin` answers unknown
-  addresses with a decoy salt that is stable per address.
-- Changing the master password rewrites one item. A test registers three entries, changes
-  the password, and asserts not one entry was touched — the claim
-  [0001](decisions/0001-cryptography-and-key-hierarchy.md) is built around.
-- A replayed refresh token revokes every session, because a token presented twice is the
-  signature of a stolen one.
-- Registration is closed unless explicitly opened, so a missing setting refuses rather
-  than leaving the vault open.
+- The client path. CloudFront serves the private S3 bucket through an Origin Access
+  Control; a client-side route such as `/vault/settings` returns the shell with 200 while
+  a missing `/missing.js` still returns a real error rather than HTML.
+- Every security header the threat model calls for, checked on a live response.
+- The function itself. `aws lambda invoke` returns `{"status":"ok"}`, and the Function URL
+  answers correctly when called with a hand-computed SigV4 signature.
+- The free-tier shape: 23 resources, nothing outside a perpetual allowance except S3.
 
-Phase 2 is written but **not applied** — no AWS resource exists yet. Phase 1 and Phase 0
-are complete.
+**Blocked:** every request through `https://<distribution>/api/*` returns 403 from the
+Function URL's authorization layer, with zero invocations and no log stream.
+
+The cause is account-level, not configuration. Six variants were tried, including a
+throwaway distribution and a throwaway function built from scratch, with and without an
+origin request policy. All returned 403. Meanwhile a Function URL with `auth-type NONE`
+and a `Principal: "*"` policy is *also* refused, while the same URL under `AWS_IAM`
+answers a signed request normally — so this account permits Function URL invocation by an
+IAM identity and refuses it for both public callers and the CloudFront service principal.
+The account also shows `ConcurrentExecutions: 10` where the default is 1,000, which is
+what an unverified account looks like.
+
+## Two ways forward
+
+1. **Ask AWS to lift the account restrictions.** Account and billing support is free on the
+   Basic plan. The evidence to cite is the reduced concurrency limit and the refusal of
+   both public and service-principal Function URL invocation. This keeps the architecture
+   exactly as designed.
+2. **Put an HTTP API in front of the function instead.** Works today and needs no
+   permission from anyone. Its free tier is twelve months rather than perpetual; after
+   that it is USD 1.00 per million requests, so a single-user vault making on the order of
+   ten thousand requests a month costs around a cent a month. That is not zero, and the
+   cost target is zero, so it is a decision to take deliberately rather than by default.
+
+Making the Function URL public is not an option — this account refuses that too.
 
 ## Next
 
