@@ -28,6 +28,7 @@ someone who would otherwise assume it was an oversight.
 | [0002](0002-storage-and-data-model.md) | Storage and data model |
 | [0003](0003-where-infrastructure-is-defined.md) | Where infrastructure is defined |
 | [0004](0004-the-access-token-header.md) | The access token header |
+| [0005](0005-oci-fallback-for-the-api.md) | Running the API on OCI compute — **proposed**, not adopted |
 
 Infrastructure decisions that span more than this project — provider placement, account
 layout — live in the `brain` repository instead.
