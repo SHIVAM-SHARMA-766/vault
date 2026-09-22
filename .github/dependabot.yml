@@ -1,0 +1,20 @@
+# Supply chain: docs/threat-model.md, A8.
+#
+# The crypto package has no runtime dependencies, so what this watches is the
+# development toolchain and the CI actions themselves — both of which execute
+# with access to the repository.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        dependency-type: development
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

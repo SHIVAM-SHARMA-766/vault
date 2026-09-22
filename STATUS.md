@@ -6,42 +6,41 @@ Last updated: 2026-09-22
 
 ## Right now
 
-**Phase 0 — foundation.** No application code and no deployed infrastructure. The AWS
-account was verified empty on 2026-09-22: seventeen regions swept, no compute, storage,
-network, or data resources, and a daily spend of zero.
+**Phase 1 — the cryptography package.** `packages/crypto` is written, tested, and
+building. It has no runtime dependencies and implements no algorithm by hand: every
+primitive comes from Web Crypto, which resolves to the browser's implementation in a page
+and to Node's in the API and in tests.
 
-**Phase 0 is complete.**
+- 83 tests, 100% line and function coverage, 98% branch coverage.
+- 30 test vectors from RFC 7914, RFC 5869, RFC 4231, RFC 6238, and the GCM
+  specification. They were cross-checked against Python's `hashlib`/`hmac` and OpenSSL
+  before being committed, and are deliberately not generated from this implementation —
+  a vector produced by the code it tests passes whether or not that code is correct.
+- CI runs typecheck, tests, and `npm audit`, and fails the build if the crypto package
+  ever acquires a runtime dependency or if a vector file stops citing where it came from.
 
-- Repository created, cryptographic design and storage model decided and recorded, threat
-  model written.
-- A billing guardrail exists on the AWS account: a $1 monthly cost budget named
-  `personal-account-monthly`, alerting to developer.shivamsharma@gmail.com at 50% of
-  actual spend, at 100% of actual spend, and on a forecast that would exceed the limit.
-  There was previously no budget and no billing alarm, which is how an earlier
-  ₹1,470 charge went unnoticed until after it had been incurred. The limit is set at $1
-  rather than a realistic ceiling because the intended steady state is zero; any alert at
-  all means something unexpected is running.
+Phase 0 is complete: the repository, the three design documents, and a $1 monthly budget
+on the AWS account alerting at 50% and 100% of actual spend and on a forecast overrun.
+The account itself was verified empty on 2026-09-22 — seventeen regions swept, nothing
+running, daily spend zero.
 
 ## Next
 
-1. **`packages/crypto`** — key derivation, wrapping, entry encryption, TOTP. No third-party
-   dependencies, test vectors from published standards, full coverage, gated in CI. Built
-   before anything else because every other component depends on it and because a defect
-   here cannot be repaired after data is written.
-2. **Terraform** — DynamoDB at provisioned 25/25 with autoscaling off, Lambda and its
+1. **Terraform** — DynamoDB at provisioned 25/25 with autoscaling off, Lambda and its
    Function URL, S3 and CloudFront with an Origin Access Control, SSM parameters,
    least-privilege IAM.
-3. **API** — the Lambda handler, scrypt verifier, short-lived access tokens with refresh
-   rotation.
-4. **Web client** — the SPA, served under a strict Content-Security-Policy.
-5. **CI/CD and hardening** — typecheck, lint, tests, crypto vectors, dependency alerts,
-   static analysis, path filters.
-6. **Backups and monitoring** — scheduled encrypted export to S3, CloudWatch alarms.
+2. **API** — the Lambda handler, scrypt verifier over the client-supplied Auth Key,
+   short-lived access tokens with refresh rotation, and the decoy-salt response that
+   keeps the login endpoint from confirming whether an address is registered.
+3. **Web client** — the SPA, served under a strict Content-Security-Policy.
+4. **Hardening** — static analysis, and the security headers the threat model requires
+   on the CloudFront distribution.
+5. **Backups and monitoring** — scheduled encrypted export to S3, CloudWatch alarms.
 
 Later, once the vault is stable: the marketing site, the admin surface, and the Android
 client. The Android client is the structural answer to the browser-delivered-code threat
-in [docs/threat-model.md](docs/threat-model.md); the shared test vectors exist from the
-start so that it can be written against them.
+in [docs/threat-model.md](docs/threat-model.md); it will assert against the same vector
+files `packages/crypto` does, which is why those exist before it is written.
 
 ## Open questions
 
@@ -54,6 +53,10 @@ start so that it can be written against them.
   reviewed, dependency-light WebAssembly implementation becomes available.
 
 ## Recently done
+
+**2026-09-22 — `packages/crypto` written.** Key hierarchy, sealed-blob format, entry and
+folder encryption, TOTP. No runtime dependencies. Vectors from published standards,
+cross-checked against two independent implementations.
 
 **2026-09-22 — Repository created; cryptography, storage, and threat model decided.**
 Started from an empty directory rather than porting the previous implementation, which

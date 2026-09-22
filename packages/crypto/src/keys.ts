@@ -1,0 +1,232 @@
+// The key hierarchy described in decisions/0001.
+//
+//   Master Password + per-user salt
+//         | PBKDF2-SHA256, 600k
+//         v
+//    Master Key ---+--- HKDF "vault.kek.v1"      --> KEK, wraps the Vault Key
+//                  +--- HKDF "vault.auth.v1"     --> Auth Key, sent to server
+//
+//    Vault Key (random, generated once, never rotates)
+//         +-- wrapped by KEK           (master password path)
+//         +-- wrapped by Recovery KEK  (recovery key path)
+//
+// The Auth Key and the KEK are separate HKDF branches of the same Master Key.
+// The server necessarily sees the Auth Key on every login; because HKDF is not
+// invertible and the two labels are domain-separated, that reveals nothing
+// about the KEK and therefore nothing about the vault.
+//
+// The Vault Key indirection is what makes changing the master password a single
+// write: the new password produces a new KEK, the Vault Key is rewrapped, and
+// not one entry is touched.
+
+import { fromRecoveryString, toBase64Url, toRecoveryString, utf8Encode } from './encoding.js'
+import { hkdfSha256, pbkdf2Sha256 } from './primitives.js'
+import { randomBytes } from './random.js'
+import { seal, unseal } from './aead.js'
+
+/** OWASP's 2023 floor for PBKDF2-HMAC-SHA256. Stored per user rather than
+ *  assumed, so it can be raised for new accounts without breaking existing
+ *  ones. */
+export const PBKDF2_ITERATIONS = 600_000
+
+export const SALT_BYTES = 32
+export const KEY_BYTES = 32
+
+/** HKDF domain separation. Changing any of these strings changes every key
+ *  derived from it, which would make existing vaults undecryptable — they are
+ *  versioned for that reason and must never be edited in place. */
+const INFO_KEK = 'vault.kek.v1'
+const INFO_AUTH = 'vault.auth.v1'
+const INFO_RECOVERY = 'vault.recovery.v1'
+
+/** Bound into each wrapped Vault Key as additional authenticated data, so the
+ *  recovery blob cannot be substituted for the master blob or the reverse. */
+const AAD_WRAP_MASTER = 'vault.wrap.master.v1'
+const AAD_WRAP_RECOVERY = 'vault.wrap.recovery.v1'
+
+export interface KdfParams {
+  algorithm: 'PBKDF2-HMAC-SHA256'
+  iterations: number
+  /** base64url. Generated per user; never derived from the email address, so
+   *  that a password reused on another service cannot be attacked with
+   *  precomputed tables. */
+  salt: string
+}
+
+/** Case and surrounding whitespace must not produce different accounts. Applied
+ *  identically by the client before salt lookup and by the server before
+ *  hashing the address for storage. */
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+export function generateSalt(): Uint8Array {
+  return randomBytes(SALT_BYTES)
+}
+
+export function generateVaultKey(): Uint8Array {
+  return randomBytes(KEY_BYTES)
+}
+
+export function generateRecoveryKey(): Uint8Array {
+  return randomBytes(KEY_BYTES)
+}
+
+export { toRecoveryString as formatRecoveryKey, fromRecoveryString as parseRecoveryKey }
+
+export async function deriveMasterKey(
+  password: string,
+  salt: Uint8Array,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<Uint8Array> {
+  return pbkdf2Sha256(utf8Encode(password.normalize('NFKC')), salt, iterations, KEY_BYTES)
+}
+
+/** HKDF with an empty salt: the input keying material is already the output of
+ *  600,000 PBKDF2 iterations over a salted password, so the extract step has
+ *  nothing further to add. RFC 5869 permits this and test case A.3 covers it. */
+async function branch(masterKey: Uint8Array, info: string): Promise<Uint8Array> {
+  return hkdfSha256(masterKey, new Uint8Array(0), utf8Encode(info), KEY_BYTES)
+}
+
+export async function deriveKek(masterKey: Uint8Array): Promise<Uint8Array> {
+  return branch(masterKey, INFO_KEK)
+}
+
+export async function deriveAuthKey(masterKey: Uint8Array): Promise<Uint8Array> {
+  return branch(masterKey, INFO_AUTH)
+}
+
+export async function deriveRecoveryKek(recoveryKey: Uint8Array): Promise<Uint8Array> {
+  return branch(recoveryKey, INFO_RECOVERY)
+}
+
+export async function wrapVaultKey(
+  vaultKey: Uint8Array,
+  kek: Uint8Array,
+  purpose: 'master' | 'recovery',
+): Promise<string> {
+  const aad = utf8Encode(purpose === 'master' ? AAD_WRAP_MASTER : AAD_WRAP_RECOVERY)
+  return seal(kek, vaultKey, aad)
+}
+
+export async function unwrapVaultKey(
+  wrapped: string,
+  kek: Uint8Array,
+  purpose: 'master' | 'recovery',
+): Promise<Uint8Array> {
+  const aad = utf8Encode(purpose === 'master' ? AAD_WRAP_MASTER : AAD_WRAP_RECOVERY)
+  return unseal(kek, wrapped, aad)
+}
+
+// ── Account-level operations ────────────────────────────────────────────────
+
+/** Everything registration produces. `vaultKey` stays in memory; `recoveryKey`
+ *  is shown to the user once and never transmitted; the rest is sent to the
+ *  server, which can do nothing useful with any of it. */
+export interface NewAccount {
+  kdf: KdfParams
+  /** base64url. The only password-derived value the server ever receives. */
+  authKey: string
+  wrappedVaultKey: string
+  wrappedVaultKeyForRecovery: string
+  /** Crockford base32, hyphenated. Display once, then discard. */
+  recoveryKey: string
+  vaultKey: Uint8Array
+}
+
+export async function createAccount(
+  password: string,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<NewAccount> {
+  const salt = generateSalt()
+  const vaultKey = generateVaultKey()
+  const recoveryKey = generateRecoveryKey()
+
+  const masterKey = await deriveMasterKey(password, salt, iterations)
+  const [kek, authKey, recoveryKek] = await Promise.all([
+    deriveKek(masterKey),
+    deriveAuthKey(masterKey),
+    deriveRecoveryKek(recoveryKey),
+  ])
+  const [wrappedVaultKey, wrappedVaultKeyForRecovery] = await Promise.all([
+    wrapVaultKey(vaultKey, kek, 'master'),
+    wrapVaultKey(vaultKey, recoveryKek, 'recovery'),
+  ])
+
+  return {
+    kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations, salt: toBase64Url(salt) },
+    authKey: toBase64Url(authKey),
+    wrappedVaultKey,
+    wrappedVaultKeyForRecovery,
+    recoveryKey: toRecoveryString(recoveryKey),
+    vaultKey,
+  }
+}
+
+export interface Unlocked {
+  vaultKey: Uint8Array
+  /** base64url, to present to the server as proof of the password. */
+  authKey: string
+}
+
+/** Derive both branches and unwrap the Vault Key. Throws UnsealError when the
+ *  password is wrong, because the wrapped key then fails its authentication
+ *  tag — the client can therefore reject a bad password without asking the
+ *  server anything. */
+export async function unlock(
+  password: string,
+  kdf: KdfParams,
+  wrappedVaultKey: string,
+  salt: Uint8Array,
+): Promise<Unlocked> {
+  const masterKey = await deriveMasterKey(password, salt, kdf.iterations)
+  const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
+  const vaultKey = await unwrapVaultKey(wrappedVaultKey, kek, 'master')
+  return { vaultKey, authKey: toBase64Url(authKey) }
+}
+
+export async function unlockWithRecoveryKey(
+  recoveryKey: string,
+  wrappedVaultKeyForRecovery: string,
+): Promise<Uint8Array> {
+  const kek = await deriveRecoveryKek(fromRecoveryString(recoveryKey))
+  return unwrapVaultKey(wrappedVaultKeyForRecovery, kek, 'recovery')
+}
+
+/** What a master password change produces. The Vault Key is deliberately not
+ *  among these values: it does not change, so no entry is re-encrypted and
+ *  password history survives. */
+export interface ChangedPassword {
+  kdf: KdfParams
+  authKey: string
+  wrappedVaultKey: string
+}
+
+export async function changePassword(
+  newPassword: string,
+  vaultKey: Uint8Array,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<ChangedPassword> {
+  const salt = generateSalt()
+  const masterKey = await deriveMasterKey(newPassword, salt, iterations)
+  const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
+  return {
+    kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations, salt: toBase64Url(salt) },
+    authKey: toBase64Url(authKey),
+    wrappedVaultKey: await wrapVaultKey(vaultKey, kek, 'master'),
+  }
+}
+
+/** Issue a replacement recovery key, invalidating the previous one by
+ *  overwriting the blob it unwraps. Requires an unlocked vault. */
+export async function rotateRecoveryKey(
+  vaultKey: Uint8Array,
+): Promise<{ recoveryKey: string; wrappedVaultKeyForRecovery: string }> {
+  const recoveryKey = generateRecoveryKey()
+  const kek = await deriveRecoveryKek(recoveryKey)
+  return {
+    recoveryKey: toRecoveryString(recoveryKey),
+    wrappedVaultKeyForRecovery: await wrapVaultKey(vaultKey, kek, 'recovery'),
+  }
+}

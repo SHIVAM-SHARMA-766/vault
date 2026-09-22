@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  crypto:
+    name: crypto — typecheck, test, vectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # `npm ci` installs exactly the committed lockfile and fails if
+      # package.json and the lockfile disagree — see docs/threat-model.md, A8.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @vault/crypto
+
+      - name: Test
+        run: npm test --workspace @vault/crypto
+
+      # The crypto package must never acquire a runtime dependency. This is the
+      # single most valuable supply-chain target in the product, so the rule is
+      # enforced here rather than left to review.
+      - name: Assert no runtime dependencies
+        run: |
+          deps=$(node -p "Object.keys(require('./packages/crypto/package.json').dependencies ?? {}).join(' ')")
+          if [ -n "$deps" ]; then
+            echo "::error::@vault/crypto must have no runtime dependencies, found: $deps"
+            exit 1
+          fi
+          echo "confirmed: no runtime dependencies"
+
+      # Vectors are published values, cross-checked against independent
+      # implementations before being committed. Regenerating them from this
+      # package would make the tests self-confirming.
+      - name: Assert test vectors cite a published source
+        run: |
+          for f in packages/crypto/vectors/*.json; do
+            src=$(node -p "require('./$f').source || ''")
+            if [ -z "$src" ]; then
+              echo "::error::$f has no 'source' field naming where its vectors come from"
+              exit 1
+            fi
+            echo "$(basename "$f"): $src"
+          done
+
+  audit:
+    name: dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=moderate
