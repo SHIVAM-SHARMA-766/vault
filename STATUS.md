@@ -6,41 +6,46 @@ Last updated: 2026-09-22
 
 ## Right now
 
-**Phase 1 — the cryptography package.** `packages/crypto` is written, tested, and
-building. It has no runtime dependencies and implements no algorithm by hand: every
-primitive comes from Web Crypto, which resolves to the browser's implementation in a page
-and to Node's in the API and in tests.
+**Phase 2 — infrastructure, written but not applied.** The AWS stack is implemented in
+the `infra` repository under `stacks/aws` (see
+[decisions/0003](decisions/0003-where-infrastructure-is-defined.md)). It validates, and
+plans clean at 23 resources to add and nothing to destroy. **It has not been applied**,
+so no AWS resource exists yet.
 
-- 83 tests, 100% line and function coverage, 98% branch coverage.
-- 30 test vectors from RFC 7914, RFC 5869, RFC 4231, RFC 6238, and the GCM
-  specification. They were cross-checked against Python's `hashlib`/`hmac` and OpenSSL
-  before being committed, and are deliberately not generated from this implementation —
-  a vector produced by the code it tests passes whether or not that code is correct.
-- CI runs typecheck, tests, and `npm audit`, and fails the build if the crypto package
-  ever acquires a runtime dependency or if a vector file stops citing where it came from.
+The plan was checked against the constraints that keep the bill at zero, each asserted
+rather than assumed: DynamoDB provisioned at 25/25 with no autoscaling target and no
+secondary indexes, point-in-time recovery off, Lambda on arm64 and outside any VPC so no
+NAT gateway is implied, log retention set explicitly, the Function URL IAM-signed, and no
+API Gateway, Secrets Manager, or NAT gateway anywhere in the plan.
 
-Phase 0 is complete: the repository, the three design documents, and a $1 monthly budget
-on the AWS account alerting at 50% and 100% of actual spend and on a forecast overrun.
-The account itself was verified empty on 2026-09-22 — seventeen regions swept, nothing
-running, daily spend zero.
+Phase 1 is complete: `packages/crypto`, 83 tests, 100% line and function coverage, 30
+vectors from published standards, CI green.
+
+Phase 0 is complete: the repository, the design documents, and a $1 monthly budget with
+alerts at 50% and 100% of actual spend and on a forecast overrun.
 
 ## Next
 
-1. **Terraform** — DynamoDB at provisioned 25/25 with autoscaling off, Lambda and its
-   Function URL, S3 and CloudFront with an Origin Access Control, SSM parameters,
-   least-privilege IAM.
-2. **API** — the Lambda handler, scrypt verifier over the client-supplied Auth Key,
+1. **Apply the AWS stack.** `make apply STACK=aws` in the `infra` repository. The
+   CloudFront distribution takes around fifteen minutes to reach a deployed state.
+2. **Set the two server secrets out of band.** Terraform creates the SSM parameters with
+   a placeholder and ignores their values thereafter, because a value passed through
+   Terraform is written to the state file in plaintext — a different security boundary
+   from the parameter store.
+3. **API** — the Lambda handler, scrypt verifier over the client-supplied Auth Key,
    short-lived access tokens with refresh rotation, and the decoy-salt response that
    keeps the login endpoint from confirming whether an address is registered.
-3. **Web client** — the SPA, served under a strict Content-Security-Policy.
-4. **Hardening** — static analysis, and the security headers the threat model requires
-   on the CloudFront distribution.
-5. **Backups and monitoring** — scheduled encrypted export to S3, CloudWatch alarms.
+4. **Web client** — the SPA. The Content-Security-Policy it must satisfy is already
+   declared on the CloudFront distribution: no inline script, no eval, and `img-src` with
+   no remote hosts, so site favicons cannot be fetched from a third party.
+5. **CI deploy** — sync the built client to S3, invalidate the distribution, update the
+   function's code. The three Terraform outputs it needs are the bucket, the distribution
+   id, and the function name.
+6. **Backups and monitoring** — scheduled encrypted export to S3, CloudWatch alarms.
 
 Later, once the vault is stable: the marketing site, the admin surface, and the Android
-client. The Android client is the structural answer to the browser-delivered-code threat
-in [docs/threat-model.md](docs/threat-model.md); it will assert against the same vector
-files `packages/crypto` does, which is why those exist before it is written.
+client. The Android client asserts against the same vector files `packages/crypto` does,
+which is why those exist before it is written.
 
 ## Open questions
 
@@ -53,6 +58,9 @@ files `packages/crypto` does, which is why those exist before it is written.
   reviewed, dependency-light WebAssembly implementation becomes available.
 
 ## Recently done
+
+**2026-09-22 — AWS stack written.** Table, function, URL, distribution, buckets, role,
+and parameters, in the `infra` repository. Not applied.
 
 **2026-09-22 — `packages/crypto` written.** Key hierarchy, sealed-blob format, entry and
 folder encryption, TOTP. No runtime dependencies. Vectors from published standards,
