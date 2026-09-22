@@ -10,15 +10,17 @@ Last updated: 2026-09-22
 account was verified empty on 2026-09-22: seventeen regions swept, no compute, storage,
 network, or data resources, and a daily spend of zero.
 
-Done in this phase:
+**Phase 0 is complete.**
 
 - Repository created, cryptographic design and storage model decided and recorded, threat
   model written.
-
-Remaining in this phase:
-
-- A billing guardrail on the AWS account. There is currently no budget and no billing
-  alarm, which is how an earlier ₹1,470 charge went unnoticed until after the fact.
+- A billing guardrail exists on the AWS account: a $1 monthly cost budget named
+  `personal-account-monthly`, alerting to developer.shivamsharma@gmail.com at 50% of
+  actual spend, at 100% of actual spend, and on a forecast that would exceed the limit.
+  There was previously no budget and no billing alarm, which is how an earlier
+  ₹1,470 charge went unnoticed until after it had been incurred. The limit is set at $1
+  rather than a realistic ceiling because the intended steady state is zero; any alert at
+  all means something unexpected is running.
 
 ## Next
 
