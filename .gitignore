@@ -30,3 +30,4 @@ build/
 .vscode/
 coverage/
 dist-coverage/
+dist-bundle/

@@ -86,6 +86,15 @@ base32 string, and displays it exactly once. It is passed through HKDF
 (`info="vault.recovery.v1"`) to produce a second Key Encryption Key, which wraps the same
 Vault Key into a second stored blob.
 
+The recovery key has a **second HKDF branch** (`info="vault.recovery.auth.v1"`) serving
+the same purpose for recovery that the Auth Key serves for the master password. Recovery
+is used precisely when the master password is gone, so the usual Auth Key cannot be
+produced — but the server must still not release the recovery-wrapped Vault Key to an
+unauthenticated caller, and must not release it to someone merely claiming to own the
+address. The recovery proof lets the recovery key authenticate itself; because the branch
+is domain-separated, seeing it tells the server nothing about the Recovery Key Encryption
+Key.
+
 Losing the master password is recoverable with the recovery key. Losing both is not, and
 the server cannot help. This is a property of the design, not a defect.
 

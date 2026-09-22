@@ -209,3 +209,38 @@ test('the production iteration count is the OWASP floor', async () => {
   assert.equal(account.kdf.iterations, 600_000)
   assert.equal(toBase64Url(fromBase64Url(account.kdf.salt)), account.kdf.salt)
 })
+
+test('the recovery key can prove itself without revealing its KEK', async () => {
+  // Recovery is used when the master password is gone, so the usual auth key
+  // cannot be produced. The server still must not hand the recovery-wrapped
+  // vault key to an unauthenticated caller, so the recovery key gets its own
+  // authentication branch — separate from the branch that unwraps the vault.
+  const { deriveRecoveryAuthKey, deriveRecoveryKek, deriveRecoveryProof, parseRecoveryKey: parse } =
+    await import('../src/index.js')
+
+  const account = await createAccount('a-long-enough-master-password', FAST)
+  const bytes = parse(account.recoveryKey)
+
+  const authBranch = await deriveRecoveryAuthKey(bytes)
+  const kekBranch = await deriveRecoveryKek(bytes)
+  assert.notEqual(toHex(authBranch), toHex(kekBranch), 'the two branches differ')
+
+  // What the client sends at recovery time must match what was stored at signup.
+  assert.equal(await deriveRecoveryProof(account.recoveryKey), account.recoveryAuthKey)
+})
+
+test('a recovery proof is reproducible from a retyped key', async () => {
+  const { deriveRecoveryProof } = await import('../src/index.js')
+  const account = await createAccount('a-long-enough-master-password', FAST)
+  const retyped = account.recoveryKey.toLowerCase().replace(/-/g, ' ')
+  assert.equal(await deriveRecoveryProof(retyped), account.recoveryAuthKey)
+})
+
+test('rotating the recovery key also rotates its proof', async () => {
+  const account = await createAccount('a-long-enough-master-password', FAST)
+  const rotated = await rotateRecoveryKey(account.vaultKey)
+  assert.notEqual(rotated.recoveryAuthKey, account.recoveryAuthKey)
+
+  const { deriveRecoveryProof } = await import('../src/index.js')
+  assert.equal(await deriveRecoveryProof(rotated.recoveryKey), rotated.recoveryAuthKey)
+})

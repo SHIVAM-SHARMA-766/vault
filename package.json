@@ -5,7 +5,8 @@
   "description": "Zero-knowledge password manager.",
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "services/*"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

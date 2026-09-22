@@ -39,6 +39,13 @@ const INFO_KEK = 'vault.kek.v1'
 const INFO_AUTH = 'vault.auth.v1'
 const INFO_RECOVERY = 'vault.recovery.v1'
 
+/** The recovery key's authentication branch. Recovery happens when the master
+ *  password is gone, so the usual auth key cannot be produced — but the server
+ *  still must not hand the recovery-wrapped vault key to an unauthenticated
+ *  caller. This branch lets the recovery key prove itself, exactly as the
+ *  master password does through INFO_AUTH, without revealing the recovery KEK. */
+const INFO_RECOVERY_AUTH = 'vault.recovery.auth.v1'
+
 /** Bound into each wrapped Vault Key as additional authenticated data, so the
  *  recovery blob cannot be substituted for the master blob or the reverse. */
 const AAD_WRAP_MASTER = 'vault.wrap.master.v1'
@@ -101,6 +108,10 @@ export async function deriveRecoveryKek(recoveryKey: Uint8Array): Promise<Uint8A
   return branch(recoveryKey, INFO_RECOVERY)
 }
 
+export async function deriveRecoveryAuthKey(recoveryKey: Uint8Array): Promise<Uint8Array> {
+  return branch(recoveryKey, INFO_RECOVERY_AUTH)
+}
+
 export async function wrapVaultKey(
   vaultKey: Uint8Array,
   kek: Uint8Array,
@@ -130,6 +141,9 @@ export interface NewAccount {
   authKey: string
   wrappedVaultKey: string
   wrappedVaultKeyForRecovery: string
+  /** base64url. Proves possession of the recovery key without revealing it,
+   *  so the server can release the recovery-wrapped vault key. */
+  recoveryAuthKey: string
   /** Crockford base32, hyphenated. Display once, then discard. */
   recoveryKey: string
   vaultKey: Uint8Array
@@ -144,10 +158,11 @@ export async function createAccount(
   const recoveryKey = generateRecoveryKey()
 
   const masterKey = await deriveMasterKey(password, salt, iterations)
-  const [kek, authKey, recoveryKek] = await Promise.all([
+  const [kek, authKey, recoveryKek, recoveryAuthKey] = await Promise.all([
     deriveKek(masterKey),
     deriveAuthKey(masterKey),
     deriveRecoveryKek(recoveryKey),
+    deriveRecoveryAuthKey(recoveryKey),
   ])
   const [wrappedVaultKey, wrappedVaultKeyForRecovery] = await Promise.all([
     wrapVaultKey(vaultKey, kek, 'master'),
@@ -159,9 +174,17 @@ export async function createAccount(
     authKey: toBase64Url(authKey),
     wrappedVaultKey,
     wrappedVaultKeyForRecovery,
+    recoveryAuthKey: toBase64Url(recoveryAuthKey),
     recoveryKey: toRecoveryString(recoveryKey),
     vaultKey,
   }
+}
+
+/** Prove possession of a recovery key, so the server will release the
+ *  recovery-wrapped vault key. Derived from the recovery key alone — the master
+ *  password is by definition unavailable when this is used. */
+export async function deriveRecoveryProof(recoveryKey: string): Promise<string> {
+  return toBase64Url(await deriveRecoveryAuthKey(fromRecoveryString(recoveryKey)))
 }
 
 export interface Unlocked {
@@ -222,11 +245,15 @@ export async function changePassword(
  *  overwriting the blob it unwraps. Requires an unlocked vault. */
 export async function rotateRecoveryKey(
   vaultKey: Uint8Array,
-): Promise<{ recoveryKey: string; wrappedVaultKeyForRecovery: string }> {
+): Promise<{ recoveryKey: string; wrappedVaultKeyForRecovery: string; recoveryAuthKey: string }> {
   const recoveryKey = generateRecoveryKey()
-  const kek = await deriveRecoveryKek(recoveryKey)
+  const [kek, authKey] = await Promise.all([
+    deriveRecoveryKek(recoveryKey),
+    deriveRecoveryAuthKey(recoveryKey),
+  ])
   return {
     recoveryKey: toRecoveryString(recoveryKey),
     wrappedVaultKeyForRecovery: await wrapVaultKey(vaultKey, kek, 'recovery'),
+    recoveryAuthKey: toBase64Url(authKey),
   }
 }

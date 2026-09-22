@@ -62,6 +62,34 @@ jobs:
             echo "$(basename "$f"): $src"
           done
 
+  api:
+    name: api — typecheck, test, bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @vault/api
+
+      - name: Test
+        run: npm test --workspace @vault/api
+
+      # A bundle that compiles but does not load is a deploy that fails after
+      # the function has already been updated.
+      - name: Bundle and load
+        working-directory: services/api
+        run: |
+          npm run bundle
+          node -e "import('./dist-bundle/index.mjs').then(m => {
+            if (typeof m.handler !== 'function') { throw new Error('no handler export') }
+            console.log('bundle loads, handler exported')
+          })"
+
   audit:
     name: dependency audit
     runs-on: ubuntu-latest
