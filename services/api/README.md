@@ -1,7 +1,6 @@
 # @vault/api
 
-The vault's API. One Lambda function behind a Function URL, reachable only through
-CloudFront.
+The vault's API. One Node process listening on localhost, behind Caddy on a single host.
 
 Design: [decisions/0001](../../decisions/0001-cryptography-and-key-hierarchy.md) for what
 the server is and is not told, [decisions/0002](../../decisions/0002-storage-and-data-model.md)
@@ -13,9 +12,9 @@ against.
 Nothing it could use. It holds ciphertext, an scrypt verifier of a key derived through a
 branch that cannot be worked backwards, and an HMAC digest of the account's address.
 
-- **The master password never arrives.** The client sends an **Auth Key**, a separate
-  HKDF branch of the master key. Seeing every Auth Key ever sent reveals nothing about
-  the key that decrypts the vault.
+- **The master password never arrives.** The client sends an **Auth Key**, a separate HKDF
+  branch of the master key. Seeing every Auth Key ever sent reveals nothing about the key
+  that decrypts the vault.
 - **Entry contents, names, tags, and folder membership are all inside one sealed blob.**
   The API validates that a blob has the right shape and size. It cannot validate anything
   about its contents, and does not try.
@@ -44,49 +43,56 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 
 ## Decisions worth knowing before changing anything
 
-**The access token arrives in `x-vault-auth`, not `Authorization`.** This is forced by
-the deployment: CloudFront reaches the Function URL through an Origin Access Control, and
-must populate `Authorization` with its own SigV4 signature to satisfy the URL's IAM auth.
-An origin request policy that forwards the viewer's `Authorization` leaves CloudFront's
-signature unset, and the Function URL then answers 403 *without invoking the function* —
-no log stream, no metric, and a status easily mistaken for the access control working
-correctly. The custom header has an incidental benefit: a cross-origin form cannot set
-one, so the token cannot be replayed by a cross-site request the way a cookie could.
+**The access token arrives in `x-vault-auth`, not `Authorization`.** A cross-origin form
+cannot set a custom header, so the token cannot be replayed by a cross-site request and
+the API needs no separate CSRF defence. A token sent in `Authorization` is rejected, and a
+test asserts that — accepting both would make the property true only for clients that
+happen to use the custom header. See
+[decisions/0004](../../decisions/0004-the-access-token-header.md).
 
 **Tokens are not JWTs.** A JWT names its own algorithm in a header the verifier is then
 expected to trust, which is the root of the "alg: none" and algorithm-confusion bugs.
-These tokens are `v1.<payload>.<HMAC-SHA256>` with one algorithm, named nowhere, and
-therefore not negotiable.
+These are `v1.<payload>.<HMAC-SHA256>` with one algorithm, named nowhere, and therefore
+not negotiable.
 
 **Refresh tokens rotate, and a replay revokes everything.** A refresh token presented
-twice means the legitimate client already rotated it away — the signature of a stolen
-one. Every session is dropped; the owner signs in again, the thief cannot.
+twice means the legitimate client already rotated it away — the signature of a stolen one.
+Every session is dropped; the owner signs in again, the thief cannot.
 
-**An unknown address and a wrong password are indistinguishable.** Same status, same
-body, and the verifier runs against a dummy so the timing matches too. `prelogin` returns
-a decoy salt derived under the pepper, stable per address and uniformly distributed.
+**An unknown address and a wrong password are indistinguishable.** Same status, same body,
+and the verifier runs against a dummy so the timing matches too. `prelogin` returns a
+decoy salt derived under the pepper, stable per address and uniformly distributed.
 Breaking any of this turns the login endpoint into an account-enumeration oracle.
 
 **Registration is closed unless `ALLOW_REGISTRATION=true`.** A missing or misspelled
-setting refuses rather than leaving the vault open to whoever finds the URL. Open it for
-the first signup, then close it.
+setting refuses rather than leaving the vault open to whoever finds the address.
 
 **The iteration floor is enforced server-side.** The client is the thing an attacker
 controls; a registration claiming 1,000 iterations would leave the wrapped vault key open
 to offline attack.
 
-**`Scan` is not in the IAM policy and no code path needs it.** Every read is a query on
-one user's partition or a point lookup.
+**The service refuses to start on a weak or placeholder secret.** A vault that comes up
+with a guessable pepper is worse than one that does not come up, because nothing about it
+looks wrong.
+
+## Storage
+
+Everything the API does to storage goes through a five-method `Store` interface:
+`get`, `put`, `delete`, `query`, `increment`. There are two implementations —
+`store-nosql.ts` for Oracle NoSQL, and an in-memory one in the tests.
+
+That interface is the reason moving off the previous platform cost an afternoon rather
+than a rewrite. It is worth keeping narrow.
 
 ## Development
 
 ```sh
 npm run typecheck
-npm test            # 47 tests against an in-memory store — no AWS needed
-npm run bundle      # single-file ESM for Lambda
+npm test            # 48 tests against an in-memory store — no cloud account needed
+npm run bundle      # single file for the host; no npm install there
 ```
 
 The tests drive the real routes through an in-memory `Store` with the same semantics the
-DynamoDB one provides: point lookups, conditional writes, sort-key prefix queries, and
-atomic counters. `store-dynamo.ts` is the only module without coverage, because it is the
-adapter those semantics are borrowed from.
+NoSQL one provides: point lookups, conditional writes, sort-key prefix queries, and
+counters that refuse a lost race. `store-nosql.ts` is the only module without coverage,
+because it is the adapter those semantics are borrowed from.

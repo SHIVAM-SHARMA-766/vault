@@ -3,48 +3,53 @@
 Operational procedures. Written for whoever is doing this at 2am, which is the same
 person who built it and will not remember.
 
-Infrastructure lives in the `infra` repository under `stacks/aws`; see
-[decisions/0003](../decisions/0003-where-infrastructure-is-defined.md). Every command
-below assumes `AWS_PROFILE=aws-shivamsharma` unless it says otherwise.
+Everything this project runs on is declared in [`infra/`](../infra/) and provisioned from
+there. There is nothing to configure in a console, and nothing about this project lives in
+another repository.
 
 ## First deploy
 
 ```sh
-cd ~/shivam/infra
-make plan STACK=aws        # read it; 0 to destroy is the only acceptable plan
-make apply STACK=aws       # CloudFront takes ~15 minutes to reach Deployed
-make output STACK=aws
+cd infra
+./bootstrap/create-state-bucket.sh     # once, ever — Terraform cannot create its own state bucket
+cp terraform.tfvars.example terraform.tfvars   # fill it in
+terraform init
+terraform plan                          # read it; 0 to destroy is the only acceptable plan
+terraform apply
+terraform output public_ip
 ```
 
-The distribution reports `InProgress` for some minutes after Terraform returns. That is
-CloudFront propagating, not a failure.
+**Point the DuckDNS record at that address before the instance finishes booting.** Caddy
+requests a certificate on first start, and the ACME challenge fails if the name does not
+resolve to the host. If it does fail, fix the record and `systemctl restart caddy`.
 
 ## Setting the server secrets
 
-**The API refuses to start until this is done.** Terraform creates both parameters with a
-placeholder it then ignores, because a value passed through Terraform is written to the
-state file in plaintext — a different security boundary from Parameter Store, and one
-that gets copied to laptops and CI runners. The handler checks for the placeholder and
-throws rather than running with a secret anyone could read out of a plan.
+Two values the API needs, both kept off disk in the repository and out of Terraform state:
+
+- **`server-pepper`** keys the HMAC that turns an email address into a database key, and
+  the decoy salt returned for unknown addresses.
+- **`token-signing-key`** signs access and refresh tokens.
+
+Generate and install them on the host:
 
 ```sh
-export AWS_PROFILE=aws-shivamsharma
-aws ssm put-parameter --name /vault/server-pepper --type SecureString \
-  --overwrite --value "$(openssl rand -base64 32)"
-aws ssm put-parameter --name /vault/token-signing-key --type SecureString \
-  --overwrite --value "$(openssl rand -base64 48)"
+sudo install -o vault -g vault -m 0600 /dev/null /srv/vault/api/run/secrets.env
+sudo tee /srv/vault/api/run/secrets.env >/dev/null <<EOT
+SERVER_PEPPER=$(openssl rand -base64 32)
+TOKEN_SIGNING_KEY=$(openssl rand -base64 48)
+EOT
+sudo systemctl restart vault-api
 ```
 
-### What each one does, and what rotating it costs
+### What rotating each one costs
 
-**`server-pepper`** keys the HMAC that turns an email address into a database key, and the
-decoy salt returned for unknown addresses. **Rotating it orphans every existing account** —
-the digest changes, so the login pointer can no longer be found. Treat it as permanent.
-If it must be rotated, every account has to be re-registered.
+**`server-pepper`: rotating it orphans every existing account.** The email digest changes,
+so the login pointer can no longer be found. Treat it as permanent; if it must change,
+every account has to be registered again.
 
-**`token-signing-key`** signs access and refresh tokens. Rotating it logs everyone out and
-costs nothing else. Safe to do at any time, and the right response to any suspicion that
-it leaked.
+**`token-signing-key`: rotating it logs everyone out and costs nothing else.** Safe at any
+time, and the right response to any suspicion that it leaked.
 
 ## Opening registration for the first account
 
@@ -52,88 +57,106 @@ Registration is closed unless `ALLOW_REGISTRATION` is exactly `"true"`, so a mis
 misspelled value refuses rather than leaving the vault open to whoever finds the URL.
 
 ```sh
-cd ~/shivam/infra
-# stacks/aws/terraform.tfvars
-echo 'allow_registration = true' >> stacks/aws/terraform.tfvars
-make apply STACK=aws
+sudo systemctl edit vault-api        # add: Environment=ALLOW_REGISTRATION=true
+sudo systemctl restart vault-api
 ```
 
-Register, **write the recovery key down before closing the browser tab** — it is shown
-once and never transmitted again — then close registration:
+Register, **write the recovery key down before closing the tab** — it is shown once and
+never transmitted again — then close registration the same way and restart.
+
+## Idle reclamation, which is the thing most likely to bite
+
+Oracle may reclaim an always-free instance whose **CPU, network and memory** all stay
+below 20% for seven days. A single-user vault is idle almost all the time.
+
+The wording is conjunctive, so the first move is to measure rather than assume:
 
 ```sh
-sed -i 's/allow_registration = true/allow_registration = false/' stacks/aws/terraform.tfvars
-make apply STACK=aws
+free -m                 # memory used, against 1 GB — 200 MB is 20%
+uptime                  # load
+vmstat 5 5              # sustained CPU
 ```
+
+Caddy plus a Node process on a 1 GB instance plausibly holds memory above 20% on its own.
+If several days of measurement say otherwise, a keep-warm loop is the blunt answer:
+
+```sh
+# /etc/systemd/system/keep-warm.service — burns one core on purpose.
+# Only add this if measurement shows it is needed.
+[Service]
+ExecStart=/usr/bin/nice -n 19 /bin/sh -c 'while :; do :; done'
+CPUQuota=50%
+Restart=always
+```
+
+Also check in the OCI console whether the tenancy is Always Free or has been upgraded to
+Pay As You Go. Reclamation applies to always-free-only accounts, so an upgraded tenancy
+makes this whole section moot.
 
 ## Deploying code
 
-CI owns the function's code; Terraform only provisions it and ignores changes to it
-thereafter. An `apply` run for an unrelated reason therefore cannot roll the API back to
-its placeholder.
-
 ```sh
-cd ~/shivam/vault
-npm test                                      # both workspaces
+npm test                                # both workspaces
 npm run bundle --workspace @vault/api
-# then: update-function-code, s3 sync, create-invalidation
+npm run build --workspace @vault/web
+# then rsync the bundle to /srv/vault/api and the client to /srv/vault/web,
+# and: sudo systemctl restart vault-api
 ```
 
-## When the budget alert fires
+Caddy needs no restart for a client deploy; it serves whatever is on disk.
 
-The budget is USD 1 a month with alerts at 50%, at 100%, and on a forecast overrun. The
-intended steady state is zero, so **any alert means something unexpected is running.**
+## Getting on the host
+
+SSH is unreachable by default: `ssh_allowed_cidr` is an empty list, so no ingress rule
+exists. Leaving SSH open to the internet on the host that serves a password manager is not
+a trade worth making for convenience — an earlier network in this tenancy did exactly
+that, and it is not repeated here.
+
+To get in, set the variable to a single address, apply, do the work, then empty it and
+apply again:
 
 ```sh
-export AWS_PROFILE=aws-shivamsharma
-aws ce get-cost-and-usage --time-period Start=$(date -u +%Y-%m-01),End=$(date -u +%Y-%m-%d) \
-  --granularity MONTHLY --metrics UnblendedCost \
-  --group-by Type=DIMENSION,Key=SERVICE --output table
+terraform apply -var 'ssh_allowed_cidr=["'"$(curl -s https://api.ipify.org)"'/32"]'
+# ... work ...
+terraform apply
 ```
 
-The usual culprits, in order of likelihood:
+The OCI console's serial connection works without any of this and is the better option
+for a host that will not boot.
 
-| Symptom | Cause |
-|---|---|
-| `EC2 - Other` or `Virtual Private Cloud` | A public IPv4 address, or a NAT gateway. Nothing in this stack creates either |
-| `DynamoDB` above zero | Capacity mode changed to on-demand, or an autoscaling target was added. Both must never exist — see `stacks/aws/dynamodb.tf` |
-| `Secrets Manager` | Something migrated off Parameter Store. It bills per secret per month |
-| `API Gateway` | Something replaced the Function URL. Its free tier expires after twelve months; Lambda's does not |
+## When something looks wrong
 
-### Verifying the account is actually empty
+```sh
+systemctl status vault-api caddy
+journalctl -u vault-api -n 100 --no-pager
+journalctl -u caddy -n 50 --no-pager
+curl -s https://<hostname>/api/health
+```
 
-**Do not run a sweep with the query inline in `$( )`.** Backticks are still interpreted by
-the shell there, so a JMESPath filter such as ``State.Name!=`terminated` `` is silently
-mangled into invalid syntax; the CLI errors, and empty output reads as "nothing found".
-This produced a false all-clear on 2026-09-22. Put the queries in a script file, and do
-not discard stderr.
-
-Also note that Cost Explorer lags for the current day: a reading of zero for today means
-"not reported yet", not "nothing is running".
+A 502 from Caddy means the API is down; a connection refused means Caddy is. A
+certificate error usually means the DuckDNS record is pointing somewhere else.
 
 ## Recovering the vault
 
-Backups are a scheduled export of the DynamoDB table to S3. The exported items are
-ciphertext the server holds no key for, so a leaked export is no worse than a leaked
-table and needs no protection the table does not already have.
+The data lives in Oracle NoSQL, not on the instance, so losing the host loses the service
+and not the vault. Rebuilding is `terraform apply` and a deploy.
+
+Exports are written to the Object Storage bucket on a schedule. They are ciphertext the
+server holds no key for, so a leaked export is no worse than a leaked table.
 
 ```sh
-aws s3 ls s3://vault-backups-505521407909/
+oci os object list --bucket-name vault-backups
 ```
-
-Restoring means writing the items back into the table. The vault key is unaffected by any
-of this — it lives only in wrapped form, and only the master password or the recovery key
-can unwrap it.
 
 **If both the master password and the recovery key are gone, the vault is gone.** The
 server cannot help; that is the design working, not a failure. See
-[decisions/0001](../decisions/0001-cryptography-and-key-hierarchy.md).
+[0001](../decisions/0001-cryptography-and-key-hierarchy.md).
 
-## Tearing the stack down
+## Tearing it down
 
-The table carries both AWS deletion protection and Terraform's `prevent_destroy`, so
-`terraform destroy` refuses twice. That is deliberate: it is the vault.
+The NoSQL table carries `prevent_destroy`, so `terraform destroy` refuses. That is
+deliberate: it is the vault.
 
 To genuinely remove it, take an export first, then remove `prevent_destroy` from
-`dynamodb.tf` and set `deletion_protection_enabled = false`, apply, and only then destroy.
-Three deliberate steps, which is the point.
+`infra/nosql.tf`, apply, and only then destroy. Three deliberate steps, which is the
+point.

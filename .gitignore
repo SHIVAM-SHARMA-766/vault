@@ -21,7 +21,10 @@ build/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
-.terraform.lock.hcl
+
+# .terraform.lock.hcl is deliberately NOT ignored. It pins provider versions
+# and their checksums, which is the only thing making `terraform init`
+# reproducible across machines and over time.
 
 # Local tooling
 .DS_Store

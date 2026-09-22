@@ -84,8 +84,10 @@ export function harness(options: { allowRegistration?: boolean } = {}): Harness 
   const app: App = {
     store,
     config: {
+      region: 'ap-mumbai-1',
       tableName: 'vault-test',
-      region: 'ap-south-1',
+      bucket: 'vault-test-backups',
+      namespace: 'test-namespace',
       pepper: 'test-pepper-not-a-real-secret',
       tokenKey: 'test-token-key-not-a-real-secret',
     },

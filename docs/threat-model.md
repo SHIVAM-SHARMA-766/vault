@@ -28,39 +28,34 @@ architecture changes. Last reviewed 2026-09-22, against the deployed system rath
   └────────────┬───────────────┘
                │  HTTPS, ciphertext + Auth Key only
   ┌────────────▼───────────────┐
-  │  UNTRUSTED                 │   CloudFront, S3, Lambda, DynamoDB,
-  │  All server infrastructure │   AWS operators, backups
-  └────────────────────────────┘
+  │  UNTRUSTED                 │   the host, Caddy, the API process,
+  │  All server infrastructure │   NoSQL, Object Storage, cloud
+  └────────────────────────────┘   operators, backups
 ```
 
 The design assumption is that everything below the boundary is hostile. A full compromise
-of the AWS account should yield ciphertext and nothing else.
+of the host and the cloud tenancy should yield ciphertext and nothing else.
 
 ## Adversaries and what stops them
 
 ### A1 — Network attacker on the path
 
-Reads or modifies traffic between browser and API.
+Reads or modifies traffic between browser and server.
 
 Stopped by TLS everywhere, HSTS with a long max-age, and the fact that plaintext never
-crosses the boundary in the first place. Modification of the *application* is the more
-serious version of this threat — see A3.
+crosses the boundary in the first place. Caddy obtains and renews the certificate itself
+and redirects plain HTTP; port 80 exists only so the certificate can be issued.
 
-**The TLS floor cannot be raised on this deployment.** CloudFront only honours a
-`minimum_protocol_version` when the distribution uses a custom ACM or IAM certificate; on
-the default `*.cloudfront.net` certificate the setting is silently discarded and the
-value stays at TLSv1. Verified with `openssl s_client`: the distribution completes a
-handshake at TLS 1.0, 1.1, 1.2 and 1.3. Raising the floor requires a custom domain, which
-the placement decision rules out.
+The TLS floor is whatever Caddy negotiates, which is 1.2 and above — unlike the previous
+deployment, where the platform's default certificate fixed it at 1.0. This is one of the
+few things the move to a single host improved.
 
-Every current browser refuses TLS 1.0 and 1.1 outright, so a browser client negotiates
-1.2 or 1.3 regardless of what the server would accept. The exposure is therefore to
-non-browser clients, and the mitigation belongs there: **the Android client must require
-TLS 1.2 or better itself** rather than relying on the server to refuse anything less.
+Modification of the *application* is the more serious version of this threat, and on this
+deployment it has a specific shape — see A3.
 
 ### A2 — Database or backup disclosure
 
-Obtains a dump of the DynamoDB table or an S3 export.
+Obtains a dump of the NoSQL table or an export from Object Storage.
 
 Every entry field is AES-256-GCM ciphertext under a key derived from a password the
 server has never seen ([0001](../decisions/0001-cryptography-and-key-hierarchy.md)). Email
@@ -75,39 +70,50 @@ is enforced at signup.
 ### A3 — Malicious or modified application code
 
 The highest-severity threat in any browser-delivered encryption product, and the one that
-bypasses all of the above. If an attacker can alter the JavaScript the browser executes,
-they can exfiltrate the master password directly and every other control becomes
-irrelevant.
+bypasses everything above. An attacker who can alter the JavaScript the browser executes
+can exfiltrate the master password directly, and every other control becomes irrelevant.
 
 Controls:
 
-- HTTPS is mandatory. The S3 website endpoint is HTTP-only and is therefore never
-  exposed; CloudFront is the sole entry point, with the bucket reachable only through an
-  Origin Access Control.
+- HTTPS only. Caddy redirects plain HTTP and serves nothing over it.
 - A strict Content-Security-Policy with no `unsafe-inline` and no `unsafe-eval`,
-  constraining `connect-src` to the API origin so that injected code cannot exfiltrate to
-  an arbitrary host.
+  restricting `connect-src` to `'self'` so that injected code cannot exfiltrate to an
+  arbitrary host. The client and the API share an origin precisely so this can be said.
+- `img-src` names no remote host. Fetching site favicons from a third party would tell
+  that third party which services the vault holds accounts for, which is most of what the
+  encryption protects.
 - Subresource Integrity on built assets.
-- Write access to the bucket and the distribution restricted to a deployment role with no
-  other permissions; deploys originate only from CI on the default branch.
 - A deliberately small dependency tree, and zero third-party dependencies in the
-  cryptographic package, so that a compromised transitive package cannot reach the key
-  material.
+  cryptographic package, so a compromised transitive package cannot reach key material.
+- The service runs unprivileged under systemd with `ProtectSystem=strict`, so a flaw in
+  the API cannot rewrite the files Caddy serves.
 
-This threat is mitigated, not eliminated. It is the strongest argument for the native
-client, and the reason the Android app exists on the roadmap.
+**The unmitigated part, stated plainly.** The hostname is a free dynamic-DNS name. Whoever
+controls that name — the dynamic-DNS operator, or anyone who takes over the account at it
+— can point it at their own server, obtain a valid certificate for it from any public CA,
+and serve whatever JavaScript they like. None of the controls above apply, because the
+browser is talking to them, legitimately, over a valid certificate.
 
-### A4 — Compromised API or AWS account
+That is materially worse than a compromise of this server, which yields only ciphertext
+and auth keys. Here the attacker gets the master password and therefore the vault.
 
-Code execution on Lambda, or stolen AWS credentials.
+This is accepted knowingly. It is the reason
+[0003](../decisions/0003-running-everything-on-oci.md) keeps buying a domain on the table
+as the cheapest available security improvement, and it is the strongest argument for the
+native Android client, which is not delivered over the web at all.
+
+### A4 — Compromised server
+
+Code execution on the instance, or a stolen cloud credential.
 
 Yields ciphertext, the ability to delete data, and the Auth Key of anyone who logs in
 during the compromise. It does not yield plaintext: the Master Key is never transmitted,
 and the Auth Key is a separate HKDF branch that cannot be worked backwards to it.
 
-Bounded further by least-privilege IAM — the Lambda role may read and write one table and
-read two SSM parameters, nothing else — and by S3 exports that let the user rebuild after
-destructive action.
+Bounded further by least privilege: the instance authenticates as itself through a dynamic
+group that matches one OCID, and its policy names one table and one bucket. It cannot
+reach anything else in the tenancy — including the automation runner that shares the
+account. Exports to Object Storage let the vault be rebuilt after destructive action.
 
 ### A5 — Stolen or shared device
 
@@ -160,18 +166,18 @@ mistakes silence for coverage.
 - **Coercion.** Legal or physical compulsion to disclose the master password.
 - **Traffic analysis.** An observer with network position learns when the vault is used
   and roughly how large it is.
-- **Denial of service.** The free-tier capacity ceiling means a determined attacker can
-  exhaust the allowance and make the vault unavailable. Availability is explicitly traded
-  for cost; the accepted mitigation is that the data survives and an export exists.
+- **Denial of service.** One small instance with no CDN in front of it, and a table
+  provisioned at a fixed ceiling. A determined attacker can make the vault unavailable.
+  Availability is explicitly traded for cost; the accepted mitigation is that the data
+  lives in a managed service and survives the host, and that an export exists.
 
 ## Accepted residual risks
 
 | Risk | Why accepted |
 |---|---|
-| Structural metadata leaks from a table dump — account count, entries per account, creation and modification times | Closing it requires the single-blob model rejected in [0002](../decisions/0002-storage-and-data-model.md) on the 400 KB item limit |
-| Browser-delivered crypto is inherently weaker than a native client (A3) | Mitigated by CSP, SRI, and OAC; the native Android client is the structural answer and is on the roadmap |
-| PBKDF2 rather than Argon2id | Avoids a WASM dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |
-| Availability subordinated to cost | A personal vault with an export; downtime is an inconvenience, not data loss |
+| **The dynamic-DNS name is the entire user-facing trust path (A3).** Whoever controls it can serve modified client code and obtain the master password | Buying a domain removes it for roughly ₹800 a year and remains the cheapest security improvement available. Declined for now, deliberately, and recorded here so the choice is visible rather than forgotten |
+| Structural metadata leaks from a database dump — account count, entries per account, creation and modification times | Closing it requires the single-row model rejected in [0002](../decisions/0002-storage-and-data-model.md) |
+| Browser-delivered crypto is inherently weaker than a native client (A3) | Mitigated by CSP and SRI; the native Android client is the structural answer and is on the roadmap |
+| PBKDF2 rather than Argon2id | Avoids a WebAssembly dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |
+| One host, no CDN, and an always-free instance that may be reclaimed for idleness | A personal vault whose data outlives the host. Downtime is an inconvenience, not data loss |
 | AES-GCM random-IV collision bound of roughly 2^32 encryptions | A personal vault performs on the order of 2^20; revisit if this ever becomes multi-tenant |
-| The distribution completes TLS 1.0 and 1.1 handshakes (A1) | The floor cannot be raised without a custom domain. Browsers refuse those versions on their own; the Android client must require 1.2+ itself |
-| The API's concurrency cannot be capped | AWS refuses any reservation that would take unreserved concurrency below 10, and this account's total limit *is* 10. The ceiling returns once that limit is raised |

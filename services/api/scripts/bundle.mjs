@@ -1,8 +1,8 @@
 // Bundles the handler into a single file for Lambda.
 //
-// The AWS SDK is bundled rather than taken from the runtime, so that a deploy
-// runs against the version in the lockfile and not whatever the runtime
-// happens to ship that week. It costs a larger zip and buys reproducibility.
+// Dependencies are bundled so that a deploy ships one file and the host needs
+// no npm install, no lockfile, and no network. What runs is exactly what was
+// built and tested.
 
 import { rm, mkdir } from 'node:fs/promises'
 import { build } from 'esbuild'
@@ -13,7 +13,7 @@ await rm(OUT, { recursive: true, force: true })
 await mkdir(OUT, { recursive: true })
 
 const result = await build({
-  entryPoints: ['src/index.ts'],
+  entryPoints: ['src/main.ts'],
   outfile: `${OUT}/index.mjs`,
   bundle: true,
   platform: 'node',

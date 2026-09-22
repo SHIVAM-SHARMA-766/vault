@@ -2,7 +2,7 @@
   "name": "@vault/api",
   "version": "0.0.0",
   "private": true,
-  "description": "The vault API. Runs as a single Lambda behind a Function URL.",
+  "description": "The vault API. One Node process behind Caddy on a single host.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -11,14 +11,13 @@
     "bundle": "node scripts/bundle.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.700.0",
-    "@aws-sdk/client-ssm": "^3.700.0",
-    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "oracle-nosqldb": "^5.5.4",
     "@vault/crypto": "*"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.5.0"
-  }
+  },
+  "main": "./dist/src/main.js"
 }

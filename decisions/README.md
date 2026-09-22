@@ -5,12 +5,8 @@ and why. Written so that a reader arriving later — including a future AI sessi
 tell whether a decision still holds, instead of guessing at the reasoning and repeating
 the analysis.
 
-Numbered sequentially, never renumbered. A decision that stops being true is superseded
-by a new one that references it; the original stays in place, because the reasoning that
-led to a wrong answer is worth keeping.
-
-A record belongs here when the reasoning is not recoverable from the code. "We use
-DynamoDB" is visible in the Terraform; *why the capacity mode may never change* is not.
+A record belongs here when the reasoning is not recoverable from the code. "We use Oracle
+NoSQL" is visible in the Terraform; *why the capacity mode may never change* is not.
 
 ## Format
 
@@ -26,9 +22,20 @@ someone who would otherwise assume it was an oversight.
 |---|---|
 | [0001](0001-cryptography-and-key-hierarchy.md) | Cryptography and key hierarchy |
 | [0002](0002-storage-and-data-model.md) | Storage and data model |
-| [0003](0003-where-infrastructure-is-defined.md) | Where infrastructure is defined |
+| [0003](0003-running-everything-on-oci.md) | Running everything on one provider |
 | [0004](0004-the-access-token-header.md) | The access token header |
-| [0005](0005-oci-fallback-for-the-api.md) | Running the API on OCI compute — **proposed**, not adopted |
 
-Infrastructure decisions that span more than this project — provider placement, account
-layout — live in the `brain` repository instead.
+## A note on the numbering
+
+This set was renumbered once, on 2026-09-22, when the platform changed from AWS to OCI.
+Ordinarily a decision that stops being true is superseded by a new one that references it,
+and the original stays — the reasoning that led to a wrong answer is worth keeping.
+
+That was not the right thing to do here. The AWS version of this project was built and
+applied but never served a request, and half the records described a system that had
+stopped existing. Keeping four superseded records about a dead architecture would have
+buried the four that describe the live one. [0003](0003-running-everything-on-oci.md)
+carries the full account of what was tried on AWS and why it was abandoned, which is the
+part worth keeping.
+
+Numbers are stable from here.

@@ -17,10 +17,11 @@ the direct reason this document exists.
 
 Three further requirements shape the design:
 
-1. **Changing the master password must not require rewriting the vault.** The storage
-   layer is DynamoDB, where an atomic multi-item write caps at 100 items. A design that
-   re-encrypts every entry on a password change is one that breaks silently once the
-   vault outgrows that cap.
+1. **Changing the master password must not require rewriting the vault.** Every key-value
+   store worth using caps an atomic multi-item write at some number, and a design that
+   re-encrypts every entry on a password change breaks silently once the vault outgrows
+   that cap. It is also simply wasteful: rewriting a thousand rows to change one password
+   is work nobody needs done.
 2. **There is no password reset.** Zero-knowledge means the server cannot help. The only
    recovery path is a key issued to the user at signup.
 3. **A second implementation is coming.** An Android client is planned. Two independent
@@ -105,8 +106,8 @@ type, custom fields, TOTP secret — and folder names. The server stores ciphert
 IVs, timestamps, and opaque identifiers.
 
 Email addresses are stored as `HMAC-SHA256(server_pepper, normalized_email)`, so a table
-dump does not reveal who the account belongs to. The pepper lives in SSM Parameter Store,
-outside the table.
+dump does not reveal who the account belongs to. The pepper is held on the host, outside
+the database and outside version control.
 
 ### Ciphertext format
 
@@ -161,7 +162,8 @@ server-side search unnecessary: the client fetches the whole vault and filters l
 **Changing the master password is a single write.** Re-derive the Master Key from the new
 password, re-wrap the Vault Key, store the new salt and verifier. Entries are untouched,
 and password history survives — unlike the previous implementation, which had to delete
-it.
+it. This property is what let the storage layer change providers without touching a line
+of the cryptography.
 
 **The Vault Key never rotates.** If it ever must — suspected compromise of the key
 itself — that is a full re-encrypt of the vault, performed client-side, and it is the one

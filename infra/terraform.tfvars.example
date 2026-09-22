@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is never committed.
+
+tenancy_ocid = "ocid1.tenancy.oc1..<yours>"
+user_ocid    = "ocid1.user.oc1..<yours>"
+fingerprint  = "aa:bb:cc:..."
+
+# From: oci compute image list --compartment-id <tenancy> \
+#         --operating-system "Canonical Ubuntu" --shape VM.Standard.E2.1.Micro \
+#         --sort-by TIMECREATED --query 'data[0].id' --raw-output
+instance_image_ocid = "ocid1.image.oc1.ap-mumbai-1.<yours>"
+
+duckdns_hostname = "your-name.duckdns.org"
+acme_email       = "you@example.com"
+
+# Empty by default, which means SSH is unreachable. Set to a single address
+# when you need it, and empty it again afterwards.
+# ssh_allowed_cidr = ["203.0.113.4/32"]

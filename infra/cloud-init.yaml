@@ -1,0 +1,152 @@
+#cloud-config
+# First boot. Everything after this is done by the deploy pipeline.
+#
+# Caddy terminates TLS with a certificate it obtains itself, serves the built
+# client from disk, sets the security headers, and proxies /api/* to the Node
+# process on localhost. The client and the API therefore share an origin
+# without anything sitting in front of them.
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - ufw
+  - unattended-upgrades
+
+write_files:
+  - path: /etc/caddy/Caddyfile
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        email ${acme_email}
+      }
+
+      ${hostname} {
+        encode zstd gzip
+
+        # The API. Same origin as the client, which is what lets the policy
+        # below say connect-src 'self'.
+        handle /api/* {
+          reverse_proxy 127.0.0.1:3000
+        }
+
+        handle {
+          root * /srv/vault/web
+          # A path with no file behind it is a client-side route. A missing
+          # asset still returns a real 404 rather than quietly becoming HTML.
+          try_files {path} /index.html
+          file_server
+        }
+
+        header {
+          # No unsafe-inline and no unsafe-eval anywhere. The build must emit
+          # external scripts and stylesheets only; an inline <script> is
+          # blocked rather than silently trusted.
+          #
+          # img-src omits remote hosts deliberately. Fetching site favicons
+          # from a third party would tell that third party which services the
+          # vault holds accounts for, which is most of what the encryption is
+          # protecting.
+          Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+          Strict-Transport-Security "max-age=63072000; includeSubDomains"
+          X-Content-Type-Options "nosniff"
+          X-Frame-Options "DENY"
+          Referrer-Policy "no-referrer"
+          Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+          Cross-Origin-Opener-Policy "same-origin"
+          Cross-Origin-Resource-Policy "same-origin"
+          -Server
+        }
+
+        # API responses are per-user and must never be cached anywhere.
+        header /api/* Cache-Control "no-store"
+      }
+
+  - path: /etc/systemd/system/vault-api.service
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Vault API
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=vault
+      Group=vault
+      WorkingDirectory=/srv/vault/api
+      ExecStart=/usr/bin/node /srv/vault/api/index.mjs
+      Restart=always
+      RestartSec=5
+
+      Environment=NODE_ENV=production
+      Environment=PORT=3000
+      Environment=OCI_REGION=${region}
+      Environment=NOSQL_TABLE=${table_name}
+      Environment=BACKUP_BUCKET=${bucket}
+      Environment=OBJECTSTORAGE_NAMESPACE=${namespace}
+      # Closed until the first account exists. See docs/runbook.md.
+      Environment=ALLOW_REGISTRATION=false
+
+      # The host serves a password manager; the service gets as little of it as
+      # it can do its job with.
+      NoNewPrivileges=true
+      PrivateTmp=true
+      ProtectSystem=strict
+      ProtectHome=true
+      ProtectKernelTunables=true
+      ProtectKernelModules=true
+      ProtectControlGroups=true
+      RestrictSUIDSGID=true
+      RestrictNamespaces=true
+      LockPersonality=true
+      MemoryDenyWriteExecute=true
+      ReadWritePaths=/srv/vault/api/run
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/apt/apt.conf.d/20auto-upgrades
+    owner: root:root
+    permissions: "0644"
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+
+runcmd:
+  # Node 20 from NodeSource. The runtime the API is built and tested against.
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+
+  # Caddy from its own repository.
+  - curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  - curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list
+  - apt-get update
+  - apt-get install -y caddy
+
+  - useradd --system --home /srv/vault --shell /usr/sbin/nologin vault || true
+  - mkdir -p /srv/vault/web /srv/vault/api/run
+  - chown -R vault:vault /srv/vault
+
+  # A placeholder so the site answers before the first deploy, which is also
+  # what lets Caddy complete the ACME challenge.
+  - sh -c 'printf "<!doctype html><title>vault</title><p>Not deployed yet." > /srv/vault/web/index.html'
+  - chown vault:vault /srv/vault/web/index.html
+
+  # OCI's network security group is the real boundary; the host firewall is a
+  # second one that survives a mistake in the first.
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw --force enable
+
+  - systemctl enable --now caddy
+  - systemctl daemon-reload
+  # Not started: there is no code in /srv/vault/api until the first deploy.
+  - systemctl enable vault-api
