@@ -1,0 +1,163 @@
+# Threat model
+
+This document states what the vault defends against, what it deliberately does not, and
+which risks are accepted and why. It is written to be falsifiable: every control names
+the threat it addresses, and every gap is listed rather than omitted.
+
+Reviewed whenever the cryptographic design, the storage model, or the hosting
+architecture changes. Last reviewed 2026-09-22.
+
+## Assets, in priority order
+
+1. **Vault contents** — credentials, TOTP secrets, notes. Disclosure is unrecoverable:
+   the user cannot un-leak a password they reused elsewhere.
+2. **Master password** — derives everything. Compromise means total compromise.
+3. **Recovery key** — an equal-power alternative to the master password.
+4. **Vault Key** — the symmetric key all entries are encrypted under.
+5. **Auth Key** — grants API access. Compromise yields ciphertext and the ability to
+   destroy data, but not plaintext.
+6. **Vault metadata** — entry counts, timestamps. Low value, and partially exposed by
+   design.
+
+## Trust boundaries
+
+```
+  ┌─ TRUSTED ──────────────────┐
+  │  The user's browser tab    │   master password, Master Key, Vault Key,
+  │  after unlock              │   decrypted entries — memory only
+  └────────────┬───────────────┘
+               │  HTTPS, ciphertext + Auth Key only
+  ┌────────────▼───────────────┐
+  │  UNTRUSTED                 │   CloudFront, S3, Lambda, DynamoDB,
+  │  All server infrastructure │   AWS operators, backups
+  └────────────────────────────┘
+```
+
+The design assumption is that everything below the boundary is hostile. A full compromise
+of the AWS account should yield ciphertext and nothing else.
+
+## Adversaries and what stops them
+
+### A1 — Network attacker on the path
+
+Reads or modifies traffic between browser and API.
+
+Stopped by TLS everywhere, HSTS with a long max-age, and the fact that plaintext never
+crosses the boundary in the first place. Modification of the *application* is the more
+serious version of this threat — see A3.
+
+### A2 — Database or backup disclosure
+
+Obtains a dump of the DynamoDB table or an S3 export.
+
+Every entry field is AES-256-GCM ciphertext under a key derived from a password the
+server has never seen ([0001](../decisions/0001-cryptography-and-key-hierarchy.md)). Email
+addresses are HMAC'd under a pepper held outside the table, so the dump does not identify
+whose accounts these are. Backups are exports of already-encrypted data and need no
+separate protection.
+
+Offline guessing against the wrapped Vault Key is bounded by PBKDF2 at 600,000
+iterations — tractable only against a weak master password, which is why a strength floor
+is enforced at signup.
+
+### A3 — Malicious or modified application code
+
+The highest-severity threat in any browser-delivered encryption product, and the one that
+bypasses all of the above. If an attacker can alter the JavaScript the browser executes,
+they can exfiltrate the master password directly and every other control becomes
+irrelevant.
+
+Controls:
+
+- HTTPS is mandatory. The S3 website endpoint is HTTP-only and is therefore never
+  exposed; CloudFront is the sole entry point, with the bucket reachable only through an
+  Origin Access Control.
+- A strict Content-Security-Policy with no `unsafe-inline` and no `unsafe-eval`,
+  constraining `connect-src` to the API origin so that injected code cannot exfiltrate to
+  an arbitrary host.
+- Subresource Integrity on built assets.
+- Write access to the bucket and the distribution restricted to a deployment role with no
+  other permissions; deploys originate only from CI on the default branch.
+- A deliberately small dependency tree, and zero third-party dependencies in the
+  cryptographic package, so that a compromised transitive package cannot reach the key
+  material.
+
+This threat is mitigated, not eliminated. It is the strongest argument for the native
+client, and the reason the Android app exists on the roadmap.
+
+### A4 — Compromised API or AWS account
+
+Code execution on Lambda, or stolen AWS credentials.
+
+Yields ciphertext, the ability to delete data, and the Auth Key of anyone who logs in
+during the compromise. It does not yield plaintext: the Master Key is never transmitted,
+and the Auth Key is a separate HKDF branch that cannot be worked backwards to it.
+
+Bounded further by least-privilege IAM — the Lambda role may read and write one table and
+read two SSM parameters, nothing else — and by S3 exports that let the user rebuild after
+destructive action.
+
+### A5 — Stolen or shared device
+
+Physical access to an unlocked session.
+
+Keys live in memory only and are discarded on logout, tab close, and idle timeout. Nothing
+sensitive is written to `localStorage`, `sessionStorage`, or IndexedDB. The consequence is
+that a page reload requires re-entering the master password, which is a deliberate trade
+against convenience.
+
+### A6 — Credential stuffing and brute force
+
+Online guessing against the login endpoint.
+
+Rate limiting per address and per IP, exponential lockout after repeated failures, and
+scrypt on the server so that each guess costs the attacker real work. The Auth Key sent
+by the client is already the output of 600,000 PBKDF2 iterations, so an attacker who has
+not stolen the client's derivation cannot cheaply generate candidates.
+
+### A7 — User enumeration
+
+Determining whether an address has an account, as a precursor to phishing.
+
+The salt lookup that must precede login returns a deterministic decoy salt for unknown
+addresses, derived under the server pepper so it is indistinguishable from a real one.
+Login then fails identically either way. Registration and any future password-reset
+surface must preserve the same property.
+
+### A8 — Supply chain
+
+A malicious version of a dependency, or of a CI action.
+
+Lockfiles committed and installs performed with `npm ci`. Automated dependency alerts
+enabled. GitHub Actions pinned. The crypto package has no third-party dependencies at all,
+which removes the most valuable target from the supply chain entirely.
+
+## Explicitly out of scope
+
+These are real risks that this design does not address. They are listed so that no one
+mistakes silence for coverage.
+
+- **A compromised endpoint.** Keyloggers, malicious browser extensions with host
+  permissions, or malware on the user's machine defeat every control here. No web
+  application can defend against this.
+- **A weak master password.** A strength floor and a warning are enforced at signup, but
+  the user can still choose something guessable, and the entire security of the vault
+  rests on that choice.
+- **Loss of both master password and recovery key.** The vault is unrecoverable. This is
+  the design working as intended, not a failure.
+- **Coercion.** Legal or physical compulsion to disclose the master password.
+- **Traffic analysis.** An observer with network position learns when the vault is used
+  and roughly how large it is.
+- **Denial of service.** The free-tier capacity ceiling means a determined attacker can
+  exhaust the allowance and make the vault unavailable. Availability is explicitly traded
+  for cost; the accepted mitigation is that the data survives and an export exists.
+
+## Accepted residual risks
+
+| Risk | Why accepted |
+|---|---|
+| Structural metadata leaks from a table dump — account count, entries per account, creation and modification times | Closing it requires the single-blob model rejected in [0002](../decisions/0002-storage-and-data-model.md) on the 400 KB item limit |
+| Browser-delivered crypto is inherently weaker than a native client (A3) | Mitigated by CSP, SRI, and OAC; the native Android client is the structural answer and is on the roadmap |
+| PBKDF2 rather than Argon2id | Avoids a WASM dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |
+| Availability subordinated to cost | A personal vault with an export; downtime is an inconvenience, not data loss |
+| AES-GCM random-IV collision bound of roughly 2^32 encryptions | A personal vault performs on the order of 2^20; revisit if this ever becomes multi-tenant |

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment and secrets — never committed, see docs/threat-model.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+
+# Terraform — state may contain sensitive values
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Local tooling
+.DS_Store
+*.log
+.idea/
+.vscode/
+coverage/
