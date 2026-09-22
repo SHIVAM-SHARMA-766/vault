@@ -36,6 +36,7 @@ Three documents, in the order worth reading them:
 |---|---|
 | [decisions/0001](decisions/0001-cryptography-and-key-hierarchy.md) | How keys are derived, what is encrypted, why the master password change is a single write |
 | [decisions/0002](decisions/0002-storage-and-data-model.md) | What the data looks like in DynamoDB and why there are no secondary indexes |
+| [decisions/0003](decisions/0003-where-infrastructure-is-defined.md) | Why Terraform lives in a different repository, and what the two share |
 | [docs/threat-model.md](docs/threat-model.md) | Who the adversaries are, what stops them, and what is explicitly not defended against |
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes the system these decisions add up to.

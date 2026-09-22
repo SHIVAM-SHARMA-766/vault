@@ -122,9 +122,14 @@ Planned; directories appear as each is built.
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, NIST CAVP, RFC 6238. Asserted by every client implementation in CI |
 | `services/api/` | The Lambda handler |
 | `apps/web/` | The vault SPA |
-| `infra/` | Terraform for the AWS resources |
 | `decisions/` | Architecture decision records |
 | `docs/` | Threat model and operational runbooks |
+
+Terraform is **not** here. The AWS resources are declared in the separate `infra`
+repository, under `stacks/aws`, and this repository holds only what changes on every
+commit. The reasoning is in [decisions/0003](decisions/0003-where-infrastructure-is-defined.md);
+the short version is that Terraform provisions the function while continuous integration
+owns the code that runs in it.
 
 The cryptography package is deliberately a separate package with no dependencies and full
 test coverage. It is the one component where a defect is unrecoverable — ciphertext
