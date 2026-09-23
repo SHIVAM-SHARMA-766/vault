@@ -15,9 +15,9 @@
     "@vault/crypto": "*"
   },
   "devDependencies": {
-    "@types/node": "^20.14.0",
-    "esbuild": "^0.25.0",
-    "typescript": "^5.5.0"
+    "@types/node": "^26.6.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
   },
   "main": "./dist/src/main.js"
 }
