@@ -135,3 +135,32 @@ variable "acme_email" {
   description = "Address Let's Encrypt uses for expiry warnings. Not published anywhere."
   type        = string
 }
+
+variable "mysql_version" {
+  description = <<-EOT
+    MySQL version.
+
+    Not a free choice. The always-free tier refuses anything but the newest
+    release:
+
+      400-InvalidParameter, attribute = {mysqlVersion} - Always Free Tier DB
+      Systems must use the latest active available version 26.7.0
+
+    An LTS family would be the better fit for something holding a password
+    vault, since Innovation releases move faster than anything here needs to.
+    The tier does not offer it. Because the tier also forces upgrades, the
+    resource ignores changes to this value so that a new release does not
+    destroy and recreate the system underneath the data.
+
+    Find the current one with:
+      oci mysql version list --compartment-id <tenancy>
+  EOT
+  type        = string
+  default     = "26.7.0"
+}
+
+variable "mysql_storage_gb" {
+  description = "Data storage. The always-free allowance is 50 GB, plus 50 GB of backup."
+  type        = number
+  default     = 50
+}

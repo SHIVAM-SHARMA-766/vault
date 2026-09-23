@@ -1,7 +1,9 @@
 // Runtime configuration.
 //
-// The two secrets are read from the environment, which systemd populates from
-// a file outside the repository and outside Terraform state. A value passed
+// The database password and the two server secrets are read from the
+// environment, which systemd populates from a root-owned file on the host.
+// They are deliberately not passed through instance metadata, which anything
+// running on the host can read. A value passed
 // through Terraform ends up in the state file in plaintext, and the state file
 // gets copied to laptops and CI runners; a value committed to the repository
 // needs no explanation at all.
@@ -10,9 +12,15 @@
 
 export interface Config {
   region: string
-  tableName: string
   bucket: string
   namespace: string
+  db: {
+    host: string
+    user: string
+    password: string
+    database: string
+    port: number
+  }
   /** HMAC key for email digests and decoy salts. */
   pepper: string
   /** HMAC key for access and refresh tokens. */
@@ -45,9 +53,15 @@ export function loadConfig(): Config {
   if (cached) return cached
   cached = {
     region: process.env['OCI_REGION'] ?? 'ap-mumbai-1',
-    tableName: required('NOSQL_TABLE'),
     bucket: process.env['BACKUP_BUCKET'] ?? '',
     namespace: process.env['OBJECTSTORAGE_NAMESPACE'] ?? '',
+    db: {
+      host: required('DB_HOST'),
+      user: process.env['DB_USER'] ?? 'vault',
+      password: required('DB_PASSWORD'),
+      database: process.env['DB_NAME'] ?? 'vault',
+      port: Number(process.env['DB_PORT'] ?? 3306),
+    },
     pepper: requiredSecret('SERVER_PEPPER'),
     tokenKey: requiredSecret('TOKEN_SIGNING_KEY'),
   }

@@ -13,9 +13,31 @@ output "instance_id" {
   value       = oci_core_instance.vault.id
 }
 
-output "table_name" {
-  description = "NoSQL table holding the vault."
-  value       = oci_nosql_table.vault.name
+output "db_host" {
+  description = "Private address of the database. Reachable only from inside this VCN."
+  value       = oci_mysql_mysql_db_system.vault.ip_address
+}
+
+output "db_admin_user" {
+  description = "Database user the API connects as."
+  value       = "vault"
+}
+
+output "db_password" {
+  description = <<-EOT
+    Generated once and held in Terraform state. Read it with
+
+      terraform output -raw db_password
+
+    and install it into the host's secrets file as described in
+    ../docs/runbook.md. It is deliberately not passed through instance
+    metadata, which is readable by anything running on the host.
+  EOT
+  # Read from the generator rather than from the database resource: the API
+  # does not return the password, so the resource's copy is empty after an
+  # import.
+  value     = random_password.db_admin.result
+  sensitive = true
 }
 
 output "backup_bucket" {

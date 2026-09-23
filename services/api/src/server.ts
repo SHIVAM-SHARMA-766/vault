@@ -14,7 +14,7 @@ import { buildRouter } from './app.js'
 import { loadConfig } from './config.js'
 import type { App } from './context.js'
 import { type LambdaEvent, errorResponse } from './http.js'
-import { NoSqlStore } from './store-nosql.js'
+import { MysqlStore } from './store-mysql.js'
 
 const PORT = Number(process.env['PORT'] ?? 3000)
 const HOST = '127.0.0.1'
@@ -23,21 +23,29 @@ const HOST = '127.0.0.1'
  *  from consuming the memory of a 1 GB host. */
 const MAX_BODY_BYTES = 1024 * 1024
 
-function buildApp(): App {
+function buildApp(): { app: App; store: MysqlStore } {
   const config = loadConfig()
-  return {
+  const store = new MysqlStore(config.db)
+  const app: App = {
     config,
-    store: new NoSqlStore(config.tableName, config.region),
+    store,
     now: () => Date.now(),
     // Closed unless explicitly opened, so a missing or misspelled setting
     // refuses registration rather than leaving the vault open to whoever finds
     // the address.
     allowRegistration: process.env['ALLOW_REGISTRATION'] === 'true',
   }
+  return { app, store }
 }
 
-export function start(): void {
-  const app = buildApp()
+export async function start(): Promise<void> {
+  const { app, store } = buildApp()
+
+  // Idempotent, and run on every start so a fresh database needs no manual
+  // step. If it fails the process exits rather than serving requests against a
+  // schema that may not be there.
+  await store.migrate()
+
   const router = buildRouter(app)
 
   const server = createServer((req, res) => {
@@ -93,7 +101,9 @@ export function start(): void {
   // a state nothing can diagnose.
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {
-      server.close(() => process.exit(0))
+      server.close(() => {
+        void store.close().finally(() => process.exit(0))
+      })
     })
   }
 }

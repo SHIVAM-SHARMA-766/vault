@@ -22,6 +22,10 @@ resource "oci_objectstorage_object_lifecycle_policy" "backups" {
   namespace = data.oci_objectstorage_namespace.this.namespace
   bucket    = oci_objectstorage_bucket.backups.name
 
+  # The service principal's grant has to exist first, and IAM takes a moment to
+  # propagate after it does.
+  depends_on = [oci_identity_policy.object_lifecycle]
+
   rules {
     name        = "expire-old-exports"
     action      = "DELETE"

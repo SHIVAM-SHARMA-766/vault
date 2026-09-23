@@ -85,9 +85,15 @@ export function harness(options: { allowRegistration?: boolean } = {}): Harness 
     store,
     config: {
       region: 'ap-mumbai-1',
-      tableName: 'vault-test',
       bucket: 'vault-test-backups',
       namespace: 'test-namespace',
+      db: {
+        host: '127.0.0.1',
+        user: 'vault',
+        password: 'not-used-by-the-in-memory-store',
+        database: 'vault',
+        port: 3306,
+      },
       pepper: 'test-pepper-not-a-real-secret',
       tokenKey: 'test-token-key-not-a-real-secret',
     },

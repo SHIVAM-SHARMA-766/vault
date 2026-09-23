@@ -38,11 +38,14 @@ resource "oci_core_instance" "vault" {
 
   metadata = {
     ssh_authorized_keys = file(pathexpand(var.ssh_public_key_path))
+    # Nothing secret goes in here. Instance metadata is readable by anything
+    # running on the host and by anyone with the right permission on the API,
+    # so the database password and the two server secrets are installed
+    # separately into a root-owned file. See ../docs/runbook.md.
     user_data = base64encode(templatefile("${path.module}/cloud-init.yaml", {
       hostname   = var.duckdns_hostname
       acme_email = var.acme_email
       region     = var.region
-      table_name = oci_nosql_table.vault.name
       bucket     = oci_objectstorage_bucket.backups.name
       namespace  = data.oci_objectstorage_namespace.this.namespace
     }))
@@ -54,4 +57,9 @@ resource "oci_core_instance" "vault" {
   lifecycle {
     ignore_changes = [source_details[0].source_id]
   }
+
+  # The database takes several minutes longer than the instance. Ordering them
+  # means the host is not up and answering before there is anything to answer
+  # from.
+  depends_on = [oci_mysql_mysql_db_system.vault]
 }

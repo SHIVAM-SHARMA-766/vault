@@ -87,11 +87,17 @@ write_files:
       Environment=NODE_ENV=production
       Environment=PORT=3000
       Environment=OCI_REGION=${region}
-      Environment=NOSQL_TABLE=${table_name}
       Environment=BACKUP_BUCKET=${bucket}
       Environment=OBJECTSTORAGE_NAMESPACE=${namespace}
       # Closed until the first account exists. See docs/runbook.md.
       Environment=ALLOW_REGISTRATION=false
+
+      # The database password and the two server secrets. Root-owned, mode
+      # 0600, and installed by hand rather than through instance metadata,
+      # which anything running on this host can read. The leading dash means
+      # the unit does not fail before the file exists; the service refuses to
+      # start without the values, which is the check that matters.
+      EnvironmentFile=-/srv/vault/api/run/secrets.env
 
       # The host serves a password manager; the service gets as little of it as
       # it can do its job with.

@@ -11,7 +11,7 @@
     "bundle": "node scripts/bundle.mjs"
   },
   "dependencies": {
-    "oracle-nosqldb": "^5.5.4",
+    "mysql2": "^3.11.0",
     "@vault/crypto": "*"
   },
   "devDependencies": {
