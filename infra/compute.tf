@@ -54,6 +54,14 @@ resource "oci_core_instance" "vault" {
   # An image update would otherwise destroy and recreate the instance, taking
   # the disk with it. Rebuilding is a deliberate act, not a side effect of
   # someone bumping a variable.
+  #
+  # Editing cloud-init.yaml *does* replace this instance, on purpose — a host
+  # built by a script that has since changed is a host nobody can reason about.
+  # Two things follow from that and are easy to forget until the site is down:
+  # the public IP changes, so the DuckDNS record has to be repointed, and the
+  # host is unreachable for the few minutes cloud-init takes. Nothing on the
+  # disk matters — the data is in MySQL and the code is redeployed — which is
+  # what makes the trade worth taking.
   lifecycle {
     ignore_changes = [source_details[0].source_id]
   }

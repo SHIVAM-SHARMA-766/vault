@@ -17,7 +17,13 @@ packages:
   - unattended-upgrades
 
 write_files:
-  - path: /etc/caddy/Caddyfile
+  # Staged, not written to /etc/caddy/Caddyfile directly. cloud-init runs
+  # write_files before runcmd, so a Caddyfile already in place when the
+  # package installs makes dpkg prompt about a conffile it did not ship —
+  # non-interactively that fails, the package stays unconfigured, its
+  # postinst never runs, and the caddy user is never created. The service
+  # then dies with status=217/USER, which names none of that.
+  - path: /etc/caddy/Caddyfile.vault
     owner: root:root
     permissions: "0644"
     content: |
@@ -133,7 +139,9 @@ runcmd:
   - curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   - curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list
   - apt-get update
-  - apt-get install -y caddy
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
+  # Only now that the package has shipped its own Caddyfile and created its user.
+  - install -o root -g root -m 0644 /etc/caddy/Caddyfile.vault /etc/caddy/Caddyfile
 
   - useradd --system --home /srv/vault --shell /usr/sbin/nologin vault || true
   - mkdir -p /srv/vault/web /srv/vault/api/run
@@ -146,13 +154,32 @@ runcmd:
 
   # OCI's network security group is the real boundary; the host firewall is a
   # second one that survives a mistake in the first.
+  #
+  # OCI's Ubuntu images ship an iptables INPUT chain that accepts SSH and then
+  # REJECTs everything else — and that REJECT sits ahead of the chains ufw
+  # installs, so ufw's rules are never reached. Enabling ufw alone leaves 80
+  # and 443 closed while `ufw status` cheerfully reports them open, which is
+  # the most misleading possible combination. These insert ahead of the
+  # REJECT; ufw is kept as the second layer.
+  - iptables -I INPUT 5 -p tcp -m state --state NEW -m tcp --dport 80 -j ACCEPT
+  - iptables -I INPUT 6 -p tcp -m state --state NEW -m tcp --dport 443 -j ACCEPT
+  - [ bash, -c, "DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent >/dev/null 2>&1 || true" ]
+  - [ bash, -c, "netfilter-persistent save >/dev/null 2>&1 || (mkdir -p /etc/iptables && iptables-save > /etc/iptables/rules.v4)" ]
   - ufw default deny incoming
   - ufw default allow outgoing
   - ufw allow 80/tcp
   - ufw allow 443/tcp
   - ufw --force enable
 
-  - systemctl enable --now caddy
+  # `enable --now` is not enough here. Installing the package already started
+  # Caddy, with the default Caddyfile it shipped — and --now does nothing to a
+  # service that is already running, so it would keep serving that default
+  # until something restarted it. The symptom is a working server showing
+  # "Caddy works!" over plain HTTP with no certificate, which looks like a
+  # configuration that was never copied rather than one that was never loaded.
+  - systemctl enable caddy
+  - systemctl restart caddy
   - systemctl daemon-reload
-  # Not started: there is no code in /srv/vault/api until the first deploy.
+  # Enabled but not started: there is no code in /srv/vault/api until the first
+  # deploy, and a service that fails on every boot buries the real errors.
   - systemctl enable vault-api

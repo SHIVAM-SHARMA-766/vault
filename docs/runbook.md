@@ -23,6 +23,56 @@ terraform output public_ip
 requests a certificate on first start, and the ACME challenge fails if the name does not
 resolve to the host. If it does fail, fix the record and `systemctl restart caddy`.
 
+## Rebuilding the host
+
+**Editing `infra/cloud-init.yaml` replaces the instance.** That is deliberate — a host
+built by a script that has since changed is a host nobody can reason about — but three
+things follow, and forgetting any of them leaves the site down:
+
+1. **The public IP changes.** Repoint the DuckDNS record, or Caddy cannot get a
+   certificate:
+
+   ```sh
+   cd infra && terraform output -raw public_ip
+   curl "https://www.duckdns.org/update?domains=<name>&token=<token>&ip=<new ip>"
+   ```
+
+   Caddy retries the ACME challenge with backoff, so it recovers on its own once DNS is
+   right. There is no need to restart anything.
+
+   **Always pass `ip=`.** A DuckDNS update without it sets the record to whatever address
+   the request came from — which, run from a laptop, points the vault at that laptop.
+
+2. **The disk is gone**, so the secrets file has to be installed again (below) and the
+   code redeployed.
+
+3. **The database is not affected.** It is a separate managed service; nothing on the
+   instance's disk is the vault.
+
+### Why cloud-init looks the way it does
+
+Two failures are worth knowing about, because both produce symptoms that name nothing
+useful and both are already handled.
+
+**The image's own firewall.** OCI's Ubuntu images ship an iptables INPUT chain that
+accepts SSH and then REJECTs everything else — and that REJECT sits *ahead* of the chains
+ufw installs, so ufw's rules are never reached. The misleading part is that
+`ufw status` cheerfully reports 80 and 443 as allowed while both are closed. cloud-init
+inserts its rules ahead of the REJECT rather than relying on ufw alone.
+
+**The Caddy package and its conffile.** cloud-init runs `write_files` before `runcmd`, so
+a Caddyfile written to `/etc/caddy/Caddyfile` is already there when the package installs.
+dpkg then prompts about a conffile it did not ship, fails non-interactively, leaves the
+package unconfigured, and never runs its postinst — so the `caddy` user is never created
+and the service dies with `status=217/USER`. The config is staged at
+`/etc/caddy/Caddyfile.vault` and copied in afterwards.
+
+**And Caddy must be restarted, not just enabled.** Installing the package starts it with
+the default Caddyfile, and `systemctl enable --now` does nothing to a service that is
+already running. The symptom is a perfectly healthy server showing "Caddy works!" over
+plain HTTP with no certificate — which looks like a config that was never copied rather
+than one that was never loaded.
+
 ## Setting the server secrets
 
 Two values the API needs, both kept off disk in the repository and out of Terraform state:
