@@ -54,8 +54,11 @@ scp -q -i "$KEY" -o BatchMode=yes \
   "$REPO/services/api/dist-bundle/index.mjs" \
   "$REPO/services/api/dist-bundle/index.mjs.map" \
   "$REPO/services/api/vault-api.service" \
+  "$REPO/services/backup/vault-backup.sh" \
+  "$REPO/services/backup/vault-backup.service" \
+  "$REPO/services/backup/vault-backup.timer" \
   "ubuntu@$HOST:/tmp/vault-deploy/"
-ok "api uploaded"
+ok "api and backup uploaded"
 
 if [ -n "$WEB_BUILD" ]; then
   rsync -a -e "ssh -i $KEY -o BatchMode=yes" --delete "$WEB_BUILD/" "ubuntu@$HOST:/tmp/vault-deploy-web/"
@@ -68,9 +71,13 @@ ssh_ 'sudo install -o vault -g vault -m 0644 /tmp/vault-deploy/index.mjs /srv/va
       sudo install -o vault -g vault -m 0644 /tmp/vault-deploy/index.mjs.map /srv/vault/api/index.mjs.map
       sudo install -o root -g root -m 0644 /tmp/vault-deploy/vault-api.service /etc/systemd/system/vault-api.service
       sudo rm -f /etc/systemd/system/vault-api.service.d/10-jit.conf
+      sudo install -o root -g root -m 0755 /tmp/vault-deploy/vault-backup.sh /usr/local/bin/vault-backup.sh
+      sudo install -o root -g root -m 0644 /tmp/vault-deploy/vault-backup.service /etc/systemd/system/vault-backup.service
+      sudo install -o root -g root -m 0644 /tmp/vault-deploy/vault-backup.timer /etc/systemd/system/vault-backup.timer
       sudo systemctl daemon-reload
-      sudo systemctl enable vault-api >/dev/null'
-ok "api and unit installed"
+      sudo systemctl enable vault-api >/dev/null
+      sudo systemctl enable --now vault-backup.timer >/dev/null'
+ok "api, unit, and backup timer installed"
 
 if [ -n "$WEB_BUILD" ]; then
   # The hostname and the ACME address come from the running Caddy environment

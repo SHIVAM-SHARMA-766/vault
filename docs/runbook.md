@@ -225,6 +225,69 @@ curl -s https://<hostname>/api/health
 A 502 from Caddy means the API is down; a connection refused means Caddy is. A
 certificate error usually means the DuckDNS record is pointing somewhere else.
 
+## Backups
+
+**This is the only backup.** The always-free MySQL tier refuses a managed backup policy —
+*"Cannot specify backup policy with 'CreateDbSystem' operation for an Always Free DB
+system"* — so there is no automatic snapshot behind the export. If the timer stops, there
+is no backup at all, and nothing will say so.
+
+```sh
+systemctl list-timers vault-backup.timer      # when it last ran and when it runs next
+journalctl -u vault-backup.service -n 30      # what happened
+systemctl start vault-backup.service          # run one now
+oci os object list --auth instance_principal --bucket-name vault-backups --query 'data[].{name:name,size:"size"}' --output table
+```
+
+**Check this periodically.** A backup that silently stopped a month ago is worse than no
+backup, because it is mistaken for one. Making the age of the newest export visible in
+the application — rather than only in a journal nobody reads — is the fix this still
+wants.
+
+### Restoring
+
+The export is a gzipped `mysqldump` of the one table. Everything in it is ciphertext the
+server holds no key for, so restoring it does not require, and does not reveal, the master
+password.
+
+A downloaded dump is a complete copy of the database — the auth verifiers and the wrapped
+keys included. Work in a directory only root can read, and remove it afterwards. Writing
+it to `/tmp` leaves it mode 644 for anyone on the host; that happened once during a
+restore test.
+
+```sh
+work=$(sudo mktemp -d) && sudo chmod 700 "$work"
+sudo oci os object get --auth instance_principal --bucket-name vault-backups \
+  --name vault-<timestamp>.sql.gz --file "$work/restore.sql.gz"
+sudo gzip -t "$work/restore.sql.gz"            # refuse a truncated file
+
+set -a; . <(sudo cat /srv/vault/api/run/secrets.env); set +a
+sudo zcat "$work/restore.sql.gz" | MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" "$DB_NAME"
+sudo systemctl restart vault-api
+
+sudo shred -u "$work"/* && sudo rmdir "$work"
+```
+
+**Restore into a scratch database first if the live one still has data.** The dump
+contains `DROP TABLE IF EXISTS`, so restoring over a working vault replaces it rather
+than merging.
+
+### Proving a backup is restorable
+
+Counting rows is not enough — it does not notice corrupted content. Compare the contents
+of the live and restored tables, excluding the rate counters, which change constantly:
+
+```sh
+q() { MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -N -B -e "$1"; }
+q "SELECT MD5(GROUP_CONCAT(CONCAT(pk,sk,CAST(data AS CHAR)) ORDER BY pk,sk))
+   FROM vault.vault WHERE pk NOT LIKE 'RATE#%'"
+q "SELECT MD5(GROUP_CONCAT(CONCAT(pk,sk,CAST(data AS CHAR)) ORDER BY pk,sk))
+   FROM vault_restore_test.vault WHERE pk NOT LIKE 'RATE#%'"
+```
+
+Done on 2026-09-24: eight rows, identical digests. A backup nobody has restored is not a
+backup.
+
 ## Recovering the vault
 
 The data lives in Oracle NoSQL, not on the instance, so losing the host loses the service

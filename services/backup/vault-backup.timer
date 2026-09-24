@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily vault export
+
+[Timer]
+OnCalendar=daily
+# Spread the start so it does not collide with everything else that runs at
+# midnight, and so a restart does not skip the day's run.
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

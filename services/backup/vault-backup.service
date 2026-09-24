@@ -1,0 +1,16 @@
+[Unit]
+Description=Export the vault to Object Storage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+EnvironmentFile=/srv/vault/api/run/secrets.env
+Environment=BACKUP_BUCKET=vault-backups
+ExecStart=/usr/local/bin/vault-backup.sh
+
+# A backup that fails silently is worse than no backup, because it is mistaken
+# for one. This writes to the journal, which the runbook says how to read.
+StandardOutput=journal
+StandardError=journal

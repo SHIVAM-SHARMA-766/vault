@@ -15,6 +15,8 @@ packages:
   - gnupg
   - ufw
   - unattended-upgrades
+  # mysqldump, for the export that is the only backup this vault has.
+  - mysql-client-core-8.0
 
 write_files:
   # Staged, not written to /etc/caddy/Caddyfile directly. cloud-init runs
@@ -91,6 +93,15 @@ runcmd:
   - DEBIAN_FRONTEND=noninteractive apt-get install -y caddy
   # Only now that the package has shipped its own Caddyfile and created its user.
   - install -o root -g root -m 0644 /etc/caddy/Caddyfile.vault /etc/caddy/Caddyfile
+
+  # The OCI CLI, for uploading exports. It authenticates as the instance
+  # through the dynamic group that matches this host's OCID, so no credential
+  # is written to disk — which is the whole reason for using it rather than the
+  # S3-compatible API, which would need a stored key.
+  - [ bash, -c, "curl -fsSL https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/oci-install.sh" ]
+  - [ bash, -c, "bash /tmp/oci-install.sh --accept-all-defaults --install-dir /opt/oci-cli --exec-dir /usr/local/bin >/dev/null 2>&1 || true" ]
+  - [ bash, -c, "ln -sf /opt/oci-cli/bin/oci /usr/local/bin/oci 2>/dev/null || true" ]
+  - [ bash, -c, "rm -f /tmp/oci-install.sh" ]
 
   - useradd --system --home /srv/vault --shell /usr/sbin/nologin vault || true
   - mkdir -p /srv/vault/web /srv/vault/api/run
