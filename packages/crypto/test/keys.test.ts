@@ -244,3 +244,28 @@ test('rotating the recovery key also rotates its proof', async () => {
   const { deriveRecoveryProof } = await import('../src/index.js')
   assert.equal(await deriveRecoveryProof(rotated.recoveryKey), rotated.recoveryAuthKey)
 })
+
+test('deriveLoginKeys produces the same pair the full unlock would', async () => {
+  // A browser cannot use unlock(): it has to send the auth key before the
+  // server will hand over the wrapped vault key. This asserts the shorter path
+  // derives exactly the same two values, so the two cannot drift apart.
+  const { deriveLoginKeys, unwrapVaultKey: unwrap } = await import('../src/index.js')
+
+  const account = await createAccount('a-long-enough-master-password', FAST)
+  const salt = fromBase64Url(account.kdf.salt)
+
+  const login = await deriveLoginKeys('a-long-enough-master-password', salt, FAST)
+  assert.equal(login.authKey, account.authKey, 'same auth key')
+
+  const vaultKey = await unwrap(account.wrappedVaultKey, login.kek, 'master')
+  assert.equal(toHex(vaultKey), toHex(account.vaultKey), 'same vault key')
+})
+
+test('deriveLoginKeys with the wrong password yields a KEK that cannot unwrap', async () => {
+  const { deriveLoginKeys, unwrapVaultKey: unwrap } = await import('../src/index.js')
+  const account = await createAccount('a-long-enough-master-password', FAST)
+  const wrong = await deriveLoginKeys('not-the-password', fromBase64Url(account.kdf.salt), FAST)
+
+  assert.notEqual(wrong.authKey, account.authKey)
+  await assert.rejects(() => unwrap(account.wrappedVaultKey, wrong.kek, 'master'), UnsealError)
+})

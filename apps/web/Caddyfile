@@ -1,0 +1,76 @@
+# How the client and the API are served.
+#
+# This lives with the application, not in cloud-init, because it describes how
+# the app is served rather than how the machine is built — and because a change
+# here should not replace the host. scripts/deploy.sh installs it.
+#
+# cloud-init writes a minimal version of this at first boot so that Caddy can
+# obtain a certificate before anything has been deployed. This one replaces it.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$VAULT_HOSTNAME} {
+	encode zstd gzip
+
+	# The API. Same origin as the client, which is what lets the policy below
+	# say connect-src 'self'.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle {
+		root * /srv/vault/web
+
+		# Fall back to the shell only for paths that look like client-side
+		# routes: no file on disk, and no file extension. A request for a
+		# missing asset must stay a 404 — returning HTML with status 200
+		# instead turns a mistyped script URL into a confusing parse error in
+		# the browser rather than an obvious missing file.
+		@spa {
+			not file
+			not path_regexp \.[a-zA-Z0-9]+$
+		}
+		rewrite @spa /index.html
+
+		file_server
+	}
+
+	header {
+		# No unsafe-inline and no unsafe-eval anywhere. The build must emit
+		# external scripts and stylesheets only; apps/web/scripts/check-csp.mjs
+		# asserts that it does, because the failure here is a blank page rather
+		# than an error.
+		#
+		# img-src omits remote hosts deliberately. Fetching site favicons from
+		# a third party would tell that third party which services the vault
+		# holds accounts for, which is most of what the encryption protects.
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+		Strict-Transport-Security "max-age=63072000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		-Server
+
+	}
+
+	# Caching, as two matchers that cannot both match.
+	#
+	# Writing this as a default plus an override did not work: both header
+	# directives applied and the order between them is not something to rely
+	# on, so the hashed assets ended up marked no-store as well. And a rule on
+	# /index.html never fires for a request to /, which is how the shell ended
+	# up with no cache header at all.
+	#
+	# A cached shell is the failure that matters: after a deploy it points at
+	# hashed assets that no longer exist, and the page is blank with nothing in
+	# the console to explain it.
+	@assets path /assets/*
+	@not-assets not path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	header @not-assets Cache-Control "no-store"
+}

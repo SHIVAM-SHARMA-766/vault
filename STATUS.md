@@ -6,24 +6,30 @@ Last updated: 2026-09-22
 
 ## Right now
 
-**The vault is serving at https://vault-shivam.duckdns.org.** One always-free OCI
-instance running Caddy and the API, with MySQL HeatWave behind it. Nothing else is
-involved — no AWS, no CDN, no second provider.
+**The client is live at https://vault-shivam.duckdns.org.** Registration, unlock, and
+entry CRUD, served from the same origin as the API by Caddy on one always-free OCI
+instance, with MySQL HeatWave behind it.
 
-Verified against the running system rather than the plan:
+The whole product is now in one repository: cryptography, API, client, infrastructure,
+deploy scripts, decisions, and runbook.
 
-- Let's Encrypt certificate, issued unattended. HTTP redirects to HTTPS.
-- TLS 1.0 and 1.1 refused, 1.2 and 1.3 accepted.
-- Every security header the threat model asks for, `server` suppressed.
-- `/api/health` answers through Caddy from outside. `/api/auth/prelogin` returns a decoy
-  salt that is stable for one address and different between addresses.
-  `/api/auth/register` is 403, because registration is closed. `/api/nope` is a real 404
-  rather than the SPA shell.
-- The database is reachable only from inside this project's VCN, and holds the schema the
-  service created for itself on first start.
-- SSH has no ingress rule.
+Verified from outside, against the running system:
 
-What does not exist yet: the client, and a deploy that does not need inbound SSH.
+- Missing assets return 404; client-side routes return the shell. Getting that boundary
+  wrong turns a mistyped script URL into HTML with status 200 and a confusing parse
+  error.
+- The shell is `no-store` and hashed assets are immutable for a year. A cached shell
+  after a deploy points at assets that no longer exist, and the page is blank with
+  nothing in the console.
+- Eight security headers, `server` suppressed, TLS 1.0 and 1.1 refused.
+- SSH is unreachable — verified by a connection attempt rather than a port probe.
+
+**The build is checked against the policy it is served under.** A Content-Security-Policy
+violation does not fail a build; it produces a blank page and a console message nobody
+sees during a deploy. `apps/web/scripts/check-csp.mjs` asserts there is no inline script,
+no inline style, no `eval`, and no remote URL, and it runs as part of `npm run build`.
+
+## What it took
 
 ## What it took to get here
 

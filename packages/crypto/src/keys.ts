@@ -193,6 +193,30 @@ export interface Unlocked {
   authKey: string
 }
 
+/** The two values a login needs, in the order a login actually needs them.
+ *
+ *  `unlock` below takes the wrapped vault key as an argument, which suits a
+ *  caller that already has it. A browser does not: it must send the Auth Key
+ *  first and receives the wrapped key in the reply. Deriving both here, from
+ *  one pass of the KDF, is what lets a client do that without running 600,000
+ *  iterations twice. */
+export interface LoginKeys {
+  /** base64url. Sent to the server. */
+  authKey: string
+  /** Unwraps the vault key once the server returns it. Stays on the device. */
+  kek: Uint8Array
+}
+
+export async function deriveLoginKeys(
+  password: string,
+  salt: Uint8Array,
+  iterations: number = PBKDF2_ITERATIONS,
+): Promise<LoginKeys> {
+  const masterKey = await deriveMasterKey(password, salt, iterations)
+  const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
+  return { authKey: toBase64Url(authKey), kek }
+}
+
 /** Derive both branches and unwrap the Vault Key. Throws UnsealError when the
  *  password is wrong, because the wrapped key then fails its authentication
  *  tag — the client can therefore reject a bad password without asking the

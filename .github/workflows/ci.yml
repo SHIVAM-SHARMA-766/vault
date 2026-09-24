@@ -151,6 +151,27 @@ jobs:
           fi
           echo "confirmed: refuses to start without a database"
 
+  web:
+    name: web — typecheck, build, policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck --workspace @vault/web
+
+      # The build runs check-csp.mjs at the end. A build that violates the
+      # Content-Security-Policy it is served under does not fail at build time
+      # — the page is simply blank, and the reason is in a browser console
+      # nobody is watching during a deploy.
+      - name: Build and check the policy
+        run: npm run build --workspace @vault/web
+
   audit:
     name: dependency audit
     runs-on: ubuntu-latest
