@@ -33,6 +33,14 @@ an unrelated `apply` — opening SSH, closing it again — carried a pending `cl
 change along with it and replaced the running host. The vault went down each time, and
 each time it was a surprise rather than a decision.
 
+**Testing an SSH key needs `IdentitiesOnly=yes`.** Without it, `ssh -i somekey` still
+offers every other key it can find, so a revoked key appears to work. Checking a rotated
+key without it reported the old one as still valid when the host had already rejected it:
+
+```sh
+ssh -i ~/.ssh/oci-vault -o IdentitiesOnly=yes -o BatchMode=yes ubuntu@<host> 'echo ok'
+```
+
 **Checking whether a port is closed needs an actual connection.** `nc -z` reported SSH as
 open on a host where it was firewalled off; `ssh` to the same port timed out, which is the
 truth. On a NAT64 network especially, trust the real client over the probe.
@@ -168,6 +176,23 @@ npm run build --workspace @vault/web
 ```
 
 Caddy needs no restart for a client deploy; it serves whatever is on disk.
+
+## Rotating the host key
+
+The public key is instance metadata, so changing it replaces the instance — everything
+under "Rebuilding the host" applies. There is no way to change it in place through
+Terraform, and editing `authorized_keys` over SSH instead leaves the repository
+describing a key the host no longer accepts.
+
+```sh
+mv ~/.ssh/oci-vault ~/.ssh/oci-vault.old && mv ~/.ssh/oci-vault.pub ~/.ssh/oci-vault.old.pub
+ssh-keygen -t ed25519 -f ~/.ssh/oci-vault -N '' -C 'vault host, break-glass only'
+cd vault && ./scripts/apply.sh          # it will ask, because this replaces the host
+```
+
+Afterwards, verify both directions with `IdentitiesOnly=yes` — the old key must be denied
+and the new one must work — then destroy the old private key and update
+`VAULT_SSH_KEY_B64` in creds.
 
 ## Getting on the host
 
