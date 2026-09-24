@@ -1,0 +1,48 @@
+[Unit]
+Description=Vault API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vault
+Group=vault
+WorkingDirectory=/srv/vault/api
+ExecStart=/usr/bin/node /srv/vault/api/index.mjs
+Restart=always
+RestartSec=5
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Closed until the first account exists. See docs/runbook.md.
+Environment=ALLOW_REGISTRATION=false
+
+# The database password and the two server secrets. Root-owned, mode 0600, and
+# installed by hand rather than through instance metadata, which anything
+# running on this host can read. The leading dash means the unit does not fail
+# before the file exists; the service refuses to start without the values,
+# which is the check that matters.
+EnvironmentFile=-/srv/vault/api/run/secrets.env
+
+# The host serves a password manager; the service gets as little of it as it
+# can do its job with.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+ReadWritePaths=/srv/vault/api/run
+
+# MemoryDenyWriteExecute is deliberately absent. It forbids memory that is both
+# writable and executable, which is exactly what V8 needs in order to JIT — the
+# process dies with status=5/TRAP inside SetPermissionsOnExecutableMemoryChunk,
+# a stack trace that names neither systemd nor this option. No JIT runtime can
+# run under it.
+
+[Install]
+WantedBy=multi-user.target

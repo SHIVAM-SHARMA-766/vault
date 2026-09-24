@@ -6,42 +6,58 @@ Last updated: 2026-09-22
 
 ## Right now
 
-**The project moved to OCI, and everything about it now lives in this repository.**
-Nothing is serving traffic.
+**The vault is serving at https://vault-shivam.duckdns.org.** One always-free OCI
+instance running Caddy and the API, with MySQL HeatWave behind it. Nothing else is
+involved — no AWS, no CDN, no second provider.
 
-What exists:
+Verified against the running system rather than the plan:
 
-- **`packages/crypto`** — key hierarchy, sealed-blob format, entry encryption, TOTP. No
-  runtime dependencies, 86 tests, 100% line and function coverage, 30 vectors from
-  published standards. Unaffected by the move.
-- **`services/api`** — registration, login, recovery, session rotation, and the vault
-  routes. 48 tests against an in-memory store, so none of them need a cloud account.
-  Unaffected by the move except for the storage adapter, which is still to be written.
-- **`infra/`** — Terraform for the instance, the NoSQL table, the bucket, the network, and
-  the cloud-init that installs Caddy and the service. Written, **not applied**.
+- Let's Encrypt certificate, issued unattended. HTTP redirects to HTTPS.
+- TLS 1.0 and 1.1 refused, 1.2 and 1.3 accepted.
+- Every security header the threat model asks for, `server` suppressed.
+- `/api/health` answers through Caddy from outside. `/api/auth/prelogin` returns a decoy
+  salt that is stable for one address and different between addresses.
+  `/api/auth/register` is 403, because registration is closed. `/api/nope` is a real 404
+  rather than the SPA shell.
+- The database is reachable only from inside this project's VCN, and holds the schema the
+  service created for itself on first start.
+- SSH has no ingress rule.
 
-What does not exist yet: the NoSQL storage adapter, the HTTP wrapper around the handler,
-the client, and the deploy pipeline.
+What does not exist yet: the client, and a deploy that does not need inbound SSH.
+
+## What it took to get here
+
+Nine faults, none of which a plan or a validate would have caught. They are listed because
+each one produced a symptom that pointed somewhere else:
+
+| Symptom | Actual cause |
+|---|---|
+| `ufw status` says 80 is open; the port is closed | OCI's image REJECTs ahead of ufw's chains |
+| `caddy.service: status=217/USER` | cloud-init wrote a conffile before the package installed, dpkg prompted, the package never configured, its user was never created |
+| A healthy server showing "Caddy works!" with no certificate | the package started Caddy first, and `enable --now` does nothing to a running service |
+| `status=5/TRAP` in V8 | `MemoryDenyWriteExecute=true`, which forbids exactly what a JIT needs |
+| `connect ETIMEDOUT` to the database | the subnet's default security list has no 3306 rule; NSGs do not cover a managed MySQL |
+| `Unknown database 'vault'` | a managed MySQL ships a server and an admin user, not a schema |
+| A permission warning about the expiry event on every start | the scheduler was already on; only the redundant `SET GLOBAL` failed |
+| Terraform wanting to replace the database forever | `admin_password` and `admin_username` are write-only and never read back |
+| Terraform creating a second database | an apply died between creating it and saving state, leaving a deleted one in state |
 
 ## Next
 
-1. **`store-nosql.ts`** — the `Store` interface is five methods, so this sits beside the
-   in-memory implementation rather than replacing anything, and the existing tests stay
-   untouched.
-2. **`server.ts`** — a Node HTTP server around the existing handler, about thirty lines.
-   The handler already takes an event and returns a response.
-3. **Apply the infrastructure**, point the DuckDNS record at the instance, and confirm the
-   certificate is issued.
-4. **The client** — the SPA. The Content-Security-Policy it must satisfy is already in the
-   Caddy configuration: no inline script, no eval, and `img-src` with no remote hosts, so
+1. **The client.** The Content-Security-Policy it must satisfy is already live and can be
+   read off a response: no inline script, no eval, and `img-src` with no remote hosts, so
    site favicons cannot be fetched from a third party.
-5. **Deploy pipeline** — build, ship to the host, restart the service.
-6. **Backups and monitoring** — scheduled encrypted export to Object Storage, and whatever
-   alerting is worth having on one host.
+2. **A deploy that needs no inbound SSH.** Today `scripts/deploy.sh` needs port 22 opened
+   and closed around it, which is friction on every deploy and a standing decision to get
+   wrong. The shape that fits: CI uploads a bundle to Object Storage, and the host pulls
+   it. Nothing inbound at all.
+3. **The scheduled export to Object Storage.** The always-free tier refuses a managed
+   backup policy, so this is not a second line of defence — it is the only one, and it
+   does not exist yet.
+4. **The first account**, once the client can create one: open registration, register,
+   write the recovery key down, close registration.
 
-Later, once the vault is stable: the marketing site and the Android client. The Android
-client asserts against the same vector files `packages/crypto` does, which is why those
-exist before it is written.
+Later: the marketing site and the Android client.
 
 ## Open questions
 

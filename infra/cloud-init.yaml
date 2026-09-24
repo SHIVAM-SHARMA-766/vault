@@ -72,57 +72,6 @@ write_files:
         header /api/* Cache-Control "no-store"
       }
 
-  - path: /etc/systemd/system/vault-api.service
-    owner: root:root
-    permissions: "0644"
-    content: |
-      [Unit]
-      Description=Vault API
-      After=network-online.target
-      Wants=network-online.target
-
-      [Service]
-      Type=simple
-      User=vault
-      Group=vault
-      WorkingDirectory=/srv/vault/api
-      ExecStart=/usr/bin/node /srv/vault/api/index.mjs
-      Restart=always
-      RestartSec=5
-
-      Environment=NODE_ENV=production
-      Environment=PORT=3000
-      Environment=OCI_REGION=${region}
-      Environment=BACKUP_BUCKET=${bucket}
-      Environment=OBJECTSTORAGE_NAMESPACE=${namespace}
-      # Closed until the first account exists. See docs/runbook.md.
-      Environment=ALLOW_REGISTRATION=false
-
-      # The database password and the two server secrets. Root-owned, mode
-      # 0600, and installed by hand rather than through instance metadata,
-      # which anything running on this host can read. The leading dash means
-      # the unit does not fail before the file exists; the service refuses to
-      # start without the values, which is the check that matters.
-      EnvironmentFile=-/srv/vault/api/run/secrets.env
-
-      # The host serves a password manager; the service gets as little of it as
-      # it can do its job with.
-      NoNewPrivileges=true
-      PrivateTmp=true
-      ProtectSystem=strict
-      ProtectHome=true
-      ProtectKernelTunables=true
-      ProtectKernelModules=true
-      ProtectControlGroups=true
-      RestrictSUIDSGID=true
-      RestrictNamespaces=true
-      LockPersonality=true
-      MemoryDenyWriteExecute=true
-      ReadWritePaths=/srv/vault/api/run
-
-      [Install]
-      WantedBy=multi-user.target
-
   - path: /etc/apt/apt.conf.d/20auto-upgrades
     owner: root:root
     permissions: "0644"
@@ -179,7 +128,7 @@ runcmd:
   # configuration that was never copied rather than one that was never loaded.
   - systemctl enable caddy
   - systemctl restart caddy
-  - systemctl daemon-reload
-  # Enabled but not started: there is no code in /srv/vault/api until the first
-  # deploy, and a service that fails on every boot buries the real errors.
-  - systemctl enable vault-api
+  # The vault-api unit is deliberately not here. It describes how the code
+  # runs, so it belongs with the code — services/api/vault-api.service,
+  # installed by scripts/deploy.sh. Keeping it in cloud-init would mean every
+  # change to how the service starts replaced the whole machine.

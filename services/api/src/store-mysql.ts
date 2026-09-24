@@ -7,7 +7,7 @@
 // The database is reachable only from inside this project's VCN, which holds
 // exactly one host. It is not on the internet.
 
-import { createPool, type Pool, type RowDataPacket } from 'mysql2/promise'
+import { createConnection, createPool, type Pool, type RowDataPacket } from 'mysql2/promise'
 
 import { AlreadyExists, type Item, type Store } from './store.js'
 
@@ -62,8 +62,10 @@ DO DELETE FROM vault WHERE expires_at IS NOT NULL AND expires_at < UNIX_TIMESTAM
 
 export class MysqlStore implements Store {
   private readonly pool: Pool
+  private readonly config: MysqlConfig
 
   constructor(config: MysqlConfig) {
+    this.config = config
     this.pool = createPool({
       host: config.host,
       port: config.port ?? 3306,
@@ -89,19 +91,59 @@ export class MysqlStore implements Store {
     })
   }
 
-  /** Creates the table and the expiry event. Idempotent, and safe to run on
-   *  every start — which is where it is called from, so a fresh database needs
-   *  no manual step. */
+  /** Creates the schema, the table, and the expiry event. Idempotent, and run
+   *  on every start, so a fresh server needs no manual step.
+   *
+   *  The database itself has to come first and cannot come from the pool: a
+   *  managed MySQL is handed over with a server and an admin user but no
+   *  schema, and every connection in the pool names one. Without this the
+   *  service fails at boot with "Unknown database", which reads like a
+   *  configuration error rather than an empty server. */
   async migrate(): Promise<void> {
+    const bootstrap = await createConnection({
+      host: this.config.host,
+      port: this.config.port ?? 3306,
+      user: this.config.user,
+      password: this.config.password,
+      connectTimeout: 5000,
+    })
+    try {
+      // The name is ours, not user input, but it is still interpolated into
+      // DDL — so it is checked rather than trusted.
+      if (!/^[A-Za-z0-9_]+$/.test(this.config.database)) {
+        throw new Error(`refusing to create a database named ${this.config.database}`)
+      }
+      await bootstrap.query(
+        `CREATE DATABASE IF NOT EXISTS \`${this.config.database}\` ` +
+          'CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci',
+      )
+    } finally {
+      await bootstrap.end()
+    }
+
     await this.pool.query(SCHEMA)
     try {
       await this.pool.query(CLEANUP_EVENT)
-      await this.pool.query('SET GLOBAL event_scheduler = ON')
+
+      // Turning the scheduler on needs SUPER, which a managed MySQL does not
+      // grant — and does not need to, because it ships with the scheduler
+      // already running. Only attempt it when it is actually off, so the
+      // common case does not log a permission error that means nothing. A
+      // warning that always appears and never matters is how warnings stop
+      // being read.
+      const [rows] = await this.pool.query<RowDataPacket[]>(
+        "SHOW GLOBAL VARIABLES LIKE 'event_scheduler'",
+      )
+      const running = String(rows[0]?.['Value'] ?? '').toUpperCase() === 'ON'
+      if (!running) {
+        await this.pool.query('SET GLOBAL event_scheduler = ON')
+      }
     } catch (err) {
-      // Creating events or setting a global needs privileges the application
-      // user may not have. Expiry is then a job for the operator rather than a
-      // reason to refuse to start; see docs/runbook.md.
-      console.warn('could not install the expiry event:', (err as Error).message)
+      // Without the event, rows carrying an expiry are never removed: sessions
+      // and activity records accumulate until someone notices. That is a
+      // degraded vault rather than a broken one, so it warns instead of
+      // refusing to start — but it does need attention. See docs/runbook.md.
+      console.warn('expiry is NOT running; rows with an expiry will accumulate:', (err as Error).message)
     }
   }
 
