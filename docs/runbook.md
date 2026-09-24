@@ -23,6 +23,20 @@ terraform output public_ip
 requests a certificate on first start, and the ACME challenge fails if the name does not
 resolve to the host. If it does fail, fix the record and `systemctl restart caddy`.
 
+## Applying infrastructure changes
+
+**Use `./scripts/apply.sh`, not `terraform apply` directly.** It plans first, says plainly
+whether the instance is about to be replaced, and makes you type `replace` if it is.
+
+That guard exists because the mistake it prevents was made three times in one sitting:
+an unrelated `apply` — opening SSH, closing it again — carried a pending `cloud-init`
+change along with it and replaced the running host. The vault went down each time, and
+each time it was a surprise rather than a decision.
+
+**Checking whether a port is closed needs an actual connection.** `nc -z` reported SSH as
+open on a host where it was firewalled off; `ssh` to the same port timed out, which is the
+truth. On a NAT64 network especially, trust the real client over the probe.
+
 ## Rebuilding the host
 
 **Editing `infra/cloud-init.yaml` replaces the instance.** That is deliberate — a host
