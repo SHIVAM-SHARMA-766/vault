@@ -4,6 +4,8 @@ import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } fro
 
 import { ApiError, api } from '../api.js'
 import * as session from '../session.js'
+import { IconAlert } from '../icons.js'
+import { PasswordInput } from '../ui.js'
 
 export function Unlock({ onRegister }: { onRegister: () => void }) {
   const [email, setEmail] = useState('')
@@ -63,25 +65,32 @@ export function Unlock({ onRegister }: { onRegister: () => void }) {
   }
 
   return (
-    <form className="panel" onSubmit={submit}>
-      <label htmlFor="email">Email</label>
-      <input id="email" type="email" autoComplete="username" required
-             value={email} onChange={(e) => setEmail(e.target.value)} />
+    <form onSubmit={submit} noValidate={false}>
+      <h2 className="auth-title">Unlock your vault</h2>
+      <p className="auth-sub">Enter your email and master password. Decryption happens in this browser.</p>
 
-      <label htmlFor="password">Master password</label>
-      <input id="password" type="password" autoComplete="current-password" required
-             value={password} onChange={(e) => setPassword(e.target.value)} />
-
-      {error ? <p className="error">{error}</p> : null}
-
-      <div className="row between" style={{ marginTop: 20 }}>
-        <button type="submit" disabled={busy || !email || !password}>
-          {busy ? 'Deriving key…' : 'Unlock'}
-        </button>
-        <button type="button" className="secondary" onClick={onRegister}>
-          Create an account
-        </button>
+      <div className="field">
+        <label htmlFor="email">Email</label>
+        <input id="email" type="email" autoComplete="username" required autoFocus
+               placeholder="you@example.com"
+               value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
+
+      <div className="field">
+        <label htmlFor="password">Master password</label>
+        <PasswordInput id="password" autoComplete="current-password" required
+                       value={password} onChange={setPassword} />
+      </div>
+
+      {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
+
+      <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
+        {busy ? <><span className="spinner" />Deriving key…</> : 'Unlock'}
+      </button>
+
+      <p className="auth-switch">
+        New here? <button type="button" className="link" onClick={onRegister}>Create an account</button>
+      </p>
     </form>
   )
 }
