@@ -310,3 +310,18 @@ kbd { padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; font:
   .footer .footer-grid { grid-template-columns: 1fr; }
   .footer .footer-base { flex-direction: column; }
 }
+
+/* ── Editable-content additions ─────────────────────────────────────── */
+
+/* The step badge label lives here rather than in content, so the only
+   choice an editor makes is which of the two it is. */
+.where-device::after { content: "On your device"; }
+.where-server::after { content: "On the server"; }
+.center-link { margin-top: 28px; text-align: center; font-weight: 600; }
+
+.banner { font-size: 14px; }
+.banner .wrap { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding-top: 9px; padding-bottom: 9px; text-align: center; }
+.banner a { font-weight: 650; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.banner-info { background: var(--accent); color: #fff; }
+.banner-success { background: #15803d; color: #fff; }
+.banner-warning { background: #b45309; color: #fff; }

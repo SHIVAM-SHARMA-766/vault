@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{faq.seo.title}}</title>
+  <meta name="description" content="{{faq.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{faq.seo.title}}">
+  <meta property="og:description" content="{{faq.seo.description}}">
+  <meta property="og:image" content="{{absimg faq.seo.image}}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<!-- page:faq -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">{{faq.hero.kicker}}</span>
+        <h1>{{faq.hero.title}}</h1>
+        <p>{{faq.hero.lede}}</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="faq">
+{{#each faq.list.items}}
+          <details>
+            <summary>{{.q}}</summary>
+            <p>{{.a}}</p>
+          </details>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+<!-- include:cta -->
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

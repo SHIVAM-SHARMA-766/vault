@@ -1,43 +1,56 @@
-// Builds the site into dist/ and refuses to finish if any page would break
-// under the policy it is served with — the same Content-Security-Policy as the
-// client: no inline script, no inline style, no remote resource. The site has
-// no JavaScript at all, which makes the first of those easy to keep.
+// Renders the site with its default content into dist/, and refuses to finish
+// if any page would break under the policy it is served with — the same
+// Content-Security-Policy as the client: no inline script, no inline style, no
+// remote resource. The site has no JavaScript at all.
 //
-// Pages are plain HTML with three build-time markers, so the header and footer
-// exist once rather than once per page:
-//
-//   <!-- page:features -->        which page this is, for the nav highlight
-//   <!-- include:header -->       replaced with src/partials/header.html
-//   {{current:features}}          (in partials) aria-current on the active link
+// On the host the same templates are rendered by the API with the content
+// published from the admin panel (services/api/src/site.ts). This build is what
+// proves the templates and the defaults are sound before they ship.
 
-import { cpSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const SRC = new URL('../src/', import.meta.url).pathname
-const DIST = new URL('../dist/', import.meta.url).pathname
+import { imageFallbacks, validateContent } from '../lib/content.mjs'
+import { renderPages } from '../lib/render.mjs'
+
+const ROOT = new URL('../', import.meta.url).pathname
+const DIST = join(ROOT, 'dist')
+const read = (p) => readFileSync(join(ROOT, p), 'utf8')
+
+const schema = JSON.parse(read('content/schema.json'))
+const defaults = JSON.parse(read('content/defaults.json'))
+const { content, errors } = validateContent(schema, defaults, defaults)
+if (errors.length) {
+  console.error('The default content does not satisfy the schema:')
+  for (const e of errors) console.error(`  - ${e.path} ${e.message}`)
+  process.exit(1)
+}
+
+const loadDir = (dir) => Object.fromEntries(
+  readdirSync(join(ROOT, dir)).filter((f) => f.endsWith('.html')).map((f) => [f.replace(/\.html$/, ''), read(join(dir, f))]),
+)
+const partials = loadDir('templates/partials')
+const pages = Object.fromEntries(Object.entries(loadDir('templates')).map(([k, v]) => [`${k}.html`, v]))
+
+const out = renderPages({
+  pages, partials, content, media: [], fallbacks: imageFallbacks(schema),
+  origin: process.env.SITE_ORIGIN ?? 'https://vault-shivam.duckdns.org',
+})
 
 rmSync(DIST, { recursive: true, force: true })
-cpSync(SRC, DIST, { recursive: true, filter: (p) => !p.includes('/partials') })
+mkdirSync(DIST, { recursive: true })
+cpSync(join(ROOT, 'static'), DIST, { recursive: true })
+for (const [name, html] of Object.entries(out)) writeFileSync(join(DIST, name), html)
 
-const partial = (name) => readFileSync(join(SRC, 'partials', `${name}.html`), 'utf8').trimEnd()
 const failures = []
-const pages = readdirSync(DIST).filter((f) => f.endsWith('.html'))
-
-for (const page of pages) {
-  let html = readFileSync(join(DIST, page), 'utf8')
-  const id = html.match(/<!-- page:([a-z-]+) -->/)?.[1] ?? ''
-  html = html.replace(/^[ \t]*<!-- include:([a-z]+) -->/gm, (_, name) => partial(name))
-  html = html.replace(/\{\{current:([a-z-]+)\}\}/g, (_, name) => (name === id ? ' aria-current="page"' : ''))
-  html = html.replace(/<!-- page:[a-z-]+ -->\n?/, '')
-  if (/<!-- include:|\{\{/.test(html)) failures.push(`${page}: an unresolved build marker is left in the output`)
-  writeFileSync(join(DIST, page), html)
-
+for (const [page, html] of Object.entries(out)) {
+  if (/<!-- include:|\{\{|\}\}/.test(html)) failures.push(`${page}: an unresolved template marker is left in the output`)
   if (/<script\b/i.test(html)) failures.push(`${page}: has a <script>; the site ships no JavaScript`)
   if (/<style\b/i.test(html)) failures.push(`${page}: has an inline <style> block`)
   if (/\sstyle="/i.test(html)) failures.push(`${page}: has a style attribute`)
   if (/\son[a-z]+="/i.test(html)) failures.push(`${page}: has an inline event handler`)
   if (!/<title>[^<]+<\/title>/.test(html)) failures.push(`${page}: has no <title>`)
-  if (!/<meta name="description"/.test(html) && page !== '404.html') failures.push(`${page}: has no meta description`)
+  if (!/<meta name="description" content="[^"]+"/.test(html) && page !== '404.html') failures.push(`${page}: has no meta description`)
   for (const m of html.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)) {
     // Outbound links are fine; loading something from another origin is not.
     const tag = html.slice(html.lastIndexOf('<', m.index), m.index)
@@ -45,17 +58,13 @@ for (const page of pages) {
   }
   for (const m of html.matchAll(/(?:src|href)="(\/[^"#?]*)(#[^"]*)?"/g)) {
     const path = m[1]
-    if (path === '/' || path.startsWith('/app/') || path.startsWith('/api/')) continue
+    if (path === '/' || path.startsWith('/app/') || path.startsWith('/api/') || path.startsWith('/media/')) continue
     const file = path.endsWith('/') ? `${path}index.html` : path
-    if (![file, `${file}.html`].some((c) => existsSync(join(DIST, c)))) {
-      failures.push(`${page}: links to ${path}, which does not exist`)
-    }
+    if (![file, `${file}.html`].some((c) => existsSync(join(DIST, c)))) failures.push(`${page}: links to ${path}, which does not exist`)
   }
-  // An anchor to another page must name an id that page has.
   for (const m of html.matchAll(/href="(\/[a-z-]*)#([a-z-]+)"/g)) {
     const target = m[1] === '/' ? 'index.html' : `${m[1].slice(1)}.html`
-    const other = existsSync(join(SRC, target)) ? readFileSync(join(SRC, target), 'utf8') : ''
-    if (!other.includes(`id="${m[2]}"`)) failures.push(`${page}: links to ${m[1]}#${m[2]}, which has no such id`)
+    if (!(out[target] ?? '').includes(`id="${m[2]}"`)) failures.push(`${page}: links to ${m[1]}#${m[2]}, which has no such id`)
   }
 }
 
@@ -64,4 +73,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  - ${f}`)
   process.exit(1)
 }
-console.log(`site: ${pages.length} page(s), no script, no inline style, no remote resource, no broken link`)
+console.log(`site: ${Object.keys(out).length} page(s) from templates, no script, no inline style, no remote resource, no broken link`)
