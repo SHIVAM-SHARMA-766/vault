@@ -207,7 +207,7 @@ input.mono { font-family: var(--mono); }
 .auth-sub { margin: 8px 0 28px; color: var(--muted); font-size: 14px; line-height: 1.55; }
 .auth-switch { margin-top: 24px; text-align: center; color: var(--muted); font-size: 13.5px; }
 .back-link {
-  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 24px;
+  display: flex; width: fit-content; align-items: center; gap: 6px; margin-bottom: 20px;
   background: none; border: 0; padding: 0; color: var(--muted); font-size: 13.5px; cursor: pointer;
 }
 .back-link:hover { color: var(--text); }
