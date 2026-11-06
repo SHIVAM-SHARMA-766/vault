@@ -8,6 +8,9 @@ import react from '@vitejs/plugin-react'
 // failure is a blank page with a console error, not a build error.
 export default defineConfig({
   plugins: [react()],
+  // The marketing site owns /; the vault client lives under /app/. Same
+  // origin either way, so connect-src 'self' still covers the API.
+  base: '/app/',
   build: {
     // Never inline an asset as a data: URI.
     assetsInlineLimit: 0,

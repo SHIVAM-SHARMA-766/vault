@@ -1,0 +1,10 @@
+{
+  "name": "@vault/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The public website. Static HTML and CSS, no JavaScript, served from / beside the client at /app/.",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

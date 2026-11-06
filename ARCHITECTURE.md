@@ -24,8 +24,8 @@ shape is chosen against.
    ┌──────────────────────────────────────────┐
    │  One always-free instance                │
    │                                          │
-   │  Caddy ──┬── /       → built client      │
-   │          │              from disk        │
+   │  Caddy ──┬── /       → public site       │
+   │          ├── /app/*  → vault client      │
    │          └── /api/*  → Node, localhost   │
    │                          │               │
    └──────────────────────────┼───────────────┘
@@ -36,7 +36,8 @@ shape is chosen against.
       ciphertext only                 daily encrypted exports
 ```
 
-Caddy terminates TLS with a certificate it obtains itself, serves the client from disk,
+Caddy terminates TLS with a certificate it obtains itself, serves the public site and the
+client from disk,
 sets every security header, and proxies `/api/*` to the Node process beside it. The client
 and the API therefore share an origin with nothing in front of them — which is what lets
 the Content-Security-Policy restrict `connect-src` to `'self'`.
@@ -135,7 +136,8 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
 | `services/api/` | The API, and the storage adapters behind one interface |
-| `apps/web/` | The vault client |
+| `apps/web/` | The vault client, served at `/app/`, and the Caddyfile |
+| `apps/site/` | The public website at `/`: static HTML and CSS, no JavaScript |
 | `infra/` | Terraform for the instance, the table, the bucket, and the network |
 | `decisions/` | Architecture decision records |
 | `docs/` | Threat model and runbook |

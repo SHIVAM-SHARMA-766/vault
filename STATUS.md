@@ -60,7 +60,8 @@ each one produced a symptom that pointed somewhere else:
    database does not, so a stray `terraform destroy` deletes the vault.
 4. **Remove the AWS resources** left standing from the first deployment.
 
-Later: the marketing site and the Android client.
+Later: the Android client, and a browser-extension client — the only way to close A3
+without a domain, since its code would not be served by the hostname.
 
 ## Open questions
 
@@ -71,10 +72,16 @@ Later: the marketing site and the Android client.
   needed. Worth several days of measurement before burning a core to satisfy a policy.
 - **Argon2id instead of PBKDF2.** Deferred rather than rejected; see
   [decisions/0001](decisions/0001-cryptography-and-key-hierarchy.md).
-- **Buy a domain?** Roughly ₹800 a year, and it removes the largest accepted risk in the
-  threat model. Declined for now, deliberately.
+- **Buy a domain.** Roughly ₹800 a year, and it removes the largest accepted risk in the
+  threat model (A3). Re-confirmed 2026-11-06: the risk is accepted until a domain is bought,
+  and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Public website.** Landing page at `/` and a security page at `/security`, in
+`apps/site`: static HTML and CSS with no JavaScript, built and checked against the same
+policy as the client. The client moved to `/app/`. `deploy.sh` now stages both into one
+tree and validates the Caddyfile on the host before installing it.
 
 **2026-11-06 — Client redesigned.** Split sign-in screen, three-pane vault (filters, list,
 detail) with search, favourites, copy with a 30-second clipboard clear, live TOTP codes, a

@@ -38,13 +38,17 @@ log "Build"
 [ -f "$REPO/services/api/dist-bundle/index.mjs" ] || die "no bundle produced"
 ok "api bundled"
 
-if [ -d "$REPO/apps/web/dist" ]; then
-  ok "web build found"
-  WEB_BUILD="$REPO/apps/web/dist"
-else
-  printf '  \033[1;33mskip\033[0m  no web build yet; the placeholder stays\n'
-  WEB_BUILD=""
-fi
+# One tree for Caddy: the public site at its root, the vault client under
+# app/. Both are rebuilt here so a stale dist/ can never be what ships.
+( cd "$REPO" && npm run build --workspace @vault/web >/dev/null && npm run build --workspace @vault/site >/dev/null ) \
+  || die "web or site build failed; nothing was deployed"
+STAGE="$(mktemp -d -t vault-web.XXXXXX)"
+trap 'rm -rf "$STAGE"' EXIT
+cp -R "$REPO/apps/site/dist/." "$STAGE/"
+mkdir -p "$STAGE/app"
+cp -R "$REPO/apps/web/dist/." "$STAGE/app/"
+WEB_BUILD="$STAGE"
+ok "site and client built and staged"
 
 log "Upload"
 # To a staging path first: a half-copied file that systemd then tries to run is
@@ -82,6 +86,13 @@ ok "api, unit, and backup timer installed"
 if [ -n "$WEB_BUILD" ]; then
   # The hostname and the ACME address come from the running Caddy environment
   # rather than being baked in, so this file is the same on any host.
+  # Validate before touching anything live. A Caddyfile that does not parse
+  # would otherwise be installed and leave Caddy running the old one, with the
+  # files already moved underneath it.
+  ssh_ "VAULT_HOSTNAME='$VAULT_HOSTNAME' ACME_EMAIL='$ACME_EMAIL' caddy validate --adapter caddyfile --config /tmp/vault-deploy/Caddyfile >/dev/null 2>&1" \
+    || die "the new Caddyfile does not validate on the host; nothing was installed"
+  ok "Caddyfile validates"
+
   ssh_ "sudo rsync -a --delete /tmp/vault-deploy-web/ /srv/vault/web/
         sudo chown -R vault:vault /srv/vault/web
         sudo install -o root -g root -m 0644 /tmp/vault-deploy/Caddyfile /etc/caddy/Caddyfile
