@@ -170,6 +170,12 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # The client imports @vault/crypto, whose types are its compiled output.
+      # Without this the typecheck fails on a clean checkout, while passing on
+      # any machine that happens to have an old build lying around.
+      - name: Build the crypto package
+        run: npm run build --workspace @vault/crypto
+
       - name: Typecheck
         run: npm run typecheck --workspace @vault/web
 
