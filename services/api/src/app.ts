@@ -6,6 +6,7 @@ import { requireUser } from './context.js'
 import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './http.js'
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { Router } from './router.js'
+import * as admin from './routes/admin.js'
 import * as auth from './routes/auth.js'
 import * as vault from './routes/vault.js'
 
@@ -42,6 +43,28 @@ export function buildRouter(app: App): Router {
   router.get('/api/vault/history/:id', authed((u, _e, id) => vault.getHistory(app, u, id)))
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)))
   router.get('/api/activity', authed((u) => vault.getActivity(app, u)))
+
+  // The operator's routes. Same sign-in as everything else, plus an address
+  // listed in ADMIN_EMAILS; see routes/admin.ts.
+  const admined =
+    (handler: (userId: string, event: LambdaEvent, param: string) => Promise<LambdaResponse>) =>
+    authed(async (userId, event, param) => {
+      await admin.requireAdmin(app, userId)
+      return handler(userId, event, param)
+    })
+
+  router.get('/api/admin/overview', admined(() => admin.overview(app)))
+  router.get('/api/admin/users', admined(() => admin.listUsers(app)))
+  router.put('/api/admin/users/:id/label', admined((u, e, id) => admin.setLabel(app, u, e, id)))
+  router.put('/api/admin/users/:id/disabled', admined((u, e, id) => admin.setDisabled(app, u, e, id)))
+  router.post('/api/admin/users/:id/revoke-sessions', admined((u, _e, id) => admin.revokeSessions(app, u, id)))
+  router.post('/api/admin/users/:id/delete', admined((u, e, id) => admin.deleteUser(app, u, e, id)))
+  router.get('/api/admin/settings', admined(() => admin.getSettingsRoute(app)))
+  router.put('/api/admin/settings', admined((u, e) => admin.putSettingsRoute(app, u, e)))
+  router.get('/api/admin/invites', admined(() => admin.listInvitesRoute(app)))
+  router.post('/api/admin/invites', admined((u, e) => admin.createInviteRoute(app, u, e)))
+  router.delete('/api/admin/invites/:id', admined((u, _e, id) => admin.deleteInviteRoute(app, u, id)))
+  router.get('/api/admin/audit', admined(() => admin.auditRoute(app)))
 
   return router
 }

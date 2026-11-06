@@ -12,6 +12,7 @@ import { createServer } from 'node:http'
 
 import { buildRouter } from './app.js'
 import { loadConfig } from './config.js'
+import { emailDigest } from './identity.js'
 import type { App } from './context.js'
 import { type LambdaEvent, errorResponse } from './http.js'
 import { MysqlStore } from './store-mysql.js'
@@ -34,6 +35,15 @@ function buildApp(): { app: App; store: MysqlStore } {
     // refuses registration rather than leaving the vault open to whoever finds
     // the address.
     allowRegistration: process.env['ALLOW_REGISTRATION'] === 'true',
+    // Comma-separated addresses in secrets.env. Turned into digests here and
+    // the addresses themselves are not kept.
+    adminDigests: new Set(
+      (process.env['ADMIN_EMAILS'] ?? '')
+        .split(',')
+        .map((e) => e.trim())
+        .filter(Boolean)
+        .map((e) => emailDigest(e, config.pepper)),
+    ),
   }
   return { app, store }
 }

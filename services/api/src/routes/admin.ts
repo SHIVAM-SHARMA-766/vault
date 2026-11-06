@@ -1,0 +1,238 @@
+// The operator's routes. Everything here manages accounts and the service; none
+// of it can read a vault. The server holds no key for entry content and stores
+// addresses only as digests, so the most an admin can learn about an account is
+// when it was created, when it last signed in, and how many items it holds.
+//
+// Access is by account: a normal sign-in, whose address digest is listed in
+// ADMIN_EMAILS. See decisions/0006-admin-panel.md.
+
+import type { App } from '../context.js'
+import { type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
+import {
+  BACKUP_SK,
+  EMAIL_SK,
+  ENTRY_PREFIX,
+  FOLDER_PREFIX,
+  PROFILE_SK,
+  SESSION_PREFIX,
+  SYSTEM_PK,
+  emailPk,
+  isValidId,
+  registrySk,
+  userPk,
+} from '../keys.js'
+import { enforce, type Limit } from '../ratelimit.js'
+import {
+  REGISTRATION_MODES,
+  type RegistrationMode,
+  type RegistryEntry,
+  type RegistryFields,
+  audit,
+  createInvite,
+  deleteInvite,
+  getRegistry,
+  getSettings,
+  listAudit,
+  listInvites,
+  listRegistry,
+  putRegistry,
+  putSettings,
+} from '../system.js'
+import { revokeAllSessions } from './auth.js'
+
+const ADMIN_LIMIT: Limit = { max: 300, windowSeconds: 15 * 60 }
+
+/** The admin check, in one place. Reads the profile for its address digest
+ *  rather than trusting anything in the token. */
+export async function requireAdmin(app: App, userId: string): Promise<void> {
+  const profile = await app.store.get(userPk(userId), PROFILE_SK)
+  const digest = profile?.['emailDigest']
+  if (typeof digest !== 'string' || !app.adminDigests.has(digest)) throw forbidden()
+  await enforce(app.store, 'admin', userId, ADMIN_LIMIT, app.now())
+}
+
+interface UserSummary {
+  userId: string
+  label: string | null
+  createdAt: string
+  lastLoginAt: string | null
+  disabled: boolean
+  isAdmin: boolean
+  entries: number
+  folders: number
+  sessions: number
+}
+
+async function summarize(app: App, reg: RegistryEntry): Promise<UserSummary> {
+  const items = await app.store.query(userPk(reg.userId))
+  const now = Math.floor(app.now() / 1000)
+  return {
+    userId: reg.userId,
+    label: reg.label ?? null,
+    createdAt: reg.createdAt,
+    lastLoginAt: reg.lastLoginAt ?? null,
+    disabled: reg.disabled === true,
+    isAdmin: app.adminDigests.has(reg.emailDigest),
+    entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
+    folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
+    sessions: items.filter((i) => i.sk.startsWith(SESSION_PREFIX)
+      && (typeof i['expiresAt'] !== 'number' || i['expiresAt'] > now)).length,
+  }
+}
+
+export async function overview(app: App): Promise<LambdaResponse> {
+  const [registry, settings, invites, backup] = await Promise.all([
+    listRegistry(app),
+    getSettings(app),
+    listInvites(app),
+    app.store.get(SYSTEM_PK, BACKUP_SK),
+  ])
+  const users = await Promise.all(registry.map((r) => summarize(app, r)))
+  const now = app.now()
+  return json(200, {
+    users: users.length,
+    disabledUsers: users.filter((u) => u.disabled).length,
+    entries: users.reduce((n, u) => n + u.entries, 0),
+    activeSessions: users.reduce((n, u) => n + u.sessions, 0),
+    activeInvites: invites.filter((i) => !i.usedAt && Date.parse(i.expiresAt) > now).length,
+    registration: settings.registration,
+    registrationForcedOpen: app.allowRegistration,
+    lastBackup: backup
+      ? { at: backup['at'] ?? null, object: backup['object'] ?? null, bytes: backup['bytes'] ?? null }
+      : null,
+    serverTime: new Date(now).toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
+  })
+}
+
+export async function listUsers(app: App): Promise<LambdaResponse> {
+  const registry = await listRegistry(app)
+  const users = await Promise.all(registry.map((r) => summarize(app, r)))
+  users.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return json(200, { users })
+}
+
+function fieldsOf(reg: RegistryEntry): RegistryFields {
+  return {
+    userId: reg.userId,
+    emailDigest: reg.emailDigest,
+    createdAt: reg.createdAt,
+    ...(reg.lastLoginAt ? { lastLoginAt: reg.lastLoginAt } : {}),
+    ...(reg.label ? { label: reg.label } : {}),
+    ...(reg.disabled ? { disabled: true } : {}),
+    ...(reg.inviteId ? { inviteId: reg.inviteId } : {}),
+  }
+}
+
+async function targetUser(app: App, actor: string, id: string, allowSelf: boolean) {
+  if (!isValidId(id)) throw badRequest('Invalid user id.')
+  if (!allowSelf && id === actor) throw badRequest('That cannot be done to your own account.')
+  const reg = await getRegistry(app, id)
+  if (!reg) throw notFound()
+  return reg
+}
+
+export async function setLabel(app: App, actor: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, id, true)
+  const body = parseJsonBody<{ label?: unknown }>(event)
+  if (typeof body.label !== 'string' || body.label.length > 80) throw badRequest('label must be a string of at most 80 characters.')
+  const label = body.label.trim()
+  await audit(app, actor, 'user.label', id, label)
+  const { label: _old, ...rest } = fieldsOf(reg)
+  await putRegistry(app, { ...rest, ...(label ? { label } : {}) })
+  return json(200, { ok: true })
+}
+
+export async function setDisabled(app: App, actor: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, id, false)
+  const body = parseJsonBody<{ disabled?: unknown }>(event)
+  if (typeof body.disabled !== 'boolean') throw badRequest('disabled must be true or false.')
+  await audit(app, actor, body.disabled ? 'user.disable' : 'user.enable', id)
+  await putRegistry(app, { ...fieldsOf(reg), disabled: body.disabled })
+  if (body.disabled) await revokeAllSessions(app, id)
+  return json(200, { ok: true })
+}
+
+export async function revokeSessions(app: App, actor: string, id: string): Promise<LambdaResponse> {
+  await targetUser(app, actor, id, true)
+  await audit(app, actor, 'user.revoke-sessions', id)
+  await revokeAllSessions(app, id)
+  return json(200, { ok: true })
+}
+
+/** Removes an account and everything in it. There is no undo: the entries
+ *  were readable only by their owner, and the daily export is the only copy. */
+export async function deleteUser(app: App, actor: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, id, false)
+  const body = parseJsonBody<{ confirm?: unknown }>(event)
+  if (body.confirm !== id) throw badRequest('Send the user id as "confirm" to delete an account.')
+  await audit(app, actor, 'user.delete', id, reg.label)
+  for (const item of await app.store.query(userPk(id))) await app.store.delete(item.pk, item.sk)
+  await app.store.delete(emailPk(reg.emailDigest), EMAIL_SK)
+  await app.store.delete(SYSTEM_PK, registrySk(id))
+  return json(200, { ok: true })
+}
+
+export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
+  return json(200, { ...(await getSettings(app)), registrationForcedOpen: app.allowRegistration })
+}
+
+export async function putSettingsRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ registration?: unknown }>(event)
+  if (!REGISTRATION_MODES.includes(body.registration as RegistrationMode)) {
+    throw badRequest(`registration must be one of: ${REGISTRATION_MODES.join(', ')}.`)
+  }
+  const registration = body.registration as RegistrationMode
+  await audit(app, actor, 'settings.registration', undefined, registration)
+  await putSettings(app, { registration, updatedAt: new Date(app.now()).toISOString() })
+  return json(200, { ok: true })
+}
+
+export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
+  const now = app.now()
+  const invites = (await listInvites(app))
+    .map((i) => ({
+      id: i.id,
+      label: i.label,
+      createdAt: i.createdAt,
+      expiresAt: i.expiresAt,
+      usedAt: i.usedAt ?? null,
+      usedBy: i.usedBy ?? null,
+      status: i.usedAt ? 'used' : Date.parse(i.expiresAt) <= now ? 'expired' : 'active',
+    }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  return json(200, { invites })
+}
+
+export async function createInviteRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ label?: unknown; days?: unknown }>(event)
+  const label = typeof body.label === 'string' ? body.label.trim() : ''
+  if (!label || label.length > 80) throw badRequest('label is required, at most 80 characters.')
+  const days = body.days === undefined ? 7 : body.days
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30) {
+    throw badRequest('days must be a whole number from 1 to 30.')
+  }
+  await audit(app, actor, 'invite.create', undefined, label)
+  const { code, invite } = await createInvite(app, actor, label, days)
+  // The code is returned exactly once. Only its hash is stored.
+  return json(201, { code, invite: { id: invite.id, label, expiresAt: invite.expiresAt } })
+}
+
+export async function deleteInviteRoute(app: App, actor: string, id: string): Promise<LambdaResponse> {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) throw badRequest('Invalid invite id.')
+  await audit(app, actor, 'invite.delete', id)
+  await deleteInvite(app, id)
+  return json(200, { ok: true })
+}
+
+export async function auditRoute(app: App): Promise<LambdaResponse> {
+  // Ids mean nothing to a person reading the log; labels do. Deleted accounts
+  // keep their id, and their label survives in the delete record's detail.
+  const labels = new Map((await listRegistry(app)).map((r) => [r.userId, r.label ?? null]))
+  const records = (await listAudit(app)).map((r) => ({
+    at: r.at, actor: r.actor, action: r.action, target: r.target ?? null, detail: r.detail ?? null,
+    actorLabel: labels.get(r.actor) ?? null,
+    targetLabel: r.target ? labels.get(r.target) ?? null : null,
+  }))
+  return json(200, { records })
+}

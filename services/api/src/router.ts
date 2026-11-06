@@ -1,5 +1,5 @@
 // A router small enough to read. Paths are matched exactly or with a single
-// trailing parameter; there is no pattern language to get wrong.
+// parameter segment, in any position; there is no pattern language to get wrong.
 
 import { type LambdaEvent, type LambdaResponse, notFound } from './http.js'
 

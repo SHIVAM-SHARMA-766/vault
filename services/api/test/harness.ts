@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto'
 import { dispatch } from '../src/app.js'
 import type { App } from '../src/context.js'
 import type { LambdaEvent, LambdaResponse } from '../src/http.js'
+import { emailDigest } from '../src/identity.js'
 import { AlreadyExists, type Item, type Store } from '../src/store.js'
 import { AUTH_HEADER } from '../src/tokens.js'
 
@@ -77,7 +78,7 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { allowRegistration?: boolean } = {}): Harness {
+export function harness(options: { allowRegistration?: boolean; adminEmails?: string[] } = {}): Harness {
   const store = new MemoryStore()
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
 
@@ -99,6 +100,7 @@ export function harness(options: { allowRegistration?: boolean } = {}): Harness 
     },
     now: () => now,
     allowRegistration: options.allowRegistration ?? true,
+    adminDigests: new Set((options.adminEmails ?? []).map((e) => emailDigest(e, 'test-pepper-not-a-real-secret'))),
   }
 
   const request = async (method: string, path: string, opts: RequestOptions = {}): Promise<Parsed> => {

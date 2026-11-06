@@ -24,7 +24,9 @@ import {
   EMAIL_SK,
   PROFILE_SK,
   SESSION_PREFIX,
+  SYSTEM_PK,
   emailPk,
+  inviteSk,
   sessionSk,
   userPk,
 } from '../keys.js'
@@ -39,6 +41,14 @@ import {
 import { hashAuthKey, verifyAuthKey } from '../verifier.js'
 import { type KdfParams, requireBase64UrlBytes, requireEmail, requireKdf, requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
+import {
+  assertEnabled,
+  claimInvite,
+  getSettings,
+  hashInviteCode,
+  putRegistry,
+  touchLogin,
+} from '../system.js'
 
 interface Profile extends Item {
   userId: string
@@ -76,7 +86,7 @@ async function issueSession(app: App, userId: string) {
   }
 }
 
-async function revokeAllSessions(app: App, userId: string): Promise<void> {
+export async function revokeAllSessions(app: App, userId: string): Promise<void> {
   const sessions = await app.store.query(userPk(userId), SESSION_PREFIX)
   for (const s of sessions) await app.store.delete(s.pk, s.sk)
 }
@@ -106,10 +116,23 @@ export async function prelogin(app: App, event: LambdaEvent): Promise<LambdaResp
 
 export async function register(app: App, event: LambdaEvent): Promise<LambdaResponse> {
   // Closed by default. A missing or malformed setting therefore refuses rather
-  // than silently leaving the vault open to anyone who finds the URL.
-  if (!app.allowRegistration) throw forbidden()
+  // than silently leaving the vault open to anyone who finds the URL. The
+  // environment override exists only to bootstrap the first account.
+  const { registration: mode } = await getSettings(app)
+  const open = app.allowRegistration || mode === 'open'
+  if (!open && mode !== 'invite') throw forbidden()
 
   const body = parseJsonBody<Record<string, unknown>>(event)
+  const inviteCode = typeof body['inviteCode'] === 'string' ? body['inviteCode'].trim() : ''
+  if (!open) {
+    // Checked before anything is written; claimed after, atomically.
+    if (!inviteCode || inviteCode.length > 64) throw forbidden()
+    const pending = await app.store.get(SYSTEM_PK, inviteSk(hashInviteCode(inviteCode)))
+    if (!pending || pending['usedAt'] || Date.parse(String(pending['expiresAt'])) <= app.now()) {
+      throw forbidden()
+    }
+  }
+
   const email = requireEmail(body['email'])
   await limitAuth(app, event, email)
 
@@ -138,6 +161,19 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     throw err
   }
 
+  let inviteId: string | undefined
+  let label: string | undefined
+  if (!open) {
+    const invite = await claimInvite(app, inviteCode, userId)
+    if (!invite) {
+      // Lost a race for the same code. Give the address back.
+      await app.store.delete(emailPk(digest), EMAIL_SK)
+      throw forbidden()
+    }
+    inviteId = invite.id
+    label = invite.label
+  }
+
   const [authVerifier, recoveryVerifier] = await Promise.all([
     hashAuthKey(authKey),
     hashAuthKey(recoveryAuthKey),
@@ -151,6 +187,13 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     createdAt: at, updatedAt: at,
   }
   await app.store.put(profile)
+  await putRegistry(app, {
+    userId,
+    emailDigest: digest,
+    createdAt: at,
+    ...(label ? { label } : {}),
+    ...(inviteId ? { inviteId } : {}),
+  })
 
   await recordActivity(app, userId, 'register', event)
   return json(201, { userId, ...(await issueSession(app, userId)) })
@@ -169,7 +212,11 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   const verifier = profile?.authVerifier ?? DUMMY_VERIFIER
   const ok = await verifyAuthKey(authKey, verifier)
   if (!ok || !profile) throw invalidCredentials()
+  // Only after the password is proved, so a disabled account cannot be told
+  // apart from a wrong password by someone who does not hold it.
+  await assertEnabled(app, profile.userId)
 
+  await touchLogin(app, profile.userId)
   await recordActivity(app, profile.userId, 'login', event)
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
@@ -193,6 +240,7 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
   const verifier = profile?.recoveryVerifier ?? DUMMY_VERIFIER
   const ok = await verifyAuthKey(proof, verifier)
   if (!ok || !profile) throw invalidCredentials()
+  await assertEnabled(app, profile.userId)
 
   // A recovery key in use means the master password is believed lost. Every
   // existing session is dropped, because the next step is to set a new one.
@@ -223,6 +271,7 @@ export async function refresh(app: App, event: LambdaEvent): Promise<LambdaRespo
   }
 
   await app.store.delete(userPk(payload.sub), sessionSk(payload.jti))
+  await assertEnabled(app, payload.sub)
   return json(200, await issueSession(app, payload.sub))
 }
 
@@ -249,6 +298,7 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     kdf: profile.kdf,
     wrappedVaultKey: profile.wrappedVaultKey,
     createdAt: profile.createdAt,
+    isAdmin: app.adminDigests.has(profile.emailDigest),
   })
 }
 

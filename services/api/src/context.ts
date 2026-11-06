@@ -11,7 +11,14 @@ export interface App {
   config: Config
   /** Injected so tests can pin the clock. */
   now: () => number
+  /** Forces registration open regardless of the stored setting. Exists for
+   *  bootstrapping the first account, before anyone can reach the admin panel
+   *  to open it; scripts/registration.sh manages it. */
   allowRegistration: boolean
+  /** Email digests (see identity.ts) of the accounts allowed into the admin
+   *  routes. Digests rather than addresses, so the running process holds the
+   *  same thing the table does. Empty means nobody is an admin. */
+  adminDigests: ReadonlySet<string>
 }
 
 export function requireUser(app: App, event: LambdaEvent): string {
