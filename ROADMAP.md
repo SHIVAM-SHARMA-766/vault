@@ -63,10 +63,10 @@ where it lands.
 | Change master password / recovery login in the UI | ✓ | ✓ | ✓ | 1 |
 | Folders, password history, custom fields in the UI | ✓ | ✓ | ✓ | 1 |
 | Import from other managers, export | ✓ | ✓ | ✓ | 1 |
-| Password health (weak, reused, old) | ✓ | ✓ (Watchtower) | — | 1 |
+| Password health (weak, reused, old) | ✓ | ✓ (Watchtower) | ✓ | 1 |
 | Breach check without revealing passwords | ◐ | ✓ | — | 1 (decision needed) |
 | Two-factor sign-in for the account | ✓ | ✓ | ✓ TOTP | 1 |
-| Device and session management | ✓ | ✓ | ◐ admin only | 1 |
+| Device and session management | ✓ | ✓ | ✓ | 1 |
 | Secret key mixed into the KDF | — | ✓ | — | 1 (decision needed) |
 | Organizations, teams, shared collections | ✓ | ✓ | ◐ keys only | 3 |
 | Per-collection permissions, hide-password | ✓ | ✓ | — | 3 |

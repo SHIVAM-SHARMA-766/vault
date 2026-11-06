@@ -204,7 +204,7 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `services/api/` | The API, and the storage adapters behind one interface |
 | `apps/web/` | The vault client, served at `/app/`, and the Caddyfile. `src/lib` (API client, session, router), `src/ui` (kit, icons, Shell), `src/features/{auth,vault,settings,admin}` |
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
-| `services/backup/` | The daily export and its systemd timer |
+| `services/backup/` | The daily export and its systemd timer, and the restore drill |
 | `services/monitor/` | The health probe and its timer; the alarms are in `infra/monitoring.tf` |
 | `services/release/` | The host's pull agent and its systemd timer |
 | `scripts/` | `release.sh` ships code (CI runs it on merge); `setup-ci.sh` creates the CI identity; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
@@ -212,7 +212,7 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `tests/e2e/` | Browser tests: a real Chrome against `scripts/dev-stack.mjs` |
 | `infra/` | Terraform for the instance, the database, both buckets, IAM, and the network |
 | `decisions/` | Architecture decision records |
-| `docs/` | Threat model and runbook |
+| `docs/` | Threat model, runbook, configuration reference, and the generated OpenAPI document |
 
 The cryptography package is deliberately separate, dependency-free, and fully covered. It
 is the one component where a defect is unrecoverable — ciphertext written under a broken

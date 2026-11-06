@@ -57,7 +57,18 @@ Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In ord
 3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
 4. ~~Folders, entry-type fields, custom fields, password history~~ — done 2026-11-06.
 5. ~~Import and export~~ — done 2026-11-06.
-6. ~~Monitoring and alerting~~ — done 2026-11-07 (needs `apply.sh` + `deploy.sh` by the operator). **The domain** remains, deferred until one is bought.
+6. ~~Monitoring and alerting~~ — done 2026-11-07 (needs `apply.sh` + `deploy.sh` by the operator).
+7. ~~Signed-in devices and security activity~~ — done 2026-11-07.
+8. ~~Password health~~ — done 2026-11-07.
+9. ~~API: error codes, request ids, OpenAPI~~ — done 2026-11-07.
+10. ~~One configuration module; storage boundary tested~~ — done 2026-11-07.
+11. ~~Restore drill, scripted and reminded by an alarm~~ — done 2026-11-07 (first scripted run is the operator's).
+
+**What still stands between phase 1 and done** — none of it code:
+- **The domain** (threat A3), deferred until one is bought.
+- **Import tested with real export files** from three managers (exit criterion).
+- **Alerts reaching a phone**: apply, confirm the subscription mail, deploy, trip one alarm.
+- **Three decisions**: secret key in the KDF, breach checks, Argon2id (see ROADMAP).
 
 Then phase 2, the self-hosted product: container image and Compose install, first-run setup,
 PostgreSQL, migrations, backups to any S3-compatible store, signed releases.
@@ -79,6 +90,22 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 1, steps 7–11.** *Devices*: each browser that signs in is a device
+with a stable id across token refreshes; Settings lists them (this one marked), lets you
+name one and sign it out, and shows ninety days of security activity. Locking — by hand,
+when idle, or by closing the tab — now ends the server session too (`POST
+/api/auth/signout`), where before each lock left a refresh token alive for thirty days.
+*Password health*: weak, reused, year-old and http-only passwords, scored and listed in the
+vault with per-entry advice; computed in the browser by `packages/core`; entries now record
+when their password changed. *API*: a typed registry of error codes, an `x-request-id` on
+every response and in every error, one JSON log line per request, and an OpenAPI document
+generated from the routes (`/api/openapi.json`, `docs/openapi.json`, kept in sync by a
+test). *Configuration*: one module declares every setting
+([docs/configuration.md](docs/configuration.md)), reports all problems at once, and has no
+default that names this installation. *Restore drill*: `vault-restore-drill.sh` restores the
+newest backup into a scratch database and compares it with the live one; an INFO alarm
+says when the next is due.
 
 **2026-11-07 — Phase 1, step 6: monitoring and alerting.** A probe on the host
 (`services/monitor/vault-probe.sh`, every five minutes) checks the site, client, API and
