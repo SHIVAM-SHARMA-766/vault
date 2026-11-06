@@ -1,6 +1,7 @@
 # Architecture
 
-One always-free virtual machine, one managed NoSQL table, one object storage bucket. No
+One always-free virtual machine, one always-free MySQL HeatWave database holding a single
+table, one object storage bucket. No
 CDN, no serverless functions, no second provider. The whole system is small enough that a
 new reader can hold all of it at once, which is deliberate.
 
@@ -31,8 +32,8 @@ shape is chosen against.
                               │
               ┌───────────────┴───────────────┐
               ▼                               ▼
-      Oracle NoSQL                    Object Storage
-      ciphertext only                 encrypted exports
+      MySQL HeatWave                  Object Storage
+      ciphertext only                 daily encrypted exports
 ```
 
 Caddy terminates TLS with a certificate it obtains itself, serves the client from disk,
@@ -40,8 +41,10 @@ sets every security header, and proxies `/api/*` to the Node process beside it. 
 and the API therefore share an origin with nothing in front of them — which is what lets
 the Content-Security-Policy restrict `connect-src` to `'self'`.
 
-The instance authenticates to NoSQL and Object Storage **as itself**, through a dynamic
-group that matches its OCID. No credential is written to its disk.
+The instance authenticates to Object Storage **as itself**, through a dynamic group that
+matches its OCID. The database is reached inside the VCN with a password that, like the
+email pepper and the token signing key, lives in `/srv/vault/api/run/secrets.env` on the
+host and never in the repository.
 
 ## Where trust ends
 

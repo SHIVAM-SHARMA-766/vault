@@ -7,9 +7,9 @@ Built and operated by one person, on infrastructure that costs nothing.
 
 ## Status
 
-**Nothing is serving traffic yet.** The cryptography and the API are written and tested;
-the infrastructure is written and not yet applied; the client is not started.
-[STATUS.md](STATUS.md) is the live account.
+**Live at https://vault-shivam.duckdns.org**, with registration closed. Cryptography, API,
+client, infrastructure and a daily export are all running. [STATUS.md](STATUS.md) is the
+live account.
 
 ## Why this repository exists
 
@@ -73,7 +73,7 @@ Nothing, on perpetual free allowances rather than expiring trials.
 | Component | Service | Allowance |
 |---|---|---|
 | Host | OCI compute, `VM.Standard.E2.1.Micro` | 2 per tenancy, always free |
-| Database | Oracle NoSQL | 133M reads and writes a month, 25 GB per table |
+| Database | OCI MySQL HeatWave, `MySQL.Free` | 1 always-free DB system, 50 GB |
 | Exports | OCI Object Storage | 20 GB, 50,000 requests a month |
 | TLS | Let's Encrypt via Caddy | free |
 | Hostname | DuckDNS | free |

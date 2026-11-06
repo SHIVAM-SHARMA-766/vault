@@ -290,7 +290,7 @@ backup.
 
 ## Recovering the vault
 
-The data lives in Oracle NoSQL, not on the instance, so losing the host loses the service
+The data lives in MySQL HeatWave, not on the instance, so losing the host loses the service
 and not the vault. Rebuilding is `terraform apply` and a deploy.
 
 Exports are written to the Object Storage bucket on a schedule. They are ciphertext the
@@ -306,9 +306,7 @@ server cannot help; that is the design working, not a failure. See
 
 ## Tearing it down
 
-The NoSQL table carries `prevent_destroy`, so `terraform destroy` refuses. That is
-deliberate: it is the vault.
-
-To genuinely remove it, take an export first, then remove `prevent_destroy` from
-`infra/nosql.tf`, apply, and only then destroy. Three deliberate steps, which is the
-point.
+**Nothing currently stops `terraform destroy` from deleting the database.** The NoSQL
+table this replaced carried `prevent_destroy`; `oci_mysql_mysql_db_system.vault` in
+`infra/mysql.tf` does not. Take an export and confirm it is in the bucket before any
+destroy, and treat adding `prevent_destroy` back as open work.

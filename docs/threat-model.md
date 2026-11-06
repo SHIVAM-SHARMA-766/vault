@@ -29,7 +29,7 @@ architecture changes. Last reviewed 2026-09-22, against the deployed system rath
                │  HTTPS, ciphertext + Auth Key only
   ┌────────────▼───────────────┐
   │  UNTRUSTED                 │   the host, Caddy, the API process,
-  │  All server infrastructure │   NoSQL, Object Storage, cloud
+  │  All server infrastructure │   MySQL, Object Storage, cloud
   └────────────────────────────┘   operators, backups
 ```
 
@@ -55,7 +55,7 @@ deployment it has a specific shape — see A3.
 
 ### A2 — Database or backup disclosure
 
-Obtains a dump of the NoSQL table or an export from Object Storage.
+Obtains a dump of the MySQL table or an export from Object Storage.
 
 Every entry field is AES-256-GCM ciphertext under a key derived from a password the
 server has never seen ([0001](../decisions/0001-cryptography-and-key-hierarchy.md)). Email

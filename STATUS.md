@@ -2,7 +2,7 @@
 
 What is in flight. Updated when something starts, stalls, or finishes.
 
-Last updated: 2026-09-22
+Last updated: 2026-11-06
 
 ## Right now
 
@@ -50,18 +50,15 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-1. **The client.** The Content-Security-Policy it must satisfy is already live and can be
-   read off a response: no inline script, no eval, and `img-src` with no remote hosts, so
-   site favicons cannot be fetched from a third party.
-2. **A deploy that needs no inbound SSH.** Today `scripts/deploy.sh` needs port 22 opened
+1. **A deploy that needs no inbound SSH.** Today `scripts/deploy.sh` needs port 22 opened
    and closed around it, which is friction on every deploy and a standing decision to get
    wrong. The shape that fits: CI uploads a bundle to Object Storage, and the host pulls
    it. Nothing inbound at all.
-3. **The scheduled export to Object Storage.** The always-free tier refuses a managed
-   backup policy, so this is not a second line of defence — it is the only one, and it
-   does not exist yet.
-4. **The first account**, once the client can create one: open registration, register,
-   write the recovery key down, close registration.
+2. **The first account**: open registration, register, write the recovery key down, close
+   registration. The daily exports are ~1.5 KB, which says the table is still empty.
+3. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
+   database does not, so a stray `terraform destroy` deletes the vault.
+4. **Remove the AWS resources** left standing from the first deployment.
 
 Later: the marketing site and the Android client.
 
@@ -78,6 +75,15 @@ Later: the marketing site and the Android client.
   threat model. Declined for now, deliberately.
 
 ## Recently done
+
+**2026-11-06 — Client redesigned.** Split sign-in screen, three-pane vault (filters, list,
+detail) with search, favourites, copy with a 30-second clipboard clear, live TOTP codes, a
+password generator and strength meter, delete confirmation, and light and dark themes that
+follow the system. Collapses to two panes on tablets and one on phones. Still no inline
+style, no remote asset, and no favicon fetch, so it runs under the same policy.
+
+**2026-09-24 — Client live, and the daily export running.** Exports land in `vault-backups`
+every day; a restore was tested on 2026-09-24.
 
 **2026-09-22 — Moved to OCI, and consolidated everything into this repository.** The AWS
 deployment was built, applied, and verified, and then could not be reached: the account
