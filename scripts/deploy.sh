@@ -44,6 +44,10 @@ ok "api bundled"
   || die "web or site build failed; nothing was deployed"
 STAGE="$(mktemp -d -t vault-web.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
+# mktemp -d creates the directory 0700, and rsync -a carries that onto
+# /srv/vault/web, which Caddy then cannot read: every file returns 403. That
+# took the site down once.
+chmod 755 "$STAGE"
 cp -R "$REPO/apps/site/dist/." "$STAGE/"
 mkdir -p "$STAGE/app"
 cp -R "$REPO/apps/web/dist/." "$STAGE/app/"
@@ -95,6 +99,8 @@ if [ -n "$WEB_BUILD" ]; then
 
   ssh_ "sudo rsync -a --delete /tmp/vault-deploy-web/ /srv/vault/web/
         sudo chown -R vault:vault /srv/vault/web
+        sudo find /srv/vault/web -type d -exec chmod 755 {} +
+        sudo find /srv/vault/web -type f -exec chmod 644 {} +
         sudo install -o root -g root -m 0644 /tmp/vault-deploy/Caddyfile /etc/caddy/Caddyfile
         sudo mkdir -p /etc/systemd/system/caddy.service.d
         printf '[Service]\nEnvironment=VAULT_HOSTNAME=%s\nEnvironment=ACME_EMAIL=%s\n' \
@@ -117,3 +123,15 @@ log "Verify"
 health=$(ssh_ 'curl -sf --max-time 10 http://127.0.0.1:3000/api/health' || true)
 [ "$health" = '{"status":"ok"}' ] || die "health said: ${health:-nothing}"
 ok "api answers on localhost"
+
+if [ -n "$WEB_BUILD" ]; then
+  # From outside, through Caddy and TLS: the API answering on localhost says
+  # nothing about whether Caddy can read the files it serves.
+  for path in / /security /app/; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$VAULT_HOSTNAME$path" || true)
+    [ "$code" = 200 ] || die "https://$VAULT_HOSTNAME$path returned ${code:-nothing}"
+  done
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://$VAULT_HOSTNAME/no-such-page" || true)
+  [ "$code" = 404 ] || die "a missing page returned $code, not 404"
+  ok "site, security page, and client answer from outside; missing pages are 404"
+fi
