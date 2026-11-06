@@ -41,6 +41,7 @@ scp -q -i "$KEY" -o BatchMode=yes \
   "$REPO/services/backup/vault-backup.sh" \
   "$REPO/services/backup/vault-backup.service" \
   "$REPO/services/backup/vault-backup.timer" \
+  "$REPO/services/backup/vault-restore-drill.sh" \
   "$REPO/services/release/vault-pull.sh" \
   "$REPO/services/release/vault-pull.service" \
   "$REPO/services/release/vault-pull.timer" \
@@ -56,6 +57,7 @@ ssh_ "sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-api.service /e
       sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-backup.sh /usr/local/bin/vault-backup.sh
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-backup.service /etc/systemd/system/vault-backup.service
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-backup.timer /etc/systemd/system/vault-backup.timer
+      sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-restore-drill.sh /usr/local/bin/vault-restore-drill.sh
       sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-pull.sh /usr/local/bin/vault-pull.sh
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-pull.service /etc/systemd/system/vault-pull.service
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-pull.timer /etc/systemd/system/vault-pull.timer

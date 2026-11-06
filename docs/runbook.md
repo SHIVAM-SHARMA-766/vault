@@ -350,6 +350,7 @@ every six hours while an alarm stays firing, and a "resolved" mail follows when 
 | `disk` | boot disk over 85% | `sudo journalctl --vacuum-size=200M`; `du -sh /srv/vault/*` |
 | `memory` | over 90% for 30 minutes | `ps aux --sort=-rss \| head` |
 | `units-failed` | a `vault-*` unit or Caddy failed | `systemctl --failed` |
+| `restore-drill` | last passing drill over 95 days ago | `sudo vault-restore-drill.sh` (below) |
 
 On the host:
 
@@ -381,10 +382,9 @@ systemctl start vault-backup.service          # run one now
 oci os object list --auth instance_principal --bucket-name vault-backups --query 'data[].{name:name,size:"size"}' --output table
 ```
 
-**Check this periodically.** A backup that silently stopped a month ago is worse than no
-backup, because it is mistaken for one. Making the age of the newest export visible in
-the application — rather than only in a journal nobody reads — is the fix this still
-wants.
+A backup that silently stopped is worse than no backup, because it is mistaken for one.
+The health probe reports the age of the last verified export and the `backup-stale` alarm
+mails when it passes 30 hours (see Alerts).
 
 ### Restoring
 
@@ -414,21 +414,29 @@ sudo shred -u "$work"/* && sudo rmdir "$work"
 contains `DROP TABLE IF EXISTS`, so restoring over a working vault replaces it rather
 than merging.
 
-### Proving a backup is restorable
+### The quarterly restore drill
 
-Counting rows is not enough — it does not notice corrupted content. Compare the contents
-of the live and restored tables, excluding the rate counters, which change constantly:
+A backup nobody has restored is not a backup. Once a quarter, on the host:
 
 ```sh
-q() { MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -N -B -e "$1"; }
-q "SELECT MD5(GROUP_CONCAT(CONCAT(pk,sk,CAST(data AS CHAR)) ORDER BY pk,sk))
-   FROM vault.vault WHERE pk NOT LIKE 'RATE#%'"
-q "SELECT MD5(GROUP_CONCAT(CONCAT(pk,sk,CAST(data AS CHAR)) ORDER BY pk,sk))
-   FROM vault_restore_test.vault WHERE pk NOT LIKE 'RATE#%'"
+sudo vault-restore-drill.sh
 ```
 
-Done on 2026-09-24: eight rows, identical digests. A backup nobody has restored is not a
-backup.
+It takes a fresh export, downloads it into a root-only directory, loads it into a scratch
+database (`vault_restore_test`) beside the live one, and compares the two tables by digest —
+every row a person stored, leaving out rows that change by themselves (rate counters,
+session rotations, activity). It then drops the scratch database and shreds the download,
+pass or fail. A pass is appended to `/var/lib/vault/restore-drills.log` and recorded for the
+health probe; the `restore-drill` alarm (INFO) mails a reminder when the last pass is over
+95 days old. A mismatch usually means someone changed their vault mid-drill — run it again;
+if it repeats, the backup is incomplete and that is an incident.
+
+The comparison logic was checked against a throwaway database: identical restores match,
+churn in the excluded rows is ignored, and a changed entry is caught.
+
+| Date | Result |
+|---|---|
+| 2026-09-24 | Manual: eight rows, identical digests |
 
 ## Recovering the vault
 

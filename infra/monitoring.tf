@@ -12,7 +12,7 @@
 # instance was stopped, reclaimed, or wedged, or the probe broke — the alarm
 # fires on their absence.
 #
-# Cost: about nine metrics at one point every five minutes is under 100,000
+# Cost: about ten metrics at one point every five minutes is under 100,000
 # datapoints a month against an always-free allowance of 500 million; alarm
 # mails come out of the 1,000 free emails a month, and repeats are throttled.
 
@@ -64,6 +64,8 @@ locals {
     "The TLS certificate expires in under 14 days and has not renewed. Caddy renews at 30 days left, so renewal is failing: journalctl -u caddy | grep -i acme"]
     backup_stale = ["CRITICAL", "backup_age_hours[1h].max() > 30", "PT1H",
     "No verified backup in over 30 hours. The daily export is the only backup there is. Look at: journalctl -u vault-backup -n 100"]
+    restore_drill = ["INFO", "restore_drill_age_days[1h].min() > 95", "PT1H",
+    "A restore drill is due (quarterly). On the host: sudo vault-restore-drill.sh — it restores the newest backup into a scratch database and compares it with the live one."]
     disk = ["WARNING", "disk_used_percent[15m].max() > 85", "PT30M",
     "The boot disk is over 85% full. Look at journald size and old releases under /srv/vault."]
     memory = ["WARNING", "memory_used_percent[15m].min() > 90", "PT30M",

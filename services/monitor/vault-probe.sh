@@ -67,14 +67,23 @@ else
   log "no backup found"
 fi
 
+# Days since the last restore drill passed (services/backup/vault-restore-drill.sh).
+# 9999 before the first, so the alarm asks for one.
+drill_mark="${DRILL_MARK:-/var/lib/vault/last-restore-drill}"
+if [ -s "$drill_mark" ] && [[ "$(cat "$drill_mark")" =~ ^[0-9]+$ ]]; then
+  restore_drill_age_days=$(( ($(date +%s) - $(cat "$drill_mark")) / 86400 ))
+else
+  restore_drill_age_days=9999
+fi
+
 disk_used_percent=$(df --output=pcent / | tail -1 | tr -dc '0-9')
 memory_used_percent=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{printf "%d", (t-a)*100/t}' /proc/meminfo)
 failed_units=$(systemctl list-units --state=failed --no-legend --plain 'vault-*' caddy.service 2>/dev/null | grep -c . || true)
 
-metrics=(api_up site_up cert_days_left backup_age_hours disk_used_percent memory_used_percent failed_units)
+metrics=(api_up site_up cert_days_left backup_age_hours restore_drill_age_days disk_used_percent memory_used_percent failed_units)
 
 if [ "$DRY_RUN" = 1 ]; then
-  for m in "${metrics[@]}"; do printf '%-20s %s\n' "$m" "${!m}"; done
+  for m in "${metrics[@]}"; do printf '%-24s %s\n' "$m" "${!m}"; done
   exit 0
 fi
 
@@ -101,7 +110,7 @@ trap 'rm -f "$payload"' EXIT
 if oci monitoring metric-data post --auth instance_principal \
      --endpoint "https://telemetry-ingestion.$region.oraclecloud.com" \
      --metric-data "file://$payload" >/dev/null; then
-  log "posted: api_up=$api_up site_up=$site_up cert_days_left=$cert_days_left backup_age_hours=$backup_age_hours disk=$disk_used_percent% memory=$memory_used_percent% failed_units=$failed_units"
+  log "posted: api_up=$api_up site_up=$site_up cert_days_left=$cert_days_left backup_age_hours=$backup_age_hours drill_age_days=$restore_drill_age_days disk=$disk_used_percent% memory=$memory_used_percent% failed_units=$failed_units"
 else
   log "posting metrics failed"
   exit 1
