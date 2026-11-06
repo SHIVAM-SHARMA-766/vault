@@ -39,6 +39,10 @@ export interface EntryContent {
   /** Base32, RFC 4648 — the format authenticator apps emit. */
   totpSecret?: string
   customFields: CustomField[]
+  /** The fields particular to the entry's type — a card's number and expiry,
+   *  an SSH key's private half — keyed as packages/core's item model names
+   *  them. Absent on entries saved before types had their own fields. */
+  fields?: Record<string, string>
   favorite: boolean
   /** Which folder this belongs to. Inside the blob rather than beside it, so
    *  the organisation of the vault is hidden along with its contents. */
@@ -70,6 +74,9 @@ export interface SealedFolder {
 
 const entryAad = (id: string): Uint8Array => utf8Encode(`vault.entry.v1:${id}`)
 const folderAad = (id: string): Uint8Array => utf8Encode(`vault.folder.v1:${id}`)
+// A previous version of an entry. Its own AAD, so the server cannot present a
+// history snapshot as the live entry or move it to another entry's history.
+const historyAad = (entryId: string): Uint8Array => utf8Encode(`vault.history.v1:${entryId}`)
 
 export async function sealEntry(
   id: string,
@@ -101,6 +108,23 @@ export async function openFolder(
   vaultKey: Uint8Array,
 ): Promise<FolderContent> {
   return unsealJson<FolderContent>(vaultKey, blob, folderAad(id))
+}
+
+/** Seals a previous version of an entry for its history. */
+export async function sealHistory(
+  entryId: string,
+  content: EntryContent,
+  vaultKey: Uint8Array,
+): Promise<string> {
+  return sealJson(vaultKey, content, historyAad(entryId))
+}
+
+export async function openHistory(
+  entryId: string,
+  blob: string,
+  vaultKey: Uint8Array,
+): Promise<EntryContent> {
+  return unsealJson<EntryContent>(vaultKey, blob, historyAad(entryId))
 }
 
 /** DynamoDB rejects any item over 400 KB, and a rejected write surfaces as a

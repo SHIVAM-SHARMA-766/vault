@@ -90,8 +90,10 @@ export {
   isWithinSizeLimit,
   openEntry,
   openFolder,
+  openHistory,
   sealEntry,
   sealFolder,
+  sealHistory,
 } from './entry.js'
 
 export {

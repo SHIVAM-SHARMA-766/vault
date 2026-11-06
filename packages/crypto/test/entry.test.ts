@@ -92,3 +92,15 @@ test('optional fields stay absent rather than becoming empty strings', async () 
   assert.deepEqual(opened, minimal)
   assert.ok(!('password' in opened))
 })
+
+test('a history snapshot opens only as history, for its own entry', async () => {
+  const { sealHistory, openHistory, sealEntry, openEntry, generateVaultKey, UnsealError } = await import('../src/index.js')
+  const key = generateVaultKey()
+  const content = { name: 'Old', type: 'login' as const, password: 'old-pass', tags: [], customFields: [], favorite: false }
+  const snap = await sealHistory('entry-aaaaaaaa', content, key)
+  assert.equal((await openHistory('entry-aaaaaaaa', snap, key)).password, 'old-pass')
+  await assert.rejects(openHistory('entry-bbbbbbbb', snap, key), UnsealError)
+  await assert.rejects(openEntry('entry-aaaaaaaa', snap, key), UnsealError)
+  const live = await sealEntry('entry-aaaaaaaa', content, key)
+  await assert.rejects(openHistory('entry-aaaaaaaa', live, key), UnsealError)
+})
