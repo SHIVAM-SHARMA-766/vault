@@ -28,10 +28,9 @@ const need = (p, hint) => { try { statSync(p) } catch { console.error(`missing $
 need(join(API, 'app.js'), 'run `npm run build` first')
 need(join(ROOT, 'apps/web/dist/index.html'), 'run `npm run build` first')
 
-const { buildRouter } = await import(join(API, 'app.js'))
+const { buildRouter, handleRequest } = await import(join(API, 'app.js'))
 const { MemoryStore } = await import(join(API, 'store-memory.js'))
 const { emailDigest } = await import(join(API, 'identity.js'))
-const { errorResponse } = await import(join(API, 'http.js'))
 const { publishToDisk } = await import(join(API, 'site.js'))
 
 const PORT = Number(process.env.PORT ?? 8080)
@@ -49,7 +48,8 @@ const app = {
   adminDigests: new Set([emailDigest(OWNER, PEPPER)]),
   site: { sourceDir: join(ROOT, 'apps/site'), outputDir: mkdtempSync(join(tmpdir(), 'vault-dev-site-')), origin: `http://localhost:${PORT}` },
   config: {
-    region: 'dev', bucket: 'dev', namespace: 'dev',
+    port: PORT, origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: [OWNER],
+    site: { sourceDir: '', outputDir: '' },
     db: { host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0 },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',
   },
@@ -86,11 +86,11 @@ createServer((req, res) => {
     }
 
     if (p.startsWith('/api/')) {
-      const r = await router.handle({
+      const r = await handleRequest(router, {
         rawPath: p, rawQueryString: url.search.slice(1), headers: req.headers,
         ...(chunks.length ? { body: Buffer.concat(chunks).toString('utf8') } : {}),
         requestContext: { http: { method: req.method ?? 'GET', sourceIp: '127.0.0.1', userAgent: String(req.headers['user-agent'] ?? '') } },
-      }).catch((e) => errorResponse(e))
+      })
       res.writeHead(r.statusCode, r.headers)
       return res.end(r.body)
     }

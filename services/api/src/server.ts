@@ -9,8 +9,6 @@
 // that shape and back.
 
 import { createServer } from 'node:http'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { buildRouter, handleRequest } from './app.js'
 import { loadConfig } from './config.js'
@@ -20,7 +18,6 @@ import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
 import { MysqlStore } from './store-mysql.js'
 
-const PORT = Number(process.env['PORT'] ?? 3000)
 const HOST = '127.0.0.1'
 
 /** Bodies are small — one sealed entry, or one image of at most 2 MB sent as
@@ -35,26 +32,13 @@ function buildApp(): { app: App; store: MysqlStore } {
     config,
     store,
     now: () => Date.now(),
-    // Closed unless explicitly opened, so a missing or misspelled setting
-    // refuses registration rather than leaving the vault open to whoever finds
-    // the address.
-    allowRegistration: process.env['ALLOW_REGISTRATION'] === 'true',
-    // Comma-separated addresses in secrets.env. Turned into digests here and
-    // the addresses themselves are not kept.
-    adminDigests: new Set(
-      (process.env['ADMIN_EMAILS'] ?? '')
-        .split(',')
-        .map((e) => e.trim())
-        .filter(Boolean)
-        .map((e) => emailDigest(e, config.pepper)),
-    ),
+    // Closed unless explicitly opened (config.ts), so a missing or misspelled
+    // setting refuses registration rather than leaving the vault open.
+    allowRegistration: config.allowRegistration,
+    adminDigests: new Set(config.adminEmails.map((e) => emailDigest(e, config.pepper))),
     // The website's templates ship beside this file in each release (api/site);
     // rendered versions go where the unit lets this process write.
-    site: {
-      sourceDir: process.env['SITE_SOURCE'] ?? join(dirname(fileURLToPath(import.meta.url)), 'site'),
-      outputDir: process.env['SITE_ROOT'] ?? '/srv/vault/site',
-      origin: process.env['SITE_ORIGIN'] ?? `https://${process.env['VAULT_HOSTNAME'] ?? 'vault-shivam.duckdns.org'}`,
-    },
+    site: { ...config.site, origin: config.origin },
   }
   return { app, store }
 }
@@ -125,8 +109,8 @@ export async function start(): Promise<void> {
     })
   })
 
-  server.listen(PORT, HOST, () => {
-    console.log(`vault api listening on ${HOST}:${PORT}`)
+  server.listen(app.config.port, HOST, () => {
+    console.log(`vault api listening on ${HOST}:${app.config.port}`)
   })
 
   // systemd restarts on failure; the job here is to exit rather than linger in
