@@ -26,3 +26,13 @@ export {
   typeSpec,
   writeField,
 } from './items.js'
+export {
+  type ImportResult,
+  type ImportedItem,
+  ImportError,
+  duplicateKey,
+  parseCsv,
+  readImport,
+  totpKey,
+} from './import.js'
+export { type ExportEntry, toCsv } from './export.js'
