@@ -14,7 +14,8 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:stack": "node scripts/dev-stack.mjs",
-    "test:e2e": "node --test --test-concurrency=1 tests/e2e/"
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "engines": {
     "node": ">=20.11"
