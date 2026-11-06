@@ -41,6 +41,7 @@ Four documents, in the order worth reading them:
 | [decisions/0004](decisions/0004-the-access-token-header.md) | Why the access token is not in the `Authorization` header |
 | [decisions/0005](decisions/0005-pull-based-releases.md) | How code reaches the host without SSH |
 | [decisions/0006](decisions/0006-admin-panel.md) | What the admin panel can and cannot do |
+| [decisions/0007](decisions/0007-roles-and-site-editing.md) | Staff roles, and editing the website safely on the vault's origin |
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes the system those add up to.
 [docs/threat-model.md](docs/threat-model.md) says who the adversaries are and which risks
@@ -90,7 +91,7 @@ the runbook.
 | `packages/crypto/` | Every cryptographic operation. Zero third-party dependencies |
 | `services/api/` | The API and its storage adapters |
 | `apps/web/` | The vault client and the admin panel, at `/app/` |
-| `apps/site/` | The public website at `/`: static HTML and CSS, no JavaScript |
+| `apps/site/` | The public website: templates, editable content schema and defaults, and its renderer |
 | `services/backup/`, `services/release/` | The daily export, and the host's release pull agent |
 | `scripts/` | `release.sh` ships code, `deploy.sh` sets up the host |
 | `infra/` | Terraform for everything this runs on |
@@ -101,7 +102,7 @@ the runbook.
 
 ```sh
 npm install
-npm test        # 159 tests across the crypto package and the API
+npm test        # 175 tests across the crypto package and the API
 ```
 
 The API's tests run against an in-memory store, so no cloud account is needed for any of

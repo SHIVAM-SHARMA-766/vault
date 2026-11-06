@@ -1,6 +1,6 @@
 # 0006 — An admin panel that cannot read the vault
 
-Status: Accepted
+Status: Accepted, extended by [0007](0007-roles-and-site-editing.md) (roles beyond owner, website editing)
 Date: 2026-11-06
 
 ## Context

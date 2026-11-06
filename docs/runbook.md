@@ -205,11 +205,47 @@ sudo systemctl start vault-pull.service       # check now instead of waiting
 
 ### Setting up the host
 
+**Order matters when the unit changes.** If a release depends on a change to
+`vault-api.service` (as the website editor does, for `ReadWritePaths=/srv/vault/site`), run
+`deploy.sh` first, then `release.sh`. The other way round, the release fails its checks and
+the pull agent rolls it back.
+
 `scripts/deploy.sh <host>` installs what releases do not carry: the `vault-api` unit, the
 backup timer, the pull timer and `/etc/vault/release.env`. Run it after rebuilding the host
 or when one of those files changes. It needs SSH open for your address (see "Getting on the
 host"), then installs the published release once, so a fresh host is serving before you
 close SSH again.
+
+## Editing the website
+
+Website text, search details, images and the announcement banner are edited in the admin
+panel under **Website** by owners, admins and marketing ([0007](../decisions/0007-roles-and-site-editing.md)).
+Changes are a draft until **Publish**; **History** puts any of the last 30 versions back.
+None of this needs a release.
+
+On the host, the API renders the site into `/srv/vault/site/v-<timestamp>/` and points
+`/srv/vault/site/current` at it; images are in `/srv/vault/site/media/`. It renders once at
+every start, too, so a release with new templates takes effect as soon as it is installed.
+
+```sh
+ls -l /srv/vault/site/                                 # current -> the live render
+journalctl -u vault-api | grep -i 'render the website' # a render that failed says so here
+```
+
+If a render fails, the previous one keeps serving. The usual cause is the API not being able
+to write `/srv/vault/site`, which means `deploy.sh` has not been run since the unit gained
+`ReadWritePaths=/srv/vault/site`.
+
+To change the *structure* of the site — a new section, a new editable field — edit
+`apps/site/templates/`, `content/schema.json` and `content/defaults.json`, and ship a release.
+Text that is already published lives in the database, so editing `defaults.json` does not
+change it.
+
+## Staff roles
+
+Owners are the addresses in `ADMIN_EMAILS`. Everyone else's role is set by an owner in
+**Users** (the Role column), or carried by an invitation created with **Starts as**. Roles take
+effect on the next request. See the table in [0007](../decisions/0007-roles-and-site-editing.md).
 
 ## Rotating the host key
 

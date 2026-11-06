@@ -102,12 +102,23 @@ release if anything fails. Nothing inbound is involved; SSH stays closed.
 Write access to that bucket decides what browsers run, so it carries the same weight as the
 hostname (A3). The host can only read it.
 
+## The website
+
+The public site is templates, a content schema and content ([0007](decisions/0007-roles-and-site-editing.md)).
+Templates ship in each release under `api/site/`; content is edited in the admin panel and
+stored in the `SYSTEM` partition. When content is published — and once at every API start —
+the API renders the templates with the live content into `/srv/vault/site/v-<ts>/` and swaps
+the `current` symlink, which is what Caddy serves at `/`. Uploaded images are stored in the
+table and written to `/srv/vault/site/media/`. The renderer escapes every value and accepts
+no markup, because the site shares an origin with the vault client.
+
 ## Administration
 
 The operator manages the service from an admin panel inside the client, at `/app/admin`
-([0006](decisions/0006-admin-panel.md)). Admin is a role on a normal account: the API keeps
-digests of the addresses in `ADMIN_EMAILS` and checks the caller's profile against them on
-every admin request. The panel can set registration to closed, invite-only or open, issue
+([0006](decisions/0006-admin-panel.md), [0007](decisions/0007-roles-and-site-editing.md)).
+Access is by role on a normal account: owners are the addresses in `ADMIN_EMAILS`, kept as
+digests; owners grant admin, marketing and viewer, stored on the account's registry row.
+Every admin request re-reads the caller's role and checks the permission the route needs. The panel can set registration to closed, invite-only or open, issue
 single-use invitations, list accounts with their counts and dates, label, sign out,
 disable or delete them, show the last recorded backup, and read an audit log. It cannot read
 a vault or show an address — there is nothing readable on the server for it to show.
@@ -131,6 +142,8 @@ shard-key query and a point lookup.
 | `SYSTEM` | `INVITE#<sha256>` / `INVITEUSED#<sha256>` | An invitation, by the hash of its code, and its single-use claim |
 | `SYSTEM` | `AUDIT#<ts>#<rand>` | An admin action, expires after a year |
 | `SYSTEM` | `BACKUP` | The last verified export, written by the backup script |
+| `SYSTEM` | `SITE#DRAFT` / `SITE#LIVE` / `SITE#V#<version>` | Website draft, pointer to the live version, and the last 30 published versions |
+| `SYSTEM` | `MEDIA#<id>` / `MEDIAMETA#<id>` | An uploaded image (bytes, base64) and its metadata |
 
 Unlocking is one query. Everything after that — search, filter, sort, folder resolution —
 happens in the client, because the server cannot read what it is storing.
@@ -163,8 +176,8 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
 | `services/api/` | The API, and the storage adapters behind one interface |
-| `apps/web/` | The vault client and admin panel, served at `/app/`, and the Caddyfile |
-| `apps/site/` | The public website at `/`: static HTML and CSS, no JavaScript |
+| `apps/web/` | The vault client and admin panel (including the website editor), served at `/app/`, and the Caddyfile |
+| `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
 | `services/backup/` | The daily export and its systemd timer |
 | `services/release/` | The host's pull agent and its systemd timer |
 | `scripts/` | `release.sh` ships code; `deploy.sh` sets up the host; `apply.sh` guards Terraform |

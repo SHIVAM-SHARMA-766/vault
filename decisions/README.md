@@ -26,6 +26,7 @@ someone who would otherwise assume it was an oversight.
 | [0004](0004-the-access-token-header.md) | The access token header |
 | [0005](0005-pull-based-releases.md) | Releases are pulled by the host |
 | [0006](0006-admin-panel.md) | An admin panel that cannot read the vault |
+| [0007](0007-roles-and-site-editing.md) | Staff roles, and a website edited from the admin panel |
 
 ## A note on the numbering
 

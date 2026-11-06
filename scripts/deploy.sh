@@ -57,6 +57,7 @@ ssh_ "sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-api.service /e
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-pull.service /etc/systemd/system/vault-pull.service
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-pull.timer /etc/systemd/system/vault-pull.timer
       sudo install -d -o root -g root -m 0755 /etc/vault
+      sudo install -d -o vault -g vault -m 0755 /srv/vault/site
       printf 'RELEASE_BUCKET=%s\nOBJECTSTORAGE_NAMESPACE=%s\nVAULT_HOSTNAME=%s\nACME_EMAIL=%s\n' \
         '$RELEASE_BUCKET' '$NAMESPACE' '$VAULT_HOSTNAME' '$ACME_EMAIL' | sudo tee /etc/vault/release.env >/dev/null
       sudo chmod 0644 /etc/vault/release.env

@@ -73,15 +73,18 @@ ok "api bundled, client and site built and policy-checked"
 STAGE="$(mktemp -d -t vault-release.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 chmod 755 "$STAGE"
-mkdir -p "$STAGE/r/web/app" "$STAGE/r/api"
-cp -R apps/site/dist/. "$STAGE/r/web/"
+mkdir -p "$STAGE/r/web/app" "$STAGE/r/api/site"
 cp -R apps/web/dist/. "$STAGE/r/web/app/"
 cp services/api/dist-bundle/index.mjs services/api/dist-bundle/index.mjs.map "$STAGE/r/api/"
+# The website ships as templates, schema, defaults and static files. The API
+# renders it on the host with whatever content is published in the admin panel.
+cp -R apps/site/templates apps/site/static apps/site/content "$STAGE/r/api/site/"
 cp apps/web/Caddyfile "$STAGE/r/Caddyfile"
 printf '%s\n' "$ID" > "$STAGE/r/RELEASE"
 # Public on purpose: a commit id reveals nothing, and it is how this script and
-# anyone else can tell which release is being served.
-printf '%s\n' "$ID" > "$STAGE/r/web/release.txt"
+# anyone else can tell which release is being served. It is a static file of
+# the site, so every render carries it.
+printf '%s\n' "$ID" > "$STAGE/r/api/site/static/release.txt"
 ( cd "$STAGE/r" && find . -type f ! -name MANIFEST -printf '%P\n' | sort | xargs -d '\n' sha256sum > MANIFEST )
 tar -czf "$STAGE/release.tar.gz" -C "$STAGE/r" .
 SHA="$(sha256sum "$STAGE/release.tar.gz" | cut -d' ' -f1)"

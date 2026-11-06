@@ -50,14 +50,11 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-1. **The first account**, now from the admin flow: force registration open once
-   (`scripts/registration.sh open`), register the address in `ADMIN_EMAILS`, close it, and
-   from then on let people in with invitations from the admin panel.
-2. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
+1. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
    database does not, so a stray `terraform destroy` deletes the vault.
-3. **Remove the AWS resources** left standing from the first deployment. The personal AWS
+2. **Remove the AWS resources** left standing from the first deployment. The personal AWS
    credentials in creds are no longer valid, so this needs new keys first.
-4. **Sign releases**, if anyone besides the operator ever gets write access to the
+3. **Sign releases**, if anyone besides the operator ever gets write access to the
    releases bucket ([0005](decisions/0005-pull-based-releases.md)).
 
 Later: the Android client, and a browser-extension client — the only way to close A3
@@ -77,6 +74,13 @@ without a domain, since its code would not be served by the hostname.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Staff roles and website editing.** Owner, admin, marketing and viewer
+roles, granted by the owner or carried by an invitation. The public site's text, search
+details, images and an announcement banner are edited in the admin panel, drafted,
+previewed, published and rolled back without a release
+([0007](decisions/0007-roles-and-site-editing.md)). Needs `deploy.sh` before the release
+that carries it, for the unit's new `ReadWritePaths=/srv/vault/site`.
 
 **2026-11-06 — Deploys without SSH.** Releases go to a private `vault-releases` bucket and
 the host pulls, verifies, installs and health-checks them every five minutes, rolling back

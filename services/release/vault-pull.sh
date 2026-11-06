@@ -64,7 +64,7 @@ mkdir -p "$DEST"
 tar -xzf "$WORK/release.tar.gz" -C "$DEST" --no-same-owner --no-same-permissions
 ( cd "$DEST" && sha256sum -c --quiet MANIFEST ) \
   || { log "the release does not match its own manifest"; echo "$ID" > "$STATE/failed"; rm -rf "$DEST"; exit 1; }
-for required in web/index.html web/app/index.html api/index.mjs Caddyfile; do
+for required in web/app/index.html api/index.mjs api/site/templates/index.html api/site/content/schema.json Caddyfile; do
   [ -f "$DEST/$required" ] || { log "the release is missing $required"; echo "$ID" > "$STATE/failed"; rm -rf "$DEST"; exit 1; }
 done
 
@@ -85,11 +85,23 @@ install_release() {
   # --delete would remove.
   install -o vault -g vault -m 0644 "$dir/api/index.mjs" /srv/vault/api/index.mjs
   [ -f "$dir/api/index.mjs.map" ] && install -o vault -g vault -m 0644 "$dir/api/index.mjs.map" /srv/vault/api/index.mjs.map
+  if [ -d "$dir/api/site" ]; then
+    rsync -a --delete "$dir/api/site/" /srv/vault/api/site/
+    chown -R vault:vault /srv/vault/api/site
+  fi
+  install -d -o vault -g vault -m 0755 /srv/vault/site
+  # The API renders the public site as it starts, so it restarts before Caddy
+  # is pointed at the rendered output.
+  systemctl restart vault-api
+  local i
+  for i in $(seq 1 15); do
+    [ -e /srv/vault/site/current ] || [ ! -d "$dir/api/site" ] && break
+    sleep 1
+  done
   if ! cmp -s "$dir/Caddyfile" /etc/caddy/Caddyfile; then
     install -o root -g root -m 0644 "$dir/Caddyfile" /etc/caddy/Caddyfile
     systemctl reload caddy
   fi
-  systemctl restart vault-api
 }
 
 verify() {

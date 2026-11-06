@@ -139,6 +139,27 @@ zero-knowledge sign-in and per-address, per-IP limits as any other, plus a separ
 rate limit. Deletion requires the target's id as confirmation, and the admin cannot disable
 or delete their own account. The daily export is the recovery path from destructive use.
 
+**Since [0007](../decisions/0007-roles-and-site-editing.md) there are lesser staff roles.**
+An *admin* can do the above to accounts ranked below it, but cannot grant roles or touch
+another admin or an owner. A *viewer* can read the panel and change nothing. A *marketing*
+account can edit and publish the public website — and only that.
+
+### A10 — Hostile website content
+
+An attacker who controls a marketing account (or any role that can publish the website), or
+who can write the content rows directly.
+
+The site shares an origin with the vault client, so script on the site could read the master
+password as it is typed. That is the outcome to prevent, and it is prevented in the renderer
+rather than by trusting editors: every value is HTML-escaped, there is no field that accepts
+markup, links are limited to site paths and `https://`, icons are from a fixed set, and
+uploaded images must be PNG, JPEG or WebP by their bytes — SVG is refused. The
+Content-Security-Policy, which allows no inline script, is the second layer. The security
+page's text is not editable.
+
+What remains is defacement: misleading text or images on the public site. It is audited,
+and any earlier version can be made live again in one click.
+
 ### A5 — Stolen or shared device
 
 Physical access to an unlocked session.
