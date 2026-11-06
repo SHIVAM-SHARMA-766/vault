@@ -3,8 +3,10 @@
 // addresses only as digests, so the most an admin can learn about an account is
 // when it was created, when it last signed in, and how many items it holds.
 //
-// Access is by account: a normal sign-in, whose address digest is listed in
-// ADMIN_EMAILS. See decisions/0006-admin-panel.md.
+// Access is by account and role: owners are the addresses in ADMIN_EMAILS, and
+// owners grant admin, marketing and viewer to other accounts. Each route names
+// the permission it needs; roles.ts maps roles to permissions. See
+// decisions/0006-admin-panel.md and 0007-roles-and-site-editing.md.
 
 import type { App } from '../context.js'
 import { type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
@@ -13,7 +15,6 @@ import {
   EMAIL_SK,
   ENTRY_PREFIX,
   FOLDER_PREFIX,
-  PROFILE_SK,
   SESSION_PREFIX,
   SYSTEM_PK,
   emailPk,
@@ -22,6 +23,16 @@ import {
   userPk,
 } from '../keys.js'
 import { enforce, type Limit } from '../ratelimit.js'
+import {
+  GRANTABLE_ROLES,
+  type GrantableRole,
+  type Permission,
+  type Role,
+  can,
+  outranks,
+  requirePermission,
+  roleFromDigest,
+} from '../roles.js'
 import {
   REGISTRATION_MODES,
   type RegistrationMode,
@@ -42,13 +53,12 @@ import { revokeAllSessions } from './auth.js'
 
 const ADMIN_LIMIT: Limit = { max: 300, windowSeconds: 15 * 60 }
 
-/** The admin check, in one place. Reads the profile for its address digest
- *  rather than trusting anything in the token. */
-export async function requireAdmin(app: App, userId: string): Promise<void> {
-  const profile = await app.store.get(userPk(userId), PROFILE_SK)
-  const digest = profile?.['emailDigest']
-  if (typeof digest !== 'string' || !app.adminDigests.has(digest)) throw forbidden()
+/** The check every admin route makes: the caller's current role, re-read from
+ *  the profile and registry, must carry the permission. */
+export async function guard(app: App, userId: string, permission: Permission): Promise<Role> {
+  const role = await requirePermission(app, userId, permission)
   await enforce(app.store, 'admin', userId, ADMIN_LIMIT, app.now())
+  return role
 }
 
 interface UserSummary {
@@ -58,6 +68,7 @@ interface UserSummary {
   lastLoginAt: string | null
   disabled: boolean
   isAdmin: boolean
+  role: Role
   entries: number
   folders: number
   sessions: number
@@ -73,6 +84,7 @@ async function summarize(app: App, reg: RegistryEntry): Promise<UserSummary> {
     lastLoginAt: reg.lastLoginAt ?? null,
     disabled: reg.disabled === true,
     isAdmin: app.adminDigests.has(reg.emailDigest),
+    role: roleFromDigest(app, reg.emailDigest, reg.role),
     entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
     folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
     sessions: items.filter((i) => i.sk.startsWith(SESSION_PREFIX)
@@ -121,19 +133,39 @@ function fieldsOf(reg: RegistryEntry): RegistryFields {
     ...(reg.label ? { label: reg.label } : {}),
     ...(reg.disabled ? { disabled: true } : {}),
     ...(reg.inviteId ? { inviteId: reg.inviteId } : {}),
+    ...(reg.role ? { role: reg.role } : {}),
   }
 }
 
-async function targetUser(app: App, actor: string, id: string, allowSelf: boolean) {
+/** Loads the account an action targets and checks the actor may touch it: not
+ *  themselves unless the action allows it, and never an account of equal or
+ *  higher rank — an admin cannot act on another admin or an owner. */
+async function targetUser(app: App, actor: string, actorRole: Role, id: string, allowSelf: boolean) {
   if (!isValidId(id)) throw badRequest('Invalid user id.')
-  if (!allowSelf && id === actor) throw badRequest('That cannot be done to your own account.')
+  const self = id === actor
+  if (!allowSelf && self) throw badRequest('That cannot be done to your own account.')
   const reg = await getRegistry(app, id)
   if (!reg) throw notFound()
+  if (!self && !outranks(actorRole, roleFromDigest(app, reg.emailDigest, reg.role))) throw forbidden()
   return reg
 }
 
-export async function setLabel(app: App, actor: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
-  const reg = await targetUser(app, actor, id, true)
+export async function setRole(app: App, actor: string, actorRole: Role, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, actorRole, id, false)
+  if (app.adminDigests.has(reg.emailDigest)) throw badRequest('Owners are set in the host configuration, not here.')
+  const body = parseJsonBody<{ role?: unknown }>(event)
+  if (!(GRANTABLE_ROLES as readonly unknown[]).includes(body.role)) {
+    throw badRequest(`role must be one of: ${GRANTABLE_ROLES.join(', ')}.`)
+  }
+  const role = body.role as GrantableRole
+  await audit(app, actor, 'user.role', id, role)
+  const { role: _old, ...rest } = fieldsOf(reg)
+  await putRegistry(app, { ...rest, ...(role !== 'user' ? { role } : {}) })
+  return json(200, { ok: true })
+}
+
+export async function setLabel(app: App, actor: string, actorRole: Role, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, actorRole, id, true)
   const body = parseJsonBody<{ label?: unknown }>(event)
   if (typeof body.label !== 'string' || body.label.length > 80) throw badRequest('label must be a string of at most 80 characters.')
   const label = body.label.trim()
@@ -143,8 +175,8 @@ export async function setLabel(app: App, actor: string, event: LambdaEvent, id: 
   return json(200, { ok: true })
 }
 
-export async function setDisabled(app: App, actor: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
-  const reg = await targetUser(app, actor, id, false)
+export async function setDisabled(app: App, actor: string, actorRole: Role, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, actorRole, id, false)
   const body = parseJsonBody<{ disabled?: unknown }>(event)
   if (typeof body.disabled !== 'boolean') throw badRequest('disabled must be true or false.')
   await audit(app, actor, body.disabled ? 'user.disable' : 'user.enable', id)
@@ -153,8 +185,8 @@ export async function setDisabled(app: App, actor: string, event: LambdaEvent, i
   return json(200, { ok: true })
 }
 
-export async function revokeSessions(app: App, actor: string, id: string): Promise<LambdaResponse> {
-  await targetUser(app, actor, id, true)
+export async function revokeSessions(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
+  await targetUser(app, actor, actorRole, id, true)
   await audit(app, actor, 'user.revoke-sessions', id)
   await revokeAllSessions(app, id)
   return json(200, { ok: true })
@@ -162,8 +194,8 @@ export async function revokeSessions(app: App, actor: string, id: string): Promi
 
 /** Removes an account and everything in it. There is no undo: the entries
  *  were readable only by their owner, and the daily export is the only copy. */
-export async function deleteUser(app: App, actor: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
-  const reg = await targetUser(app, actor, id, false)
+export async function deleteUser(app: App, actor: string, actorRole: Role, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, actorRole, id, false)
   const body = parseJsonBody<{ confirm?: unknown }>(event)
   if (body.confirm !== id) throw badRequest('Send the user id as "confirm" to delete an account.')
   await audit(app, actor, 'user.delete', id, reg.label)
@@ -198,24 +230,31 @@ export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
       expiresAt: i.expiresAt,
       usedAt: i.usedAt ?? null,
       usedBy: i.usedBy ?? null,
+      role: i.role ?? 'user',
       status: i.usedAt ? 'used' : Date.parse(i.expiresAt) <= now ? 'expired' : 'active',
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return json(200, { invites })
 }
 
-export async function createInviteRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
-  const body = parseJsonBody<{ label?: unknown; days?: unknown }>(event)
+export async function createInviteRoute(app: App, actor: string, actorRole: Role, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ label?: unknown; days?: unknown; role?: unknown }>(event)
+  const role = body.role === undefined ? 'user' : body.role
+  if (!(GRANTABLE_ROLES as readonly unknown[]).includes(role)) {
+    throw badRequest(`role must be one of: ${GRANTABLE_ROLES.join(', ')}.`)
+  }
+  // Inviting someone into a staff role is granting that role.
+  if (role !== 'user' && !can(actorRole, 'roles.write')) throw forbidden()
   const label = typeof body.label === 'string' ? body.label.trim() : ''
   if (!label || label.length > 80) throw badRequest('label is required, at most 80 characters.')
   const days = body.days === undefined ? 7 : body.days
   if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30) {
     throw badRequest('days must be a whole number from 1 to 30.')
   }
-  await audit(app, actor, 'invite.create', undefined, label)
-  const { code, invite } = await createInvite(app, actor, label, days)
+  await audit(app, actor, 'invite.create', undefined, role === 'user' ? label : `${label} (${role})`)
+  const { code, invite } = await createInvite(app, actor, label, days, role as string)
   // The code is returned exactly once. Only its hash is stored.
-  return json(201, { code, invite: { id: invite.id, label, expiresAt: invite.expiresAt } })
+  return json(201, { code, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role } })
 }
 
 export async function deleteInviteRoute(app: App, actor: string, id: string): Promise<LambdaResponse> {

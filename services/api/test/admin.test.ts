@@ -188,3 +188,13 @@ test('the overview reports the last backup the host recorded', async () => {
   assert.equal(res.body['users'], 2)
   assert.deepEqual(res.body['lastBackup'], { at: '2026-09-22T00:30:00Z', object: 'vault-x.sql.gz', bytes: 1500 })
 })
+
+test('an account from before the registry gets a row on its next sign-in', async () => {
+  const { h, ownerToken, userId } = await setup()
+  await h.store.delete('SYSTEM', `USER#${userId}`)
+  let users = (await h.request('GET', '/api/admin/users', { token: ownerToken })).body['users'] as Array<Record<string, unknown>>
+  assert.ok(!users.some((u) => u['userId'] === userId))
+  await h.request('POST', '/api/auth/login', { body: { email: 'someone@example.com', authKey: fixtureB64('user-auth') } })
+  users = (await h.request('GET', '/api/admin/users', { token: ownerToken })).body['users'] as Array<Record<string, unknown>>
+  assert.ok(users.some((u) => u['userId'] === userId))
+})

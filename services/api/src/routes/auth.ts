@@ -41,9 +41,11 @@ import {
 import { hashAuthKey, verifyAuthKey } from '../verifier.js'
 import { type KdfParams, requireBase64UrlBytes, requireEmail, requireKdf, requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
+import { isStaff, permissionsOf, roleFromDigest } from '../roles.js'
 import {
   assertEnabled,
   claimInvite,
+  getRegistry,
   getSettings,
   hashInviteCode,
   putRegistry,
@@ -163,6 +165,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
 
   let inviteId: string | undefined
   let label: string | undefined
+  let role: string | undefined
   if (!open) {
     const invite = await claimInvite(app, inviteCode, userId)
     if (!invite) {
@@ -172,6 +175,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     }
     inviteId = invite.id
     label = invite.label
+    role = invite.role
   }
 
   const [authVerifier, recoveryVerifier] = await Promise.all([
@@ -193,6 +197,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     createdAt: at,
     ...(label ? { label } : {}),
     ...(inviteId ? { inviteId } : {}),
+    ...(role ? { role } : {}),
   })
 
   await recordActivity(app, userId, 'register', event)
@@ -216,7 +221,7 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   // apart from a wrong password by someone who does not hold it.
   await assertEnabled(app, profile.userId)
 
-  await touchLogin(app, profile.userId)
+  await touchLogin(app, profile.userId, profile)
   await recordActivity(app, profile.userId, 'login', event)
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
@@ -293,12 +298,15 @@ export async function logout(app: App, userId: string, event: LambdaEvent): Prom
 export async function me(app: App, userId: string): Promise<LambdaResponse> {
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()
+  const role = roleFromDigest(app, profile.emailDigest, (await getRegistry(app, userId))?.role)
   return json(200, {
     userId: profile.userId,
     kdf: profile.kdf,
     wrappedVaultKey: profile.wrappedVaultKey,
     createdAt: profile.createdAt,
-    isAdmin: app.adminDigests.has(profile.emailDigest),
+    role,
+    isAdmin: isStaff(role),
+    permissions: permissionsOf(role),
   })
 }
 

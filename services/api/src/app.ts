@@ -7,7 +7,9 @@ import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './ht
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { Router } from './router.js'
 import * as admin from './routes/admin.js'
+import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
+import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
 
 export function buildRouter(app: App): Router {
@@ -44,27 +46,39 @@ export function buildRouter(app: App): Router {
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)))
   router.get('/api/activity', authed((u) => vault.getActivity(app, u)))
 
-  // The operator's routes. Same sign-in as everything else, plus an address
-  // listed in ADMIN_EMAILS; see routes/admin.ts.
+  // The operator's routes. Same sign-in as everything else; each names the
+  // permission it needs, and the caller's role is re-read on every request.
+  // See roles.ts and routes/admin.ts.
   const admined =
-    (handler: (userId: string, event: LambdaEvent, param: string) => Promise<LambdaResponse>) =>
+    (permission: Permission,
+     handler: (userId: string, event: LambdaEvent, param: string, role: Role) => Promise<LambdaResponse>) =>
     authed(async (userId, event, param) => {
-      await admin.requireAdmin(app, userId)
-      return handler(userId, event, param)
+      const role = await admin.guard(app, userId, permission)
+      return handler(userId, event, param, role)
     })
 
-  router.get('/api/admin/overview', admined(() => admin.overview(app)))
-  router.get('/api/admin/users', admined(() => admin.listUsers(app)))
-  router.put('/api/admin/users/:id/label', admined((u, e, id) => admin.setLabel(app, u, e, id)))
-  router.put('/api/admin/users/:id/disabled', admined((u, e, id) => admin.setDisabled(app, u, e, id)))
-  router.post('/api/admin/users/:id/revoke-sessions', admined((u, _e, id) => admin.revokeSessions(app, u, id)))
-  router.post('/api/admin/users/:id/delete', admined((u, e, id) => admin.deleteUser(app, u, e, id)))
-  router.get('/api/admin/settings', admined(() => admin.getSettingsRoute(app)))
-  router.put('/api/admin/settings', admined((u, e) => admin.putSettingsRoute(app, u, e)))
-  router.get('/api/admin/invites', admined(() => admin.listInvitesRoute(app)))
-  router.post('/api/admin/invites', admined((u, e) => admin.createInviteRoute(app, u, e)))
-  router.delete('/api/admin/invites/:id', admined((u, _e, id) => admin.deleteInviteRoute(app, u, id)))
-  router.get('/api/admin/audit', admined(() => admin.auditRoute(app)))
+  router.get('/api/admin/overview', admined('overview.read', () => admin.overview(app)))
+  router.get('/api/admin/users', admined('users.read', () => admin.listUsers(app)))
+  router.put('/api/admin/users/:id/label', admined('users.write', (u, e, id, r) => admin.setLabel(app, u, r, e, id)))
+  router.put('/api/admin/users/:id/role', admined('roles.write', (u, e, id, r) => admin.setRole(app, u, r, e, id)))
+  router.put('/api/admin/users/:id/disabled', admined('users.write', (u, e, id, r) => admin.setDisabled(app, u, r, e, id)))
+  router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)))
+  router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)))
+  router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)))
+  router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)))
+  router.get('/api/admin/invites', admined('invites.read', () => admin.listInvitesRoute(app)))
+  router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)))
+  router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)))
+  router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)))
+
+  router.get('/api/admin/site', admined('site.read', () => site.getSite(app)))
+  router.put('/api/admin/site/draft', admined('site.write', (u, e) => site.saveDraft(app, u, e)))
+  router.delete('/api/admin/site/draft', admined('site.write', (u) => site.discardDraft(app, u)))
+  router.post('/api/admin/site/preview', admined('site.read', (_u, e) => site.preview(app, e)))
+  router.post('/api/admin/site/publish', admined('site.publish', (u, e) => site.publish(app, u, e)))
+  router.post('/api/admin/site/rollback/:version', admined('site.publish', (u, _e, v) => site.rollback(app, u, v)))
+  router.post('/api/admin/media', admined('site.write', (u, e) => site.uploadMedia(app, u, e)))
+  router.delete('/api/admin/media/:id', admined('site.write', (u, _e, id) => site.deleteMedia(app, u, id)))
 
   return router
 }

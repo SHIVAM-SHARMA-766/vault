@@ -34,6 +34,8 @@ export class HttpError extends Error {
   readonly code: string
   /** Seconds, for 429 responses. */
   readonly retryAfter: number | undefined
+  /** Field-level problems, for a 400 the caller can show next to each field. */
+  details: unknown
 
   constructor(status: number, code: string, message: string, retryAfter?: number) {
     super(message)
@@ -80,7 +82,7 @@ export function json(status: number, body: unknown, extra: Record<string, string
 export function errorResponse(err: unknown): LambdaResponse {
   if (err instanceof HttpError) {
     const extra = err.retryAfter === undefined ? {} : { 'retry-after': String(err.retryAfter) }
-    return json(err.status, { error: err.code, message: err.message }, extra)
+    return json(err.status, { error: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) }, extra)
   }
   // Unexpected. The detail goes to the log, never to the caller.
   console.error('unhandled error', err)

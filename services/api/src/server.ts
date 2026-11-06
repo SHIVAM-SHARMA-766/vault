@@ -9,20 +9,24 @@
 // that shape and back.
 
 import { createServer } from 'node:http'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { buildRouter } from './app.js'
 import { loadConfig } from './config.js'
 import { emailDigest } from './identity.js'
 import type { App } from './context.js'
 import { type LambdaEvent, errorResponse } from './http.js'
+import { publishToDisk } from './site.js'
 import { MysqlStore } from './store-mysql.js'
 
 const PORT = Number(process.env['PORT'] ?? 3000)
 const HOST = '127.0.0.1'
 
-/** Bodies are small — one sealed entry at most. A cap stops a single request
- *  from consuming the memory of a 1 GB host. */
-const MAX_BODY_BYTES = 1024 * 1024
+/** Bodies are small — one sealed entry, or one image of at most 2 MB sent as
+ *  base64 from the admin panel. A cap stops a single request from consuming
+ *  the memory of a 1 GB host. */
+const MAX_BODY_BYTES = 4 * 1024 * 1024
 
 function buildApp(): { app: App; store: MysqlStore } {
   const config = loadConfig()
@@ -44,6 +48,13 @@ function buildApp(): { app: App; store: MysqlStore } {
         .filter(Boolean)
         .map((e) => emailDigest(e, config.pepper)),
     ),
+    // The website's templates ship beside this file in each release (api/site);
+    // rendered versions go where the unit lets this process write.
+    site: {
+      sourceDir: process.env['SITE_SOURCE'] ?? join(dirname(fileURLToPath(import.meta.url)), 'site'),
+      outputDir: process.env['SITE_ROOT'] ?? '/srv/vault/site',
+      origin: process.env['SITE_ORIGIN'] ?? `https://${process.env['VAULT_HOSTNAME'] ?? 'vault-shivam.duckdns.org'}`,
+    },
   }
   return { app, store }
 }
@@ -55,6 +66,17 @@ export async function start(): Promise<void> {
   // step. If it fails the process exits rather than serving requests against a
   // schema that may not be there.
   await store.migrate()
+
+  // Render the live website before taking requests, so a new release serves
+  // its own templates from the first request. A failure is logged and the
+  // previous render keeps serving; the API itself does not depend on it.
+  if (app.site) {
+    try {
+      await publishToDisk(app, app.site)
+    } catch (err) {
+      console.error('could not render the website; the previous version stays live:', (err as Error).message)
+    }
+  }
 
   const router = buildRouter(app)
 

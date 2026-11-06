@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "mysql2": "^3.11.0",
-    "@vault/crypto": "*"
+    "@vault/crypto": "*",
+    "@vault/site": "*"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

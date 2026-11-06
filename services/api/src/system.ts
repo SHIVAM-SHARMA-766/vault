@@ -62,6 +62,9 @@ export interface RegistryFields {
   label?: string
   disabled?: boolean
   inviteId?: string
+  /** A staff role granted by an owner: admin, marketing or viewer. Absent
+   *  means a plain user. Owner is never stored; see roles.ts. */
+  role?: string
 }
 export type RegistryEntry = Item & RegistryFields
 
@@ -77,12 +80,21 @@ export async function putRegistry(app: App, entry: RegistryFields): Promise<void
   await app.store.put({ ...entry, pk: SYSTEM_PK, sk: registrySk(entry.userId) })
 }
 
-export async function touchLogin(app: App, userId: string): Promise<void> {
+export async function touchLogin(
+  app: App, userId: string, profile: { emailDigest: string; createdAt: string },
+): Promise<void> {
   // Best effort, like activity: failing to record a login time must not fail
   // the login.
   try {
+    const at = new Date(app.now()).toISOString()
     const entry = await getRegistry(app, userId)
-    if (entry) await app.store.put({ ...entry, lastLoginAt: new Date(app.now()).toISOString() })
+    if (entry) {
+      await app.store.put({ ...entry, lastLoginAt: at })
+    } else {
+      // An account created before the registry existed. Give it a row on its
+      // first sign-in, so it appears in the admin panel like any other.
+      await putRegistry(app, { userId, emailDigest: profile.emailDigest, createdAt: profile.createdAt, lastLoginAt: at })
+    }
   } catch {
     /* recorded next time */
   }
@@ -123,10 +135,12 @@ export interface Invite extends Item {
   createdBy: string
   usedAt?: string
   usedBy?: string
+  /** The role the new account starts with. Absent means a plain user. */
+  role?: string
 }
 
 export async function createInvite(
-  app: App, actor: string, label: string, days: number,
+  app: App, actor: string, label: string, days: number, role?: string,
 ): Promise<{ code: string; invite: Invite }> {
   const code = newInviteCode()
   const id = hashInviteCode(code)
@@ -139,6 +153,7 @@ export async function createInvite(
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + days * 86_400_000).toISOString(),
     createdBy: actor,
+    ...(role && role !== 'user' ? { role } : {}),
   }
   await app.store.put(invite, { mustNotExist: true })
   return { code, invite }

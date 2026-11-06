@@ -3,6 +3,7 @@
 import { type LambdaEvent, unauthorized } from './http.js'
 import type { Config } from './config.js'
 import { userPk } from './keys.js'
+import type { SiteConfig } from './site.js'
 import type { Store } from './store.js'
 import { bearerFrom, verifyToken } from './tokens.js'
 
@@ -19,6 +20,9 @@ export interface App {
    *  routes. Digests rather than addresses, so the running process holds the
    *  same thing the table does. Empty means nobody is an admin. */
   adminDigests: ReadonlySet<string>
+  /** Where the public website's templates are and where it is rendered to.
+   *  Absent where website editing is not set up; those routes then refuse. */
+  site?: SiteConfig
 }
 
 export function requireUser(app: App, event: LambdaEvent): string {

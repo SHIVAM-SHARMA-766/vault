@@ -4,6 +4,7 @@
 // writes, prefix queries on the sort key, and atomic counters.
 
 import { createHash } from 'node:crypto'
+import { join } from 'node:path'
 
 import { dispatch } from '../src/app.js'
 import type { App } from '../src/context.js'
@@ -78,7 +79,7 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { allowRegistration?: boolean; adminEmails?: string[] } = {}): Harness {
+export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string } = {}): Harness {
   const store = new MemoryStore()
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
 
@@ -101,6 +102,9 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
     now: () => now,
     allowRegistration: options.allowRegistration ?? true,
     adminDigests: new Set((options.adminEmails ?? []).map((e) => emailDigest(e, 'test-pepper-not-a-real-secret'))),
+    ...(options.siteOutput
+      ? { site: { sourceDir: join(process.cwd(), '../../apps/site'), outputDir: options.siteOutput, origin: 'https://vault.test' } }
+      : {}),
   }
 
   const request = async (method: string, path: string, opts: RequestOptions = {}): Promise<Parsed> => {
