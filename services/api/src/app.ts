@@ -37,6 +37,10 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)))
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)))
   router.put('/api/keys/identity', authed((u, e) => auth.setIdentity(app, u, e)))
+  router.post('/api/auth/2fa/setup', authed((u, e) => auth.setupTwoFactor(app, u, e)))
+  router.post('/api/auth/2fa/enable', authed((u, e) => auth.enableTwoFactor(app, u, e)))
+  router.post('/api/auth/2fa/disable', authed((u, e) => auth.disableTwoFactor(app, u, e)))
+  router.post('/api/auth/2fa/recovery-codes', authed((u, e) => auth.regenerateRecoveryCodes(app, u, e)))
 
   router.get('/api/vault', authed((u) => vault.getVault(app, u)))
   router.put('/api/vault/entries/:id', authed((u, e, id) => vault.putEntry(app, u, e, id)))
@@ -64,6 +68,7 @@ export function buildRouter(app: App): Router {
   router.put('/api/admin/users/:id/role', admined('roles.write', (u, e, id, r) => admin.setRole(app, u, r, e, id)))
   router.put('/api/admin/users/:id/disabled', admined('users.write', (u, e, id, r) => admin.setDisabled(app, u, r, e, id)))
   router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)))
+  router.post('/api/admin/users/:id/reset-2fa', admined('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)))
   router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)))
   router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)))
   router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)))

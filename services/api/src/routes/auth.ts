@@ -41,6 +41,17 @@ import {
 import { hashAuthKey, verifyAuthKey } from '../verifier.js'
 import { type KdfParams, requireBase64UrlBytes, requireEmail, requireIdentity, requireKdf, requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
+import {
+  type TotpState,
+  hashRecoveryCode,
+  invalidTwoFactor,
+  newRecoveryCodes,
+  newSecret,
+  openSecret,
+  sealSecret,
+  twoFactorRequired,
+  verifyTotp,
+} from '../twofactor.js'
 import { isStaff, permissionsOf, roleFromDigest } from '../roles.js'
 import {
   assertEnabled,
@@ -64,6 +75,10 @@ interface Profile extends Item {
    *  created before identity keys existed until their next unlock enrols one. */
   publicKey?: string
   wrappedPrivateKey?: string
+  /** Two-factor sign-in (decisions/0011). */
+  totp?: TotpState
+  pendingTotp?: { secret: string; expiresAt: number }
+  recoveryCodes?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -226,6 +241,7 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   // Only after the password is proved, so a disabled account cannot be told
   // apart from a wrong password by someone who does not hold it.
   await assertEnabled(app, profile.userId)
+  await requireSecondFactor(app, profile, body, event)
 
   await touchLogin(app, profile.userId, profile)
   await recordActivity(app, profile.userId, 'login', event)
@@ -252,6 +268,9 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
   const ok = await verifyAuthKey(proof, verifier)
   if (!ok || !profile) throw invalidCredentials()
   await assertEnabled(app, profile.userId)
+  // The recovery key replaces the password, not the second factor; losing
+  // the phone too is what recovery codes are for.
+  await requireSecondFactor(app, profile, body, event)
 
   // A recovery key in use means the master password is believed lost. Every
   // existing session is dropped, because the next step is to set a new one.
@@ -313,6 +332,7 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     role,
     isAdmin: isStaff(role),
     permissions: permissionsOf(role),
+    twoFactor: { enabled: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0 },
     identity: profile.publicKey && profile.wrappedPrivateKey
       ? { publicKey: profile.publicKey, wrappedPrivateKey: profile.wrappedPrivateKey }
       : null,
@@ -421,3 +441,99 @@ async function profileByEmail(app: App, email: string): Promise<Profile | null> 
  *  cannot be told apart by how long the response takes. */
 const DUMMY_VERIFIER =
   'scrypt$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+
+// ── Two-factor sign-in ─────────────────────────────────────────────────────
+
+/** Checks the second factor on an account that has one. Called after the
+ *  password (or recovery key) is proved. Consumes a recovery code if one is
+ *  used, and records the step of a TOTP code so it cannot be replayed. */
+async function requireSecondFactor(
+  app: App, profile: Profile, body: Record<string, unknown>, event: LambdaEvent,
+): Promise<void> {
+  if (!profile.totp) return
+  const code = typeof body['totpCode'] === 'string' ? body['totpCode'].replace(/\s/g, '') : ''
+  const recovery = typeof body['recoveryCode'] === 'string' ? body['recoveryCode'] : ''
+  if (!code && !recovery) throw twoFactorRequired()
+
+  if (code) {
+    const step = await verifyTotp(openSecret(profile.totp.secret, app.config.pepper), code, app.now(), profile.totp.lastStep)
+    if (step === null) throw invalidTwoFactor()
+    await app.store.put({ ...profile, totp: { ...profile.totp, lastStep: step } })
+    return
+  }
+  const hash = hashRecoveryCode(recovery, app.config.pepper)
+  const left = (profile.recoveryCodes ?? []).filter((h) => h !== hash)
+  if (left.length === (profile.recoveryCodes ?? []).length) throw invalidTwoFactor()
+  await app.store.put({ ...profile, recoveryCodes: left })
+  await recordActivity(app, profile.userId, 'used-2fa-recovery-code', event)
+}
+
+async function profileWithPassword(app: App, userId: string, body: Record<string, unknown>): Promise<Profile> {
+  const currentAuthKey = requireBase64UrlBytes(body['currentAuthKey'], 32, 'currentAuthKey')
+  const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
+  if (!profile) throw unauthorized()
+  if (!(await verifyAuthKey(currentAuthKey, profile.authVerifier))) throw invalidCredentials()
+  return profile
+}
+
+/** Step one of turning it on: a new TOTP key, held as pending for ten
+ *  minutes until a code from it proves the app has it. */
+export async function setupTwoFactor(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const profile = await profileWithPassword(app, userId, parseJsonBody<Record<string, unknown>>(event))
+  if (profile.totp) throw conflict('Two-factor sign-in is already on. Turn it off first to use a different app.')
+  const secret = newSecret()
+  await app.store.put({
+    ...profile,
+    pendingTotp: { secret: sealSecret(secret, app.config.pepper), expiresAt: app.now() + 10 * 60_000 },
+  })
+  // The client builds the otpauth:// URI: it knows the address, the server does not.
+  return json(200, { secret })
+}
+
+/** Step two: a valid code turns it on and issues recovery codes, once. */
+export async function enableTwoFactor(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ code?: unknown }>(event)
+  const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
+  if (!profile) throw unauthorized()
+  if (!profile.pendingTotp || profile.pendingTotp.expiresAt < app.now()) {
+    throw badRequest('Start again: the setup has expired.')
+  }
+  const secret = openSecret(profile.pendingTotp.secret, app.config.pepper)
+  const step = await verifyTotp(secret, typeof body.code === 'string' ? body.code.replace(/\s/g, '') : '', app.now())
+  if (step === null) throw invalidTwoFactor()
+  const codes = newRecoveryCodes()
+  const { pendingTotp: _p, ...rest } = profile
+  await app.store.put({
+    ...rest,
+    totp: { secret: profile.pendingTotp.secret, enabledAt: new Date(app.now()).toISOString(), lastStep: step },
+    recoveryCodes: codes.map((c) => hashRecoveryCode(c, app.config.pepper)),
+  } as Profile)
+  await recordActivity(app, userId, 'enable-2fa', event)
+  return json(200, { recoveryCodes: codes })
+}
+
+/** Turning it off needs the password and a current code (or a recovery code). */
+export async function disableTwoFactor(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<Record<string, unknown>>(event)
+  const profile = await profileWithPassword(app, userId, body)
+  if (!profile.totp) return json(200, { ok: true })
+  await requireSecondFactor(app, profile, body, event)
+  const fresh = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile
+  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, ...rest } = fresh
+  await app.store.put(rest as Profile)
+  await recordActivity(app, userId, 'disable-2fa', event)
+  return json(200, { ok: true })
+}
+
+/** New recovery codes, replacing every old one. */
+export async function regenerateRecoveryCodes(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<Record<string, unknown>>(event)
+  const profile = await profileWithPassword(app, userId, body)
+  if (!profile.totp) throw badRequest('Two-factor sign-in is not on.')
+  await requireSecondFactor(app, profile, body, event)
+  const fresh = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile
+  const codes = newRecoveryCodes()
+  await app.store.put({ ...fresh, recoveryCodes: codes.map((c) => hashRecoveryCode(c, app.config.pepper)) })
+  await recordActivity(app, userId, 'regenerate-2fa-recovery-codes', event)
+  return json(200, { recoveryCodes: codes })
+}
