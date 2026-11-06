@@ -11,9 +11,11 @@ Last revised: 2026-11-06
 
 ## The target
 
-**A zero-knowledge password manager for teams that organizations run on their own servers**
-([0010](decisions/0010-self-hosted-product.md)) — the job Zoho Vault, 1Password Business and
-Bitwarden do, delivered the way Bitwarden's self-hosted edition is: a signed package the
+**A zero-knowledge password manager that anyone runs on their own server** — one person on a
+home server, a family, or a company with hundreds of people
+([0010](decisions/0010-self-hosted-product.md)). It does the job Zoho Vault, 1Password and
+Bitwarden do, for personal and business use alike, delivered the way Bitwarden's self-hosted
+edition is: a signed package the
 customer installs and upgrades, with no central service and nothing phoning home. Two things
 are not negotiable: the server never holds anything readable, including who you are
 (addresses are keyed hashes) and what you store (names, URLs and tags are encrypted too); and
@@ -22,8 +24,10 @@ the customer never depends on us to keep running.
 This project's own deployment on OCI is the reference instance and demo, run with the same
 package customers get.
 
-Personal use stays first-class: every member of a team has their own private vault, and a
-single person can use Vault without an organization.
+**One product, every size.** Personal and business are not separate editions: the same
+package runs a single person's vault on a Raspberry Pi and a company's on a cluster. Every
+member of a team keeps their own private vault, a single person never has to create an
+organization, and features scale up rather than branch.
 
 The first client after the web app is a **browser extension**, because that is where a
 password manager is actually used — and because code installed from a package is not served
@@ -158,8 +162,11 @@ three managers is tested with real export files; alerts reach a phone; the domai
 What a customer installs. Built before teams because packaging, configuration and upgrades
 touch every part of the system, and are cheaper to get right while it is small.
 
-- **Container image and Compose file**: app, database, reverse proxy with automatic TLS for
-  the customer's domain. A tarball with systemd units as the alternative.
+- **Two install profiles from one image**:
+  - *Personal*: one container with SQLite and built-in TLS — small enough for a Raspberry Pi
+    or a free cloud VM, started with one command.
+  - *Business*: Compose with PostgreSQL and a reverse proxy, documented for HA in phase 6.
+  - A tarball with systemd units as the alternative to containers.
 - **First-run setup**: a one-time token in the server log lets the first visitor create the
   owner. Replaces `ALLOW_REGISTRATION` and `ADMIN_EMAILS` for customers.
 - **Storage**: PostgreSQL alongside MySQL; SQLite for a single server. One store contract test
@@ -173,8 +180,9 @@ touch every part of the system, and are cheaper to get right while it is small.
 - **Admin documentation**: install, configure, upgrade, back up, restore, rotate secrets.
 - **Licensing**, once decided: verified offline, never a run-time dependency.
 
-**Exit criteria:** a fresh VM goes from nothing to a working install with a TLS domain in under
-fifteen minutes following the docs; an install upgrades across three releases without manual
+**Exit criteria:** the personal profile runs on a 1 GB ARM board with one command; a fresh VM
+goes from nothing to a business install with a TLS domain in under fifteen minutes following
+the docs; an install upgrades across three releases without manual
 steps; a restore from backup is tested in CI; a tampered image is refused.
 
 ### Phase 3 — Teams

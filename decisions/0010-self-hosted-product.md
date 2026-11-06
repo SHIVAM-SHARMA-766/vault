@@ -5,8 +5,9 @@ Date: 2026-11-06
 
 ## Context
 
-The business model is self-hosting: an organization installs Vault on infrastructure it
-controls and runs it for its own people. This is the Bitwarden self-hosted model, not the
+The business model is self-hosting: whoever wants a password manager — one person, a family, a
+company — installs Vault on infrastructure they control and runs it for their own people.
+Personal and business use are the same product at different sizes. This is the Bitwarden self-hosted model, not the
 1Password model, where the vendor operates the service for everyone.
 
 Everything built so far assumed one deployment — this project's own, on OCI, behind a DuckDNS
@@ -23,9 +24,11 @@ What that commits the product to:
 - **Configuration, not code, describes a deployment.** Hostname, database, backup target,
   mail server and owner are settings. Nothing in the product names DuckDNS, OCI, a region or an
   address.
-- **A standard way to run it.** A container image and a Compose file (app, database, reverse
-  proxy) is the supported install; a plain tarball with systemd units remains for those who
-  want it. Kubernetes comes when a customer asks.
+- **One product, every size.** No separate personal and business editions. A single person
+  runs the *personal* profile — one container, SQLite, built-in TLS, small enough for a
+  Raspberry Pi; a company runs the *business* profile — Compose with PostgreSQL and a reverse
+  proxy. Same image, same features, same upgrades. A plain tarball with systemd units remains
+  for those who want it; Kubernetes comes when someone asks.
 - **First-run setup in the product.** The first person to open a fresh install, holding a
   one-time setup token printed in the server log, creates the owner account. No SSH, no
   environment-variable toggles.
