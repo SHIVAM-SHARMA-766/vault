@@ -50,7 +50,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
     void (async () => {
       try {
         const me = await api.me(await session.token())
-        session.patch({ userId: me.userId, isAdmin: me.isAdmin })
+        session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions })
       } catch { /* the vault still works; the admin entry just stays hidden */ }
     })()
   }, [])

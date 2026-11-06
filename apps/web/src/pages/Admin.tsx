@@ -13,32 +13,50 @@ import {
   type AdminInvite,
   type AdminOverview,
   type AdminUser,
+  type Permission,
   type RegistrationMode,
+  type Role,
   api,
 } from '../api.js'
+import { Website } from './Website.js'
 import * as session from '../session.js'
 import {
-  IconAlert, IconArrowLeft, IconCheck, IconEdit, IconGrid, IconKey, IconLock, IconNote,
+  IconAlert, IconArrowLeft, IconCheck, IconEdit, IconGlobe, IconGrid, IconKey, IconLock, IconNote,
   IconPlus, IconRefresh, IconShield, IconTrash, IconUser, IconX,
 } from '../icons.js'
 import { CopyButton, useToast } from '../ui.js'
 
-type Tab = 'overview' | 'users' | 'invites' | 'audit'
+type Tab = 'overview' | 'website' | 'users' | 'invites' | 'audit'
 
-const TABS: { id: Tab; label: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
-  { id: 'overview', label: 'Overview', Icon: IconGrid },
-  { id: 'users', label: 'Users', Icon: IconUser },
-  { id: 'invites', label: 'Invitations', Icon: IconKey },
-  { id: 'audit', label: 'Audit log', Icon: IconNote },
+const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => JSX.Element }[] = [
+  { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
+  { id: 'website', label: 'Website', needs: 'site.read', Icon: IconGlobe },
+  { id: 'users', label: 'Users', needs: 'users.read', Icon: IconUser },
+  { id: 'invites', label: 'Invitations', needs: 'invites.read', Icon: IconKey },
+  { id: 'audit', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
 ]
 
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: 'Owner', admin: 'Admin', marketing: 'Marketing', viewer: 'Viewer', user: 'User',
+}
+const ROLE_HELP: Record<Role, string> = {
+  owner: 'Everything, including roles. Set in the host configuration.',
+  admin: 'Users, invitations, registration and the website. Cannot change roles.',
+  marketing: 'The website only: text, search details, images and the banner.',
+  viewer: 'Can see everything in this panel and change nothing.',
+  user: 'No admin access.',
+}
+
 export function Admin({ state, onClose }: { state: session.Unlocked; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>('overview')
+  const perms = new Set<Permission>(state.permissions ?? [])
+  const tabs = TABS.filter((t) => perms.has(t.needs))
+  const [tab, setTab] = useState<Tab>(tabs[0]?.id ?? 'overview')
+  const role: Role = state.role ?? 'user'
 
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand"><span className="brand-mark"><IconShield size={18} /></span>Vault <span className="admin-tag">Admin</span></div>
+        <div className="brand"><span className="brand-mark"><IconShield size={18} /></span>Vault <span className="admin-tag">{ROLE_LABELS[role]}</span></div>
         <div className="topbar-actions">
           <button className="btn btn-secondary" onClick={onClose}><IconArrowLeft size={16} /><span className="hide-sm">Back to vault</span></button>
           <div className="account" title={state.email}>
@@ -53,7 +71,7 @@ export function Admin({ state, onClose }: { state: session.Unlocked; onClose: ()
 
       <div className="admin-layout">
         <nav className="sidebar" aria-label="Admin sections">
-          {TABS.map(({ id, label, Icon }) => (
+          {tabs.map(({ id, label, Icon }) => (
             <button key={id} className={`side-item ${tab === id ? 'side-active' : ''}`} onClick={() => setTab(id)} aria-current={tab === id}>
               <Icon size={16} /><span>{label}</span>
             </button>
@@ -64,16 +82,17 @@ export function Admin({ state, onClose }: { state: session.Unlocked; onClose: ()
         </nav>
 
         <div className="filter-chips admin-chips">
-          {TABS.map(({ id, label }) => (
+          {tabs.map(({ id, label }) => (
             <button key={id} className={`chip ${tab === id ? 'chip-active' : ''}`} onClick={() => setTab(id)}>{label}</button>
           ))}
         </div>
 
         <main className="admin-main">
-          {tab === 'overview' ? <Overview onGo={setTab} /> : null}
-          {tab === 'users' ? <Users selfId={state.userId} /> : null}
-          {tab === 'invites' ? <Invites /> : null}
-          {tab === 'audit' ? <Audit /> : null}
+          {tab === 'overview' && perms.has('overview.read') ? <Overview onGo={setTab} canWrite={perms.has('settings.write')} /> : null}
+          {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
+          {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
+          {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
+          {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
         </main>
       </div>
     </div>
@@ -146,7 +165,7 @@ async function run(toast: ReturnType<typeof useToast>, action: (token: string) =
 
 const loadOverview = (t: string) => api.admin.overview(t)
 
-function Overview({ onGo }: { onGo: (t: Tab) => void }) {
+function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolean }) {
   const toast = useToast()
   const { data, error, reload } = useAdminData(loadOverview)
 
@@ -194,7 +213,7 @@ function Overview({ onGo }: { onGo: (t: Tab) => void }) {
               </div>
               <div className="segmented" role="radiogroup" aria-label="Registration">
                 {(['closed', 'invite', 'open'] as RegistrationMode[]).map((m) => (
-                  <button key={m} role="radio" aria-checked={data.registration === m}
+                  <button key={m} role="radio" aria-checked={data.registration === m} disabled={!canWrite}
                           className={data.registration === m ? 'seg-active' : ''} onClick={() => void setMode(m)}>
                     {m === 'closed' ? 'Closed' : m === 'invite' ? 'Invite only' : 'Open'}
                   </button>
@@ -237,7 +256,7 @@ function Stat({ label, value, note, onClick }: { label: string; value: number; n
 
 const loadUsers = (t: string) => api.admin.users(t)
 
-function Users({ selfId }: { selfId: string }) {
+function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boolean; canRoles: boolean }) {
   const toast = useToast()
   const { data, error, reload } = useAdminData(loadUsers)
   const [editing, setEditing] = useState<string | null>(null)
@@ -257,7 +276,7 @@ function Users({ selfId }: { selfId: string }) {
         <div className="table-wrap">
           <table className="data">
             <thead>
-              <tr><th>Account</th><th>Created</th><th>Last sign-in</th><th className="num">Items</th><th className="num">Sessions</th><th>Status</th><th aria-label="Actions" /></tr>
+              <tr><th>Account</th><th>Role</th><th>Created</th><th>Last sign-in</th><th className="num">Items</th><th className="num">Sessions</th><th>Status</th>{canWrite ? <th aria-label="Actions" /> : null}</tr>
             </thead>
             <tbody>
               {data.users.map((u) => {
@@ -274,19 +293,26 @@ function Users({ selfId }: { selfId: string }) {
                       ) : (
                         <div className="acct">
                           <span className="acct-name">{u.label || <span className="muted">Unlabelled</span>}
-                            {u.isAdmin ? <span className="pill pill-accent">Admin</span> : null}
                             {self ? <span className="pill">You</span> : null}
                           </span>
                           <code className="acct-id">{u.userId.slice(0, 8)}…</code>
                         </div>
                       )}
                     </td>
+                    <td>
+                      {canRoles && u.role !== 'owner' && !self ? (
+                        <select className="role-select" value={u.role} aria-label="Role" title={ROLE_HELP[u.role]}
+                                onChange={async (e) => { if (await run(toast, (t) => api.admin.setRole(t, u.userId, e.target.value as Role), `Role set to ${ROLE_LABELS[e.target.value as Role]}`)) await reload() }}>
+                          {(['admin', 'marketing', 'viewer', 'user'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                        </select>
+                      ) : <span className={`pill ${u.role === 'user' ? '' : 'pill-accent'}`} title={ROLE_HELP[u.role]}>{ROLE_LABELS[u.role]}</span>}
+                    </td>
                     <td>{when(u.createdAt)}</td>
                     <td title={when(u.lastLoginAt)}>{ago(u.lastLoginAt)}</td>
                     <td className="num">{u.entries}</td>
                     <td className="num">{u.sessions}</td>
                     <td>{u.disabled ? <span className="pill pill-danger">Disabled</span> : <span className="pill pill-ok">Active</span>}</td>
-                    <td>
+                    {canWrite ? <td>
                       <div className="row-actions">
                         <button className="icon-btn" title="Edit label" aria-label="Edit label" onClick={() => { setEditing(u.userId); setLabel(u.label ?? '') }}><IconEdit size={15} /></button>
                         <button className="icon-btn" title="Sign out everywhere" aria-label="Sign out everywhere" disabled={u.sessions === 0}
@@ -306,7 +332,7 @@ function Users({ selfId }: { selfId: string }) {
                           </>
                         ) : null}
                       </div>
-                    </td>
+                    </td> : null}
                   </tr>
                 )
               })}
@@ -346,8 +372,9 @@ function Users({ selfId }: { selfId: string }) {
 
 const loadInvites = (t: string) => api.admin.invites(t)
 
-function Invites() {
+function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean }) {
   const toast = useToast()
+  const [role, setRole] = useState<Role>('user')
   const { data, error, reload } = useAdminData(loadInvites)
   const [label, setLabel] = useState('')
   const [days, setDays] = useState(7)
@@ -358,8 +385,9 @@ function Invites() {
     e.preventDefault()
     setBusy(true)
     try {
-      const res = await api.admin.createInvite(await session.token(), label.trim(), days)
+      const res = await api.admin.createInvite(await session.token(), label.trim(), days, role)
       setIssued({ code: res.code, label: res.invite.label, expiresAt: res.invite.expiresAt })
+      setRole('user')
       setLabel('')
       await reload()
     } catch (err) {
@@ -373,7 +401,7 @@ function Invites() {
     <Section title="Invitations" sub="Single-use codes. Registration must be set to “Invite only” or “Open” for them to work.">
       <ErrorBox error={error} />
 
-      <form className="admin-card invite-form" onSubmit={create}>
+      {canWrite ? <form className="admin-card invite-form" onSubmit={create}>
         <div className="field">
           <label htmlFor="inv-label">Who is it for?</label>
           <input id="inv-label" required maxLength={80} placeholder="e.g. Rahul — personal laptop" value={label} onChange={(e) => setLabel(e.target.value)} />
@@ -384,8 +412,16 @@ function Invites() {
             {[1, 3, 7, 14, 30].map((d) => <option key={d} value={d}>{d} day{d > 1 ? 's' : ''}</option>)}
           </select>
         </div>
+        {canRoles ? (
+          <div className="field">
+            <label htmlFor="inv-role">Starts as</label>
+            <select id="inv-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              {(['user', 'viewer', 'marketing', 'admin'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+            </select>
+          </div>
+        ) : null}
         <button className="btn btn-primary" type="submit" disabled={busy || !label.trim()}><IconPlus size={16} />Create invitation</button>
-      </form>
+      </form> : null}
 
       {issued ? (
         <div className="issued">
@@ -398,16 +434,17 @@ function Invites() {
       {!data ? null : data.invites.length === 0 ? <p className="muted">No invitations yet.</p> : (
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>For</th><th>Created</th><th>Expires</th><th>Status</th><th aria-label="Actions" /></tr></thead>
+            <thead><tr><th>For</th><th>Role</th><th>Created</th><th>Expires</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>
               {data.invites.map((i: AdminInvite) => (
                 <tr key={i.id}>
                   <td className="strong">{i.label}</td>
+                  <td>{ROLE_LABELS[i.role] ?? 'User'}</td>
                   <td>{when(i.createdAt)}</td>
                   <td>{i.status === 'used' ? `Used ${when(i.usedAt)}` : when(i.expiresAt)}</td>
                   <td><span className={`pill ${i.status === 'active' ? 'pill-ok' : i.status === 'used' ? 'pill-accent' : ''}`}>{i.status}</span></td>
                   <td>
-                    {i.status !== 'used' ? (
+                    {i.status !== 'used' && canWrite ? (
                       <button className="icon-btn icon-danger" title="Revoke" aria-label="Revoke invitation"
                               onClick={async () => { if (await run(toast, (t) => api.admin.deleteInvite(t, i.id), 'Invitation revoked')) await reload() }}>
                         <IconTrash size={15} />
@@ -437,6 +474,12 @@ const ACTIONS: Record<string, string> = {
   'user.enable': 'Enabled account',
   'user.revoke-sessions': 'Signed account out everywhere',
   'user.delete': 'Deleted account',
+  'user.role': 'Changed role',
+  'site.publish': 'Published the website',
+  'site.rollback': 'Rolled the website back',
+  'site.discard-draft': 'Discarded the website draft',
+  'media.upload': 'Uploaded an image',
+  'media.delete': 'Deleted an image',
 }
 
 function Audit() {

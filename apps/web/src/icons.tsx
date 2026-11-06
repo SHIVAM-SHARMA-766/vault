@@ -88,6 +88,18 @@ export const IconCheck = (p: P) => (
 export const IconAlert = (p: P) => (
   <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5M12 16.5v.01" /></Svg>
 )
+export const IconGlobe = (p: P) => (
+  <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></Svg>
+)
+export const IconImage = (p: P) => (
+  <Svg {...p}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2" /><path d="m21 16-5-5-9 9" /></Svg>
+)
+export const IconUp = (p: P) => (
+  <Svg {...p}><path d="m6 15 6-6 6 6" /></Svg>
+)
+export const IconDown = (p: P) => (
+  <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>
+)
 export const IconX = (p: P) => (
   <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
 )

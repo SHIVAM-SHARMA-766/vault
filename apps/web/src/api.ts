@@ -26,6 +26,8 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string
   readonly retryAfter: number | undefined
+  /** Field-level problems the server reported, for a 400 on website content. */
+  details?: { path: string; message: string }[]
 
   constructor(status: number, code: string, message: string, retryAfter?: number) {
     super(message)
@@ -72,12 +74,14 @@ async function request<T>(
 
   if (!response.ok) {
     const retryAfter = Number(response.headers.get('retry-after') ?? '')
-    throw new ApiError(
+    const error = new ApiError(
       response.status,
       String(payload['error'] ?? 'error'),
       String(payload['message'] ?? 'Something went wrong.'),
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
+    if (Array.isArray(payload['details'])) error.details = payload['details'] as { path: string; message: string }[]
+    throw error
   }
 
   return payload as T
@@ -118,7 +122,7 @@ export const api = {
     request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { refreshToken } }),
 
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[] }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -141,6 +145,8 @@ export const api = {
     users: (token: string) => request<{ users: AdminUser[] }>('GET', '/api/admin/users', { token }),
     setLabel: (token: string, id: string, label: string) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/label`, { token, body: { label } }),
+    setRole: (token: string, id: string, role: Role) =>
+      request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { token, body: { role } }),
     setDisabled: (token: string, id: string, disabled: boolean) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/disabled`, { token, body: { disabled } }),
     revokeSessions: (token: string, id: string) =>
@@ -152,17 +158,52 @@ export const api = {
     setRegistration: (token: string, registration: RegistrationMode) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
     invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),
-    createInvite: (token: string, label: string, days: number) =>
-      request<{ code: string; invite: { id: string; label: string; expiresAt: string } }>(
-        'POST', '/api/admin/invites', { token, body: { label, days } },
+    createInvite: (token: string, label: string, days: number, role: Role = 'user') =>
+      request<{ code: string; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
+        'POST', '/api/admin/invites', { token, body: { label, days, role } },
       ),
     deleteInvite: (token: string, id: string) =>
       request<{ ok: true }>('DELETE', `/api/admin/invites/${encodeURIComponent(id)}`, { token }),
     audit: (token: string) => request<{ records: AdminAudit[] }>('GET', '/api/admin/audit', { token }),
+    site: (token: string) => request<SiteState>('GET', '/api/admin/site', { token }),
+    saveDraft: (token: string, content: SiteContent) =>
+      request<{ ok: true; content: SiteContent }>('PUT', '/api/admin/site/draft', { token, body: { content } }),
+    discardDraft: (token: string) => request<{ ok: true }>('DELETE', '/api/admin/site/draft', { token }),
+    preview: (token: string, content: SiteContent, page: string) =>
+      request<{ html: string }>('POST', '/api/admin/site/preview', { token, body: { content, page } }),
+    publish: (token: string, note: string) =>
+      request<{ ok: true; version: string }>('POST', '/api/admin/site/publish', { token, body: { note } }),
+    rollback: (token: string, version: string) =>
+      request<{ ok: true }>('POST', `/api/admin/site/rollback/${encodeURIComponent(version)}`, { token }),
+    uploadMedia: (token: string, name: string, data: string) =>
+      request<{ media: SiteMedia }>('POST', '/api/admin/media', { token, body: { name, data } }),
+    deleteMedia: (token: string, id: string) =>
+      request<{ ok: true }>('DELETE', `/api/admin/media/${encodeURIComponent(id)}`, { token }),
   },
 }
 
 export type RegistrationMode = 'closed' | 'invite' | 'open'
+export type Role = 'owner' | 'admin' | 'marketing' | 'viewer' | 'user'
+export type Permission =
+  | 'overview.read' | 'users.read' | 'users.write' | 'roles.write' | 'invites.read' | 'invites.write'
+  | 'settings.write' | 'audit.read' | 'site.read' | 'site.write' | 'site.publish'
+
+export type SiteContent = Record<string, Record<string, Record<string, unknown>>>
+export interface SiteMedia { id: string; type: string; name: string; bytes: number; uploadedAt: string; uploadedBy: string }
+export interface SiteField {
+  key: string; label: string; type: 'text' | 'textarea' | 'bool' | 'select' | 'icon' | 'link' | 'image' | 'list'
+  max?: number; hint?: string; options?: [string, string][]; fallback?: string
+  min?: number; itemLabel?: string; fields?: SiteField[]
+}
+export interface SiteSchema { version: number; sections: { id: string; label: string; hint?: string; groups: { key: string; label: string; hint?: string; fields: SiteField[] }[] }[] }
+export interface SiteState {
+  schema: SiteSchema
+  defaults: SiteContent
+  live: { version: string | null; content: SiteContent; publishedAt: string | null; publishedBy: string | null }
+  draft: { content: SiteContent; updatedAt: string | null; updatedBy: string | null } | null
+  versions: { version: string; publishedAt: string | null; publishedBy: string | null; note: string | null }[]
+  media: SiteMedia[]
+}
 
 export interface AdminOverview {
   users: number
@@ -184,6 +225,7 @@ export interface AdminUser {
   lastLoginAt: string | null
   disabled: boolean
   isAdmin: boolean
+  role: Role
   entries: number
   folders: number
   sessions: number
@@ -196,6 +238,7 @@ export interface AdminInvite {
   expiresAt: string
   usedAt: string | null
   usedBy: string | null
+  role: Role
   status: 'active' | 'used' | 'expired'
 }
 

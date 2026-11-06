@@ -38,8 +38,13 @@
 
 	# Three things share this origin: the API, the vault client under /app/,
 	# and the public site at /. Sharing it is what lets the policy say
-	# connect-src 'self'. The site ships no JavaScript, so living beside the
-	# client gives nothing that runs there a way into it.
+	# connect-src 'self'. The site ships no JavaScript, and its editable text is
+	# escaped by the renderer, so living beside the client gives nothing that
+	# runs there a way into it.
+	#
+	# The site is rendered by the API from the content published in the admin
+	# panel, into /srv/vault/site/<version>, with /srv/vault/site/current
+	# pointing at the live one. Images uploaded there live in /srv/vault/site/media.
 
 	# The API.
 	handle /api/* {
@@ -65,17 +70,28 @@
 		file_server
 	}
 
+	# Images uploaded from the admin panel. Only the three raster types the
+	# API accepts are served; anything else here is a 404.
+	@media path_regexp ^/media/m_[A-Za-z0-9_-]+\.(png|jpg|webp)$
+	handle @media {
+		root * /srv/vault/site
+		file_server
+	}
+	handle /media/* {
+		respond 404
+	}
+
 	# The public site: plain files, with /security answering for
 	# security.html.
 	handle {
-		root * /srv/vault/web
+		root * /srv/vault/site/current
 		try_files {path} {path}.html {path}/index.html
 		file_server
 	}
 
 	# Anything missing gets the site's 404 page, with the 404 status kept.
 	handle_errors 404 {
-		root * /srv/vault/web
+		root * /srv/vault/site/current
 		rewrite * /404.html
 		file_server
 		import security_headers
