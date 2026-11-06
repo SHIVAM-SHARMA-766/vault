@@ -111,8 +111,10 @@ jobs:
         working-directory: services/api
         run: |
           npm run bundle
+          site_out="$(mktemp -d)"
           SERVER_PEPPER="$(openssl rand -base64 32)" \
           TOKEN_SIGNING_KEY="$(openssl rand -base64 48)" \
+          SITE_SOURCE="$GITHUB_WORKSPACE/apps/site" SITE_ROOT="$site_out" \
           PORT=3123 node dist-bundle/index.mjs &
           pid=$!
           for _ in $(seq 1 30); do
@@ -123,6 +125,12 @@ jobs:
           kill $pid
           echo "health said: $body"
           [ "$body" = '{"status":"ok"}' ] || { echo "::error::the bundle did not serve health"; exit 1; }
+          # The bundle renders the public site as it starts; on the host that is
+          # what Caddy serves. Prove the bundled renderer produced pages.
+          for page in index.html security.html 404.html; do
+            [ -s "$site_out/current/$page" ] || { echo "::error::the bundle did not render $page"; exit 1; }
+          done
+          echo "confirmed: the bundle rendered the website"
 
       # The service must refuse to start on a placeholder or short secret. A
       # vault that comes up with a guessable pepper is worse than one that does
@@ -162,6 +170,12 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # The client imports @vault/crypto, whose types are its compiled output.
+      # Without this the typecheck fails on a clean checkout, while passing on
+      # any machine that happens to have an old build lying around.
+      - name: Build the crypto package
+        run: npm run build --workspace @vault/crypto
+
       - name: Typecheck
         run: npm run typecheck --workspace @vault/web
 
@@ -171,6 +185,23 @@ jobs:
       # nobody is watching during a deploy.
       - name: Build and check the policy
         run: npm run build --workspace @vault/web
+
+  site:
+    name: site — render, policy, links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      # Renders the templates with the default content and fails on inline
+      # script or style, remote resources, missing titles, broken links, and
+      # defaults that do not satisfy the content schema.
+      - name: Render and check
+        run: npm run build --workspace @vault/site
 
   audit:
     name: dependency audit

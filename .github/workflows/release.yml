@@ -1,0 +1,83 @@
+name: Release
+
+# Ships what is on main. A merge to main is a deploy.
+#
+# This job builds, tests and uploads a release to the private vault-releases
+# bucket, then waits for the host to install it. It never reaches the host:
+# the host pulls the release on its own timer, verifies it, health-checks it
+# and rolls back on failure (decisions/0005). Nothing inbound is opened.
+#
+# It authenticates to OCI as the vault-ci user, which can write to that one
+# bucket and nothing else (infra/ci.tf, decisions/0008).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One release at a time, in order. A newer push waits rather than racing the
+# `current` pointer; nothing is cancelled half-uploaded.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: build, test, publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # Exactly the committed lockfile — see docs/threat-model.md, A8.
+      - run: npm ci
+
+      - name: Install the OCI CLI
+        # Pinned, so a release of the CLI cannot change what this job does
+        # between two identical commits.
+        run: |
+          python3 -m pip install --user --quiet 'oci-cli==3.51.2'
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Configure OCI credentials
+        env:
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_REGION: ${{ secrets.OCI_REGION }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+        run: |
+          for v in OCI_TENANCY_OCID OCI_USER_OCID OCI_FINGERPRINT OCI_REGION OCI_PRIVATE_KEY; do
+            [ -n "${!v}" ] || { echo "::error::secret $v is not set; run scripts/setup-ci.sh"; exit 1; }
+          done
+          umask 077
+          mkdir -p ~/.oci
+          printf '%s\n' "$OCI_PRIVATE_KEY" > ~/.oci/ci_key.pem
+          cat > ~/.oci/config <<CFG
+          [DEFAULT]
+          user=${OCI_USER_OCID}
+          fingerprint=${OCI_FINGERPRINT}
+          tenancy=${OCI_TENANCY_OCID}
+          region=${OCI_REGION}
+          key_file=$HOME/.oci/ci_key.pem
+          CFG
+          oci os ns get --query data --raw-output >/dev/null
+
+      - name: Publish
+        # release.sh tests, builds, checks every policy, uploads, points
+        # `current` at the new release, and waits until /release.txt shows it.
+        run: ./scripts/release.sh
+        env:
+          SUPPRESS_LABEL_WARNING: 'True'
+
+      - name: Remove credentials
+        if: always()
+        run: rm -rf ~/.oci

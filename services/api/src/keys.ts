@@ -6,6 +6,21 @@ export const userPk = (userId: string) => `USER#${userId}`
 export const emailPk = (emailDigest: string) => `EMAIL#${emailDigest}`
 export const ratePk = (bucket: string) => `RATE#${bucket}`
 
+/** One partition for everything the operator manages rather than a user owns:
+ *  settings, the account registry, invitations, the admin audit log, and the
+ *  last backup. It is the only partition the admin routes read across users,
+ *  which is what lets them avoid scanning the table. */
+export const SYSTEM_PK = 'SYSTEM'
+export const SETTINGS_SK = 'SETTINGS'
+export const BACKUP_SK = 'BACKUP'
+export const registrySk = (userId: string) => `USER#${userId}`
+export const inviteSk = (codeHash: string) => `INVITE#${codeHash}`
+export const inviteUsedSk = (codeHash: string) => `INVITEUSED#${codeHash}`
+export const auditSk = (at: string, nonce: string) => `AUDIT#${at}#${nonce}`
+export const REGISTRY_PREFIX = 'USER#'
+export const INVITE_PREFIX = 'INVITE#'
+export const AUDIT_PREFIX = 'AUDIT#'
+
 export const PROFILE_SK = 'PROFILE'
 export const EMAIL_SK = 'EMAIL'
 

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{home.seo.title}}</title>
+  <meta name="description" content="{{home.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{home.seo.title}}">
+  <meta property="og:description" content="{{home.seo.description}}">
+  <meta property="og:image" content="{{absimg home.seo.image}}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<!-- page:home -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-copy">
+          <span class="eyebrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>{{home.hero.eyebrow}}</span>
+          <h1>{{home.hero.titleStart}} <span class="grad">{{home.hero.titleAccent}}</span> {{home.hero.titleEnd}}</h1>
+          <p class="lede">{{home.hero.lede}}</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/app/">{{home.hero.primary}}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a class="btn btn-ghost" href="/how-it-works">{{home.hero.secondary}}</a>
+          </div>
+{{#if home.hero.note}}
+          <p class="cta-note">{{home.hero.note}}</p>
+{{/if}}
+        </div>
+        <div class="shot">
+          <img src="{{img home.hero.image}}" width="1440" height="900" alt="{{home.hero.imageAlt}}">
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">{{home.why.kicker}}</span>
+          <h2>{{home.why.title}}</h2>
+          <p>{{home.why.text}}</p>
+        </div>
+        <div class="grid">
+{{#each home.why.cards}}
+          <article class="card">
+            <span class="icon">{{icon .icon}}</span>
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">{{home.steps.kicker}}</span>
+          <h2>{{home.steps.title}}</h2>
+          <p>{{home.steps.text}}</p>
+        </div>
+        <div class="steps">
+{{#each home.steps.items}}
+          <article class="step">
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+            <span class="where where-{{.where}}"></span>
+          </article>
+{{/each}}
+        </div>
+        <p class="center-link"><a href="/how-it-works">See the full explanation →</a></p>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap">
+        <div class="callout">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 6a3 3 0 0 0 6 0L5 7Zm14 0-3 6a3 3 0 0 0 6 0l-3-6Z"/></svg></span>
+          <div>
+            <h3>{{home.honest.title}}</h3>
+            <p>{{home.honest.text}}</p>
+            <p><a href="/security#limits">Read the known limitations →</a></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- include:cta -->
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

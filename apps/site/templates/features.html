@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{features.seo.title}}</title>
+  <meta name="description" content="{{features.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{features.seo.title}}">
+  <meta property="og:description" content="{{features.seo.description}}">
+  <meta property="og:image" content="{{absimg features.seo.image}}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<!-- page:features -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">{{features.hero.kicker}}</span>
+        <h1>{{features.hero.title}}</h1>
+        <p>{{features.hero.lede}}</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head section-head-left">
+          <h2>{{features.core.title}}</h2>
+        </div>
+        <div class="grid">
+{{#each features.core.cards}}
+          <article class="card">
+            <span class="icon">{{icon .icon}}</span>
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap split">
+        <div>
+          <span class="kicker">{{features.split.kicker}}</span>
+          <h2>{{features.split.title}}</h2>
+          <p class="split-lede">{{features.split.lede}}</p>
+          <ul class="ticks">
+{{#each features.split.bullets}}
+            <li><strong>{{.strong}}</strong> {{.rest}}</li>
+{{/each}}
+          </ul>
+        </div>
+        <div class="split-media">
+          <img src="{{img features.split.image}}" width="1440" height="900" alt="{{features.split.imageAlt}}" loading="lazy">
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">{{features.details.kicker}}</span>
+          <h2>{{features.details.title}}</h2>
+        </div>
+        <div class="grid">
+{{#each features.details.cards}}
+          <article class="card">
+            <span class="icon">{{icon .icon}}</span>
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+<!-- include:cta -->
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

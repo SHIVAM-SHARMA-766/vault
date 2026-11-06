@@ -63,4 +63,13 @@ remote=$(oci os object head --auth instance_principal --bucket-name "$BUCKET" --
   2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("content-length", 0))')
 [ "$remote" = "$size" ] || { log "stored size ${remote} does not match ${size}"; exit 1; }
 
+# Record it where the admin panel can see it. Best effort: the export is
+# already verified in the bucket, and failing here must not mark a good backup
+# as failed. The values are generated above, never user input.
+MYSQL_PWD="$DB_PASSWORD" mysql --host="$DB_HOST" --user="$DB_USER" "$DB_NAME" -e "
+  INSERT INTO vault (pk, sk, data, expires_at)
+  VALUES ('SYSTEM', 'BACKUP', JSON_OBJECT('at', '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 'object', '${OBJECT}', 'bytes', ${size}), NULL)
+  ON DUPLICATE KEY UPDATE data = VALUES(data)" \
+  || log "could not record the backup in the database; the admin panel will show the previous one"
+
 log "done: ${OBJECT}, ${size} bytes, verified"

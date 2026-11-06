@@ -54,3 +54,8 @@ output "ssh_command" {
   description = "Only works when ssh_allowed_cidr includes your address; it is empty by default."
   value       = "ssh -i ~/.ssh/oci-vault ubuntu@${oci_core_instance.vault.public_ip}"
 }
+
+output "release_bucket" {
+  description = "Where scripts/release.sh uploads, and where the host's vault-pull timer reads from."
+  value       = oci_objectstorage_bucket.releases.name
+}

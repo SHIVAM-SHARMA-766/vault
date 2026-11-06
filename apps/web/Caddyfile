@@ -11,32 +11,7 @@
 	email {$ACME_EMAIL}
 }
 
-{$VAULT_HOSTNAME} {
-	encode zstd gzip
-
-	# The API. Same origin as the client, which is what lets the policy below
-	# say connect-src 'self'.
-	handle /api/* {
-		reverse_proxy 127.0.0.1:3000
-	}
-
-	handle {
-		root * /srv/vault/web
-
-		# Fall back to the shell only for paths that look like client-side
-		# routes: no file on disk, and no file extension. A request for a
-		# missing asset must stay a 404 — returning HTML with status 200
-		# instead turns a mistyped script URL into a confusing parse error in
-		# the browser rather than an obvious missing file.
-		@spa {
-			not file
-			not path_regexp \.[a-zA-Z0-9]+$
-		}
-		rewrite @spa /index.html
-
-		file_server
-	}
-
+(security_headers) {
 	header {
 		# No unsafe-inline and no unsafe-eval anywhere. The build must emit
 		# external scripts and stylesheets only; apps/web/scripts/check-csp.mjs
@@ -55,8 +30,74 @@
 		Cross-Origin-Opener-Policy "same-origin"
 		Cross-Origin-Resource-Policy "same-origin"
 		-Server
-
 	}
+}
+
+{$VAULT_HOSTNAME} {
+	encode zstd gzip
+
+	# Three things share this origin: the API, the vault client under /app/,
+	# and the public site at /. Sharing it is what lets the policy say
+	# connect-src 'self'. The site ships no JavaScript, and its editable text is
+	# escaped by the renderer, so living beside the client gives nothing that
+	# runs there a way into it.
+	#
+	# The site is rendered by the API from the content published in the admin
+	# panel, into /srv/vault/site/<version>, with /srv/vault/site/current
+	# pointing at the live one. Images uploaded there live in /srv/vault/site/media.
+
+	# The API.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# The vault client.
+	redir /app /app/ 308
+	handle /app/* {
+		root * /srv/vault/web
+
+		# Fall back to the shell only for paths that look like client-side
+		# routes: no file on disk, and no file extension. A request for a
+		# missing asset must stay a 404 — returning HTML with status 200
+		# instead turns a mistyped script URL into a confusing parse error in
+		# the browser rather than an obvious missing file.
+		@spa {
+			not file
+			not path_regexp \.[a-zA-Z0-9]+$
+		}
+		rewrite @spa /app/index.html
+
+		file_server
+	}
+
+	# Images uploaded from the admin panel. Only the three raster types the
+	# API accepts are served; anything else here is a 404.
+	@media path_regexp ^/media/m_[A-Za-z0-9_-]+\.(png|jpg|webp)$
+	handle @media {
+		root * /srv/vault/site
+		file_server
+	}
+	handle /media/* {
+		respond 404
+	}
+
+	# The public site: plain files, with /security answering for
+	# security.html.
+	handle {
+		root * /srv/vault/site/current
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+
+	# Anything missing gets the site's 404 page, with the 404 status kept.
+	handle_errors 404 {
+		root * /srv/vault/site/current
+		rewrite * /404.html
+		file_server
+		import security_headers
+	}
+
+	import security_headers
 
 	# Caching, as two matchers that cannot both match.
 	#
@@ -69,8 +110,8 @@
 	# A cached shell is the failure that matters: after a deploy it points at
 	# hashed assets that no longer exist, and the page is blank with nothing in
 	# the console to explain it.
-	@assets path /assets/*
-	@not-assets not path /assets/*
+	@assets path /app/assets/*
+	@not-assets not path /app/assets/*
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	header @not-assets Cache-Control "no-store"
 }

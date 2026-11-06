@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{security.seo.title}}</title>
+  <meta name="description" content="{{security.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{security.seo.title}}">
+  <meta property="og:description" content="{{security.seo.description}}">
+  <meta property="og:image" content="{{absimg security.seo.image}}">
+</head>
+<body>
+<!-- page:security -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="doc-hero">
+      <div class="wrap">
+        <span class="kicker">Security</span>
+        <h1>How Vault keeps your secrets</h1>
+        <p>The design assumes the entire server side is hostile. This page explains what that means in
+           practice, what is encrypted and how, and — just as plainly — what it does not protect against.</p>
+      </div>
+    </section>
+
+    <div class="wrap doc">
+      <nav class="toc" aria-label="On this page">
+        <span>On this page</span>
+        <a href="#model">The model</a>
+        <a href="#keys">Keys</a>
+        <a href="#encrypted">What is encrypted</a>
+        <a href="#signin">Signing in</a>
+        <a href="#recovery">Recovery</a>
+        <a href="#operator">The operator</a>
+        <a href="#browser">In the browser</a>
+        <a href="#infra">Infrastructure</a>
+        <a href="#limits">Known limitations</a>
+      </nav>
+
+      <article class="prose">
+        <h2 id="model">The model</h2>
+        <p>Vault is a <strong>zero-knowledge</strong> password manager. Encryption and decryption happen
+           only in your browser. The server stores what it is given and checks who is asking, but it
+           never holds a key that can open a vault, and it never sees the master password.</p>
+        <p>The test the design is held to: if an attacker took a full copy of the server — its disk,
+           its database, its backups, its configuration — they should get ciphertext and nothing more.</p>
+
+        <h2 id="keys">Keys</h2>
+        <p>Everything starts from your master password and a random salt unique to your account.</p>
+        <div class="diagram">Master password + salt
+        │  PBKDF2-SHA256, 600,000 rounds         ← in your browser
+        ▼
+   Master key ──┬── HKDF "kek"   ──► Key-encryption key ──► unlocks the vault key
+                └── HKDF "auth"  ──► Login key ──► sent to the server
+
+   Vault key  (random, created once at sign-up)
+        ├── locked by the key-encryption key      (master password path)
+        ├── locked by the recovery key            (recovery path)
+        └── encrypts every entry, AES-256-GCM</div>
+        <ul>
+          <li><strong>The login key and the key-encryption key are separate branches.</strong> Knowing
+              the login key tells you nothing about the key that opens the vault, so the one thing the
+              server receives is useless for decryption.</li>
+          <li><strong>The server stores a scrypt hash of the login key</strong>, not the key itself.</li>
+          <li><strong>A random vault key sits in the middle.</strong> Changing your master password
+              re-locks that one key; your entries are never re-encrypted.</li>
+        </ul>
+
+        <h2 id="encrypted">What is encrypted</h2>
+        <table class="table">
+          <thead><tr><th>Data</th><th>How the server holds it</th></tr></thead>
+          <tbody>
+            <tr><td>Passwords, usernames, websites</td><td>AES-256-GCM ciphertext</td></tr>
+            <tr><td>Entry names, notes, tags, folders</td><td>AES-256-GCM ciphertext</td></tr>
+            <tr><td>Two-factor (TOTP) secrets</td><td>AES-256-GCM ciphertext</td></tr>
+            <tr><td>Your email address</td><td>HMAC under a server-side secret kept outside the database</td></tr>
+            <tr><td>Master password</td><td>Never received</td></tr>
+            <tr><td>Recovery key</td><td>Never received</td></tr>
+          </tbody>
+        </table>
+        <p>Every write uses a fresh 96-bit nonce, and each entry's ciphertext is bound to its own ID, so
+           an entry cannot be swapped into another's place without detection.</p>
+
+        <h2 id="signin">Signing in</h2>
+        <p>Your browser first asks for your account's salt. An email with no account receives a
+           convincing decoy salt, so the sign-in form cannot be used to discover who has an account.</p>
+        <p>Your browser then derives the keys, sends only the login key, and receives back your locked
+           vault key, which it unlocks itself. A wrong password fails on the server's check; a damaged
+           key would fail in your browser — either way, the server never learns your password.</p>
+        <p>Repeated failures are rate-limited per address and per account.</p>
+
+        <h2 id="recovery">Recovery</h2>
+        <p>At sign-up your browser creates a recovery key and shows it to you once. It is never sent to
+           the server. A second copy of your vault key is locked with it, which is the only way back in
+           if you forget the master password.</p>
+        <p>There is no password reset and no support override, because there is nothing the server could
+           reset. If both the master password and the recovery key are lost, the vault cannot be opened.</p>
+
+        <h2 id="operator">What the operator can see</h2>
+        <p>Whoever runs this Vault has an admin panel. It exists to manage accounts, not to look inside them,
+           and it is limited by the same design as everything else: the server holds nothing readable to show.</p>
+        <table class="table">
+          <thead><tr><th>The admin panel can</th><th>It cannot</th></tr></thead>
+          <tbody>
+            <tr><td>See that an account exists, when it was created and last signed in</td><td>See its email address — only a keyed hash is stored</td></tr>
+            <tr><td>See how many items an account holds</td><td>See what any item is, or its name</td></tr>
+            <tr><td>Open or close registration, and issue single-use invitations</td><td>Reset a master password or unlock a vault</td></tr>
+            <tr><td>Sign an account out everywhere, disable it, or delete it</td><td>Read, change or export anyone's entries</td></tr>
+          </tbody>
+        </table>
+        <p>Admin access comes in four roles. The <strong>owner</strong> is set in the server's configuration and can
+           do everything; owners grant the others. <strong>Admins</strong> manage accounts and invitations,
+           <strong>marketing</strong> edits this website's text and images, and <strong>viewers</strong> can look
+           without changing anything. None of the roles can read a vault.</p>
+        <p>Website editing is limited to plain text, links and uploaded photos. Everything typed is shown as text,
+           never run as code, because this site shares its address with the app that handles master passwords.
+           This page itself cannot be edited from the panel, so what it says always matches how the system works.</p>
+        <p>Every admin action is written to an audit log before it runs. Admin access is a normal sign-in —
+           there is no separate master key or back door.</p>
+
+        <h2 id="browser">In the browser</h2>
+        <ul>
+          <li><strong>Keys stay in memory.</strong> Nothing sensitive is written to local storage,
+              session storage, IndexedDB, or cookies. Reloading or closing the tab locks the vault, and
+              fifteen idle minutes lock it automatically.</li>
+          <li><strong>A strict Content-Security-Policy.</strong> No inline scripts, no
+              <code>eval</code>, and network access limited to this server. Injected code cannot quietly
+              send data somewhere else.</li>
+          <li><strong>No third parties.</strong> No analytics, fonts, CDNs, or icon services. Fetching a
+              website's icon would reveal which sites you use, so Vault never does.</li>
+          <li><strong>A small dependency tree.</strong> The cryptography package has no third-party
+              dependencies at all and is tested against published standard vectors.</li>
+        </ul>
+
+        <h2 id="infra">Infrastructure</h2>
+        <ul>
+          <li>HTTPS only, with HSTS. TLS 1.0 and 1.1 are refused.</li>
+          <li>The API listens on the loopback interface only; it is reachable solely through the web
+              server in front of it.</li>
+          <li>The server has no SSH access open to the internet. New releases are pulled by the server from
+              private storage and checked against a hash before they are installed, so deploying needs no way in.</li>
+          <li>The database lives on a private network, not on the web server's disk.</li>
+          <li>Encrypted exports are taken daily to private object storage. Restoring them has been
+              tested. They contain the same ciphertext as the database and nothing more.</li>
+        </ul>
+
+        <h2 id="limits">Known limitations</h2>
+        <p>A security page that lists only strengths is a marketing page. These are the risks that are
+           known and currently accepted.</p>
+
+        <div class="callout">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg></span>
+          <div>
+            <h3>The web address is the trust anchor</h3>
+            <p>Any web-based password manager is only as trustworthy as the code it is served. Whoever
+               controls this site's address could serve modified code that captures a master password
+               as it is typed — and that would bypass everything above.</p>
+            <p>Today the address is a free dynamic-DNS name, which places that control with a third-party
+               service. Moving to a registered domain is planned. Until then, this is the largest risk,
+               and it is accepted knowingly rather than hidden.</p>
+          </div>
+        </div>
+
+        <h3>One server</h3>
+        <p>The service runs on a single host. If it goes down, the vault is unavailable until it is
+           restored — but your data is in the database and the daily exports, not on that host.</p>
+
+        <h3>Your own device</h3>
+        <p>Malware on your computer, or a malicious browser extension, can read what you type and what
+           the page shows. No web application can defend against a compromised device.</p>
+      </article>
+    </div>
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

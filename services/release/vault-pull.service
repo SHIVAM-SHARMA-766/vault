@@ -1,0 +1,14 @@
+[Unit]
+Description=Install the published vault release, if it is not already live
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Root, because installing means restarting vault-api and reloading Caddy. The
+# script reads one bucket, read-only, as the instance; it holds no key.
+ExecStart=/usr/local/bin/vault-pull.sh
+EnvironmentFile=/etc/vault/release.env
+NoNewPrivileges=true
+PrivateTmp=true
+TimeoutStartSec=300

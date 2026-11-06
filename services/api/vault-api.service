@@ -23,6 +23,8 @@ Environment=ALLOW_REGISTRATION=false
 # before the file exists; the service refuses to start without the values,
 # which is the check that matters.
 EnvironmentFile=-/srv/vault/api/run/secrets.env
+# The hostname, for absolute share-image URLs on the rendered site. Not secret.
+EnvironmentFile=-/etc/vault/release.env
 
 # The host serves a password manager; the service gets as little of it as it
 # can do its job with.
@@ -36,7 +38,9 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictNamespaces=true
 LockPersonality=true
-ReadWritePaths=/srv/vault/api/run
+# run/ for the API's own state; site/ is where it renders the public website
+# when someone publishes from the admin panel (Caddy serves site/current).
+ReadWritePaths=/srv/vault/api/run /srv/vault/site
 
 # MemoryDenyWriteExecute is deliberately absent. It forbids memory that is both
 # writable and executable, which is exactly what V8 needs in order to JIT — the

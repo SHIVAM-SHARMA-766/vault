@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{how.seo.title}}</title>
+  <meta name="description" content="{{how.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{how.seo.title}}">
+  <meta property="og:description" content="{{how.seo.description}}">
+  <meta property="og:image" content="{{absimg how.seo.image}}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<!-- page:how -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">{{how.hero.kicker}}</span>
+        <h1>{{how.hero.title}}</h1>
+        <p>{{how.hero.lede}}</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="steps">
+{{#each how.steps.items}}
+          <article class="step">
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+            <span class="where where-{{.where}}"></span>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">{{how.holds.kicker}}</span>
+          <h2>{{how.holds.title}}</h2>
+        </div>
+        <div class="compare">
+          <article class="card has">
+            <h3>What the server stores</h3>
+            <ul>
+{{#each how.holds.stores}}
+              <li>{{.text}}</li>
+{{/each}}
+            </ul>
+          </article>
+          <article class="card hasnt">
+            <h3>What it never sees</h3>
+            <ul>
+{{#each how.holds.never}}
+              <li>{{.text}}</li>
+{{/each}}
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap split split-reverse">
+        <div>
+          <span class="kicker">One key in the middle</span>
+          <h2>Why changing your password is instant</h2>
+          <p class="split-lede">Your entries are not encrypted with your password. They are encrypted with a random
+             vault key, created once when you sign up. Your password only locks that one key.</p>
+          <ul class="ticks">
+            <li>Change your master password and only the vault key is re-locked — your entries are untouched</li>
+            <li>A second copy of the vault key is locked with your recovery key, which is how recovery works</li>
+            <li>Every entry is sealed with AES-256-GCM and a fresh nonce, and bound to its own ID</li>
+          </ul>
+          <p><a href="/security#keys">See the full key hierarchy →</a></p>
+        </div>
+        <div class="diagram diagram-card">Master password
+     │  PBKDF2 · 600,000 rounds
+     ▼
+Master key
+     ├─► Key-encryption key
+     │        └─► unlocks the Vault key
+     │                 └─► encrypts your entries
+     │
+     └─► Login key ─► sent to the server
+              (checked, never usable
+               for decryption)</div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap">
+        <div class="callout">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg></span>
+          <div>
+            <h3>{{how.recovery.title}}</h3>
+            {{paras how.recovery.text}}
+          </div>
+        </div>
+      </div>
+    </section>
+
+<!-- include:cta -->
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

@@ -1,6 +1,7 @@
 # Architecture
 
-One always-free virtual machine, one managed NoSQL table, one object storage bucket. No
+One always-free virtual machine, one always-free MySQL HeatWave database holding a single
+table, one object storage bucket. No
 CDN, no serverless functions, no second provider. The whole system is small enough that a
 new reader can hold all of it at once, which is deliberate.
 
@@ -23,25 +24,28 @@ shape is chosen against.
    ┌──────────────────────────────────────────┐
    │  One always-free instance                │
    │                                          │
-   │  Caddy ──┬── /       → built client      │
-   │          │              from disk        │
+   │  Caddy ──┬── /       → public site       │
+   │          ├── /app/*  → vault client      │
    │          └── /api/*  → Node, localhost   │
    │                          │               │
    └──────────────────────────┼───────────────┘
                               │
               ┌───────────────┴───────────────┐
               ▼                               ▼
-      Oracle NoSQL                    Object Storage
-      ciphertext only                 encrypted exports
+      MySQL HeatWave                  Object Storage
+      ciphertext only                 vault-backups   daily encrypted exports (write)
+                                      vault-releases  what the host serves (read-only)
 ```
 
-Caddy terminates TLS with a certificate it obtains itself, serves the client from disk,
-sets every security header, and proxies `/api/*` to the Node process beside it. The client
+Caddy terminates TLS with a certificate it obtains itself, serves the public site and the
+client from disk, sets every security header, and proxies `/api/*` to the Node process beside it. The client
 and the API therefore share an origin with nothing in front of them — which is what lets
 the Content-Security-Policy restrict `connect-src` to `'self'`.
 
-The instance authenticates to NoSQL and Object Storage **as itself**, through a dynamic
-group that matches its OCID. No credential is written to its disk.
+The instance authenticates to Object Storage **as itself**, through a dynamic group that
+matches its OCID. The database is reached inside the VCN with a password that, like the
+email pepper and the token signing key, lives in `/srv/vault/api/run/secrets.env` on the
+host and never in the repository.
 
 ## Where trust ends
 
@@ -86,6 +90,42 @@ The recovery key has a second branch of its own, `vault.recovery.auth.v1`, so it
 itself to the server without revealing the branch that unwraps the vault. Recovery happens
 exactly when the master password is gone, so the usual Auth Key cannot be produced.
 
+## Releases
+
+Code reaches the host by the host pulling it ([0005](decisions/0005-pull-based-releases.md)).
+`scripts/release.sh` uploads a tarball — site, client, API bundle, Caddyfile, and a SHA-256
+manifest — to `vault-releases` and points the `current` object at it. On the host,
+`vault-pull.timer` checks every five minutes, verifies the hash and the manifest, validates
+the Caddyfile, installs, checks the service through Caddy, and reinstalls the previous
+release if anything fails. Nothing inbound is involved; SSH stays closed.
+
+Releases are published by GitHub Actions on every merge to `main`
+([0008](decisions/0008-release-pipeline.md)), as `vault-ci`, an OCI user that can write the
+releases bucket and nothing else. Write access to that bucket — and so push access to
+`main` — decides what browsers run, so it carries the same weight as the hostname (A3). The
+host can only read it.
+
+## The website
+
+The public site is templates, a content schema and content ([0007](decisions/0007-roles-and-site-editing.md)).
+Templates ship in each release under `api/site/`; content is edited in the admin panel and
+stored in the `SYSTEM` partition. When content is published — and once at every API start —
+the API renders the templates with the live content into `/srv/vault/site/v-<ts>/` and swaps
+the `current` symlink, which is what Caddy serves at `/`. Uploaded images are stored in the
+table and written to `/srv/vault/site/media/`. The renderer escapes every value and accepts
+no markup, because the site shares an origin with the vault client.
+
+## Administration
+
+The operator manages the service from an admin panel inside the client, at `/app/admin`
+([0006](decisions/0006-admin-panel.md), [0007](decisions/0007-roles-and-site-editing.md)).
+Access is by role on a normal account: owners are the addresses in `ADMIN_EMAILS`, kept as
+digests; owners grant admin, marketing and viewer, stored on the account's registry row.
+Every admin request re-reads the caller's role and checks the permission the route needs. The panel can set registration to closed, invite-only or open, issue
+single-use invitations, list accounts with their counts and dates, label, sign out,
+disable or delete them, show the last recorded backup, and read an audit log. It cannot read
+a vault or show an address — there is nothing readable on the server for it to show.
+
 ## Data
 
 One table. One partition per user. No secondary indexes, because the only two reads are a
@@ -100,6 +140,13 @@ shard-key query and a point lookup.
 | `USER#<id>` | `ACT#<ts>#<rand>` | Activity record, expires itself |
 | `USER#<id>` | `SESSION#<tokenId>` | A live refresh token, expires itself |
 | `EMAIL#<hmac>` | `EMAIL` | Login pointer to a user id |
+| `SYSTEM` | `SETTINGS` | Registration mode; absent means closed |
+| `SYSTEM` | `USER#<id>` | Registry row for the admin panel: digest, dates, label, disabled |
+| `SYSTEM` | `INVITE#<sha256>` / `INVITEUSED#<sha256>` | An invitation, by the hash of its code, and its single-use claim |
+| `SYSTEM` | `AUDIT#<ts>#<rand>` | An admin action, expires after a year |
+| `SYSTEM` | `BACKUP` | The last verified export, written by the backup script |
+| `SYSTEM` | `SITE#DRAFT` / `SITE#LIVE` / `SITE#V#<version>` | Website draft, pointer to the live version, and the last 30 published versions |
+| `SYSTEM` | `MEDIA#<id>` / `MEDIAMETA#<id>` | An uploaded image (bytes, base64) and its metadata |
 
 Unlocking is one query. Everything after that — search, filter, sort, folder resolution —
 happens in the client, because the server cannot read what it is storing.
@@ -132,8 +179,13 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
 | `services/api/` | The API, and the storage adapters behind one interface |
-| `apps/web/` | The vault client |
-| `infra/` | Terraform for the instance, the table, the bucket, and the network |
+| `apps/web/` | The vault client and admin panel (including the website editor), served at `/app/`, and the Caddyfile |
+| `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
+| `services/backup/` | The daily export and its systemd timer |
+| `services/release/` | The host's pull agent and its systemd timer |
+| `scripts/` | `release.sh` ships code (CI runs it on merge); `setup-ci.sh` creates the CI identity; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
+| `.github/workflows/` | `ci.yml` tests every change; `release.yml` publishes every merge to `main` |
+| `infra/` | Terraform for the instance, the database, both buckets, IAM, and the network |
 | `decisions/` | Architecture decision records |
 | `docs/` | Threat model and runbook |
 

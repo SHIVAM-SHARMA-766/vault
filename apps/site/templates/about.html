@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{about.seo.title}}</title>
+  <meta name="description" content="{{about.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{about.seo.title}}">
+  <meta property="og:description" content="{{about.seo.description}}">
+  <meta property="og:image" content="{{absimg about.seo.image}}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<!-- page:about -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">{{about.hero.kicker}}</span>
+        <h1>{{about.hero.title}}</h1>
+        <p>{{about.hero.lede}}</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap prose-wrap">
+        <div class="prose">
+          <h2>{{about.story.title}}</h2>
+          {{paras about.story.text}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="principles">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">{{about.principles.kicker}}</span>
+          <h2>{{about.principles.title}}</h2>
+        </div>
+        <div class="grid">
+{{#each about.principles.cards}}
+          <article class="card">
+            <span class="icon">{{icon .icon}}</span>
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">{{about.runs.kicker}}</span>
+          <h2>{{about.runs.title}}</h2>
+          <p>{{about.runs.text}}</p>
+        </div>
+        <div class="grid">
+{{#each about.runs.cards}}
+          <article class="card">
+            <span class="icon">{{icon .icon}}</span>
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+<!-- include:cta -->
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

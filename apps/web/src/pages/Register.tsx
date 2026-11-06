@@ -4,6 +4,8 @@ import { createAccount, deriveRecoveryProof } from '@vault/crypto'
 
 import { ApiError, api } from '../api.js'
 import * as session from '../session.js'
+import { IconAlert, IconArrowLeft } from '../icons.js'
+import { Check, CopyButton, PasswordInput, StrengthMeter } from '../ui.js'
 
 /** Short enough not to be theatre, long enough that 600,000 PBKDF2 iterations
  *  are doing work rather than papering over a guessable secret. */
@@ -17,6 +19,7 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
   const [error, setError] = useState('')
   const [recoveryKey, setRecoveryKey] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -47,6 +50,7 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
         kdf: account.kdf,
         wrappedVaultKey: account.wrappedVaultKey,
         wrappedVaultKeyForRecovery: account.wrappedVaultKeyForRecovery,
+        ...(inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
       })
 
       // Shown once. It is never transmitted and cannot be recovered from the
@@ -69,7 +73,9 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
       session.lock()
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
-        setError('Registration is closed on this server.')
+        setError(inviteCode.trim()
+          ? 'That invitation code is not valid. It may have been used or have expired.'
+          : 'New accounts need an invitation code on this server.')
       } else if (err instanceof ApiError && err.status === 409) {
         setError('That address is already registered.')
       } else {
@@ -82,56 +88,77 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
 
   if (recoveryKey) {
     return (
-      <div className="panel">
-        <h2>Write this down now</h2>
-        <p className="small muted">
-          This is the only way back into your vault if you forget the master password.
-          It is shown once, it was never sent to the server, and nobody can reissue it.
-          Lose both this and the password and the vault is gone.
+      <div>
+        <span className="step">Step 2 of 2</span>
+        <h2 className="auth-title">Save your recovery key</h2>
+        <p className="auth-sub">
+          This is the only way back into your vault if you forget the master password. It is
+          shown once, it was never sent to the server, and nobody can reissue it.
         </p>
-        <div className="recovery-key">{recoveryKey}</div>
-        <label className="row" style={{ gap: 8 }}>
-          <input type="checkbox" style={{ width: 'auto' }}
-                 checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
-          <span className="small">I have written it down somewhere safe.</span>
-        </label>
-        <div style={{ marginTop: 16 }}>
-          <button type="button" disabled={!acknowledged} onClick={onDone}>
-            Continue to sign in
-          </button>
+        <div className="recovery-key">
+          <code>{recoveryKey}</code>
+          <CopyButton value={recoveryKey} label="Recovery key" />
         </div>
+        <p className="alert alert-warn"><IconAlert size={16} />
+          Lose both this key and your master password and the vault cannot be opened — by anyone.
+        </p>
+        <Check checked={acknowledged} onChange={setAcknowledged}>
+          I have stored the recovery key somewhere safe, off this device.
+        </Check>
+        <button type="button" className="btn btn-primary btn-block" disabled={!acknowledged} onClick={onDone}>
+          Continue to sign in
+        </button>
       </div>
     )
   }
 
+  const mismatch = confirm.length > 0 && confirm !== password
+
   return (
-    <form className="panel" onSubmit={submit}>
-      <h2>Create an account</h2>
-      <p className="small muted">
-        There is no password reset. The server cannot read your vault, so it cannot help
-        you back into it — a recovery key issued here is the only other way in.
+    <form onSubmit={submit}>
+      <button type="button" className="back-link" onClick={onCancel}><IconArrowLeft size={16} />Back to sign in</button>
+      <span className="step">Step 1 of 2</span>
+      <h2 className="auth-title">Create your vault</h2>
+      <p className="auth-sub">
+        There is no password reset. The server cannot read your vault, so it cannot help you
+        back in — the recovery key issued next is the only other way.
       </p>
 
-      <label htmlFor="r-email">Email</label>
-      <input id="r-email" type="email" autoComplete="username" required
-             value={email} onChange={(e) => setEmail(e.target.value)} />
-
-      <label htmlFor="r-password">Master password</label>
-      <input id="r-password" type="password" autoComplete="new-password" required
-             value={password} onChange={(e) => setPassword(e.target.value)} />
-
-      <label htmlFor="r-confirm">Master password again</label>
-      <input id="r-confirm" type="password" autoComplete="new-password" required
-             value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-
-      {error ? <p className="error">{error}</p> : null}
-
-      <div className="row between" style={{ marginTop: 20 }}>
-        <button type="submit" disabled={busy || !email || !password || !confirm}>
-          {busy ? 'Generating keys…' : 'Create'}
-        </button>
-        <button type="button" className="secondary" onClick={onCancel}>Back</button>
+      <div className="field">
+        <label htmlFor="r-invite">Invitation code</label>
+        <input id="r-invite" autoComplete="off" spellCheck={false} className="mono"
+               placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+               value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
+        <p className="hint">Accounts are opened by invitation. Leave blank only if registration is open.</p>
       </div>
+
+      <div className="field">
+        <label htmlFor="r-email">Email</label>
+        <input id="r-email" type="email" autoComplete="username" required autoFocus
+               placeholder="you@example.com"
+               value={email} onChange={(e) => setEmail(e.target.value)} />
+      </div>
+
+      <div className="field">
+        <label htmlFor="r-password">Master password</label>
+        <PasswordInput id="r-password" autoComplete="new-password" required
+                       value={password} onChange={setPassword} />
+        <StrengthMeter password={password} />
+        <p className="hint">At least {MIN_LENGTH} characters. A long passphrase of unrelated words works well.</p>
+      </div>
+
+      <div className="field">
+        <label htmlFor="r-confirm">Confirm master password</label>
+        <PasswordInput id="r-confirm" autoComplete="new-password" required
+                       value={confirm} onChange={setConfirm} />
+        {mismatch ? <p className="hint hint-error">The passwords do not match yet.</p> : null}
+      </div>
+
+      {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
+
+      <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password || !confirm}>
+        {busy ? <><span className="spinner" />Generating keys…</> : 'Create vault'}
+      </button>
     </form>
   )
 }

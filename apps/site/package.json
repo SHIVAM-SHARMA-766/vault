@@ -1,0 +1,14 @@
+{
+  "name": "@vault/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The public website: templates, editable content schema and defaults, and the renderer shared by the build and the API.",
+  "exports": {
+    "./render": { "types": "./lib/render.d.mts", "default": "./lib/render.mjs" },
+    "./content": { "types": "./lib/content.d.mts", "default": "./lib/content.mjs" }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

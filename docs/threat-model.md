@@ -29,7 +29,7 @@ architecture changes. Last reviewed 2026-09-22, against the deployed system rath
                │  HTTPS, ciphertext + Auth Key only
   ┌────────────▼───────────────┐
   │  UNTRUSTED                 │   the host, Caddy, the API process,
-  │  All server infrastructure │   NoSQL, Object Storage, cloud
+  │  All server infrastructure │   MySQL, Object Storage, cloud
   └────────────────────────────┘   operators, backups
 ```
 
@@ -55,7 +55,7 @@ deployment it has a specific shape — see A3.
 
 ### A2 — Database or backup disclosure
 
-Obtains a dump of the NoSQL table or an export from Object Storage.
+Obtains a dump of the MySQL table or an export from Object Storage.
 
 Every entry field is AES-256-GCM ciphertext under a key derived from a password the
 server has never seen ([0001](../decisions/0001-cryptography-and-key-hierarchy.md)). Email
@@ -97,6 +97,20 @@ browser is talking to them, legitimately, over a valid certificate.
 That is materially worse than a compromise of this server, which yields only ciphertext
 and auth keys. Here the attacker gets the master password and therefore the vault.
 
+**A second way into the same position: the releases bucket.** Since
+[0005](../decisions/0005-pull-based-releases.md) the host installs whatever the
+`vault-releases` bucket's `current` object points at. Whoever can write that bucket chooses
+the code browsers run. The host itself can only read it; write access belongs to the
+operator's OCI user alone, and that user's API key is therefore as sensitive as the DuckDNS
+account. The SHA-256 manifest guards against corruption, not against a writer.
+
+**And a third: `main`.** Since [0008](../decisions/0008-release-pipeline.md) every push to
+`main` is published by GitHub Actions as `vault-ci`, which can write the releases bucket.
+Whoever can push to `main`, take over the GitHub account, or read the repository's Actions
+secrets can therefore publish code. Two-factor authentication on GitHub carries the same
+weight as on DuckDNS; the CI key is limited to that one bucket, so a leak of it is bounded to
+publishing a release.
+
 This is accepted knowingly. It is the reason
 [0003](../decisions/0003-running-everything-on-oci.md) keeps buying a domain on the table
 as the cheapest available security improvement, and it is the strongest argument for the
@@ -111,9 +125,47 @@ during the compromise. It does not yield plaintext: the Master Key is never tran
 and the Auth Key is a separate HKDF branch that cannot be worked backwards to it.
 
 Bounded further by least privilege: the instance authenticates as itself through a dynamic
-group that matches one OCID, and its policy names one table and one bucket. It cannot
+group that matches one OCID, and its policy names the backup bucket and, read-only, the
+releases bucket — so a compromised host cannot plant a release that outlives a rebuild. It cannot
 reach anything else in the tenancy — including the automation runner that shares the
 account. Exports to Object Storage let the vault be rebuilt after destructive action.
+
+### A9 — Compromised admin account
+
+An attacker who signs in as an account listed in `ADMIN_EMAILS`.
+
+Can open registration, issue invitations, disable or delete accounts, and sign them out.
+Cannot read a vault, see an address, or reset a master password: the admin panel is limited
+to what the server already holds, which is ciphertext and metadata
+([0006](../decisions/0006-admin-panel.md)). Every action is in the audit log, written before
+the action runs.
+
+Controls: admin is decided by configuration on the host, not by anything in the database,
+so a database write cannot create an admin. The account is protected by the same
+zero-knowledge sign-in and per-address, per-IP limits as any other, plus a separate admin
+rate limit. Deletion requires the target's id as confirmation, and the admin cannot disable
+or delete their own account. The daily export is the recovery path from destructive use.
+
+**Since [0007](../decisions/0007-roles-and-site-editing.md) there are lesser staff roles.**
+An *admin* can do the above to accounts ranked below it, but cannot grant roles or touch
+another admin or an owner. A *viewer* can read the panel and change nothing. A *marketing*
+account can edit and publish the public website — and only that.
+
+### A10 — Hostile website content
+
+An attacker who controls a marketing account (or any role that can publish the website), or
+who can write the content rows directly.
+
+The site shares an origin with the vault client, so script on the site could read the master
+password as it is typed. That is the outcome to prevent, and it is prevented in the renderer
+rather than by trusting editors: every value is HTML-escaped, there is no field that accepts
+markup, links are limited to site paths and `https://`, icons are from a fixed set, and
+uploaded images must be PNG, JPEG or WebP by their bytes — SVG is refused. The
+Content-Security-Policy, which allows no inline script, is the second layer. The security
+page's text is not editable.
+
+What remains is defacement: misleading text or images on the public site. It is audited,
+and any earlier version can be made live again in one click.
 
 ### A5 — Stolen or shared device
 
@@ -175,7 +227,9 @@ mistakes silence for coverage.
 
 | Risk | Why accepted |
 |---|---|
-| **The dynamic-DNS name is the entire user-facing trust path (A3).** Whoever controls it can serve modified client code and obtain the master password | Buying a domain removes it for roughly ₹800 a year and remains the cheapest security improvement available. Declined for now, deliberately, and recorded here so the choice is visible rather than forgotten |
+| **The dynamic-DNS name is the entire user-facing trust path (A3).** Whoever controls it can serve modified client code and obtain the master password | Buying a domain removes it for roughly ₹800 a year and remains the cheapest security improvement available. Re-confirmed 2026-11-06: accepted until a domain is bought, and stated on the public security page |
+| **Write access to the releases bucket is equivalent to A3.** Releases are hashed, not signed | One person holds write access. Signing releases with a key the host trusts is the step to take if that ever changes |
+| **Push access to `main` is equivalent to A3** (0008). No branch protection or required approval | Not available for private repositories on the free plan. One collaborator, two-factor authentication, and a CI key limited to one bucket |
 | Structural metadata leaks from a database dump — account count, entries per account, creation and modification times | Closing it requires the single-row model rejected in [0002](../decisions/0002-storage-and-data-model.md) |
 | Browser-delivered crypto is inherently weaker than a native client (A3) | Mitigated by CSP and SRI; the native Android client is the structural answer and is on the roadmap |
 | PBKDF2 rather than Argon2id | Avoids a WebAssembly dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |

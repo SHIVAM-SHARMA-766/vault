@@ -3,6 +3,7 @@
 import { type LambdaEvent, unauthorized } from './http.js'
 import type { Config } from './config.js'
 import { userPk } from './keys.js'
+import type { SiteConfig } from './site.js'
 import type { Store } from './store.js'
 import { bearerFrom, verifyToken } from './tokens.js'
 
@@ -11,7 +12,17 @@ export interface App {
   config: Config
   /** Injected so tests can pin the clock. */
   now: () => number
+  /** Forces registration open regardless of the stored setting. Exists for
+   *  bootstrapping the first account, before anyone can reach the admin panel
+   *  to open it; scripts/registration.sh manages it. */
   allowRegistration: boolean
+  /** Email digests (see identity.ts) of the accounts allowed into the admin
+   *  routes. Digests rather than addresses, so the running process holds the
+   *  same thing the table does. Empty means nobody is an admin. */
+  adminDigests: ReadonlySet<string>
+  /** Where the public website's templates are and where it is rendered to.
+   *  Absent where website editing is not set up; those routes then refuse. */
+  site?: SiteConfig
 }
 
 export function requireUser(app: App, event: LambdaEvent): string {

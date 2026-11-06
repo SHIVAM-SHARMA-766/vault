@@ -1,0 +1,991 @@
+{
+ "version": 1,
+ "sections": [
+  {
+   "id": "global",
+   "label": "Site-wide",
+   "groups": [
+    {
+     "key": "banner",
+     "label": "Announcement banner",
+     "hint": "A strip across the top of every page.",
+     "fields": [
+      {
+       "key": "enabled",
+       "label": "Show the banner",
+       "type": "bool"
+      },
+      {
+       "key": "text",
+       "label": "Message",
+       "type": "text",
+       "max": 160
+      },
+      {
+       "key": "linkText",
+       "label": "Link text",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "linkHref",
+       "label": "Link address",
+       "type": "link",
+       "hint": "A page on this site such as /features, or a full https:// address."
+      },
+      {
+       "key": "tone",
+       "label": "Style",
+       "type": "select",
+       "options": [
+        [
+         "info",
+         "Information"
+        ],
+        [
+         "success",
+         "Good news"
+        ],
+        [
+         "warning",
+         "Warning"
+        ]
+       ]
+      }
+     ]
+    },
+    {
+     "key": "cta",
+     "label": "Closing call to action",
+     "hint": "The dark panel near the bottom of most pages.",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "text",
+       "label": "Text",
+       "type": "text",
+       "max": 160
+      },
+      {
+       "key": "primary",
+       "label": "Main button",
+       "type": "text",
+       "max": 30
+      },
+      {
+       "key": "secondary",
+       "label": "Second button",
+       "type": "text",
+       "max": 30
+      }
+     ]
+    },
+    {
+     "key": "footer",
+     "label": "Footer",
+     "fields": [
+      {
+       "key": "tagline",
+       "label": "Tagline",
+       "type": "textarea",
+       "max": 200
+      },
+      {
+       "key": "note",
+       "label": "Small print",
+       "type": "text",
+       "max": 120
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "home",
+   "label": "Home",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    },
+    {
+     "key": "hero",
+     "label": "Hero",
+     "fields": [
+      {
+       "key": "eyebrow",
+       "label": "Small label",
+       "type": "text",
+       "max": 50
+      },
+      {
+       "key": "titleStart",
+       "label": "Heading — start",
+       "type": "text",
+       "max": 60
+      },
+      {
+       "key": "titleAccent",
+       "label": "Heading — highlighted words",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "titleEnd",
+       "label": "Heading — end",
+       "type": "text",
+       "max": 60
+      },
+      {
+       "key": "lede",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 400
+      },
+      {
+       "key": "primary",
+       "label": "Main button",
+       "type": "text",
+       "max": 30
+      },
+      {
+       "key": "secondary",
+       "label": "Second button",
+       "type": "text",
+       "max": 30
+      },
+      {
+       "key": "note",
+       "label": "Note under the buttons",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "image",
+       "label": "Screenshot",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      },
+      {
+       "key": "imageAlt",
+       "label": "Screenshot description",
+       "type": "text",
+       "max": 250,
+       "hint": "Read aloud by screen readers. Describe what the image shows."
+      }
+     ]
+    },
+    {
+     "key": "why",
+     "label": "Why Vault",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "text",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 300
+      },
+      {
+       "key": "cards",
+       "label": "Cards",
+       "type": "list",
+       "min": 3,
+       "max": 3,
+       "itemLabel": "Card",
+       "fields": [
+        {
+         "key": "icon",
+         "label": "Icon",
+         "type": "icon"
+        },
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "steps",
+     "label": "How it works (summary)",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "text",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 300
+      },
+      {
+       "key": "items",
+       "label": "Steps",
+       "type": "list",
+       "min": 3,
+       "max": 3,
+       "itemLabel": "Step",
+       "fields": [
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        },
+        {
+         "key": "where",
+         "label": "Happens",
+         "type": "select",
+         "options": [
+          [
+           "device",
+           "On your device"
+          ],
+          [
+           "server",
+           "On the server"
+          ]
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "honest",
+     "label": "Honesty note",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "text",
+       "label": "Text",
+       "type": "textarea",
+       "max": 500
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "features",
+   "label": "Features",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    },
+    {
+     "key": "hero",
+     "label": "Page header",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "lede",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 400
+      }
+     ]
+    },
+    {
+     "key": "core",
+     "label": "Main features",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "cards",
+       "label": "Cards",
+       "type": "list",
+       "min": 3,
+       "max": 9,
+       "itemLabel": "Card",
+       "fields": [
+        {
+         "key": "icon",
+         "label": "Icon",
+         "type": "icon"
+        },
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "split",
+     "label": "Organised section",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "lede",
+       "label": "Text",
+       "type": "textarea",
+       "max": 400
+      },
+      {
+       "key": "bullets",
+       "label": "Points",
+       "type": "list",
+       "min": 1,
+       "max": 8,
+       "itemLabel": "Point",
+       "fields": [
+        {
+         "key": "strong",
+         "label": "Bold start",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "rest",
+         "label": "Rest of the point",
+         "type": "text",
+         "max": 200
+        }
+       ]
+      },
+      {
+       "key": "image",
+       "label": "Image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      },
+      {
+       "key": "imageAlt",
+       "label": "Image description",
+       "type": "text",
+       "max": 250
+      }
+     ]
+    },
+    {
+     "key": "details",
+     "label": "Details",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "cards",
+       "label": "Cards",
+       "type": "list",
+       "min": 3,
+       "max": 9,
+       "itemLabel": "Card",
+       "fields": [
+        {
+         "key": "icon",
+         "label": "Icon",
+         "type": "icon"
+        },
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "how",
+   "label": "How it works",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    },
+    {
+     "key": "hero",
+     "label": "Page header",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "lede",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 400
+      }
+     ]
+    },
+    {
+     "key": "steps",
+     "label": "Steps",
+     "fields": [
+      {
+       "key": "items",
+       "label": "Steps",
+       "type": "list",
+       "min": 3,
+       "max": 3,
+       "itemLabel": "Step",
+       "fields": [
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        },
+        {
+         "key": "where",
+         "label": "Happens",
+         "type": "select",
+         "options": [
+          [
+           "device",
+           "On your device"
+          ],
+          [
+           "server",
+           "On the server"
+          ]
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "holds",
+     "label": "What the server holds",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "stores",
+       "label": "The server stores",
+       "type": "list",
+       "min": 1,
+       "max": 8,
+       "itemLabel": "Item",
+       "fields": [
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "text",
+         "max": 120
+        }
+       ]
+      },
+      {
+       "key": "never",
+       "label": "It never sees",
+       "type": "list",
+       "min": 1,
+       "max": 8,
+       "itemLabel": "Item",
+       "fields": [
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "text",
+         "max": 120
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "recovery",
+     "label": "No password reset note",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "text",
+       "label": "Text",
+       "type": "textarea",
+       "max": 600
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "faq",
+   "label": "FAQ",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    },
+    {
+     "key": "hero",
+     "label": "Page header",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "lede",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 400
+      }
+     ]
+    },
+    {
+     "key": "list",
+     "label": "Questions",
+     "fields": [
+      {
+       "key": "items",
+       "label": "Questions",
+       "type": "list",
+       "min": 1,
+       "max": 30,
+       "itemLabel": "Question",
+       "fields": [
+        {
+         "key": "q",
+         "label": "Question",
+         "type": "text",
+         "max": 150
+        },
+        {
+         "key": "a",
+         "label": "Answer",
+         "type": "textarea",
+         "max": 800
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "about",
+   "label": "About",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    },
+    {
+     "key": "hero",
+     "label": "Page header",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "lede",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 400
+      }
+     ]
+    },
+    {
+     "key": "story",
+     "label": "Story",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "text",
+       "label": "Text",
+       "type": "textarea",
+       "max": 1500,
+       "hint": "Leave a blank line between paragraphs."
+      }
+     ]
+    },
+    {
+     "key": "principles",
+     "label": "Principles",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "cards",
+       "label": "Cards",
+       "type": "list",
+       "min": 1,
+       "max": 6,
+       "itemLabel": "Card",
+       "fields": [
+        {
+         "key": "icon",
+         "label": "Icon",
+         "type": "icon"
+        },
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "runs",
+     "label": "What it runs on",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "text",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 300
+      },
+      {
+       "key": "cards",
+       "label": "Cards",
+       "type": "list",
+       "min": 1,
+       "max": 6,
+       "itemLabel": "Card",
+       "fields": [
+        {
+         "key": "icon",
+         "label": "Icon",
+         "type": "icon"
+        },
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "security",
+   "label": "Security",
+   "hint": "The security page text stays in code, so its claims always match how the system works. Only its search details can be changed here.",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

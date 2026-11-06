@@ -2,7 +2,7 @@
 
 What is in flight. Updated when something starts, stalls, or finishes.
 
-Last updated: 2026-09-22
+Last updated: 2026-11-06
 
 ## Right now
 
@@ -50,20 +50,15 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-1. **The client.** The Content-Security-Policy it must satisfy is already live and can be
-   read off a response: no inline script, no eval, and `img-src` with no remote hosts, so
-   site favicons cannot be fetched from a third party.
-2. **A deploy that needs no inbound SSH.** Today `scripts/deploy.sh` needs port 22 opened
-   and closed around it, which is friction on every deploy and a standing decision to get
-   wrong. The shape that fits: CI uploads a bundle to Object Storage, and the host pulls
-   it. Nothing inbound at all.
-3. **The scheduled export to Object Storage.** The always-free tier refuses a managed
-   backup policy, so this is not a second line of defence — it is the only one, and it
-   does not exist yet.
-4. **The first account**, once the client can create one: open registration, register,
-   write the recovery key down, close registration.
+1. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
+   database does not, so a stray `terraform destroy` deletes the vault.
+2. **Remove the AWS resources** left standing from the first deployment. The personal AWS
+   credentials in creds are no longer valid, so this needs new keys first.
+3. **Sign releases**, if anyone besides the operator ever gets write access to the
+   releases bucket ([0005](decisions/0005-pull-based-releases.md)).
 
-Later: the marketing site and the Android client.
+Later: the Android client, and a browser-extension client — the only way to close A3
+without a domain, since its code would not be served by the hostname.
 
 ## Open questions
 
@@ -74,10 +69,50 @@ Later: the marketing site and the Android client.
   needed. Worth several days of measurement before burning a core to satisfy a policy.
 - **Argon2id instead of PBKDF2.** Deferred rather than rejected; see
   [decisions/0001](decisions/0001-cryptography-and-key-hierarchy.md).
-- **Buy a domain?** Roughly ₹800 a year, and it removes the largest accepted risk in the
-  threat model. Declined for now, deliberately.
+- **Buy a domain.** Roughly ₹800 a year, and it removes the largest accepted risk in the
+  threat model (A3). Re-confirmed 2026-11-06: the risk is accepted until a domain is bought,
+  and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Release pipeline.** Every merge to `main` is published by GitHub Actions as
+`vault-ci`, an OCI user that can write the releases bucket and nothing else
+([0008](decisions/0008-release-pipeline.md)). Needs `scripts/setup-ci.sh` once, and
+`deploy.sh` before the first merge that carries the website editor.
+
+**2026-11-06 — Staff roles and website editing.** Owner, admin, marketing and viewer
+roles, granted by the owner or carried by an invitation. The public site's text, search
+details, images and an announcement banner are edited in the admin panel, drafted,
+previewed, published and rolled back without a release
+([0007](decisions/0007-roles-and-site-editing.md)). Needs `deploy.sh` before the release
+that carries it, for the unit's new `ReadWritePaths=/srv/vault/site`.
+
+**2026-11-06 — Deploys without SSH.** Releases go to a private `vault-releases` bucket and
+the host pulls, verifies, installs and health-checks them every five minutes, rolling back
+on failure ([0005](decisions/0005-pull-based-releases.md)). `scripts/release.sh` ships code;
+`scripts/deploy.sh` now only sets up the host.
+
+**2026-11-06 — Admin panel.** At `/app/admin` for accounts listed in `ADMIN_EMAILS`:
+registration mode, single-use invitations, account list with counts, label, sign-out,
+disable and delete, last backup, and an audit log. It cannot read a vault or show an
+address ([0006](decisions/0006-admin-panel.md)).
+
+**2026-11-06 — Multipage website.** Home, Features, How it works, Security, FAQ and About,
+from shared partials, still with no JavaScript and checked for broken links at build.
+
+**2026-11-06 — Public website.** Landing page at `/` and a security page at `/security`, in
+`apps/site`: static HTML and CSS with no JavaScript, built and checked against the same
+policy as the client. The client moved to `/app/`. `deploy.sh` now stages both into one
+tree and validates the Caddyfile on the host before installing it.
+
+**2026-11-06 — Client redesigned.** Split sign-in screen, three-pane vault (filters, list,
+detail) with search, favourites, copy with a 30-second clipboard clear, live TOTP codes, a
+password generator and strength meter, delete confirmation, and light and dark themes that
+follow the system. Collapses to two panes on tablets and one on phones. Still no inline
+style, no remote asset, and no favicon fetch, so it runs under the same policy.
+
+**2026-09-24 — Client live, and the daily export running.** Exports land in `vault-backups`
+every day; a restore was tested on 2026-09-24.
 
 **2026-09-22 — Moved to OCI, and consolidated everything into this repository.** The AWS
 deployment was built, applied, and verified, and then could not be reached: the account

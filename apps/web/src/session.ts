@@ -10,7 +10,7 @@
 
 import { wipe } from '@vault/crypto'
 
-import { api, type KdfParams, type Session } from './api.js'
+import { api, type KdfParams, type Permission, type Role, type Session } from './api.js'
 
 export interface Unlocked {
   userId: string
@@ -23,6 +23,18 @@ export interface Unlocked {
   kdf: KdfParams
   /** When the access token stops being accepted, as epoch milliseconds. */
   accessExpiresAt: number
+  /** Whether the server lists this account as an operator. Only decides
+   *  whether the admin panel is offered; every admin route checks again. */
+  isAdmin?: boolean
+  role?: Role
+  permissions?: Permission[]
+}
+
+/** Updates fields of the unlocked state without touching the keys. */
+export function patch(fields: Partial<Pick<Unlocked, 'userId' | 'isAdmin' | 'role' | 'permissions'>>): void {
+  if (!current) return
+  current = { ...current, ...fields }
+  notify()
 }
 
 let current: Unlocked | null = null
