@@ -1,122 +1,243 @@
+<div align="center">
+
 # Vault
 
-A zero-knowledge password manager. Encryption happens on the device; the server stores
-ciphertext it holds no key for.
+**A zero-knowledge password manager you run on your own server.**
+Everything is encrypted in your browser; the server stores ciphertext it holds no key for.
 
-Built and operated by one person, on infrastructure that costs nothing.
+[![CI](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml/badge.svg)](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml)
+![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM%20in%20the%20browser-4f46e5)
+![Tests](https://img.shields.io/badge/tests-290%20unit%20%C2%B7%2015%20browser-16a34a)
+![Running cost](https://img.shields.io/badge/running%20cost-%240%20a%20month-0ea5e9)
 
-## Status
+[**Live instance**](https://vault-shivam.duckdns.org) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
 
-**Live at https://vault-shivam.duckdns.org**, with registration closed. Cryptography, API,
-client, infrastructure and a daily export are all running. [STATUS.md](STATUS.md) is the
-live account.
+<img src="docs/images/vault.png" alt="The Vault web app: folders and types on the left, items in the middle, a login with a live one-time code on the right" width="900">
 
-## Why this repository exists
+</div>
 
-An earlier version of this product ran on a single virtual machine with PostgreSQL behind
-it. That machine's free allocation was withdrawn, the instance was reclaimed, and
-everything stopped. Rebuilding it in place would have carried forward two things worth
-leaving behind:
+## Features
 
-- **It was not actually zero-knowledge.** The master password was transmitted to the
-  server and hashed there. The README claimed otherwise.
-- **It was shaped for a server that no longer existed** — a long-lived process, a
-  relational database, and a reverse proxy on a host someone had to patch.
+<table>
+<tr>
+<td width="50%" valign="top">
 
-This is a rewrite from an empty directory. None of the old code was carried over.
+### 🔐 Zero-knowledge by design
+Your master password never leaves the browser. Names, websites, usernames, notes, folders
+and tags are encrypted along with passwords — a database dump does not even reveal which
+sites you use.
 
-The rewrite was first built for AWS and applied there before being moved; the account
-would not let CloudFront reach the function, and the reasoning behind moving rather than
-waiting is in [decisions/0003](decisions/0003-running-everything-on-oci.md).
+</td>
+<td width="50%" valign="top">
 
-## Design
+### 🗂️ Seven item types, nested folders
+Logins, secure notes, cards, identities, bank accounts, SSH keys and Wi-Fi, each with its
+own fields; custom and hidden fields; folders four levels deep; live one-time codes.
 
-Four documents, in the order worth reading them:
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-| Document | What it answers |
-|---|---|
-| [decisions/0001](decisions/0001-cryptography-and-key-hierarchy.md) | How keys are derived, what is encrypted, why a master password change is a single write |
-| [decisions/0002](decisions/0002-storage-and-data-model.md) | What the data looks like and why there are no secondary indexes |
-| [decisions/0003](decisions/0003-running-everything-on-oci.md) | Why everything runs on one provider, and what that costs |
-| [decisions/0004](decisions/0004-the-access-token-header.md) | Why the access token is not in the `Authorization` header |
-| [decisions/0005](decisions/0005-pull-based-releases.md) | How code reaches the host without SSH |
-| [decisions/0006](decisions/0006-admin-panel.md) | What the admin panel can and cannot do |
-| [decisions/0007](decisions/0007-roles-and-site-editing.md) | Staff roles, and editing the website safely on the vault's origin |
-| [decisions/0008](decisions/0008-release-pipeline.md) | Merging to main publishes a release, and what that trusts |
-| [decisions/0009](decisions/0009-identity-keys-and-sharing.md) | Identity keys, and how sharing will work |
-| [decisions/0011](decisions/0011-two-factor-sign-in.md) | Two-factor sign-in, and what it does and does not protect |
-| [decisions/0010](decisions/0010-self-hosted-product.md) | Why customers run Vault on their own servers, and what that commits the product to |
+### 🩺 Password health
+Weak, reused, year-old and `http://`-only passwords, scored out of 100 with advice on each
+item — computed in your browser.
 
-[ARCHITECTURE.md](ARCHITECTURE.md) describes the system those add up to.
-[ROADMAP.md](ROADMAP.md) says where it is going: a zero-knowledge password manager for teams,
-that organizations install and run on their own servers.
-[docs/threat-model.md](docs/threat-model.md) says who the adversaries are and which risks
-are accepted rather than mitigated. [docs/runbook.md](docs/runbook.md) covers deploying it
-and what to do when something breaks.
+</td>
+<td valign="top">
 
-## Security summary
+### 🔁 Import from nine formats
+Chrome, Edge, Brave, Firefox, Safari, Bitwarden, 1Password, LastPass, KeePass and Zoho Vault,
+previewed before saving, duplicates skipped. Encrypted export to move between servers.
 
-The full account is in the documents above. In short:
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-- The master password never leaves the device. The server receives an Auth Key derived
-  through a separate, non-invertible HKDF branch.
-- Everything belonging to an entry is encrypted, including its name, tags, and folder — so
-  a database dump does not reveal which services the user holds accounts for.
-- A recovery key is issued once at signup and is the only way back from a forgotten master
-  password. There is no password reset, because the server cannot perform one.
-- Changing the master password rewraps a single key. Entries are never re-encrypted.
+### 🕘 History you can restore
+Every edit keeps the previous version, encrypted like the item, up to twenty per item. See
+the old password; restore it in one click.
 
-The design assumes the entire server side is hostile and aims to leak nothing but
-ciphertext under that assumption.
+</td>
+<td valign="top">
 
-**One risk is accepted rather than mitigated, and it is the largest one.** The hostname is
-a free dynamic-DNS name, which is the whole user-facing trust path — whoever controls it
-can serve modified client code and obtain the master password. This is recorded in the
-threat model as A3 and revisited in [decisions/0003](decisions/0003-running-everything-on-oci.md);
-buying a domain would remove it and remains the cheapest improvement available here.
+### 🛡️ Account security
+Two-factor sign-in with recovery codes, a recovery key instead of a password reset,
+signed-in devices you can name and sign out, and ninety days of security activity.
 
-## Cost
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-Nothing, on perpetual free allowances rather than expiring trials.
+### 🧑‍💼 Admin panel with roles
+Owner, admin, marketing and viewer roles; invitations; account management; an audit log;
+and an editor for the public website — none of which can read a vault.
 
-| Component | Service | Allowance |
-|---|---|---|
-| Host | OCI compute, `VM.Standard.E2.1.Micro` | 2 per tenancy, always free |
-| Database | OCI MySQL HeatWave, `MySQL.Free` | 1 always-free DB system, 50 GB |
-| Exports and releases | OCI Object Storage, two private buckets | 20 GB, 50,000 requests a month |
-| TLS | Let's Encrypt via Caddy | free |
-| Hostname | DuckDNS | free |
+</td>
+<td valign="top">
 
-The one thing to watch is not a bill: an idle always-free instance may be reclaimed. See
-the runbook.
+### 🚀 Ships itself
+Merge to `main` and the server installs the release within five minutes, verifies it, and
+rolls back on failure. Health is watched and alarms reach the operator.
 
-## Layout
+</td>
+</tr>
+</table>
 
-| Path | Contents |
-|---|---|
-| `packages/crypto/` | Every cryptographic operation. Zero third-party dependencies |
-| `services/api/` | The API and its storage adapters |
-| `apps/web/` | The vault client and the admin panel, at `/app/` |
-| `apps/site/` | The public website: templates, editable content schema and defaults, and its renderer |
-| `services/backup/`, `services/release/` | The daily export, and the host's release pull agent |
-| `scripts/` | `release.sh` ships code, `deploy.sh` sets up the host |
-| `infra/` | Terraform for everything this runs on |
-| `decisions/` | Why things are the way they are |
-| `docs/` | Threat model and runbook |
+## A closer look
 
-## Development
+<details open>
+<summary><b>Password health</b> — what to fix, and why</summary>
+<br>
+<img src="docs/images/health.png" alt="Password health with a score of 78 and advice on a reused, unencrypted login" width="860">
+</details>
+
+<details>
+<summary><b>Import</b> — see what a file holds before anything is saved</summary>
+<br>
+<img src="docs/images/import.png" alt="Import screen previewing a Bitwarden export" width="860">
+</details>
+
+<details>
+<summary><b>History</b> — every previous version, restorable</summary>
+<br>
+<img src="docs/images/history.png" alt="Previous versions of a login" width="860">
+</details>
+
+<details>
+<summary><b>Cards and other item types</b></summary>
+<br>
+<img src="docs/images/card.png" alt="A card item" width="860">
+</details>
+
+<details>
+<summary><b>Devices and security activity</b></summary>
+<br>
+<img src="docs/images/devices.png" alt="Signed-in devices and security activity" width="860">
+</details>
+
+<details>
+<summary><b>Dark mode and phones</b></summary>
+<br>
+<img src="docs/images/vault-dark.png" alt="Dark mode" width="860">
+<p>
+<img src="docs/images/mobile-list.png" alt="Phone: item list" width="260">
+&nbsp;
+<img src="docs/images/mobile-detail.png" alt="Phone: an item" width="260">
+</p>
+</details>
+
+<details>
+<summary><b>Website editor</b> in the admin panel</summary>
+<br>
+<img src="docs/images/admin-website.png" alt="The website editor" width="860">
+</details>
+
+<details>
+<summary><b>The public website</b></summary>
+<br>
+<img src="docs/images/website.png" alt="The public website's home page" width="860">
+</details>
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph browser["Your browser"]
+    pw["Master password"] --> keys["Keys derived here<br/>(PBKDF2 → HKDF)"]
+    keys --> enc["Encrypt / decrypt<br/>AES-256-GCM"]
+  end
+  enc -- "ciphertext only" --> api["API"]
+  api --> db[("Database<br/>ciphertext only")]
+  keys -. "a separate auth key,<br/>never the password" .-> api
+```
+
+- The server receives an **auth key** derived through a separate, one-way branch. Seeing
+  every one ever sent reveals nothing that decrypts a vault.
+- A random **vault key** encrypts everything; the master password only wraps it, so changing
+  the password is one write and nothing is re-encrypted.
+- A **recovery key**, shown once at sign-up, is the only way back from a forgotten master
+  password. There is no reset, because the server cannot perform one.
+
+The full design: [ARCHITECTURE.md](ARCHITECTURE.md) and the
+[decision records](decisions/). Adversaries and mitigations:
+[threat model](docs/threat-model.md).
+
+## Run it locally
 
 ```sh
 npm install
-npm test             # 190 tests across the crypto package and the API
 npm run build
-npm run dev:stack    # the whole product on http://localhost:8080, in memory
-npm run test:e2e     # browser tests against it (needs Chrome)
+npm run dev:stack      # the whole product on http://localhost:8080, in memory — no cloud account
 ```
 
-The API's tests run against an in-memory store, so no cloud account is needed for any of
-them.
+<details>
+<summary>Tests, screenshots and the API description</summary>
 
-Shipping is merging to `main`: GitHub Actions runs `./scripts/release.sh`, which tests,
-builds and uploads a release, and the host installs it within five minutes. The same script
-runs by hand. See [docs/runbook.md](docs/runbook.md).
+```sh
+npm test               # crypto, core and API — 290 tests
+npm run test:e2e       # 15 browser tests against the real stack (needs Chrome)
+npm run screenshots    # regenerate docs/images from the running product
+npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
+```
+
+</details>
+
+<details>
+<summary>Repository layout</summary>
+
+| Path | Contents |
+|---|---|
+| [`packages/crypto/`](packages/crypto/) | Every cryptographic operation. Zero dependencies |
+| [`packages/core/`](packages/core/) | Item model, search, import/export, password health. Shared by every client, no UI |
+| [`services/api/`](services/api/) | The API, its storage adapters, and its OpenAPI generator |
+| [`apps/web/`](apps/web/) | The vault client and the admin panel, at `/app/` |
+| [`apps/site/`](apps/site/) | The public website: templates, editable content, renderer |
+| [`services/`](services/) | Backup and restore drill, release pull agent, health probe |
+| [`infra/`](infra/) | Terraform for everything the reference instance runs on |
+| [`scripts/`](scripts/) | Release, host setup, dev stack, screenshots |
+| [`decisions/`](decisions/) | Why things are the way they are |
+| [`docs/`](docs/) | User guide, runbook, configuration, threat model, roadmap |
+
+</details>
+
+## Documentation
+
+| | Document | For |
+|---|---|---|
+| 📘 | [User guide](docs/USER-GUIDE.md) | Using Vault, screen by screen |
+| 🏗️ | [Architecture](ARCHITECTURE.md) | How the system fits together, with diagrams |
+| ⚙️ | [Configuration](docs/configuration.md) | Every server setting |
+| 🔌 | [API](services/api/README.md) · [OpenAPI](docs/openapi.json) | Routes, errors, request ids |
+| 🛠️ | [Runbook](docs/runbook.md) | Deploying, alerts, backups, restore drill, recovery |
+| 🔒 | [Threat model](docs/threat-model.md) | Adversaries, mitigations, accepted risks |
+| 🧭 | [Roadmap](docs/ROADMAP.md) | What is planned, what is done, what is left |
+| 📋 | [Known issues](docs/KNOWN-ISSUES.md) | Current limits |
+| 📰 | [Status](STATUS.md) | The running log of changes |
+| 🧾 | [Decisions](decisions/) | The reasoning behind each design choice |
+
+## Running cost
+
+The reference instance runs on perpetual free allowances — $0 a month.
+
+| Component | Service |
+|---|---|
+| Host | OCI compute `VM.Standard.E2.1.Micro`, always free |
+| Database | OCI MySQL HeatWave `MySQL.Free`, 50 GB |
+| Backups and releases | OCI Object Storage, two private buckets |
+| Monitoring and alerts | OCI Monitoring and Notifications |
+| TLS | Let's Encrypt, via Caddy |
+
+<details>
+<summary>Background: why this is a rewrite</summary>
+
+An earlier version ran on a single VM with PostgreSQL. Its free allocation was withdrawn and
+the instance reclaimed. Rather than rebuild it in place, Vault was rewritten from an empty
+directory, because the old version transmitted the master password to the server and was
+shaped for a host that no longer existed. None of the old code was carried over. The move
+from AWS to OCI is explained in
+[decisions/0003](decisions/0003-running-everything-on-oci.md).
+
+</details>

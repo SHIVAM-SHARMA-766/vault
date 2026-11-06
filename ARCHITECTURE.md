@@ -5,7 +5,7 @@ table, one object storage bucket. No
 CDN, no serverless functions, no second provider. The whole system is small enough that a
 new reader can hold all of it at once, which is deliberate.
 
-This describes the **target**. [STATUS.md](STATUS.md) says what is actually built.
+This describes the system as built. [STATUS.md](STATUS.md) is the running log, [docs/ROADMAP.md](docs/ROADMAP.md) the plan, and [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) the limits.
 
 The reasoning lives in [`decisions/`](decisions/): [0001](decisions/0001-cryptography-and-key-hierarchy.md)
 for the cryptographic scheme, [0002](decisions/0002-storage-and-data-model.md) for the
@@ -15,21 +15,48 @@ shape is chosen against.
 
 ## Shape
 
+```mermaid
+flowchart TB
+  subgraph device["Browser — the only place plaintext exists"]
+    ui["Vault client /app/<br/>master password · Master Key · Vault Key"]
+  end
+  subgraph host["One always-free OCI instance"]
+    caddy["Caddy<br/>TLS · security headers"]
+    site["Public website /"]
+    api["Node API /api/*<br/>localhost only"]
+    probe["vault-probe<br/>every 5 min"]
+    pull["vault-pull<br/>every 5 min"]
+  end
+  db[("MySQL HeatWave<br/>one table, ciphertext only")]
+  backups[("vault-backups<br/>daily encrypted exports")]
+  releases[("vault-releases<br/>signed-off builds, read-only")]
+  mon["OCI Monitoring<br/>alarms"]
+  mail["Operator's email / push"]
+
+  ui -- HTTPS --> caddy
+  caddy --> site
+  caddy --> api
+  api --> db
+  api -. daily export .-> backups
+  pull -. install, verify, roll back .-> releases
+  probe -- metrics --> mon
+  mon -- alarm --> mail
+```
+
+<details>
+<summary>The same picture as text, for tools that do not render diagrams</summary>
+
 ```
         Browser  ── master password, Master Key, Vault Key, plaintext
            │        all live here and nowhere else
-           │
            │  HTTPS
            ▼
    ┌──────────────────────────────────────────┐
    │  One always-free instance                │
-   │                                          │
    │  Caddy ──┬── /       → public site       │
    │          ├── /app/*  → vault client      │
    │          └── /api/*  → Node, localhost   │
-   │                          │               │
    └──────────────────────────┼───────────────┘
-                              │
               ┌───────────────┴───────────────┐
               ▼                               ▼
       MySQL HeatWave                  Object Storage
@@ -41,6 +68,8 @@ shape is chosen against.
            ▼
       Notifications ──► operator's email (optionally an HTTPS push endpoint)
 ```
+
+</details>
 
 Caddy terminates TLS with a certificate it obtains itself, serves the public site and the
 client from disk, sets every security header, and proxies `/api/*` to the Node process beside it. The client
@@ -79,6 +108,23 @@ hierarchy. It is accepted knowingly; see A3 in the threat model.
 
 ## Key hierarchy
 
+```mermaid
+flowchart LR
+  pw["Master password<br/>+ per-user salt"] -- "PBKDF2-SHA256<br/>600,000 rounds" --> mk["Master Key"]
+  mk -- "HKDF vault.kek.v1" --> kek["KEK"]
+  mk -- "HKDF vault.auth.v1" --> auth["Auth Key"]
+  auth -- "sent; stored as<br/>scrypt verifier" --> server[("Server")]
+  rk["Recovery key<br/>(shown once)"] --> rkek["Recovery KEK"]
+  rk --> rauth["Recovery auth"] --> server
+  vk["Vault Key<br/>random, never rotates"]
+  kek -- wraps --> vk
+  rkek -- wraps --> vk
+  vk -- "AES-256-GCM,<br/>fresh IV, AAD per purpose" --> items["Entries · folders · history<br/>identity private key"]
+```
+
+<details>
+<summary>As text</summary>
+
 ```
 Master Password + per-user salt
         │ PBKDF2-SHA256, 600k
@@ -91,6 +137,8 @@ Master Password + per-user salt
         ├── wrapped by Recovery KEK         (recovery key path)
         └── encrypts every entry field, AES-256-GCM, fresh 96-bit IV
 ```
+
+</details>
 
 Each account also has an **identity key pair** (ECDH P-256): the public key in the clear on the
 profile, the private key sealed under the Vault Key. It is what sharing will use to hand a
@@ -120,6 +168,14 @@ manifest — to `vault-releases` and points the `current` object at it. On the h
 `vault-pull.timer` checks every five minutes, verifies the hash and the manifest, validates
 the Caddyfile, installs, checks the service through Caddy, and reinstalls the previous
 release if anything fails. Nothing inbound is involved; SSH stays closed.
+
+```mermaid
+flowchart LR
+  pr["Pull request"] -- "CI: crypto · core · api · web · site · e2e · audit" --> main["merge to main"]
+  main -- "GitHub Actions as vault-ci" --> bucket[("vault-releases<br/>tarball + SHA-256 manifest")]
+  bucket -- "vault-pull.timer, every 5 min" --> host["host: verify → install → health check"]
+  host -- "fails" --> rollback["reinstall previous release"]
+```
 
 Releases are published by GitHub Actions on every merge to `main`
 ([0008](decisions/0008-release-pipeline.md)), as `vault-ci`, an OCI user that can write the
@@ -160,7 +216,7 @@ shard-key query and a point lookup.
 | `USER#<id>` | `FOLDER#<id>` | Encrypted folder name and parent |
 | `USER#<id>` | `HIST#<entryId>#<ts>` | Prior versions, capped at twenty, sealed with their own AAD so the server cannot swap one in as the live entry |
 | `USER#<id>` | `ACT#<ts>#<rand>` | Activity record, expires itself |
-| `USER#<id>` | `SESSION#<tokenId>` | A live refresh token, expires itself |
+| `USER#<id>` | `SESSION#<tokenId>` | A live refresh token: its device id (`sid`, stable across rotation), device description, address, optional name; expires itself |
 | `EMAIL#<hmac>` | `EMAIL` | Login pointer to a user id |
 | `SYSTEM` | `SETTINGS` | Registration mode; absent means closed |
 | `SYSTEM` | `USER#<id>` | Registry row for the admin panel: digest, dates, label, disabled |
@@ -179,6 +235,25 @@ happens in the client, because the server cannot read what it is storing.
 Key from the chosen password and a fresh salt, wraps the Vault Key twice, and sends the
 salt, the Auth Key, the recovery proof, and both wrapped blobs. The recovery key is
 displayed once and never transmitted.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant A as API
+  participant D as Database
+  B->>A: POST /api/auth/prelogin {email}
+  A->>D: email pointer (by HMAC digest)
+  A-->>B: KDF salt and rounds (a decoy if unknown)
+  Note over B: PBKDF2 → Master Key → KEK + Auth Key
+  B->>A: POST /api/auth/login {email, Auth Key, TOTP?}
+  A->>D: verify scrypt(Auth Key), second factor
+  A-->>B: access token (15 min), refresh token (30 days), wrapped Vault Key
+  Note over B: unwrap Vault Key with KEK — the password never left
+  B->>A: GET /api/vault
+  A-->>B: every sealed entry and folder
+  Note over B: decrypt, search and sort in memory
+```
 
 **Login.** The client requests the salt for an email address; unknown addresses receive a
 deterministic decoy, so the endpoint cannot be used to enumerate accounts. It derives the

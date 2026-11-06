@@ -7,6 +7,31 @@ Everything this project runs on is declared in [`infra/`](../infra/) and provisi
 there. There is nothing to configure in a console, and nothing about this project lives in
 another repository.
 
+**Something is wrong right now?** Start at [Alerts](#alerts) if a mail arrived, or
+[When something looks wrong](#when-something-looks-wrong) if not.
+
+<details>
+<summary><b>Contents</b></summary>
+
+| Setting up | Day to day | When it breaks |
+|---|---|---|
+| [First deploy](#first-deploy) | [Deploying code](#deploying-code) | [When something looks wrong](#when-something-looks-wrong) |
+| [Applying infrastructure changes](#applying-infrastructure-changes) | [Editing the website](#editing-the-website) | [Alerts](#alerts) |
+| [Rebuilding the host](#rebuilding-the-host) | [Staff roles](#staff-roles) | [Backups](#backups) and the [restore drill](#the-quarterly-restore-drill) |
+| [Setting the server secrets](#setting-the-server-secrets) | [Developing locally](#developing-locally) | [Recovering the vault](#recovering-the-vault) |
+| [Opening registration for the first account](#opening-registration-for-the-first-account) | [Rotating the host key](#rotating-the-host-key) | [Idle reclamation](#idle-reclamation-which-is-the-thing-most-likely-to-bite) |
+| | [Getting on the host](#getting-on-the-host) | [Tearing it down](#tearing-it-down) |
+
+</details>
+
+```mermaid
+flowchart LR
+  code["Code change"] -- "merge to main" --> auto["Released automatically<br/>(no SSH)"]
+  infra["infra/*.tf change"] -- "./scripts/apply.sh" --> oci["OCI resources"]
+  units["systemd units, probe,<br/>backup, drill scripts"] -- "open SSH → ./scripts/deploy.sh → close SSH" --> host["Host"]
+  secrets["Secrets"] -- "by hand, on the host" --> env["/srv/vault/api/run/secrets.env"]
+```
+
 ## First deploy
 
 ```sh
@@ -332,6 +357,15 @@ A 502 from Caddy means the API is down; a connection refused means Caddy is. A
 certificate error usually means the DuckDNS record is pointing somewhere else.
 
 ## Alerts
+
+```mermaid
+flowchart LR
+  probe["vault-probe<br/>every 5 min"] -- "8 metrics" --> mon["OCI Monitoring"]
+  mon -- "threshold or<br/>missing data" --> alarm["Alarm"]
+  alarm --> topic["Notifications topic"]
+  topic --> mail["Email"]
+  topic -. optional .-> push["HTTPS push (ntfy)"]
+```
 
 `vault-probe.timer` runs `/usr/local/bin/vault-probe.sh` every five minutes. It checks the
 public site, the client, the API and the certificate through public DNS, and disk, memory,

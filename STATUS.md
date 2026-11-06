@@ -2,7 +2,7 @@
 
 What is in flight. Updated when something starts, stalls, or finishes.
 
-Last updated: 2026-11-06
+Last updated: 2026-11-07
 
 ## Right now
 
@@ -50,7 +50,7 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In order:
+Phase 1 of [docs/ROADMAP.md](docs/ROADMAP.md): a complete, hardened personal vault. In order:
 
 1. ~~Client architecture~~ — done 2026-11-06.
 2. ~~Account settings~~ — done 2026-11-06.
@@ -90,6 +90,16 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Documentation with screenshots.** README rebuilt as a showcase; a
+[user guide](docs/USER-GUIDE.md) screen by screen; the roadmap moved to
+[docs/ROADMAP.md](docs/ROADMAP.md) with progress per phase and what is left;
+[docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) for limits and accepted risks; diagrams in
+ARCHITECTURE and the runbook; READMEs for `packages/core`, `apps/web`, `apps/site` and
+`services/`. Screenshots come from `npm run screenshots`, which drives the real product.
+Taking them found and fixed three things: the entry action bar overflowed on phones, a word
+plus a year ("summer2024") rated Fair instead of Weak, and the import folder was named with
+the UTC date.
 
 **2026-11-07 — Phase 1, steps 7–11.** *Devices*: each browser that signs in is a device
 with a stable id across token refreshes; Settings lists them (this one marked), lets you
@@ -152,7 +162,7 @@ signed package (phase 2) before teams (phase 3) and the extension (phase 4).
 
 **2026-11-06 — Phase 0, the foundation.** Identity key pairs on every account, with the
 sharing model designed ([0009](decisions/0009-identity-keys-and-sharing.md)); a one-command
-local stack; browser tests in CI; `prevent_destroy` on the database; [ROADMAP.md](ROADMAP.md)
+local stack; browser tests in CI; `prevent_destroy` on the database; [docs/ROADMAP.md](docs/ROADMAP.md)
 for teams, with the browser extension as the next client.
 
 **2026-11-06 — Release pipeline.** Every merge to `main` is published by GitHub Actions as
