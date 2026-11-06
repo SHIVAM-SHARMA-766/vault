@@ -16,7 +16,7 @@ resource "oci_identity_dynamic_group" "vault_host" {
 resource "oci_identity_policy" "vault_host" {
   compartment_id = var.tenancy_ocid
   name           = "${local.name}-host"
-  description    = "What the vault host may reach: its own table and its own bucket."
+  description    = "What the vault host may reach: its backup bucket, and its releases bucket read-only."
 
   # The database is reached with a username and password over the private
   # subnet, not with an instance principal, so nothing here mentions it. What
@@ -26,6 +26,11 @@ resource "oci_identity_policy" "vault_host" {
     # from the host; manage-buckets is not, so it cannot create or delete one.
     "Allow dynamic-group ${oci_identity_dynamic_group.vault_host.name} to manage objects in tenancy where target.bucket.name = '${oci_objectstorage_bucket.backups.name}'",
     "Allow dynamic-group ${oci_identity_dynamic_group.vault_host.name} to read buckets in tenancy where target.bucket.name = '${oci_objectstorage_bucket.backups.name}'",
+
+    # The releases bucket, read-only. The host fetches what it serves from
+    # here; it must not be able to change it, or a compromise of the host
+    # could plant code that survives a rebuild.
+    "Allow dynamic-group ${oci_identity_dynamic_group.vault_host.name} to read objects in tenancy where target.bucket.name = '${oci_objectstorage_bucket.releases.name}'",
   ]
 
   freeform_tags = var.default_tags
@@ -46,10 +51,11 @@ resource "oci_identity_policy" "vault_host" {
 resource "oci_identity_policy" "object_lifecycle" {
   compartment_id = var.tenancy_ocid
   name           = "${local.name}-object-lifecycle"
-  description    = "Lets Object Storage expire objects in the vault's backup bucket."
+  description    = "Lets Object Storage expire objects in the vault's backup and releases buckets."
 
   statements = [
     "Allow service objectstorage-${var.region} to manage object-family in tenancy where target.bucket.name = '${oci_objectstorage_bucket.backups.name}'",
+    "Allow service objectstorage-${var.region} to manage object-family in tenancy where target.bucket.name = '${oci_objectstorage_bucket.releases.name}'",
   ]
 
   freeform_tags = var.default_tags
