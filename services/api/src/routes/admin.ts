@@ -15,6 +15,7 @@ import {
   EMAIL_SK,
   ENTRY_PREFIX,
   FOLDER_PREFIX,
+  PROFILE_SK,
   SESSION_PREFIX,
   SYSTEM_PK,
   emailPk,
@@ -69,6 +70,7 @@ interface UserSummary {
   disabled: boolean
   isAdmin: boolean
   role: Role
+  twoFactor: boolean
   entries: number
   folders: number
   sessions: number
@@ -76,6 +78,7 @@ interface UserSummary {
 
 async function summarize(app: App, reg: RegistryEntry): Promise<UserSummary> {
   const items = await app.store.query(userPk(reg.userId))
+  const profile = items.find((i) => i.sk === PROFILE_SK)
   const now = Math.floor(app.now() / 1000)
   return {
     userId: reg.userId,
@@ -85,6 +88,7 @@ async function summarize(app: App, reg: RegistryEntry): Promise<UserSummary> {
     disabled: reg.disabled === true,
     isAdmin: app.adminDigests.has(reg.emailDigest),
     role: roleFromDigest(app, reg.emailDigest, reg.role),
+    twoFactor: Boolean(profile?.['totp']),
     entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
     folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
     sessions: items.filter((i) => i.sk.startsWith(SESSION_PREFIX)
@@ -189,6 +193,18 @@ export async function revokeSessions(app: App, actor: string, actorRole: Role, i
   await targetUser(app, actor, actorRole, id, true)
   await audit(app, actor, 'user.revoke-sessions', id)
   await revokeAllSessions(app, id)
+  return json(200, { ok: true })
+}
+
+/** Turns off someone's two-factor sign-in, for the person who lost both their
+ *  phone and their recovery codes. Audited; they can turn it on again. */
+export async function resetTwoFactor(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
+  await targetUser(app, actor, actorRole, id, false)
+  const profile = await app.store.get(userPk(id), PROFILE_SK)
+  if (!profile) throw notFound()
+  await audit(app, actor, 'user.reset-2fa', id)
+  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, ...rest } = profile
+  await app.store.put(rest as typeof profile)
   return json(200, { ok: true })
 }
 

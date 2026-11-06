@@ -110,15 +110,28 @@ export const api = {
   setIdentity: (token: string, identity: Identity) =>
     request<{ ok: true }>('PUT', '/api/keys/identity', { token, body: identity }),
 
-  login: (email: string, authKey: string) =>
+  /** `second` is the two-factor code, when the server has asked for one
+   *  (ApiError code 'two_factor_required'). */
+  login: (email: string, authKey: string, second?: SecondFactor) =>
     request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(
-      'POST', '/api/auth/login', { body: { email, authKey } },
+      'POST', '/api/auth/login', { body: { email, authKey, ...second } },
     ),
 
-  recoveryLogin: (email: string, recoveryAuthKey: string) =>
+  recoveryLogin: (email: string, recoveryAuthKey: string, second?: SecondFactor) =>
     request<Session & { wrappedVaultKeyForRecovery: string }>(
-      'POST', '/api/auth/recovery-login', { body: { email, recoveryAuthKey } },
+      'POST', '/api/auth/recovery-login', { body: { email, recoveryAuthKey, ...second } },
     ),
+
+  twoFactor: {
+    setup: (token: string, currentAuthKey: string) =>
+      request<{ secret: string }>('POST', '/api/auth/2fa/setup', { token, body: { currentAuthKey } }),
+    enable: (token: string, code: string) =>
+      request<{ recoveryCodes: string[] }>('POST', '/api/auth/2fa/enable', { token, body: { code } }),
+    disable: (token: string, currentAuthKey: string, second: SecondFactor) =>
+      request<{ ok: true }>('POST', '/api/auth/2fa/disable', { token, body: { currentAuthKey, ...second } }),
+    recoveryCodes: (token: string, currentAuthKey: string, second: SecondFactor) =>
+      request<{ recoveryCodes: string[] }>('POST', '/api/auth/2fa/recovery-codes', { token, body: { currentAuthKey, ...second } }),
+  },
 
   refresh: (refreshToken: string) =>
     request<Session>('POST', '/api/auth/refresh', { body: { refreshToken } }),
@@ -149,7 +162,7 @@ export const api = {
     request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { refreshToken } }),
 
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number } }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -174,6 +187,8 @@ export const api = {
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/label`, { token, body: { label } }),
     setRole: (token: string, id: string, role: Role) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { token, body: { role } }),
+    resetTwoFactor: (token: string, id: string) =>
+      request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/reset-2fa`, { token }),
     setDisabled: (token: string, id: string, disabled: boolean) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/disabled`, { token, body: { disabled } }),
     revokeSessions: (token: string, id: string) =>
@@ -210,6 +225,8 @@ export const api = {
 }
 
 export type RegistrationMode = 'closed' | 'invite' | 'open'
+/** A two-factor code: six digits from the authenticator app, or a recovery code. */
+export type SecondFactor = { totpCode: string } | { recoveryCode: string }
 /** Public key in the clear (base64url, 65 bytes); private key sealed under the vault key. */
 export interface Identity { publicKey: string; wrappedPrivateKey: string }
 export type Role = 'owner' | 'admin' | 'marketing' | 'viewer' | 'user'
@@ -255,6 +272,7 @@ export interface AdminUser {
   disabled: boolean
   isAdmin: boolean
   role: Role
+  twoFactor: boolean
   entries: number
   folders: number
   sessions: number

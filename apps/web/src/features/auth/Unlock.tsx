@@ -2,69 +2,109 @@ import { useState } from 'react'
 
 import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } from '@vault/crypto'
 
-import { ApiError, api } from '../../lib/api.js'
+import { ApiError, type SecondFactor, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
+import { SecondFactorStep } from '../../ui/SecondFactor.js'
 
 export function Unlock({ onRegister, onRecover, forAdmin = false }: { onRegister: () => void; onRecover: () => void; forAdmin?: boolean }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  // Set once the password is proved and the server asks for a second factor.
+  // The derived keys wait here, in memory, until the code is in.
+  const [pending, setPending] = useState<{ authKey: string; kek: Uint8Array } | null>(null)
+
+  function explain(err: unknown) {
+    if (err instanceof UnsealError) {
+      // The server accepted the auth key but the blob would not open. That
+      // is corruption or the wrong account, not a wrong password.
+      setError('The vault did not open. The stored key may be damaged.')
+    } else if (err instanceof ApiError && err.code === 'invalid_two_factor') {
+      setError(err.message)
+    } else if (err instanceof ApiError && err.status === 403) {
+      setError('This account has been disabled. Contact the person who runs this vault.')
+    } else if (err instanceof ApiError && err.status === 401) {
+      setError('Wrong email or master password.')
+    } else if (err instanceof ApiError && err.status === 429) {
+      const wait = err.retryAfter ? Math.ceil(err.retryAfter / 60) : null
+      setError(wait ? `Too many attempts. Try again in ${wait} minute(s).` : err.message)
+    } else {
+      setError(err instanceof Error ? err.message : 'Something went wrong.')
+    }
+  }
+
+  /** Steps 3 and 4: prove the password (and the second factor, if asked),
+   *  then unwrap the vault key here. A wrong password fails at the server; a
+   *  damaged key fails in this browser. */
+  async function finish(authKey: string, kek: Uint8Array, second?: SecondFactor) {
+    const result = await api.login(email, authKey, second)
+    const vaultKey = await unwrapVaultKey(result.wrappedVaultKey, kek, 'master')
+    session.unlock({
+      userId: '',
+      email,
+      vaultKey,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      kdf: result.kdf,
+      accessExpiresAt: session.expiresAtFrom(result),
+    })
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setError('')
     setBusy(true)
-
     let kek: Uint8Array | null = null
+    let keep = false
     try {
       // 1. Fetch the salt. An address with no account gets a decoy, so this
       //    reply does not say whether one exists.
       const { kdf } = await api.prelogin(email)
-
       // 2. Derive, on this device. 600,000 iterations — the pause before the
       //    vault opens is the same pause an attacker faces per guess.
       const keys = await deriveLoginKeys(password, fromBase64Url(kdf.salt), kdf.iterations)
       kek = keys.kek
-
-      // 3. Prove the password with the auth key. The password itself, and the
-      //    key that decrypts the vault, stay here.
-      const result = await api.login(email, keys.authKey)
-
-      // 4. Unwrap locally. A wrong password fails here, not at the server.
-      const vaultKey = await unwrapVaultKey(result.wrappedVaultKey, keys.kek, 'master')
-
-      session.unlock({
-        userId: '',
-        email,
-        vaultKey,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        kdf: result.kdf,
-        accessExpiresAt: session.expiresAtFrom(result),
-      })
-    } catch (err) {
-      if (err instanceof UnsealError) {
-        // The server accepted the auth key but the blob would not open. That
-        // is corruption or the wrong account, not a wrong password.
-        setError('The vault did not open. The stored key may be damaged.')
-      } else if (err instanceof ApiError && err.status === 403) {
-        setError('This account has been disabled. Contact the person who runs this vault.')
-      } else if (err instanceof ApiError && err.status === 401) {
-        setError('Wrong email or master password.')
-      } else if (err instanceof ApiError && err.status === 429) {
-        const wait = err.retryAfter ? Math.ceil(err.retryAfter / 60) : null
-        setError(wait ? `Too many attempts. Try again in ${wait} minute(s).` : err.message)
-      } else {
-        setError(err instanceof Error ? err.message : 'Something went wrong.')
+      try {
+        await finish(keys.authKey, keys.kek)
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'two_factor_required') {
+          keep = true
+          setPending({ authKey: keys.authKey, kek: keys.kek })
+          return
+        }
+        throw err
       }
+    } catch (err) {
+      explain(err)
     } finally {
-      if (kek) wipe(kek)
+      if (kek && !keep) wipe(kek)
       setBusy(false)
     }
   }
+
+  async function submitSecond(second: SecondFactor) {
+    if (!pending) return
+    setError('')
+    setBusy(true)
+    try {
+      await finish(pending.authKey, pending.kek, second)
+      wipe(pending.kek)
+    } catch (err) {
+      explain(err)
+      setBusy(false)
+    }
+  }
+
+  function cancelSecond() {
+    if (pending) wipe(pending.kek)
+    setPending(null)
+    setError('')
+  }
+
+  if (pending) return <SecondFactorStep onSubmit={submitSecond} onCancel={cancelSecond} busy={busy} error={error} />
 
   return (
     <form onSubmit={submit} noValidate={false}>

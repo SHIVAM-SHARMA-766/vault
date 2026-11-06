@@ -10,15 +10,17 @@ import { useState } from 'react'
 
 import { UnsealError, changePassword, deriveRecoveryProof, unlockWithRecoveryKey } from '@vault/crypto'
 
-import { ApiError, api } from '../../lib/api.js'
+import { ApiError, type SecondFactor, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconArrowLeft } from '../../ui/icons.js'
 import { PasswordInput, StrengthMeter } from '../../ui/kit.js'
+import { SecondFactorStep } from '../../ui/SecondFactor.js'
 
 const MIN_LENGTH = 12
 
 type Step =
   | { kind: 'key' }
+  | { kind: 'second'; proof: string; key: string }
   | { kind: 'password'; vaultKey: Uint8Array; proof: string; token: string }
 
 export function Recover({ onCancel }: { onCancel: () => void }) {
@@ -29,6 +31,21 @@ export function Recover({ onCancel }: { onCancel: () => void }) {
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  function explain(err: unknown) {
+    setError(err instanceof ApiError && err.code === 'invalid_two_factor' ? err.message
+      : err instanceof ApiError && err.status === 401 ? 'That email and recovery key do not match an account.'
+      : err instanceof ApiError && err.status === 429 ? 'Too many attempts. Try again later.'
+      : err instanceof UnsealError ? 'The recovery key was accepted but the vault did not open. The stored key may be damaged.'
+      : err instanceof Error ? err.message : 'Something went wrong.')
+  }
+
+  async function open(proof: string, key: string, second?: SecondFactor) {
+    const res = await api.recoveryLogin(email, proof, second)
+    const vaultKey = await unlockWithRecoveryKey(key, res.wrappedVaultKeyForRecovery)
+    setStep({ kind: 'password', vaultKey, proof, token: res.accessToken })
+    setRecoveryKey('')
+  }
 
   async function useKey(e: React.FormEvent) {
     e.preventDefault()
@@ -41,15 +58,30 @@ export function Recover({ onCancel }: { onCancel: () => void }) {
       } catch {
         throw new Error('That does not look like a recovery key. Check it against the one you saved.')
       }
-      const res = await api.recoveryLogin(email, proof)
-      const vaultKey = await unlockWithRecoveryKey(recoveryKey.trim(), res.wrappedVaultKeyForRecovery)
-      setStep({ kind: 'password', vaultKey, proof, token: res.accessToken })
-      setRecoveryKey('')
+      try {
+        await open(proof, recoveryKey.trim())
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'two_factor_required') {
+          setStep({ kind: 'second', proof, key: recoveryKey.trim() })
+          return
+        }
+        throw err
+      }
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 401 ? 'That email and recovery key do not match an account.'
-        : err instanceof ApiError && err.status === 429 ? 'Too many attempts. Try again later.'
-        : err instanceof UnsealError ? 'The recovery key was accepted but the vault did not open. The stored key may be damaged.'
-        : err instanceof Error ? err.message : 'Something went wrong.')
+      explain(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function submitSecond(second: SecondFactor) {
+    if (step.kind !== 'second') return
+    setError('')
+    setBusy(true)
+    try {
+      await open(step.proof, step.key, second)
+    } catch (err) {
+      explain(err)
     } finally {
       setBusy(false)
     }
@@ -76,6 +108,10 @@ export function Recover({ onCancel }: { onCancel: () => void }) {
       setError(err instanceof Error ? err.message : 'Could not set the new master password.')
       setBusy(false)
     }
+  }
+
+  if (step.kind === 'second') {
+    return <SecondFactorStep onSubmit={submitSecond} onCancel={() => { setStep({ kind: 'key' }); setError('') }} busy={busy} error={error} />
   }
 
   if (step.kind === 'password') {

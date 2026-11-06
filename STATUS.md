@@ -54,7 +54,7 @@ Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In ord
 
 1. ~~Client architecture~~ — done 2026-11-06.
 2. ~~Account settings~~ — done 2026-11-06.
-3. **Two-factor sign-in** — TOTP, server-enforced, with recovery codes.
+3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
 4. **Folders, entry-type fields, custom fields, password history** in the UI.
 5. **Import and export.**
 6. **Monitoring and alerting**, and the domain.
@@ -79,6 +79,12 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Phase 1, step 3: two-factor sign-in.** TOTP with ten single-use recovery
+codes, enforced by the server after the password at sign-in and at recovery-key sign-in;
+replay refused; TOTP keys sealed under the pepper; admin reset with audit; QR code drawn by
+`packages/core`, the new shared package, checked against an independent encoder
+([0011](decisions/0011-two-factor-sign-in.md)).
 
 **2026-11-06 — Phase 1, steps 1 and 2.** The client is organised as `lib/` (API, session,
 router), `ui/` (kit, icons, the shared Shell with an account menu) and `features/` (auth,

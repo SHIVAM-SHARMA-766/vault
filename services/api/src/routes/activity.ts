@@ -19,6 +19,10 @@ export type ActivityKind =
   | 'rotate-recovery-key'
   | 'enrol-identity'
   | 'reset-password-with-recovery-key'
+  | 'enable-2fa'
+  | 'disable-2fa'
+  | 'regenerate-2fa-recovery-codes'
+  | 'used-2fa-recovery-code'
 
 const RETENTION_SECONDS = 90 * 24 * 60 * 60
 

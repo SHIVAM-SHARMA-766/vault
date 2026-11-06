@@ -60,12 +60,12 @@ where it lands.
 | Zero-knowledge encryption of passwords | ✓ | ✓ | ✓ | — |
 | Names, URLs, tags encrypted too | ◐ | ✓ | ✓ | — |
 | Recovery without the server | ◐ | ✓ (Emergency Kit) | ✓ (recovery key) | — |
-| Change master password / recovery login in the UI | ✓ | ✓ | ◐ API only | 1 |
+| Change master password / recovery login in the UI | ✓ | ✓ | ✓ | 1 |
 | Folders, password history, custom fields in the UI | ✓ | ✓ | ◐ API only | 1 |
 | Import from other managers, export | ✓ | ✓ | — | 1 |
 | Password health (weak, reused, old) | ✓ | ✓ (Watchtower) | — | 1 |
 | Breach check without revealing passwords | ◐ | ✓ | — | 1 (decision needed) |
-| Two-factor sign-in for the account | ✓ | ✓ | — | 1 |
+| Two-factor sign-in for the account | ✓ | ✓ | ✓ TOTP | 1 |
 | Device and session management | ✓ | ✓ | ◐ admin only | 1 |
 | Secret key mixed into the KDF | — | ✓ | — | 1 (decision needed) |
 | Organizations, teams, shared collections | ✓ | ✓ | ◐ keys only | 3 |

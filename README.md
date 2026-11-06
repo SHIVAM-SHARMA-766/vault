@@ -44,6 +44,7 @@ Four documents, in the order worth reading them:
 | [decisions/0007](decisions/0007-roles-and-site-editing.md) | Staff roles, and editing the website safely on the vault's origin |
 | [decisions/0008](decisions/0008-release-pipeline.md) | Merging to main publishes a release, and what that trusts |
 | [decisions/0009](decisions/0009-identity-keys-and-sharing.md) | Identity keys, and how sharing will work |
+| [decisions/0011](decisions/0011-two-factor-sign-in.md) | Two-factor sign-in, and what it does and does not protect |
 | [decisions/0010](decisions/0010-self-hosted-product.md) | Why customers run Vault on their own servers, and what that commits the product to |
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes the system those add up to.

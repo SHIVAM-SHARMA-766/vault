@@ -5,43 +5,31 @@
 
 import { useEffect, useState } from 'react'
 
-import {
-  changePassword,
-  deriveLoginKeys,
-  fromBase64Url,
-  identityFingerprint,
-  rotateRecoveryKey,
-  wipe,
-} from '@vault/crypto'
+import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey } from '@vault/crypto'
 
 import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconKey, IconLock, IconShield, IconUser } from '../../ui/icons.js'
 import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
+import { proveCurrent } from './prove.js'
+import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 
 const MIN_LENGTH = 12
 
-/** The auth key for a password, derived with the account's current KDF
- *  parameters. It proves the password to the server without sending it. */
-async function proveCurrent(state: session.Unlocked, password: string): Promise<string> {
-  const keys = await deriveLoginKeys(password, fromBase64Url(state.kdf.salt), state.kdf.iterations)
-  wipe(keys.kek)
-  return keys.authKey
-}
-
 export function Settings({ state }: { state: session.Unlocked }) {
-  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null } | null>(null)
+  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus } | null>(null)
+  const [version, setVersion] = useState(0)
 
   useEffect(() => {
     void (async () => {
       try {
         const info = await api.me(await session.token())
         const fingerprint = info.identity ? await identityFingerprint(fromBase64Url(info.identity.publicKey)) : null
-        setMe({ createdAt: info.createdAt, fingerprint })
+        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor })
       } catch { /* sections that need it say so */ }
     })()
-  }, [])
+  }, [version])
 
   return (
     <Shell state={state}>
@@ -61,6 +49,7 @@ export function Settings({ state }: { state: session.Unlocked }) {
         </section>
 
         <ChangePassword state={state} />
+        <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
         <RotateRecovery state={state} />
 
         <section className="settings-card" aria-labelledby="s-identity">

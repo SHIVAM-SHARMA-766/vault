@@ -307,7 +307,10 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                     <td title={when(u.lastLoginAt)}>{ago(u.lastLoginAt)}</td>
                     <td className="num">{u.entries}</td>
                     <td className="num">{u.sessions}</td>
-                    <td>{u.disabled ? <span className="pill pill-danger">Disabled</span> : <span className="pill pill-ok">Active</span>}</td>
+                    <td>
+                      {u.disabled ? <span className="pill pill-danger">Disabled</span> : <span className="pill pill-ok">Active</span>}
+                      {u.twoFactor ? <span className="pill pill-accent" title="Two-factor sign-in is on"> 2FA</span> : null}
+                    </td>
                     {canWrite ? <td>
                       <div className="row-actions">
                         <button className="icon-btn" title="Edit label" aria-label="Edit label" onClick={() => { setEditing(u.userId); setLabel(u.label ?? '') }}><IconEdit size={15} /></button>
@@ -315,6 +318,15 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                                 onClick={async () => { if (await run(toast, (t) => api.admin.revokeSessions(t, u.userId), 'Sessions revoked')) await reload() }}>
                           <IconRefresh size={15} />
                         </button>
+                        {!self && u.twoFactor ? (
+                          <button className="icon-btn" title="Reset two-factor sign-in" aria-label="Reset two-factor sign-in"
+                                  onClick={async () => {
+                                    if (!window.confirm(`Turn off two-factor sign-in for ${u.label || 'this account'}? Use this only for someone who has lost both their phone and their recovery codes. It is recorded in the audit log.`)) return
+                                    if (await run(toast, (t) => api.admin.resetTwoFactor(t, u.userId), 'Two-factor sign-in reset')) await reload()
+                                  }}>
+                            <IconShield size={15} />
+                          </button>
+                        ) : null}
                         {!self ? (
                           <>
                             <button className="btn btn-secondary btn-sm"
@@ -471,6 +483,7 @@ const ACTIONS: Record<string, string> = {
   'user.revoke-sessions': 'Signed account out everywhere',
   'user.delete': 'Deleted account',
   'user.role': 'Changed role',
+  'user.reset-2fa': 'Reset two-factor sign-in',
   'site.publish': 'Published the website',
   'site.rollback': 'Rolled the website back',
   'site.discard-draft': 'Discarded the website draft',

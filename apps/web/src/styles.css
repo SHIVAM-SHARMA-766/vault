@@ -668,3 +668,17 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .settings .recovery-key { margin: 12px 0; }
 .settings .check { margin: 12px 0; }
 @media (max-width: 760px) { .facts { grid-template-columns: 1fr; } }
+
+/* ── Two-factor ──────────────────────────────────────────────────────── */
+
+.settings-card-head .pill { margin-left: auto; }
+.code-input { font-family: var(--mono); font-size: 20px; letter-spacing: .3em; text-align: center; max-width: 220px; }
+.steps-list { margin: 0 0 16px; padding-left: 20px; color: var(--text-2); font-size: 13.5px; display: grid; gap: 4px; }
+.scan { display: flex; gap: 24px; align-items: flex-start; margin-bottom: 8px; }
+.qr { width: 196px; height: 196px; flex: none; border-radius: 10px; border: 1px solid var(--line); }
+.scan-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.secret-key { display: block; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); font-family: var(--mono); font-size: 14px; letter-spacing: .06em; word-break: break-all; margin-bottom: 12px; }
+.codes { list-style: none; margin: 12px 0; padding: 14px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.codes code { font-family: var(--mono); font-size: 15px; letter-spacing: .05em; }
+.settings-actions-left { justify-content: flex-start; }
+@media (max-width: 760px) { .scan { flex-direction: column; align-items: center; } .codes { grid-template-columns: 1fr; } }
