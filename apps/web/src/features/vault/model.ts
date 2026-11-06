@@ -49,7 +49,7 @@ export function stripMeta(e: Decrypted): EntryContent {
 /** Whether an edit changed anything worth keeping a version of. Starring an
  *  entry or moving it between folders is not. */
 function meaningfullyChanged(before: EntryContent, after: EntryContent): boolean {
-  const strip = ({ favorite: _f, folderId: _d, ...rest }: EntryContent) => JSON.stringify(rest)
+  const strip = ({ favorite: _f, folderId: _d, passwordChangedAt: _p, ...rest }: EntryContent) => JSON.stringify(rest)
   return strip(before) !== strip(after)
 }
 
@@ -90,12 +90,17 @@ export function useVault(vaultKey: Uint8Array) {
 
   /** Saves an entry. When an existing entry changes, its previous version is
    *  sealed into its history first, so nothing typed over is lost. */
-  async function saveEntry(content: EntryContent, id?: string, opts: { reload?: boolean } = {}): Promise<string> {
+  async function saveEntry(input: EntryContent, id?: string, opts: { reload?: boolean } = {}): Promise<string> {
     const entryId = id ?? crypto.randomUUID()
+    const previous = id ? entries.find((e) => e.id === id) : undefined
+    // Record when the password changed, for the health check's "old" finding.
+    const content: EntryContent = { ...input }
+    if (input.password && input.password !== (previous?.password ?? '')) content.passwordChangedAt = new Date().toISOString()
+    else if (previous?.passwordChangedAt) content.passwordChangedAt = previous.passwordChangedAt
+    else delete content.passwordChangedAt
     const blob = await sealEntry(entryId, content, vaultKey)
     if (!isWithinSizeLimit(blob)) throw new Error('That entry is too large to store. Shorten the notes.')
     const token = await session.token()
-    const previous = id ? entries.find((e) => e.id === id) : undefined
     if (previous && !previous.unreadable && meaningfullyChanged(stripMeta(previous), content)) {
       await api.addHistory(token, entryId, await sealHistory(entryId, stripMeta(previous), vaultKey))
     }

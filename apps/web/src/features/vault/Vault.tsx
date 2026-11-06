@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { descendants, folderPath, matches, subtitle, typeSpec } from '@vault/core'
+import { ISSUES, analyse, descendants, folderPath, matches, subtitle, typeSpec } from '@vault/core'
 
 import { Link } from '../../lib/router.js'
 import * as session from '../../lib/session.js'
@@ -49,15 +49,17 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const folderIds = useMemo(() => new Set(folders.map((f) => f.id)), [folders])
   const inFolder = (e: Decrypted) => (e.folderId && folderIds.has(e.folderId) ? e.folderId : undefined)
 
+  const health = useMemo(() => analyse(entries.filter((e) => !e.unreadable)), [entries])
+
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: entries.length, favorites: 0, unfiled: 0 }
+    const c: Record<string, number> = { all: entries.length, favorites: 0, unfiled: 0, health: health.issues.size }
     for (const e of entries) {
       c[e.type] = (c[e.type] ?? 0) + 1
       if (e.favorite) c['favorites']! += 1
       if (!inFolder(e)) c['unfiled']! += 1
     }
     return c
-  }, [entries, folderIds])
+  }, [entries, folderIds, health])
 
   // A folder's count includes everything beneath it.
   const folderCounts = useMemo(() => {
@@ -73,12 +75,16 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const scope = filter.kind === 'folder' ? descendants(folders, filter.id) : null
     return entries.filter((e) => {
       if (filter.kind === 'favorites' && !e.favorite) return false
+      if (filter.kind === 'health') {
+        const found = health.issues.get(e.id)
+        if (!found || (filter.issue && !found.includes(filter.issue))) return false
+      }
       if (filter.kind === 'type' && e.type !== filter.type) return false
       if (filter.kind === 'unfiled' && inFolder(e)) return false
       if (scope && !(e.folderId && scope.has(e.folderId))) return false
       return matches(e, query, folderPath(folders, inFolder(e)))
     })
-  }, [entries, folders, filter, query, folderIds])
+  }, [entries, folders, filter, query, folderIds, health])
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
 
@@ -112,6 +118,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
   }
 
   const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites'
+    : filter.kind === 'health' ? 'Password health'
     : filter.kind === 'unfiled' ? 'No folder' : filter.kind === 'type' ? typeInfo(filter.type as EntryType).plural
     : folderPath(folders, filter.id) || 'Folder'
   const paneOpen = mode.kind === 'edit' || selected !== null
@@ -145,6 +152,23 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <h2 className="truncate">{title}</h2>
             <span className="muted">{visible.length}</span>
           </div>
+          {filter.kind === 'health' ? (
+            <div className="health-summary">
+              <div className={`health-score ${health.score >= 80 ? 'is-good' : health.score >= 50 ? 'is-fair' : 'is-poor'}`}>
+                <strong>{health.score}</strong><span>/ 100</span>
+              </div>
+              <div className="health-text">
+                <span className="small">{health.checked ? `${health.checked - health.issues.size} of ${health.checked} passwords have no issues` : 'No passwords to check yet'}</span>
+                <div className="health-chips">
+                  <button className={`chip ${!filter.issue ? 'chip-active' : ''}`} onClick={() => setFilter({ kind: 'health' })}>All issues</button>
+                  {ISSUES.map(({ issue, label }) => (
+                    <button key={issue} className={`chip ${filter.issue === issue ? 'chip-active' : ''}`} disabled={!health.counts[issue]}
+                            onClick={() => setFilter({ kind: 'health', issue })}>{label} {health.counts[issue]}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="filter-chips">
             {chips.map(({ f, label }) => (
               <button key={JSON.stringify(f)} className={`chip ${sameFilter(filter, f) ? 'chip-active' : ''}`} onClick={() => setFilter(f)}>{label}</button>
@@ -155,6 +179,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
           {vault.loading ? (
             <div className="skeletons">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="skeleton" />)}</div>
+          ) : visible.length === 0 && filter.kind === 'health' ? (
+            <div className="empty"><div className="empty-icon"><IconShield size={28} /></div><h3>{health.checked ? 'No issues' : 'Nothing to check'}</h3>
+              <p>{health.checked ? 'Every password here is unique, strong, recent and used over https.' : 'Logins and Wi-Fi passwords are checked once you add some.'}</p></div>
           ) : visible.length === 0 ? (
             <EmptyState hasEntries={entries.length > 0} onNew={startNew} />
           ) : (
@@ -166,7 +193,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
                     <Monogram name={e.name} />
                     <span className="row-text">
                       <span className="row-name">{e.name || 'Untitled'}{e.favorite ? <span className="row-star"><IconStar size={12} filled /></span> : null}</span>
-                      <span className="row-meta">{e.unreadable ? 'This entry could not be decrypted' : subtitle(e)}</span>
+                      <span className="row-meta">{e.unreadable ? 'This entry could not be decrypted' : filter.kind === 'health'
+                        ? (health.issues.get(e.id) ?? []).map((i) => ISSUES.find((x) => x.issue === i)!.label).join(' · ')
+                        : subtitle(e)}</span>
                     </span>
                   </button>
                 </li>
@@ -180,7 +209,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <EntryForm key={mode.id ?? 'new'} initial={mode.draft} id={mode.id} folders={folders}
                        onCancel={() => setMode({ kind: 'view' })} onSave={save} />
           ) : selected ? (
-            <EntryDetail key={selected.id} entry={selected} folders={folders}
+            <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []}
                          onBack={() => setSelectedId(null)}
                          onEdit={() => setMode({ kind: 'edit', draft: withTypeDefaults(stripMeta(selected)), id: selected.id })}
                          onToggleFavorite={() => { void save({ ...stripMeta(selected), favorite: !selected.favorite }, selected.id) }}

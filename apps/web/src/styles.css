@@ -752,3 +752,18 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .activity-list li { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
 .activity-list li:first-child { border-top: 0; }
 @media (max-width: 640px) { .device-row { flex-direction: column; align-items: flex-start; } }
+
+/* ── Password health ───────────────────────────────────────────────── */
+.side-count-warn { background: var(--warn-soft); color: var(--warn); }
+.health-summary { display: flex; gap: 14px; align-items: center; padding: 12px 14px; margin: 0 12px 8px; border: 1px solid var(--line); border-radius: 12px; }
+.health-score { display: flex; align-items: baseline; gap: 3px; flex: none; }
+.health-score strong { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.health-score span { color: var(--muted); font-size: 12.5px; }
+.health-score.is-good strong { color: var(--ok); }
+.health-score.is-fair strong { color: var(--warn); }
+.health-score.is-poor strong { color: var(--danger); }
+.health-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.health-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.health-chips .chip:disabled { opacity: .45; cursor: default; }
+.health-issues ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.health-issues { margin: 0 0 14px; }

@@ -3,13 +3,13 @@
 
 import { useState } from 'react'
 
-import { MAX_FOLDER_DEPTH, type FolderNode, folderTree } from '@vault/core'
+import { MAX_FOLDER_DEPTH, type FolderNode, type Issue, folderTree } from '@vault/core'
 
-import { IconEdit, IconFolder, IconGrid, IconLock, IconPlus, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconEdit, IconFolder, IconGrid, IconLock, IconPlus, IconPulse, IconStar, IconTrash } from '../../ui/icons.js'
 import { TYPES } from '../../ui/kit.js'
 import type { Folder } from './model.js'
 
-export type Filter = { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' }
+export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' }
 
 export const sameFilter = (a: Filter, b: Filter) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -28,6 +28,7 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, onNe
     <nav className="sidebar" aria-label="Filter">
       <SideItem active={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })} icon={<IconGrid size={16} />} label="All items" count={counts['all']} />
       <SideItem active={filter.kind === 'favorites'} onClick={() => setFilter({ kind: 'favorites' })} icon={<IconStar size={16} />} label="Favorites" count={counts['favorites']} />
+      <SideItem active={filter.kind === 'health'} onClick={() => setFilter({ kind: 'health' })} icon={<IconPulse size={16} />} label="Password health" count={counts['health']} warn />
 
       <div className="sidebar-heading sidebar-heading-row">
         <span>Folders</span>
@@ -88,12 +89,12 @@ function FolderItem({ node, filter, setFilter, counts, onNew, onRename, onDelete
   )
 }
 
-function SideItem({ active, onClick, icon, label, count, muted }: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count: number | undefined; muted?: boolean
+function SideItem({ active, onClick, icon, label, count, muted, warn }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count: number | undefined; muted?: boolean; warn?: boolean
 }) {
   return (
     <button className={`side-item ${active ? 'side-active' : ''} ${muted ? 'side-muted' : ''}`} onClick={onClick} aria-current={active}>
-      {icon}<span>{label}</span>{count ? <span className="side-count">{count}</span> : null}
+      {icon}<span>{label}</span>{count ? <span className={`side-count ${warn ? 'side-count-warn' : ''}`}>{count}</span> : null}
     </button>
   )
 }
