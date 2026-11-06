@@ -19,6 +19,7 @@ import {
   parseJsonBody,
   unauthorized,
 } from '../http.js'
+import { describeDevice } from '../device.js'
 import { decoySalt, emailDigest } from '../identity.js'
 import {
   EMAIL_SK,
@@ -91,15 +92,36 @@ async function limitAuth(app: App, event: LambdaEvent, email: string): Promise<v
   await enforce(app.store, 'auth-email', digest, AUTH_LIMIT, app.now())
 }
 
-async function issueSession(app: App, userId: string) {
-  const access = issueAccessToken(userId, app.config.tokenKey, app.now())
+/** A signed-in device. Refreshing rotates the record (a new token id each
+ *  time) but carries the device's `sid`, name and first sign-in forward, so
+ *  the owner sees one stable row per device. */
+export interface SessionRecord extends Item {
+  sid?: string
+  createdAt: string
+  lastUsedAt?: string
+  device?: string
+  ip?: string
+  name?: string
+}
+
+async function issueSession(app: App, userId: string, event: LambdaEvent, family?: SessionRecord) {
   const refresh = issueRefreshToken(userId, app.config.tokenKey, app.now())
-  await app.store.put({
+  const now = new Date(app.now()).toISOString()
+  // Sessions from before devices had ids keep their old token id as one.
+  const sid = family ? (family.sid ?? family.sk.slice(SESSION_PREFIX.length)) : randomUUID()
+  const access = issueAccessToken(userId, app.config.tokenKey, app.now(), sid)
+  const record: SessionRecord = {
     pk: userPk(userId),
     sk: sessionSk(refresh.tokenId),
+    sid,
     expiresAt: refresh.expiresAt,
-    createdAt: new Date(app.now()).toISOString(),
-  })
+    createdAt: family?.createdAt ?? now,
+    lastUsedAt: now,
+    device: describeDevice(event.requestContext.http.userAgent),
+    ip: event.requestContext.http.sourceIp,
+    ...(family?.name ? { name: family.name } : {}),
+  }
+  await app.store.put(record)
   return {
     accessToken: access,
     refreshToken: refresh.token,
@@ -222,7 +244,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   })
 
   await recordActivity(app, userId, 'register', event)
-  return json(201, { userId, ...(await issueSession(app, userId)) })
+  return json(201, { userId, ...(await issueSession(app, userId, event)) })
 }
 
 export async function login(app: App, event: LambdaEvent): Promise<LambdaResponse> {
@@ -248,7 +270,7 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
     kdf: profile.kdf,
-    ...(await issueSession(app, profile.userId)),
+    ...(await issueSession(app, profile.userId, event)),
   })
 }
 
@@ -279,7 +301,7 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
 
   return json(200, {
     wrappedVaultKeyForRecovery: profile.wrappedVaultKeyForRecovery,
-    ...(await issueSession(app, profile.userId)),
+    ...(await issueSession(app, profile.userId, event)),
   })
 }
 
@@ -302,7 +324,19 @@ export async function refresh(app: App, event: LambdaEvent): Promise<LambdaRespo
 
   await app.store.delete(userPk(payload.sub), sessionSk(payload.jti))
   await assertEnabled(app, payload.sub)
-  return json(200, await issueSession(app, payload.sub))
+  return json(200, await issueSession(app, payload.sub, event, session as SessionRecord))
+}
+
+/** Ends the session a refresh token belongs to. Needs no access token: holding
+ *  the refresh token is the right to end it, and a client locking after a long
+ *  idle no longer has a live access token. Always 200, so it reveals nothing
+ *  about whether the session still existed. */
+export async function signOut(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ refreshToken?: unknown }>(event)
+  if (typeof body.refreshToken !== 'string') throw badRequest('refreshToken is required.')
+  const payload = verifyToken(body.refreshToken, 'refresh', app.config.tokenKey, app.now())
+  if (payload?.jti) await app.store.delete(userPk(payload.sub), sessionSk(payload.jti))
+  return json(200, { ok: true })
 }
 
 export async function logout(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
@@ -402,7 +436,7 @@ export async function changePassword(
   await revokeAllSessions(app, userId)
   await recordActivity(app, userId, byRecovery ? 'reset-password-with-recovery-key' : 'change-password', event)
 
-  return json(200, await issueSession(app, userId))
+  return json(200, await issueSession(app, userId, event))
 }
 
 /** Issue a replacement recovery key, invalidating the previous one. */

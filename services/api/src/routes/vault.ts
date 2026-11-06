@@ -17,6 +17,7 @@ import {
   isValidId,
   userPk,
 } from '../keys.js'
+import { describeDevice } from '../device.js'
 import { AlreadyExists, type Item } from '../store.js'
 import { requireSealed } from '../validate.js'
 
@@ -132,7 +133,7 @@ export async function getActivity(app: App, userId: string): Promise<LambdaRespo
   const items = await app.store.query(userPk(userId), 'ACT#')
   return json(200, {
     events: items
-      .map((i) => ({ kind: String(i['kind']), at: String(i['at']), ip: String(i['ip'] ?? '') }))
+      .map((i) => ({ kind: String(i['kind']), at: String(i['at']), ip: String(i['ip'] ?? ''), device: describeDevice(i['userAgent'] as string | undefined) }))
       .sort((a, b) => b.at.localeCompare(a.at))
       .slice(0, 100),
   })

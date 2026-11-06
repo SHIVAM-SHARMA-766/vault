@@ -23,6 +23,7 @@ export type ActivityKind =
   | 'disable-2fa'
   | 'regenerate-2fa-recovery-codes'
   | 'used-2fa-recovery-code'
+  | 'revoke-session'
 
 const RETENTION_SECONDS = 90 * 24 * 60 * 60
 

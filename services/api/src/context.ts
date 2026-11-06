@@ -26,11 +26,17 @@ export interface App {
 }
 
 export function requireUser(app: App, event: LambdaEvent): string {
+  return requireSession(app, event).userId
+}
+
+/** The caller and, for tokens issued since sessions carried one, the device
+ *  session the token belongs to. */
+export function requireSession(app: App, event: LambdaEvent): { userId: string; sid?: string } {
   const token = bearerFrom(event.headers)
   if (!token) throw unauthorized()
   const payload = verifyToken(token, 'access', app.config.tokenKey, app.now())
   if (!payload) throw unauthorized()
-  return payload.sub
+  return { userId: payload.sub, ...(typeof payload.sid === 'string' ? { sid: payload.sid } : {}) }
 }
 
 export const partitionFor = (userId: string) => userPk(userId)

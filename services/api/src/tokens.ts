@@ -24,6 +24,9 @@ export interface TokenPayload {
   exp: number
   /** Refresh tokens only: the session this token belongs to. */
   jti?: string
+  /** The device session (stable across refreshes) the token was issued to.
+   *  Lets the API tell a caller which of its sessions is the current one. */
+  sid?: string
 }
 
 const VERSION = 'v1'
@@ -37,9 +40,9 @@ export function issueToken(payload: TokenPayload, key: string): string {
   return `${VERSION}.${body}.${sign(body, key)}`
 }
 
-export function issueAccessToken(userId: string, key: string, now = Date.now()): string {
+export function issueAccessToken(userId: string, key: string, now = Date.now(), sid?: string): string {
   return issueToken(
-    { sub: userId, typ: 'access', exp: Math.floor(now / 1000) + ACCESS_TTL_SECONDS },
+    { sub: userId, typ: 'access', exp: Math.floor(now / 1000) + ACCESS_TTL_SECONDS, ...(sid ? { sid } : {}) },
     key,
   )
 }

@@ -31,6 +31,10 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 | POST | `/api/auth/login` | — | Exchange an Auth Key for a session and the wrapped vault key |
 | POST | `/api/auth/recovery-login` | — | The same, using the recovery key's own proof |
 | POST | `/api/auth/refresh` | refresh | Rotate the session |
+| POST | `/api/auth/signout` | refresh token in body | End that session; always 200. The client calls it on every lock |
+| GET | `/api/sessions` | access | Signed-in devices, the caller's marked `current` |
+| PUT | `/api/sessions/:id/name` | access | Name a device (≤ 40 characters; empty clears) |
+| DELETE | `/api/sessions/:id` | access | Sign a device out |
 | POST | `/api/auth/logout` | access | Revoke one session, or all |
 | GET | `/api/auth/me` | access | Profile and KDF parameters |
 | POST | `/api/auth/change-password` | access | Rewrap the vault key under a new password |

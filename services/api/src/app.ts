@@ -9,6 +9,7 @@ import { Router } from './router.js'
 import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
+import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
 
@@ -22,6 +23,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/login', ({ event }) => auth.login(app, event))
   router.post('/api/auth/recovery-login', ({ event }) => auth.recoveryLogin(app, event))
   router.post('/api/auth/refresh', ({ event }) => auth.refresh(app, event))
+  router.post('/api/auth/signout', ({ event }) => auth.signOut(app, event))
 
   // Everything below needs a valid access token.
   const authed =
@@ -41,6 +43,10 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/2fa/enable', authed((u, e) => auth.enableTwoFactor(app, u, e)))
   router.post('/api/auth/2fa/disable', authed((u, e) => auth.disableTwoFactor(app, u, e)))
   router.post('/api/auth/2fa/recovery-codes', authed((u, e) => auth.regenerateRecoveryCodes(app, u, e)))
+
+  router.get('/api/sessions', authed((_u, e) => sessions.list(app, e)))
+  router.put('/api/sessions/:id/name', authed((u, e, id) => sessions.rename(app, u, e, id)))
+  router.delete('/api/sessions/:id', authed((u, e, id) => sessions.revoke(app, u, e, id)))
 
   router.get('/api/vault', authed((u) => vault.getVault(app, u)))
   router.put('/api/vault/entries/:id', authed((u, e, id) => vault.putEntry(app, u, e, id)))
