@@ -49,8 +49,14 @@ test('roles see what they should, and a marketing edit goes live escaped', async
     await seo.getByRole('button', { name: 'Save draft' }).click()
     await seo.getByRole('button', { name: 'Publish', exact: true }).click()
     await seo.getByRole('button', { name: 'Publish now' }).click()
-    await seo.waitForSelector('text=Published')
-    const home = await (await fetch(`${s.base}/`)).text()
+    await seo.waitForSelector('text=Published — live now')
+    // The render lands on disk a moment after the panel says so; poll briefly
+    // rather than race it.
+    let home = ''
+    for (let i = 0; i < 40 && !home.includes('alert(1)'); i++) {
+      home = await (await fetch(`${s.base}/`)).text()
+      if (!home.includes('alert(1)')) await new Promise((r) => setTimeout(r, 250))
+    }
     assert.ok(home.includes('&lt;script&gt;alert(1)&lt;/script&gt;'))
     assert.ok(!home.includes('<script>alert(1)'))
 
