@@ -15,7 +15,8 @@
     "@vault/crypto": "*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@vault/site": "*"
+    "@vault/site": "*",
+    "@vault/core": "*"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",
