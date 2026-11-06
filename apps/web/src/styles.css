@@ -682,3 +682,46 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .codes code { font-family: var(--mono); font-size: 15px; letter-spacing: .05em; }
 .settings-actions-left { justify-content: flex-start; }
 @media (max-width: 760px) { .scan { flex-direction: column; align-items: center; } .codes { grid-template-columns: 1fr; } }
+
+/* ── Folders, type fields, custom fields, history ────────────────────── */
+
+.sidebar-heading-row { display: flex; align-items: center; justify-content: space-between; }
+.icon-btn.icon-sm { width: 24px; height: 24px; border-radius: 6px; }
+.sidebar-empty { margin: 0 10px 6px; font-size: 12.5px; color: var(--muted); }
+.folder-item { position: relative; display: flex; align-items: center; border-radius: var(--radius-sm); }
+.folder-item .side-item { flex: 1; min-width: 0; }
+.folder-item .side-item span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-item.side-active, .folder-item.side-active:hover { background: var(--accent-soft); }
+.folder-item.side-active .side-item { background: transparent; }
+.folder-depth-1 { padding-left: 26px; }
+.folder-depth-2 { padding-left: 42px; }
+.folder-depth-3 { padding-left: 58px; }
+.folder-actions { display: none; gap: 1px; padding-right: 4px; }
+.folder-actions-on { display: inline-flex; }
+.side-muted { color: var(--muted); }
+.detail-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.badge-folder { background: var(--accent-soft); color: var(--accent); }
+.field-badge { margin-left: 6px; font-size: 10.5px; padding: 1px 6px; text-transform: none; }
+.field-block { margin: 6px 0 2px; padding: 10px 12px; white-space: pre-wrap; word-break: break-all; border-radius: var(--radius-sm); background: var(--surface-2); font-size: 13px; line-height: 1.5; max-height: 260px; overflow: auto; }
+.field-row .label-row { align-items: center; }
+.type-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.type-fields .field:has(textarea) { grid-column: 1 / -1; }
+.type-login .field:first-child, .type-wifi .field:first-child { grid-column: 1 / -1; }
+.custom-fields { display: flex; flex-direction: column; gap: 8px; }
+.custom-row { display: grid; grid-template-columns: 1fr 1.4fr auto auto; gap: 6px; align-items: center; }
+.custom-fields > .btn { align-self: flex-start; }
+.btn-pressed { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.history { margin-bottom: 20px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); }
+.history-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.history-head h3 { font-size: 14px; }
+.history-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.history-item { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.history-row { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 10px 12px; background: none; border: 0; text-align: left; cursor: pointer; font-size: 13.5px; }
+.history-row:hover { background: var(--surface-2); }
+.history-body { padding: 0 12px 12px; display: grid; gap: 8px; justify-items: start; }
+.history-body .field-row { width: 100%; padding: 8px 0; border-bottom: 0; }
+@media (max-width: 760px) {
+  .type-fields { grid-template-columns: 1fr; }
+  .custom-row { grid-template-columns: 1fr 1fr auto auto; }
+  .folder-actions { display: inline-flex; }
+}

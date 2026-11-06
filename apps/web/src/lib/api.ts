@@ -180,6 +180,19 @@ export const api = {
   deleteEntry: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/vault/entries/${encodeURIComponent(id)}`, { token }),
 
+  putFolder: (token: string, id: string, blob: string) =>
+    request<{ id: string }>('PUT', `/api/vault/folders/${encodeURIComponent(id)}`, { token, body: { blob } }),
+
+  deleteFolder: (token: string, id: string) =>
+    request<{ ok: true }>('DELETE', `/api/vault/folders/${encodeURIComponent(id)}`, { token }),
+
+  /** Previous versions of an entry, newest first, each sealed for history. */
+  history: (token: string, id: string) =>
+    request<{ versions: { at: string; blob: string }[] }>('GET', `/api/vault/history/${encodeURIComponent(id)}`, { token }),
+
+  addHistory: (token: string, id: string, blob: string) =>
+    request<{ at: string }>('POST', `/api/vault/history/${encodeURIComponent(id)}`, { token, body: { blob } }),
+
   admin: {
     overview: (token: string) => request<AdminOverview>('GET', '/api/admin/overview', { token }),
     users: (token: string) => request<{ users: AdminUser[] }>('GET', '/api/admin/users', { token }),
