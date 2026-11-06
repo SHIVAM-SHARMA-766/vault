@@ -39,6 +39,8 @@ Four documents, in the order worth reading them:
 | [decisions/0002](decisions/0002-storage-and-data-model.md) | What the data looks like and why there are no secondary indexes |
 | [decisions/0003](decisions/0003-running-everything-on-oci.md) | Why everything runs on one provider, and what that costs |
 | [decisions/0004](decisions/0004-the-access-token-header.md) | Why the access token is not in the `Authorization` header |
+| [decisions/0005](decisions/0005-pull-based-releases.md) | How code reaches the host without SSH |
+| [decisions/0006](decisions/0006-admin-panel.md) | What the admin panel can and cannot do |
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes the system those add up to.
 [docs/threat-model.md](docs/threat-model.md) says who the adversaries are and which risks
@@ -74,7 +76,7 @@ Nothing, on perpetual free allowances rather than expiring trials.
 |---|---|---|
 | Host | OCI compute, `VM.Standard.E2.1.Micro` | 2 per tenancy, always free |
 | Database | OCI MySQL HeatWave, `MySQL.Free` | 1 always-free DB system, 50 GB |
-| Exports | OCI Object Storage | 20 GB, 50,000 requests a month |
+| Exports and releases | OCI Object Storage, two private buckets | 20 GB, 50,000 requests a month |
 | TLS | Let's Encrypt via Caddy | free |
 | Hostname | DuckDNS | free |
 
@@ -87,7 +89,10 @@ the runbook.
 |---|---|
 | `packages/crypto/` | Every cryptographic operation. Zero third-party dependencies |
 | `services/api/` | The API and its storage adapters |
-| `apps/web/` | The client |
+| `apps/web/` | The vault client and the admin panel, at `/app/` |
+| `apps/site/` | The public website at `/`: static HTML and CSS, no JavaScript |
+| `services/backup/`, `services/release/` | The daily export, and the host's release pull agent |
+| `scripts/` | `release.sh` ships code, `deploy.sh` sets up the host |
 | `infra/` | Terraform for everything this runs on |
 | `decisions/` | Why things are the way they are |
 | `docs/` | Threat model and runbook |
@@ -96,8 +101,11 @@ the runbook.
 
 ```sh
 npm install
-npm test        # 133 tests across the crypto package and the API
+npm test        # 159 tests across the crypto package and the API
 ```
 
 The API's tests run against an in-memory store, so no cloud account is needed for any of
 them.
+
+Shipping is `./scripts/release.sh`: it tests, builds, uploads a release, and the host
+installs it within five minutes. See [docs/runbook.md](docs/runbook.md).

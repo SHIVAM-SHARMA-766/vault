@@ -103,6 +103,12 @@ Two values the API needs, both kept off disk in the repository and out of Terraf
   the decoy salt returned for unknown addresses.
 - **`token-signing-key`** signs access and refresh tokens.
 
+And one that is configuration rather than a secret, kept in the same file:
+
+- **`ADMIN_EMAILS`**, comma-separated: the accounts allowed into the admin panel
+  ([0006](../decisions/0006-admin-panel.md)). The API turns them into digests at start-up.
+  Changing it needs a restart of `vault-api`, and nothing else.
+
 Generate and install them on the host:
 
 ```sh
@@ -110,6 +116,7 @@ sudo install -o vault -g vault -m 0600 /dev/null /srv/vault/api/run/secrets.env
 sudo tee /srv/vault/api/run/secrets.env >/dev/null <<EOT
 SERVER_PEPPER=$(openssl rand -base64 32)
 TOKEN_SIGNING_KEY=$(openssl rand -base64 48)
+ADMIN_EMAILS=you@example.com
 EOT
 sudo systemctl restart vault-api
 ```
@@ -125,16 +132,21 @@ time, and the right response to any suspicion that it leaked.
 
 ## Opening registration for the first account
 
-Registration is closed unless `ALLOW_REGISTRATION` is exactly `"true"`, so a missing or
-misspelled value refuses rather than leaving the vault open to whoever finds the URL.
+Day to day, registration is controlled from the admin panel (**Overview → Registration**:
+closed, invite only, or open), and new people are let in with single-use invitations
+(**Invitations**). The stored setting defaults to closed.
+
+The first account cannot come from the panel, because nobody can sign in to it yet. For
+that one, force registration open on the host:
 
 ```sh
-sudo systemctl edit vault-api        # add: Environment=ALLOW_REGISTRATION=true
-sudo systemctl restart vault-api
+./scripts/registration.sh <host> open     # sets ALLOW_REGISTRATION=true and verifies over HTTPS
+# register the address listed in ADMIN_EMAILS at /app/
+./scripts/registration.sh <host> close
 ```
 
-Register, **write the recovery key down before closing the tab** — it is shown once and
-never transmitted again — then close registration the same way and restart.
+**Write the recovery key down before closing the tab** — it is shown once and never
+transmitted again. While `ALLOW_REGISTRATION` is set, the admin panel shows a warning.
 
 ## Idle reclamation, which is the thing most likely to bite
 
@@ -167,15 +179,37 @@ makes this whole section moot.
 
 ## Deploying code
 
+Code ships as a release the host pulls for itself ([0005](../decisions/0005-pull-based-releases.md)).
+No SSH, no Terraform:
+
 ```sh
-npm test                                # both workspaces
-npm run bundle --workspace @vault/api
-npm run build --workspace @vault/web
-# then rsync the bundle to /srv/vault/api and the client to /srv/vault/web,
-# and: sudo systemctl restart vault-api
+./scripts/release.sh --dry-run    # build, test and list what would ship; uploads nothing
+./scripts/release.sh              # needs a clean, committed tree
+./scripts/release.sh --status     # what is published, and what /release.txt says is live
+./scripts/release.sh --rollback <release id>
 ```
 
-Caddy needs no restart for a client deploy; it serves whatever is on disk.
+`release.sh` runs the tests, builds the API bundle, the client and the site, packs them with
+the Caddyfile and a SHA-256 manifest, uploads to `vault-releases`, and points `current` at
+it. The host's `vault-pull.timer` checks every five minutes, verifies, installs, checks
+`/api/health`, `/`, `/app/` and `/security` through Caddy, and reinstalls the previous
+release if any check fails. `release.sh` waits until `/release.txt` shows the new id.
+
+A release that failed once is not retried. On the host:
+
+```sh
+journalctl -u vault-pull -n 50 --no-pager     # what happened
+cat /srv/vault/releases/installed /srv/vault/releases/failed
+sudo systemctl start vault-pull.service       # check now instead of waiting
+```
+
+### Setting up the host
+
+`scripts/deploy.sh <host>` installs what releases do not carry: the `vault-api` unit, the
+backup timer, the pull timer and `/etc/vault/release.env`. Run it after rebuilding the host
+or when one of those files changes. It needs SSH open for your address (see "Getting on the
+host"), then installs the published release once, so a fresh host is serving before you
+close SSH again.
 
 ## Rotating the host key
 
@@ -291,7 +325,8 @@ backup.
 ## Recovering the vault
 
 The data lives in MySQL HeatWave, not on the instance, so losing the host loses the service
-and not the vault. Rebuilding is `terraform apply` and a deploy.
+and not the vault. Rebuilding is `./scripts/apply.sh`, the secrets file, and
+`./scripts/deploy.sh <host>`, which also installs the current release.
 
 Exports are written to the Object Storage bucket on a schedule. They are ciphertext the
 server holds no key for, so a leaked export is no worse than a leaked table.

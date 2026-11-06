@@ -50,15 +50,15 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-1. **A deploy that needs no inbound SSH.** Today `scripts/deploy.sh` needs port 22 opened
-   and closed around it, which is friction on every deploy and a standing decision to get
-   wrong. The shape that fits: CI uploads a bundle to Object Storage, and the host pulls
-   it. Nothing inbound at all.
-2. **The first account**: open registration, register, write the recovery key down, close
-   registration. The daily exports are ~1.5 KB, which says the table is still empty.
-3. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
+1. **The first account**, now from the admin flow: force registration open once
+   (`scripts/registration.sh open`), register the address in `ADMIN_EMAILS`, close it, and
+   from then on let people in with invitations from the admin panel.
+2. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
    database does not, so a stray `terraform destroy` deletes the vault.
-4. **Remove the AWS resources** left standing from the first deployment.
+3. **Remove the AWS resources** left standing from the first deployment. The personal AWS
+   credentials in creds are no longer valid, so this needs new keys first.
+4. **Sign releases**, if anyone besides the operator ever gets write access to the
+   releases bucket ([0005](decisions/0005-pull-based-releases.md)).
 
 Later: the Android client, and a browser-extension client — the only way to close A3
 without a domain, since its code would not be served by the hostname.
@@ -77,6 +77,19 @@ without a domain, since its code would not be served by the hostname.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Deploys without SSH.** Releases go to a private `vault-releases` bucket and
+the host pulls, verifies, installs and health-checks them every five minutes, rolling back
+on failure ([0005](decisions/0005-pull-based-releases.md)). `scripts/release.sh` ships code;
+`scripts/deploy.sh` now only sets up the host.
+
+**2026-11-06 — Admin panel.** At `/app/admin` for accounts listed in `ADMIN_EMAILS`:
+registration mode, single-use invitations, account list with counts, label, sign-out,
+disable and delete, last backup, and an audit log. It cannot read a vault or show an
+address ([0006](decisions/0006-admin-panel.md)).
+
+**2026-11-06 — Multipage website.** Home, Features, How it works, Security, FAQ and About,
+from shared partials, still with no JavaScript and checked for broken links at build.
 
 **2026-11-06 — Public website.** Landing page at `/` and a security page at `/security`, in
 `apps/site`: static HTML and CSS with no JavaScript, built and checked against the same

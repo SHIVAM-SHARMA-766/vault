@@ -24,6 +24,8 @@ someone who would otherwise assume it was an oversight.
 | [0002](0002-storage-and-data-model.md) | Storage and data model |
 | [0003](0003-running-everything-on-oci.md) | Running everything on one provider |
 | [0004](0004-the-access-token-header.md) | The access token header |
+| [0005](0005-pull-based-releases.md) | Releases are pulled by the host |
+| [0006](0006-admin-panel.md) | An admin panel that cannot read the vault |
 
 ## A note on the numbering
 

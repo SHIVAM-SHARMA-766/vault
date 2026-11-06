@@ -33,12 +33,12 @@ shape is chosen against.
               ┌───────────────┴───────────────┐
               ▼                               ▼
       MySQL HeatWave                  Object Storage
-      ciphertext only                 daily encrypted exports
+      ciphertext only                 vault-backups   daily encrypted exports (write)
+                                      vault-releases  what the host serves (read-only)
 ```
 
 Caddy terminates TLS with a certificate it obtains itself, serves the public site and the
-client from disk,
-sets every security header, and proxies `/api/*` to the Node process beside it. The client
+client from disk, sets every security header, and proxies `/api/*` to the Node process beside it. The client
 and the API therefore share an origin with nothing in front of them — which is what lets
 the Content-Security-Policy restrict `connect-src` to `'self'`.
 
@@ -90,6 +90,28 @@ The recovery key has a second branch of its own, `vault.recovery.auth.v1`, so it
 itself to the server without revealing the branch that unwraps the vault. Recovery happens
 exactly when the master password is gone, so the usual Auth Key cannot be produced.
 
+## Releases
+
+Code reaches the host by the host pulling it ([0005](decisions/0005-pull-based-releases.md)).
+`scripts/release.sh` uploads a tarball — site, client, API bundle, Caddyfile, and a SHA-256
+manifest — to `vault-releases` and points the `current` object at it. On the host,
+`vault-pull.timer` checks every five minutes, verifies the hash and the manifest, validates
+the Caddyfile, installs, checks the service through Caddy, and reinstalls the previous
+release if anything fails. Nothing inbound is involved; SSH stays closed.
+
+Write access to that bucket decides what browsers run, so it carries the same weight as the
+hostname (A3). The host can only read it.
+
+## Administration
+
+The operator manages the service from an admin panel inside the client, at `/app/admin`
+([0006](decisions/0006-admin-panel.md)). Admin is a role on a normal account: the API keeps
+digests of the addresses in `ADMIN_EMAILS` and checks the caller's profile against them on
+every admin request. The panel can set registration to closed, invite-only or open, issue
+single-use invitations, list accounts with their counts and dates, label, sign out,
+disable or delete them, show the last recorded backup, and read an audit log. It cannot read
+a vault or show an address — there is nothing readable on the server for it to show.
+
 ## Data
 
 One table. One partition per user. No secondary indexes, because the only two reads are a
@@ -104,6 +126,11 @@ shard-key query and a point lookup.
 | `USER#<id>` | `ACT#<ts>#<rand>` | Activity record, expires itself |
 | `USER#<id>` | `SESSION#<tokenId>` | A live refresh token, expires itself |
 | `EMAIL#<hmac>` | `EMAIL` | Login pointer to a user id |
+| `SYSTEM` | `SETTINGS` | Registration mode; absent means closed |
+| `SYSTEM` | `USER#<id>` | Registry row for the admin panel: digest, dates, label, disabled |
+| `SYSTEM` | `INVITE#<sha256>` / `INVITEUSED#<sha256>` | An invitation, by the hash of its code, and its single-use claim |
+| `SYSTEM` | `AUDIT#<ts>#<rand>` | An admin action, expires after a year |
+| `SYSTEM` | `BACKUP` | The last verified export, written by the backup script |
 
 Unlocking is one query. Everything after that — search, filter, sort, folder resolution —
 happens in the client, because the server cannot read what it is storing.
@@ -136,9 +163,12 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
 | `services/api/` | The API, and the storage adapters behind one interface |
-| `apps/web/` | The vault client, served at `/app/`, and the Caddyfile |
+| `apps/web/` | The vault client and admin panel, served at `/app/`, and the Caddyfile |
 | `apps/site/` | The public website at `/`: static HTML and CSS, no JavaScript |
-| `infra/` | Terraform for the instance, the table, the bucket, and the network |
+| `services/backup/` | The daily export and its systemd timer |
+| `services/release/` | The host's pull agent and its systemd timer |
+| `scripts/` | `release.sh` ships code; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
+| `infra/` | Terraform for the instance, the database, both buckets, IAM, and the network |
 | `decisions/` | Architecture decision records |
 | `docs/` | Threat model and runbook |
 
