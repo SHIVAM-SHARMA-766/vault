@@ -184,7 +184,7 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
 | `services/api/` | The API, and the storage adapters behind one interface |
-| `apps/web/` | The vault client and admin panel (including the website editor), served at `/app/`, and the Caddyfile |
+| `apps/web/` | The vault client, served at `/app/`, and the Caddyfile. `src/lib` (API client, session, router), `src/ui` (kit, icons, Shell), `src/features/{auth,vault,settings,admin}` |
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
 | `services/backup/` | The daily export and its systemd timer |
 | `services/release/` | The host's pull agent and its systemd timer |

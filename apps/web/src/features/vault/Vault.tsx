@@ -9,15 +9,14 @@ import {
   sealEntry,
 } from '@vault/crypto'
 
-import { api } from '../api.js'
-import * as session from '../session.js'
+import { api } from '../../lib/api.js'
+import * as session from '../../lib/session.js'
 import {
   IconAlert, IconArrowLeft, IconEdit, IconExternal, IconEye, IconEyeOff, IconGrid, IconLock,
   IconPlus, IconSearch, IconShield, IconStar, IconTrash, IconX,
-} from '../icons.js'
-import { CopyButton, Generator, Monogram, StrengthMeter, TYPES, typeInfo, useToast } from '../ui.js'
-import { Admin } from './Admin.js'
-import { newIdentity } from '../identity.js'
+} from '../../ui/icons.js'
+import { CopyButton, Generator, Monogram, StrengthMeter, TYPES, typeInfo, useToast } from '../../ui/kit.js'
+import { Shell } from '../../ui/Shell.js'
 
 interface Decrypted extends EntryContent {
   id: string
@@ -43,36 +42,6 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const searchRef = useRef<HTMLInputElement>(null)
-  const [adminOpen, setAdminOpen] = useState(() => location.pathname.startsWith('/app/admin'))
-
-  // Learn who this is. The login response carries no user id or role, and the
-  // admin panel is offered only if the server says so.
-  useEffect(() => {
-    void (async () => {
-      try {
-        const me = await api.me(await session.token())
-        session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions })
-        // Accounts from before identity keys get one now, quietly. Nothing
-        // uses it yet; sharing will, and every account must have one by then.
-        if (!me.identity) {
-          try {
-            await api.setIdentity(await session.token(), await newIdentity(state.vaultKey))
-          } catch { /* tried again on the next unlock */ }
-        }
-      } catch { /* the vault still works; the admin entry just stays hidden */ }
-    })()
-  }, [])
-
-  // /app/admin is a real address, so the back button and a reload behave.
-  useEffect(() => {
-    const onPop = () => setAdminOpen(location.pathname.startsWith('/app/admin'))
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
-  const openAdmin = (open: boolean) => {
-    history.pushState(null, '', open ? '/app/admin' : '/app/')
-    setAdminOpen(open)
-  }
 
   const load = useCallback(async () => {
     setError('')
@@ -178,37 +147,22 @@ export function Vault({ state }: { state: session.Unlocked }) {
     setMode({ kind: 'edit', draft: empty(type) })
   }
 
-  if (adminOpen && state.isAdmin) return <Admin state={state} onClose={() => openAdmin(false)} />
-
   const filterTitle = filter === 'all' ? 'All items' : filter === 'favorites' ? 'Favorites' : typeInfo(filter).plural
   const paneOpen = mode.kind === 'edit' || selected !== null
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand"><span className="brand-mark"><IconShield size={18} /></span>Vault</div>
+    <Shell
+      state={state}
+      center={
         <div className="search">
           <IconSearch size={16} />
           <input ref={searchRef} type="search" placeholder="Search vault" aria-label="Search vault"
                  value={query} onChange={(e) => setQuery(e.target.value)} />
           <kbd>/</kbd>
         </div>
-        <div className="topbar-actions">
-          <button className="btn btn-primary" onClick={startNew}><IconPlus size={16} /><span className="hide-sm">New item</span></button>
-          {state.isAdmin ? (
-            <button className="btn btn-secondary" onClick={() => openAdmin(true)} title="Admin panel">
-              <IconGrid size={16} /><span className="hide-sm">Admin</span>
-            </button>
-          ) : null}
-          <div className="account" title={state.email}>
-            <span className="account-avatar">{state.email[0]?.toUpperCase()}</span>
-            <span className="account-email hide-md">{state.email}</span>
-          </div>
-          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault" aria-label="Lock vault">
-            <IconLock size={16} /><span className="hide-sm">Lock</span>
-          </button>
-        </div>
-      </header>
+      }
+      actions={<button className="btn btn-primary" onClick={startNew}><IconPlus size={16} /><span className="hide-sm">New item</span></button>}
+    >
 
       <div className={`layout ${paneOpen ? 'pane-open' : ''}`}>
         <nav className="sidebar" aria-label="Filter">
@@ -281,7 +235,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
           )}
         </section>
       </div>
-    </div>
+    </Shell>
   )
 }
 

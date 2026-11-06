@@ -173,7 +173,7 @@ test('rotating the recovery key invalidates the previous one', async () => {
   const token = String(session.body['accessToken'])
 
   await h.request('POST', '/api/auth/recovery/rotate', {
-    token, body: { recoveryAuthKey: b64('v70'), wrappedVaultKeyForRecovery: sealed('v71') },
+    token, body: { currentAuthKey: reg['authKey'], recoveryAuthKey: b64('v70'), wrappedVaultKeyForRecovery: sealed('v71') },
   })
 
   const old = await h.request('POST', '/api/auth/recovery-login', {
@@ -201,4 +201,73 @@ test('security events are recorded with an expiry', async () => {
   for (const item of h.store.dump().filter((i) => i.sk.startsWith('ACT#'))) {
     assert.equal(typeof item['expiresAt'], 'number', 'TTL set, so the log cannot grow without bound')
   }
+})
+
+test('after signing in with the recovery key, a new master password can be set with it', async () => {
+  const h = harness()
+  const reg = registration()
+  await h.request('POST', '/api/auth/register', { body: reg })
+  const rec = await h.request('POST', '/api/auth/recovery-login', {
+    body: { email: reg['email'], recoveryAuthKey: reg['recoveryAuthKey'] },
+  })
+  const changed = await h.request('POST', '/api/auth/change-password', {
+    token: String(rec.body['accessToken']),
+    body: {
+      recoveryAuthKey: reg['recoveryAuthKey'],
+      newAuthKey: b64('reset-new'),
+      kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations: 600_000, salt: b64('reset-salt') },
+      wrappedVaultKey: sealed('reset-wrapped'),
+    },
+  })
+  assert.equal(changed.status, 200)
+  const login = await h.request('POST', '/api/auth/login', { body: { email: reg['email'], authKey: b64('reset-new') } })
+  assert.equal(login.status, 200)
+  assert.equal(login.body['wrappedVaultKey'], sealed('reset-wrapped'))
+})
+
+test('a wrong recovery proof cannot set a new master password', async () => {
+  const h = harness()
+  const reg = registration()
+  const session = await h.request('POST', '/api/auth/register', { body: reg })
+  const res = await h.request('POST', '/api/auth/change-password', {
+    token: String(session.body['accessToken']),
+    body: {
+      recoveryAuthKey: b64('not-the-recovery-key'),
+      newAuthKey: b64('n1'),
+      kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations: 600_000, salt: b64('n2') },
+      wrappedVaultKey: sealed('n3'),
+    },
+  })
+  assert.equal(res.status, 401)
+})
+
+test('a password change needs one proof or the other', async () => {
+  const h = harness()
+  const reg = registration()
+  const session = await h.request('POST', '/api/auth/register', { body: reg })
+  const res = await h.request('POST', '/api/auth/change-password', {
+    token: String(session.body['accessToken']),
+    body: { newAuthKey: b64('n1'), kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations: 600_000, salt: b64('n2') }, wrappedVaultKey: sealed('n3') },
+  })
+  assert.equal(res.status, 400)
+})
+
+test('rotating the recovery key needs the current password, not just a session', async () => {
+  const h = harness()
+  const reg = registration()
+  const session = await h.request('POST', '/api/auth/register', { body: reg })
+  const token = String(session.body['accessToken'])
+  const noProof = await h.request('POST', '/api/auth/recovery/rotate', {
+    token, body: { recoveryAuthKey: b64('r1'), wrappedVaultKeyForRecovery: sealed('r2') },
+  })
+  assert.equal(noProof.status, 400)
+  const wrongProof = await h.request('POST', '/api/auth/recovery/rotate', {
+    token, body: { currentAuthKey: b64('wrong'), recoveryAuthKey: b64('r1'), wrappedVaultKeyForRecovery: sealed('r2') },
+  })
+  assert.equal(wrongProof.status, 401)
+  // The original recovery key still works.
+  const still = await h.request('POST', '/api/auth/recovery-login', {
+    body: { email: reg['email'], recoveryAuthKey: reg['recoveryAuthKey'] },
+  })
+  assert.equal(still.status, 200)
 })

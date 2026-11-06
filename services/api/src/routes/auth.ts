@@ -348,7 +348,13 @@ export async function changePassword(
   app: App, userId: string, event: LambdaEvent,
 ): Promise<LambdaResponse> {
   const body = parseJsonBody<Record<string, unknown>>(event)
-  const currentAuthKey = requireBase64UrlBytes(body['currentAuthKey'], 32, 'currentAuthKey')
+  // Proof of the current password, or — after signing in with the recovery
+  // key, when the password is exactly what has been lost — proof of the
+  // recovery key. One of the two is required.
+  const byRecovery = body['currentAuthKey'] === undefined && body['recoveryAuthKey'] !== undefined
+  const proof = byRecovery
+    ? requireBase64UrlBytes(body['recoveryAuthKey'], 32, 'recoveryAuthKey')
+    : requireBase64UrlBytes(body['currentAuthKey'], 32, 'currentAuthKey')
   const newAuthKey = requireBase64UrlBytes(body['newAuthKey'], 32, 'newAuthKey')
   const kdf = requireKdf(body['kdf'])
   const wrappedVaultKey = requireSealed(body['wrappedVaultKey'], 'wrappedVaultKey', 4096)
@@ -356,9 +362,11 @@ export async function changePassword(
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()
 
-  // Holding a valid access token is not enough; the current password has to be
-  // proved again, so a stolen token cannot lock the owner out.
-  if (!(await verifyAuthKey(currentAuthKey, profile.authVerifier))) throw invalidCredentials()
+  // Holding a valid access token is not enough; the current password (or the
+  // recovery key) has to be proved again, so a stolen token cannot lock the
+  // owner out.
+  const verifier = byRecovery ? profile.recoveryVerifier : profile.authVerifier
+  if (!(await verifyAuthKey(proof, verifier))) throw invalidCredentials()
 
   const updated: Profile = {
     ...profile,
@@ -372,7 +380,7 @@ export async function changePassword(
 
   // Every other session was authenticated with the old password.
   await revokeAllSessions(app, userId)
-  await recordActivity(app, userId, 'change-password', event)
+  await recordActivity(app, userId, byRecovery ? 'reset-password-with-recovery-key' : 'change-password', event)
 
   return json(200, await issueSession(app, userId))
 }
@@ -382,11 +390,15 @@ export async function rotateRecovery(
   app: App, userId: string, event: LambdaEvent,
 ): Promise<LambdaResponse> {
   const body = parseJsonBody<Record<string, unknown>>(event)
+  const currentAuthKey = requireBase64UrlBytes(body['currentAuthKey'], 32, 'currentAuthKey')
   const recoveryAuthKey = requireBase64UrlBytes(body['recoveryAuthKey'], 32, 'recoveryAuthKey')
   const wrapped = requireSealed(body['wrappedVaultKeyForRecovery'], 'wrappedVaultKeyForRecovery', 4096)
 
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()
+  // Replacing the recovery key invalidates the old one. A stolen access token
+  // must not be enough to take that way back away from the owner.
+  if (!(await verifyAuthKey(currentAuthKey, profile.authVerifier))) throw invalidCredentials()
 
   await app.store.put({
     ...profile,

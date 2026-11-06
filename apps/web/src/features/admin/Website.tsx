@@ -17,12 +17,13 @@ import {
   type SiteMedia,
   type SiteState,
   api,
-} from '../api.js'
-import * as session from '../session.js'
+} from '../../lib/api.js'
+import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconDown, IconExternal, IconImage, IconNote, IconPlus, IconRefresh, IconTrash, IconUp, IconX,
-} from '../icons.js'
-import { VaultLink, useToast } from '../ui.js'
+} from '../../ui/icons.js'
+import { useToast } from '../../ui/kit.js'
+import { Link } from '../../lib/router.js'
 
 const PAGE_OF: Record<string, string> = {
   global: 'index.html', home: 'index.html', features: 'features.html', how: 'how-it-works.html',
@@ -177,7 +178,7 @@ export function Website({ canWrite, canPublish }: { canWrite: boolean; canPublis
       <div className="admin-head">
         <div>
           <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
-            <li><VaultLink>Vault</VaultLink></li>
+            <li><Link to="/app/">Vault</Link></li>
             <li>Admin</li>
             <li aria-current="page">Website{view.kind === 'section' ? ` · ${state.schema.sections.find((s) => s.id === view.id)?.label ?? ''}` : view.kind === 'images' ? ' · Images' : ' · History'}</li>
           </ol>

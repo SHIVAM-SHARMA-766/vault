@@ -2,12 +2,12 @@ import { useState } from 'react'
 
 import { createAccount, deriveRecoveryProof } from '@vault/crypto'
 
-import { newIdentity } from '../identity.js'
+import { newIdentity } from '../../lib/identity.js'
 
-import { ApiError, api } from '../api.js'
-import * as session from '../session.js'
-import { IconAlert, IconArrowLeft } from '../icons.js'
-import { Check, CopyButton, PasswordInput, StrengthMeter } from '../ui.js'
+import { ApiError, api } from '../../lib/api.js'
+import * as session from '../../lib/session.js'
+import { IconAlert, IconArrowLeft } from '../../ui/icons.js'
+import { Check, CopyButton, PasswordInput, StrengthMeter } from '../../ui/kit.js'
 
 /** Short enough not to be theatre, long enough that 600,000 PBKDF2 iterations
  *  are doing work rather than papering over a guessable secret. */

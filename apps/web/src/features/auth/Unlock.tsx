@@ -2,12 +2,12 @@ import { useState } from 'react'
 
 import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } from '@vault/crypto'
 
-import { ApiError, api } from '../api.js'
-import * as session from '../session.js'
-import { IconAlert } from '../icons.js'
-import { PasswordInput } from '../ui.js'
+import { ApiError, api } from '../../lib/api.js'
+import * as session from '../../lib/session.js'
+import { IconAlert } from '../../ui/icons.js'
+import { PasswordInput } from '../../ui/kit.js'
 
-export function Unlock({ onRegister, forAdmin = false }: { onRegister: () => void; forAdmin?: boolean }) {
+export function Unlock({ onRegister, onRecover, forAdmin = false }: { onRegister: () => void; onRecover: () => void; forAdmin?: boolean }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -98,6 +98,10 @@ export function Unlock({ onRegister, forAdmin = false }: { onRegister: () => voi
       <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
         {busy ? <><span className="spinner" />Deriving key…</> : 'Unlock'}
       </button>
+
+      <p className="auth-forgot">
+        <button type="button" className="link" onClick={onRecover}>Forgot your master password? Use your recovery key</button>
+      </p>
 
       <p className="auth-switch">
         New here? <button type="button" className="link" onClick={onRegister}>Create an account</button>

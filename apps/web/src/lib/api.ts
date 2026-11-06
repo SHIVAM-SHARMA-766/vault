@@ -123,6 +123,28 @@ export const api = {
   refresh: (refreshToken: string) =>
     request<Session>('POST', '/api/auth/refresh', { body: { refreshToken } }),
 
+  /** Revokes every session on the account, this one included. */
+  logoutEverywhere: (token: string) =>
+    request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { all: true } }),
+
+  /** A new master password. Proved by the current one, or — after signing in
+   *  with the recovery key — by the recovery key. Signs out every other
+   *  session and returns a fresh one. */
+  changePassword: (token: string, body: {
+    currentAuthKey?: string
+    recoveryAuthKey?: string
+    newAuthKey: string
+    kdf: KdfParams
+    wrappedVaultKey: string
+  }) => request<Session>('POST', '/api/auth/change-password', { token, body }),
+
+  /** A replacement recovery key; the old one stops working. */
+  rotateRecovery: (token: string, body: {
+    currentAuthKey: string
+    recoveryAuthKey: string
+    wrappedVaultKeyForRecovery: string
+  }) => request<{ ok: true }>('POST', '/api/auth/recovery/rotate', { token, body }),
+
   logout: (token: string, refreshToken: string) =>
     request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { refreshToken } }),
 
