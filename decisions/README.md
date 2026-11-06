@@ -30,6 +30,7 @@ someone who would otherwise assume it was an oversight.
 | [0008](0008-release-pipeline.md) | Releases are published by CI on every merge to main |
 | [0009](0009-identity-keys-and-sharing.md) | Identity keys, and the shape sharing will take |
 | [0010](0010-self-hosted-product.md) | Vault is a product customers run on their own servers |
+| [0011](0011-two-factor-sign-in.md) | Two-factor sign-in |
 
 ## A note on the numbering
 

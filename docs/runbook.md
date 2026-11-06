@@ -124,7 +124,8 @@ sudo systemctl restart vault-api
 ### What rotating each one costs
 
 **`server-pepper`: rotating it orphans every existing account.** The email digest changes,
-so the login pointer can no longer be found. Treat it as permanent; if it must change,
+so the login pointer can no longer be found. It also seals every two-factor key and recovery
+code hash ([0011](../decisions/0011-two-factor-sign-in.md)), which would become unreadable. Treat it as permanent; if it must change,
 every account has to be registered again.
 
 **`token-signing-key`: rotating it logs everyone out and costs nothing else.** Safe at any

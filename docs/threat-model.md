@@ -206,6 +206,13 @@ against convenience.
 
 ### A6 — Credential stuffing and brute force
 
+**With two-factor sign-in on** ([0011](../decisions/0011-two-factor-sign-in.md)), a correct
+master password alone yields no wrapped vault key and no session; a code from the user's
+authenticator (or a single-use recovery code) is also required, and each code works once.
+The TOTP keys and recovery-code hashes are sealed under the pepper, outside the database's
+reach.
+
+
 Online guessing against the login endpoint.
 
 Rate limiting per address and per IP, exponential lockout after repeated failures, and
