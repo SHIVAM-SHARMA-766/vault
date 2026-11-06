@@ -186,6 +186,14 @@ export const api = {
   deleteFolder: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/vault/folders/${encodeURIComponent(id)}`, { token }),
 
+  sessions: (token: string) => request<{ sessions: DeviceSession[] }>('GET', '/api/sessions', { token }),
+  renameSession: (token: string, id: string, name: string) =>
+    request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
+  revokeSession: (token: string, id: string) =>
+    request<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`, { token }),
+  activity: (token: string) =>
+    request<{ events: { kind: string; at: string; ip: string; device: string }[] }>('GET', '/api/activity', { token }),
+
   /** Previous versions of an entry, newest first, each sealed for history. */
   history: (token: string, id: string) =>
     request<{ versions: { at: string; blob: string }[] }>('GET', `/api/vault/history/${encodeURIComponent(id)}`, { token }),
@@ -242,6 +250,7 @@ export const api = {
   },
 }
 
+export interface DeviceSession { id: string; device: string; name?: string; ip: string; createdAt: string; lastUsedAt: string; current: boolean }
 export type RegistrationMode = 'closed' | 'invite' | 'open'
 /** A two-factor code: six digits from the authenticator app, or a recovery code. */
 export type SecondFactor = { totpCode: string } | { recoveryCode: string }

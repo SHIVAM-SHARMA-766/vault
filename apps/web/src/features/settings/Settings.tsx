@@ -13,6 +13,7 @@ import { IconAlert, IconCheck, IconKey, IconLock, IconShield, IconUser } from '.
 import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
+import { Activity, Devices } from './Devices.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 
 const MIN_LENGTH = 12
@@ -64,7 +65,8 @@ export function Settings({ state }: { state: session.Unlocked }) {
           </div>
         </section>
 
-        <SignOutEverywhere />
+        <Devices />
+        <Activity />
       </main>
     </Shell>
   )
@@ -194,32 +196,5 @@ function RotateRecovery({ state }: { state: session.Unlocked }) {
         </button>
       </div>
     </form>
-  )
-}
-
-function SignOutEverywhere() {
-  const toast = useToast()
-  const [confirming, setConfirming] = useState(false)
-  return (
-    <section className="settings-card" aria-labelledby="s-sessions">
-      <div className="settings-card-head"><IconLock size={18} /><h2 id="s-sessions">Signed-in devices</h2></div>
-      <p className="muted small">Sign out of Vault on every device, this one included. Use it if a device is lost or you signed in somewhere you should not have.</p>
-      {confirming ? (
-        <div className="confirm">
-          <p><strong>Sign out everywhere?</strong> You will need your master password on every device, including this one.</p>
-          <div className="confirm-actions">
-            <button className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>Cancel</button>
-            <button className="btn btn-danger btn-sm" onClick={async () => {
-              try { await api.logoutEverywhere(await session.token()); session.lock() }
-              catch (err) { toast(err instanceof Error ? err.message : 'Could not sign out.', 'error') }
-            }}>Sign out everywhere</button>
-          </div>
-        </div>
-      ) : (
-        <div className="settings-actions">
-          <button className="btn btn-danger-ghost" onClick={() => setConfirming(true)}>Sign out everywhere</button>
-        </div>
-      )}
-    </section>
   )
 }

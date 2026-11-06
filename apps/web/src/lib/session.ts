@@ -72,7 +72,16 @@ export function unlock(state: Unlocked): void {
  *  a JavaScript engine may have copied the bytes during garbage collection and
  *  nothing here can reach those copies, but the live copy is gone. */
 export function lock(): void {
-  if (current) wipe(current.vaultKey)
+  // End the server session too, or every lock would leave a refresh token
+  // alive for thirty days. keepalive lets it finish while the tab closes.
+  if (current) {
+    void fetch('/api/auth/signout', {
+      method: 'POST', keepalive: true, credentials: 'omit', cache: 'no-store',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refreshToken: current.refreshToken }),
+    }).catch(() => { /* the session expires on its own */ })
+    wipe(current.vaultKey)
+  }
   current = null
   if (idleTimer) clearTimeout(idleTimer)
   idleTimer = null
@@ -122,7 +131,8 @@ export function expiresAtFrom(session: Session): number {
 }
 
 // A closed or reloaded tab must not leave an unlocked vault behind in any
-// form. There is nothing persisted to clear, so this only drops the live copy.
+// form. There is nothing persisted to clear, so this drops the live copy and
+// ends the server session.
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', lock)
   for (const event of ['click', 'keydown', 'pointermove'] as const) {

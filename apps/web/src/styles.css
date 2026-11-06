@@ -739,3 +739,16 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .import-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
 .progress { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 8px; }
 .progress > div { height: 100%; background: var(--accent); transition: width .2s; }
+
+/* ── Devices and activity ──────────────────────────────────────────── */
+.device-list, .activity-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.device-row:first-child { border-top: 0; }
+.device-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.device-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.device-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.device-rename { display: flex; gap: 6px; align-items: center; }
+.device-rename input { max-width: 220px; }
+.activity-list li { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.activity-list li:first-child { border-top: 0; }
+@media (max-width: 640px) { .device-row { flex-direction: column; align-items: flex-start; } }
