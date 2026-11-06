@@ -141,7 +141,7 @@ shard-key query and a point lookup.
 | `USER#<id>` | `PROFILE` | KDF parameters, auth verifier, both wrapped Vault Keys |
 | `USER#<id>` | `ENTRY#<id>` | One encrypted entry |
 | `USER#<id>` | `FOLDER#<id>` | Encrypted folder name and parent |
-| `USER#<id>` | `HIST#<entryId>#<ts>` | Prior versions, capped at twenty |
+| `USER#<id>` | `HIST#<entryId>#<ts>` | Prior versions, capped at twenty, sealed with their own AAD so the server cannot swap one in as the live entry |
 | `USER#<id>` | `ACT#<ts>#<rand>` | Activity record, expires itself |
 | `USER#<id>` | `SESSION#<tokenId>` | A live refresh token, expires itself |
 | `EMAIL#<hmac>` | `EMAIL` | Login pointer to a user id |
@@ -183,7 +183,7 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 |---|---|
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
-| `packages/core/` | Shared by every client, no UI, no dependencies: QR encoding today; item model and import/export next |
+| `packages/core/` | Shared by every client, no UI, no dependencies: the item model (what each entry type holds, folder trees, search) and QR encoding; import/export next |
 | `services/api/` | The API, and the storage adapters behind one interface |
 | `apps/web/` | The vault client, served at `/app/`, and the Caddyfile. `src/lib` (API client, session, router), `src/ui` (kit, icons, Shell), `src/features/{auth,vault,settings,admin}` |
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
