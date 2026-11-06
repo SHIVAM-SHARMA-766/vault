@@ -210,4 +210,8 @@ export function download(name: string, text: string, type: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export const today = () => new Date().toISOString().slice(0, 10)
+/** Today's date in the user's own time zone, as YYYY-MM-DD. */
+export const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}

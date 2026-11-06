@@ -767,3 +767,9 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .health-chips .chip:disabled { opacity: .45; cursor: default; }
 .health-issues ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .health-issues { margin: 0 0 14px; }
+
+/* Narrow phones: entry actions become icons so the bar fits. */
+@media (max-width: 480px) {
+  .detail-actions .btn-label { display: none; }
+  .detail-actions .btn-sm { padding-left: 10px; padding-right: 10px; }
+}

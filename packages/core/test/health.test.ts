@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { analyse, passwordStrength } from '../src/index.js'
 
 test('common, short, repeated and sequential passwords are weak', () => {
-  for (const pw of ['password', 'Password123!', 'qwerty', '12345678', 'aaaaaaaaaaaa', 'abcdef123', 'letmein2024']) {
+  for (const pw of ['password', 'Password123!', 'qwerty', '12345678', 'aaaaaaaaaaaa', 'abcdef123', 'letmein2024', 'summer2024', 'Pune@123', 'Rahul1990!']) {
     assert.equal(passwordStrength(pw).label, 'Weak', pw)
   }
 })

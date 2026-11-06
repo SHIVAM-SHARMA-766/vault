@@ -38,7 +38,10 @@ export type Strength = { score: 0 | 1 | 2 | 3 | 4; label: '' | 'Weak' | 'Fair' |
 export function passwordStrength(password: string): Strength {
   if (!password) return { score: 0, label: '' }
   const core = password.toLowerCase().replace(/[\d\W_]+$/, '').replace(/^[\d\W_]+/, '')
-  if (COMMON.has(password.toLowerCase()) || COMMON.has(core) || /^(.)\1*$/.test(password) || /^\d{1,8}$/.test(password)) {
+  // A single short word plus a number or a symbol — "summer2024", "Pune@123" —
+  // is the first thing any guessing tool tries.
+  const wordAndNumber = /^[a-z]{2,10}[\W_]?\d{1,4}[\W_]?$/i.test(password)
+  if (COMMON.has(password.toLowerCase()) || COMMON.has(core) || wordAndNumber || /^(.)\1*$/.test(password) || /^\d{1,8}$/.test(password)) {
     return { score: 1, label: 'Weak' }
   }
   let pool = 0

@@ -38,9 +38,9 @@ export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFa
             <IconStar size={16} filled={entry.favorite} />
           </button>
           <button className={`btn btn-secondary btn-sm ${showHistory ? 'btn-pressed' : ''}`} onClick={() => setShowHistory(!showHistory)}
-                  disabled={entry.unreadable} aria-pressed={showHistory}><IconClock size={15} />History</button>
-          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable}><IconEdit size={15} />Edit</button>
-          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)}><IconTrash size={15} />Delete</button>
+                  disabled={entry.unreadable} aria-pressed={showHistory} aria-label="History"><IconClock size={15} /><span className="btn-label">History</span></button>
+          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable} aria-label="Edit"><IconEdit size={15} /><span className="btn-label">Edit</span></button>
+          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} aria-label="Delete"><IconTrash size={15} /><span className="btn-label">Delete</span></button>
         </div>
       </div>
 
