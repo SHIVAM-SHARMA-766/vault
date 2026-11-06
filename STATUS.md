@@ -55,7 +55,7 @@ Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In ord
 1. ~~Client architecture~~ — done 2026-11-06.
 2. ~~Account settings~~ — done 2026-11-06.
 3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
-4. **Folders, entry-type fields, custom fields, password history** in the UI.
+4. ~~Folders, entry-type fields, custom fields, password history~~ — done 2026-11-06.
 5. **Import and export.**
 6. **Monitoring and alerting**, and the domain.
 
@@ -79,6 +79,13 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Phase 1, step 4: the full entry model.** Nested folders (create, rename,
+delete with contents moving up, filter including subfolders); every type has its own fields
+from `packages/core`'s item model (card, identity, bank account, SSH key, Wi-Fi, login);
+custom fields that can be hidden; every meaningful edit keeps the previous version, sealed
+under its own AAD (`vault.history.v1`), viewable and restorable from the entry. Search now
+covers visible fields, folder paths and visible custom fields, never secrets.
 
 **2026-11-06 — Phase 1, step 3: two-factor sign-in.** TOTP with ten single-use recovery
 codes, enforced by the server after the password at sign-in and at recovery-key sign-in;

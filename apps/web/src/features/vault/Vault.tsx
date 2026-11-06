@@ -1,124 +1,89 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+// The vault: filters and folders on the left, the list in the middle, one
+// entry on the right. Data and its encryption live in model.ts; fields in
+// fields.tsx; the editor and detail in their own files.
 
-import {
-  type EntryContent,
-  type EntryType,
-  generateTotp,
-  isWithinSizeLimit,
-  openEntry,
-  sealEntry,
-} from '@vault/crypto'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { api } from '../../lib/api.js'
+import { descendants, folderPath, matches, subtitle, typeSpec } from '@vault/core'
+
 import * as session from '../../lib/session.js'
-import {
-  IconAlert, IconArrowLeft, IconEdit, IconExternal, IconEye, IconEyeOff, IconGrid, IconLock,
-  IconPlus, IconSearch, IconShield, IconStar, IconTrash, IconX,
-} from '../../ui/icons.js'
-import { CopyButton, Generator, Monogram, StrengthMeter, TYPES, typeInfo, useToast } from '../../ui/kit.js'
+import { IconAlert, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
+import { Monogram, TYPES, typeInfo, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
+import { EntryDetail } from './EntryDetail.js'
+import { EntryForm } from './EntryForm.js'
+import { FolderDialog } from './FolderDialog.js'
+import { type Decrypted, type Folder, emptyEntry, stripMeta, useVault } from './model.js'
+import { type Filter, Sidebar, sameFilter } from './Sidebar.js'
+import type { EntryContent, EntryType } from '@vault/crypto'
 
-interface Decrypted extends EntryContent {
-  id: string
-  updatedAt: string
-  unreadable?: boolean
-}
-
-type Filter = 'all' | 'favorites' | EntryType
 type Mode = { kind: 'view' } | { kind: 'edit'; draft: EntryContent; id?: string }
-
-const empty = (type: EntryType = 'login'): EntryContent => ({
-  name: '', type, username: '', password: '', url: '', notes: '',
-  tags: [], customFields: [], favorite: false,
-})
+type Dialog = { kind: 'new'; parentId?: string } | { kind: 'rename'; folder: Folder } | { kind: 'delete'; folder: Folder } | null
 
 export function Vault({ state }: { state: session.Unlocked }) {
   const toast = useToast()
-  const [entries, setEntries] = useState<Decrypted[]>([])
+  const vault = useVault(state.vaultKey)
+  const { entries, folders } = vault
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>({ kind: 'view' })
-  const [filter, setFilter] = useState<Filter>('all')
+  const [filter, setFilter] = useState<Filter>({ kind: 'all' })
   const [query, setQuery] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [dialog, setDialog] = useState<Dialog>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-
-  const load = useCallback(async () => {
-    setError('')
-    try {
-      const token = await session.token()
-      const { entries: sealed } = await api.vault(token)
-
-      // One request returns the whole vault; everything after this is local.
-      // The server cannot search or sort it, because it cannot read it.
-      const opened = await Promise.all(
-        sealed.map(async (e): Promise<Decrypted> => {
-          try {
-            return { ...(await openEntry(e.id, e.blob, state.vaultKey)), id: e.id, updatedAt: e.updatedAt }
-          } catch {
-            // One unreadable entry must not hide the rest.
-            return { ...empty(), name: 'Could not decrypt', id: e.id, updatedAt: e.updatedAt, unreadable: true }
-          }
-        }),
-      )
-      opened.sort((a, b) => a.name.localeCompare(b.name))
-      setEntries(opened)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load the vault.')
-    } finally {
-      setLoading(false)
-    }
-  }, [state.vaultKey])
-
-  useEffect(() => { void load() }, [load])
 
   // "/" jumps to search, Escape backs out of whatever is open.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement
       if (e.key === '/' && !typing) { e.preventDefault(); searchRef.current?.focus() }
-      if (e.key === 'Escape' && !typing) {
+      if (e.key === 'Escape' && !typing && !dialog) {
         if (mode.kind === 'edit') setMode({ kind: 'view' })
         else setSelectedId(null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [mode.kind])
+  }, [mode.kind, dialog])
+
+  const folderIds = useMemo(() => new Set(folders.map((f) => f.id)), [folders])
+  const inFolder = (e: Decrypted) => (e.folderId && folderIds.has(e.folderId) ? e.folderId : undefined)
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: entries.length, favorites: 0 }
+    const c: Record<string, number> = { all: entries.length, favorites: 0, unfiled: 0 }
     for (const e of entries) {
       c[e.type] = (c[e.type] ?? 0) + 1
       if (e.favorite) c['favorites']! += 1
+      if (!inFolder(e)) c['unfiled']! += 1
     }
     return c
-  }, [entries])
+  }, [entries, folderIds])
+
+  // A folder's count includes everything beneath it.
+  const folderCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const f of folders) {
+      const ids = descendants(folders, f.id)
+      m.set(f.id, entries.filter((e) => e.folderId && ids.has(e.folderId)).length)
+    }
+    return m
+  }, [entries, folders])
 
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase()
+    const scope = filter.kind === 'folder' ? descendants(folders, filter.id) : null
     return entries.filter((e) => {
-      if (filter === 'favorites' && !e.favorite) return false
-      if (filter !== 'all' && filter !== 'favorites' && e.type !== filter) return false
-      if (!q) return true
-      return [e.name, e.username, e.url, ...e.tags].some((s) => s?.toLowerCase().includes(q))
+      if (filter.kind === 'favorites' && !e.favorite) return false
+      if (filter.kind === 'type' && e.type !== filter.type) return false
+      if (filter.kind === 'unfiled' && inFolder(e)) return false
+      if (scope && !(e.folderId && scope.has(e.folderId))) return false
+      return matches(e, query, folderPath(folders, inFolder(e)))
     })
-  }, [entries, filter, query])
+  }, [entries, folders, filter, query, folderIds])
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
 
   async function save(content: EntryContent, id?: string): Promise<boolean> {
-    setError('')
     try {
-      const entryId = id ?? crypto.randomUUID()
-      const blob = await sealEntry(entryId, content, state.vaultKey)
-      if (!isWithinSizeLimit(blob)) {
-        toast('That entry is too large to store. Shorten the notes.', 'error')
-        return false
-      }
-      const token = await session.token()
-      await api.putEntry(token, entryId, blob)
-      await load()
+      const entryId = await vault.saveEntry(content, id)
       setSelectedId(entryId)
       setMode({ kind: 'view' })
       return true
@@ -130,25 +95,30 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   async function remove(id: string) {
     try {
-      const token = await session.token()
-      await api.deleteEntry(token, id)
+      await vault.deleteEntry(id)
       setSelectedId(null)
       setMode({ kind: 'view' })
       toast('Entry deleted')
-      await load()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not delete.', 'error')
     }
   }
 
   function startNew() {
-    const type = filter !== 'all' && filter !== 'favorites' ? filter : 'login'
+    const type = (filter.kind === 'type' ? filter.type : 'login') as EntryType
     setSelectedId(null)
-    setMode({ kind: 'edit', draft: empty(type) })
+    setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : undefined) })
   }
 
-  const filterTitle = filter === 'all' ? 'All items' : filter === 'favorites' ? 'Favorites' : typeInfo(filter).plural
+  const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites'
+    : filter.kind === 'unfiled' ? 'No folder' : filter.kind === 'type' ? typeInfo(filter.type as EntryType).plural
+    : folderPath(folders, filter.id) || 'Folder'
   const paneOpen = mode.kind === 'edit' || selected !== null
+  const chips: { f: Filter; label: string }[] = [
+    { f: { kind: 'all' }, label: 'All' }, { f: { kind: 'favorites' }, label: 'Favorites' },
+    ...folders.filter((x) => !x.parentId).map((x) => ({ f: { kind: 'folder', id: x.id } as Filter, label: x.name })),
+    ...TYPES.map((t) => ({ f: { kind: 'type', type: t.type } as Filter, label: t.plural })),
+  ]
 
   return (
     <Shell
@@ -163,39 +133,26 @@ export function Vault({ state }: { state: session.Unlocked }) {
       }
       actions={<button className="btn btn-primary" onClick={startNew}><IconPlus size={16} /><span className="hide-sm">New item</span></button>}
     >
-
       <div className={`layout ${paneOpen ? 'pane-open' : ''}`}>
-        <nav className="sidebar" aria-label="Filter">
-          <SideItem active={filter === 'all'} onClick={() => setFilter('all')} icon={<IconGrid size={16} />}
-                    label="All items" count={counts['all']} />
-          <SideItem active={filter === 'favorites'} onClick={() => setFilter('favorites')}
-                    icon={<IconStar size={16} />} label="Favorites" count={counts['favorites']} />
-          <div className="sidebar-heading">Types</div>
-          {TYPES.map(({ type, plural, Icon }) => (
-            <SideItem key={type} active={filter === type} onClick={() => setFilter(type)}
-                      icon={<Icon size={16} />} label={plural} count={counts[type]} />
-          ))}
-          <div className="sidebar-foot">
-            <IconLock size={14} /> End-to-end encrypted. Locks after 15 minutes idle.
-          </div>
-        </nav>
+        <Sidebar filter={filter} setFilter={setFilter} counts={counts} folders={folders} folderCounts={folderCounts}
+                 onNewFolder={(parentId) => setDialog({ kind: 'new', ...(parentId ? { parentId } : {}) })}
+                 onRenameFolder={(folder) => setDialog({ kind: 'rename', folder })}
+                 onDeleteFolder={(folder) => setDialog({ kind: 'delete', folder })} />
 
-        <section className="list" aria-label={filterTitle}>
+        <section className="list" aria-label={title}>
           <div className="list-head">
-            <h2>{filterTitle}</h2>
+            <h2 className="truncate">{title}</h2>
             <span className="muted">{visible.length}</span>
           </div>
           <div className="filter-chips">
-            {(['all', 'favorites', ...TYPES.map((t) => t.type)] as Filter[]).map((f) => (
-              <button key={f} className={`chip ${filter === f ? 'chip-active' : ''}`} onClick={() => setFilter(f)}>
-                {f === 'all' ? 'All' : f === 'favorites' ? 'Favorites' : typeInfo(f).plural}
-              </button>
+            {chips.map(({ f, label }) => (
+              <button key={JSON.stringify(f)} className={`chip ${sameFilter(filter, f) ? 'chip-active' : ''}`} onClick={() => setFilter(f)}>{label}</button>
             ))}
           </div>
 
-          {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
+          {vault.error ? <p className="alert alert-error"><IconAlert size={16} />{vault.error}</p> : null}
 
-          {loading ? (
+          {vault.loading ? (
             <div className="skeletons">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="skeleton" />)}</div>
           ) : visible.length === 0 ? (
             <EmptyState hasEntries={entries.length > 0} onNew={startNew} />
@@ -208,7 +165,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                     <Monogram name={e.name} />
                     <span className="row-text">
                       <span className="row-name">{e.name || 'Untitled'}{e.favorite ? <span className="row-star"><IconStar size={12} filled /></span> : null}</span>
-                      <span className="row-meta">{e.unreadable ? 'This entry could not be decrypted' : e.username || hostOf(e.url) || typeInfo(e.type).label}</span>
+                      <span className="row-meta">{e.unreadable ? 'This entry could not be decrypted' : subtitle(e)}</span>
                     </span>
                   </button>
                 </li>
@@ -219,14 +176,16 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
         <section className="pane" aria-label="Details">
           {mode.kind === 'edit' ? (
-            <EntryForm key={mode.id ?? 'new'} initial={mode.draft} id={mode.id}
+            <EntryForm key={mode.id ?? 'new'} initial={mode.draft} id={mode.id} folders={folders}
                        onCancel={() => setMode({ kind: 'view' })} onSave={save} />
           ) : selected ? (
-            <EntryDetail key={selected.id} entry={selected}
+            <EntryDetail key={selected.id} entry={selected} folders={folders}
                          onBack={() => setSelectedId(null)}
-                         onEdit={() => setMode({ kind: 'edit', draft: stripMeta(selected), id: selected.id })}
-                         onToggleFavorite={() => save({ ...stripMeta(selected), favorite: !selected.favorite }, selected.id)}
-                         onDelete={() => remove(selected.id)} />
+                         onEdit={() => setMode({ kind: 'edit', draft: withTypeDefaults(stripMeta(selected)), id: selected.id })}
+                         onToggleFavorite={() => { void save({ ...stripMeta(selected), favorite: !selected.favorite }, selected.id) }}
+                         onDelete={() => remove(selected.id)}
+                         loadHistory={() => vault.history(selected.id)}
+                         onRestore={async (content) => { await vault.saveEntry({ ...content, favorite: selected.favorite, ...(selected.folderId ? { folderId: selected.folderId } : {}) }, selected.id) }} />
           ) : (
             <div className="pane-empty">
               <IconShield size={40} />
@@ -235,28 +194,54 @@ export function Vault({ state }: { state: session.Unlocked }) {
           )}
         </section>
       </div>
+
+      {dialog?.kind === 'new' ? (
+        <FolderDialog title={dialog.parentId ? 'New folder inside' : 'New folder'}
+                      {...(dialog.parentId ? { parentPath: folderPath(folders, dialog.parentId) } : {})}
+                      onCancel={() => setDialog(null)}
+                      onSave={async (name) => {
+                        const id = await vault.saveFolder({ name, ...(dialog.parentId ? { parentId: dialog.parentId } : {}) })
+                        setDialog(null)
+                        setFilter({ kind: 'folder', id })
+                        toast('Folder created')
+                      }} />
+      ) : null}
+      {dialog?.kind === 'rename' ? (
+        <FolderDialog title="Rename folder" initial={dialog.folder.name}
+                      onCancel={() => setDialog(null)}
+                      onSave={async (name) => {
+                        const { id, ...content } = dialog.folder
+                        await vault.saveFolder({ ...content, name }, id)
+                        setDialog(null)
+                        toast('Folder renamed')
+                      }} />
+      ) : null}
+      {dialog?.kind === 'delete' ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="del-folder">
+          <div className="modal">
+            <h2 id="del-folder">Delete “{dialog.folder.name}”?</h2>
+            <p className="muted">Its items and subfolders move up to {dialog.folder.parentId ? `“${folderPath(folders, dialog.folder.parentId)}”` : 'no folder'}. Nothing inside is deleted.</p>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setDialog(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={async () => {
+                try {
+                  await vault.deleteFolder(dialog.folder.id)
+                  if (filter.kind === 'folder' && filter.id === dialog.folder.id) setFilter({ kind: 'all' })
+                  setDialog(null)
+                  toast('Folder deleted; its contents moved up')
+                } catch (err) { toast(err instanceof Error ? err.message : 'Could not delete the folder.', 'error') }
+              }}>Delete folder</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </Shell>
   )
 }
 
-function stripMeta(e: Decrypted): EntryContent {
-  const { id: _id, updatedAt: _u, unreadable: _r, ...content } = e
-  return content
-}
-
-function hostOf(url: string | undefined): string {
-  if (!url) return ''
-  try { return new URL(url.includes('://') ? url : `https://${url}`).hostname } catch { return url }
-}
-
-function SideItem({ active, onClick, icon, label, count }: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count: number | undefined
-}) {
-  return (
-    <button className={`side-item ${active ? 'side-active' : ''}`} onClick={onClick} aria-current={active}>
-      {icon}<span>{label}</span>{count ? <span className="side-count">{count}</span> : null}
-    </button>
-  )
+/** Older entries predate type fields; give the editor an object to write into. */
+function withTypeDefaults(c: EntryContent): EntryContent {
+  return { ...c, fields: c.fields ?? {}, customFields: c.customFields ?? [], tags: c.tags ?? [], type: typeSpec(c.type).type as EntryType }
 }
 
 function EmptyState({ hasEntries, onNew }: { hasEntries: boolean; onNew: () => void }) {
@@ -264,7 +249,7 @@ function EmptyState({ hasEntries, onNew }: { hasEntries: boolean; onNew: () => v
     <div className="empty">
       <div className="empty-icon"><IconShield size={28} /></div>
       {hasEntries ? (
-        <><h3>No matches</h3><p>Nothing in this view matches your search.</p></>
+        <><h3>Nothing here</h3><p>No items in this view match. Try another folder or search.</p></>
       ) : (
         <>
           <h3>Your vault is empty</h3>
@@ -273,279 +258,5 @@ function EmptyState({ hasEntries, onNew }: { hasEntries: boolean; onNew: () => v
         </>
       )}
     </div>
-  )
-}
-
-// ── Detail ────────────────────────────────────────────────────────────────
-
-function EntryDetail({ entry, onBack, onEdit, onToggleFavorite, onDelete }: {
-  entry: Decrypted; onBack: () => void; onEdit: () => void; onToggleFavorite: () => void; onDelete: () => void
-}) {
-  const [confirming, setConfirming] = useState(false)
-  const info = typeInfo(entry.type)
-  const href = entry.url ? (entry.url.includes('://') ? entry.url : `https://${entry.url}`) : ''
-  const safeHref = /^https?:\/\//i.test(href) ? href : ''
-
-  return (
-    <article className="detail">
-      <div className="detail-bar">
-        <button className="btn btn-ghost back-sm" onClick={onBack}><IconArrowLeft size={16} />Back</button>
-        <div className="detail-actions">
-          <button className={`icon-btn ${entry.favorite ? 'is-fav' : ''}`} onClick={onToggleFavorite} disabled={entry.unreadable}
-                  title={entry.favorite ? 'Remove from favorites' : 'Add to favorites'} aria-label="Toggle favorite">
-            <IconStar size={16} filled={entry.favorite} />
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable}><IconEdit size={15} />Edit</button>
-          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)}><IconTrash size={15} />Delete</button>
-        </div>
-      </div>
-
-      <header className="detail-head">
-        <Monogram name={entry.name} size="lg" />
-        <div>
-          <h2>{entry.name || 'Untitled'}</h2>
-          <span className="badge"><info.Icon size={13} />{info.label}</span>
-        </div>
-      </header>
-
-      {confirming ? (
-        <div className="confirm">
-          <p><strong>Delete “{entry.name || 'Untitled'}”?</strong> This cannot be undone.</p>
-          <div className="confirm-actions">
-            <button className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>Cancel</button>
-            <button className="btn btn-danger btn-sm" onClick={onDelete}>Delete permanently</button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="fields">
-        <FieldRow label="Username" value={entry.username} copy />
-        <SecretRow label="Password" value={entry.password} showStrength />
-        {entry.totpSecret ? <TotpRow secret={entry.totpSecret} /> : null}
-        {entry.url ? (
-          <div className="field-row">
-            <span className="field-label">Website</span>
-            <div className="field-value">
-              <span className="truncate">{entry.url}</span>
-              <span className="field-tools">
-                {safeHref ? (
-                  <a className="icon-btn" href={safeHref} target="_blank" rel="noopener noreferrer" title="Open website" aria-label="Open website">
-                    <IconExternal size={16} />
-                  </a>
-                ) : null}
-                <CopyButton value={entry.url} label="Website" />
-              </span>
-            </div>
-          </div>
-        ) : null}
-        {entry.customFields.map((f, i) =>
-          f.hidden ? <SecretRow key={i} label={f.label} value={f.value} />
-                   : <FieldRow key={i} label={f.label} value={f.value} copy />)}
-      </div>
-
-      {entry.notes ? (
-        <div className="notes">
-          <span className="field-label">Notes</span>
-          <pre>{entry.notes}</pre>
-        </div>
-      ) : null}
-
-      {entry.tags.length ? (
-        <div className="tags">{entry.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
-      ) : null}
-
-      <p className="detail-foot">Last modified {formatDate(entry.updatedAt)}</p>
-    </article>
-  )
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function FieldRow({ label, value, copy }: { label: string; value: string | undefined; copy?: boolean }) {
-  if (!value) return null
-  return (
-    <div className="field-row">
-      <span className="field-label">{label}</span>
-      <div className="field-value">
-        <span className="truncate">{value}</span>
-        {copy ? <span className="field-tools"><CopyButton value={value} label={label} /></span> : null}
-      </div>
-    </div>
-  )
-}
-
-function SecretRow({ label, value, showStrength }: { label: string; value: string | undefined; showStrength?: boolean }) {
-  const [revealed, setRevealed] = useState(false)
-  if (!value) return null
-  return (
-    <div className="field-row">
-      <span className="field-label">{label}</span>
-      <div className="field-value">
-        <span className="mono truncate">{revealed ? value : '•'.repeat(Math.min(value.length, 16))}</span>
-        <span className="field-tools">
-          <button type="button" className="icon-btn" onClick={() => setRevealed(!revealed)}
-                  title={revealed ? 'Hide' : 'Reveal'} aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}>
-            {revealed ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-          </button>
-          <CopyButton value={value} label={label} />
-        </span>
-      </div>
-      {showStrength ? <StrengthMeter password={value} /> : null}
-    </div>
-  )
-}
-
-function TotpRow({ secret }: { secret: string }) {
-  const [code, setCode] = useState<{ code: string; secondsRemaining: number } | null>(null)
-  const [bad, setBad] = useState(false)
-
-  useEffect(() => {
-    let alive = true
-    const tick = async () => {
-      try {
-        const next = await generateTotp(secret.replace(/\s+/g, ''))
-        if (alive) setCode(next)
-      } catch {
-        if (alive) setBad(true)
-      }
-    }
-    void tick()
-    const t = setInterval(tick, 1000)
-    return () => { alive = false; clearInterval(t) }
-  }, [secret])
-
-  return (
-    <div className="field-row">
-      <span className="field-label">One-time code</span>
-      <div className="field-value">
-        {bad ? <span className="muted">The stored secret is not valid Base32</span> : code ? (
-          <>
-            <span className="mono totp">{code.code.slice(0, 3)} {code.code.slice(3)}</span>
-            <span className="field-tools">
-              <span className={`totp-timer ${code.secondsRemaining <= 5 ? 'totp-low' : ''}`}>{code.secondsRemaining}s</span>
-              <CopyButton value={code.code} label="Code" />
-            </span>
-          </>
-        ) : <span className="muted">…</span>}
-      </div>
-    </div>
-  )
-}
-
-// ── Editor ────────────────────────────────────────────────────────────────
-
-function EntryForm({ initial, id, onCancel, onSave }: {
-  initial: EntryContent
-  id?: string | undefined
-  onCancel: () => void
-  onSave: (content: EntryContent, id?: string) => Promise<boolean>
-}) {
-  const [draft, setDraft] = useState<EntryContent>(initial)
-  const [showGen, setShowGen] = useState(false)
-  const [showPw, setShowPw] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [tagText, setTagText] = useState(initial.tags.join(', '))
-
-  const set = <K extends keyof EntryContent>(k: K, v: EntryContent[K]) => setDraft((d) => ({ ...d, [k]: v }))
-  const isNote = draft.type === 'note'
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    const tags = tagText.split(',').map((t) => t.trim()).filter(Boolean)
-    const ok = await onSave({ ...draft, tags: [...new Set(tags)] }, id)
-    if (!ok) setSaving(false)
-  }
-
-  return (
-    <form className="editor" onSubmit={submit}>
-      <div className="detail-bar">
-        <h2>{id ? 'Edit item' : 'New item'}</h2>
-        <button type="button" className="icon-btn" onClick={onCancel} aria-label="Close"><IconX size={18} /></button>
-      </div>
-
-      <div className="editor-body">
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="f-type">Type</label>
-            <select id="f-type" value={draft.type} onChange={(e) => set('type', e.target.value as EntryType)}>
-              {TYPES.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="f-name">Name</label>
-            <input id="f-name" required autoFocus placeholder="e.g. GitHub" value={draft.name}
-                   onChange={(e) => set('name', e.target.value)} />
-          </div>
-        </div>
-
-        {!isNote ? (
-          <>
-            <div className="field">
-              <label htmlFor="f-username">{draft.type === 'wifi' ? 'Network name (SSID)' : 'Username or email'}</label>
-              <input id="f-username" autoComplete="off" spellCheck={false} value={draft.username ?? ''}
-                     onChange={(e) => set('username', e.target.value)} />
-            </div>
-
-            <div className="field">
-              <div className="label-row">
-                <label htmlFor="f-password">Password</label>
-                <button type="button" className="link" onClick={() => setShowGen(!showGen)}>
-                  {showGen ? 'Hide generator' : 'Generate'}
-                </button>
-              </div>
-              <div className="input-wrap">
-                <input id="f-password" type={showPw ? 'text' : 'password'} autoComplete="new-password"
-                       spellCheck={false} className="mono" value={draft.password ?? ''}
-                       onChange={(e) => set('password', e.target.value)} />
-                <button type="button" className="input-affix" onClick={() => setShowPw(!showPw)}
-                        aria-label={showPw ? 'Hide password' : 'Show password'}>
-                  {showPw ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                </button>
-              </div>
-              <StrengthMeter password={draft.password ?? ''} />
-              {showGen ? <Generator onUse={(p) => { set('password', p); setShowPw(true); setShowGen(false) }} /> : null}
-            </div>
-
-            {draft.type === 'login' ? (
-              <div className="grid-2">
-                <div className="field">
-                  <label htmlFor="f-url">Website</label>
-                  <input id="f-url" type="text" inputMode="url" placeholder="https://" spellCheck={false}
-                         value={draft.url ?? ''} onChange={(e) => set('url', e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="f-totp">Authenticator key (TOTP)</label>
-                  <input id="f-totp" spellCheck={false} className="mono" placeholder="Base32 secret"
-                         value={draft.totpSecret ?? ''} onChange={(e) => set('totpSecret', e.target.value || undefined)} />
-                </div>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-
-        <div className="field">
-          <label htmlFor="f-notes">Notes</label>
-          <textarea id="f-notes" rows={isNote ? 10 : 4} value={draft.notes ?? ''}
-                    onChange={(e) => set('notes', e.target.value)} />
-        </div>
-
-        <div className="field">
-          <label htmlFor="f-tags">Tags</label>
-          <input id="f-tags" placeholder="work, personal" value={tagText} onChange={(e) => setTagText(e.target.value)} />
-          <p className="hint">Separate with commas. Tags are encrypted along with everything else.</p>
-        </div>
-      </div>
-
-      <div className="editor-foot">
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary" disabled={!draft.name.trim() || saving}>
-          {saving ? <><span className="spinner" />Encrypting…</> : 'Save'}
-        </button>
-      </div>
-    </form>
   )
 }

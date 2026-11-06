@@ -100,6 +100,15 @@ export const IconUp = (p: P) => (
 export const IconDown = (p: P) => (
   <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>
 )
+export const IconClock = (p: P) => (
+  <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></Svg>
+)
+export const IconFolder = (p: P) => (
+  <Svg {...p}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" /></Svg>
+)
+export const IconMore = (p: P) => (
+  <Svg {...p}><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></Svg>
+)
 export const IconX = (p: P) => (
   <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
 )
