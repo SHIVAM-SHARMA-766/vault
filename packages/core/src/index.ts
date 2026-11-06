@@ -36,3 +36,4 @@ export {
   totpKey,
 } from './import.js'
 export { type ExportEntry, toCsv } from './export.js'
+export { ISSUES, type HealthInput, type HealthReport, type Issue, type Strength, analyse, passwordStrength } from './health.js'
