@@ -1,0 +1,20 @@
+[Unit]
+Description=Report the vault's health to OCI Monitoring
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Its own throwaway user: the probe reads nothing private. The backup mark and
+# /proc are world-readable, and it authenticates as the instance through the
+# metadata service, which needs no file.
+DynamicUser=yes
+StateDirectory=vault-probe
+Environment=HOME=/var/lib/vault-probe
+EnvironmentFile=/etc/vault/release.env
+ExecStart=/usr/local/bin/vault-probe.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+TimeoutStartSec=120
