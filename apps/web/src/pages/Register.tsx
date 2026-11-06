@@ -19,6 +19,7 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
   const [error, setError] = useState('')
   const [recoveryKey, setRecoveryKey] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -49,6 +50,7 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
         kdf: account.kdf,
         wrappedVaultKey: account.wrappedVaultKey,
         wrappedVaultKeyForRecovery: account.wrappedVaultKeyForRecovery,
+        ...(inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
       })
 
       // Shown once. It is never transmitted and cannot be recovered from the
@@ -71,7 +73,9 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
       session.lock()
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
-        setError('Registration is closed on this server.')
+        setError(inviteCode.trim()
+          ? 'That invitation code is not valid. It may have been used or have expired.'
+          : 'New accounts need an invitation code on this server.')
       } else if (err instanceof ApiError && err.status === 409) {
         setError('That address is already registered.')
       } else {
@@ -119,6 +123,14 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
         There is no password reset. The server cannot read your vault, so it cannot help you
         back in — the recovery key issued next is the only other way.
       </p>
+
+      <div className="field">
+        <label htmlFor="r-invite">Invitation code</label>
+        <input id="r-invite" autoComplete="off" spellCheck={false} className="mono"
+               placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+               value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
+        <p className="hint">Accounts are opened by invitation. Leave blank only if registration is open.</p>
+      </div>
 
       <div className="field">
         <label htmlFor="r-email">Email</label>

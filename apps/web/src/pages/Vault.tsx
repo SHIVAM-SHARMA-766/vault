@@ -16,6 +16,7 @@ import {
   IconPlus, IconSearch, IconShield, IconStar, IconTrash, IconX,
 } from '../icons.js'
 import { CopyButton, Generator, Monogram, StrengthMeter, TYPES, typeInfo, useToast } from '../ui.js'
+import { Admin } from './Admin.js'
 
 interface Decrypted extends EntryContent {
   id: string
@@ -41,6 +42,29 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const searchRef = useRef<HTMLInputElement>(null)
+  const [adminOpen, setAdminOpen] = useState(() => location.pathname.startsWith('/app/admin'))
+
+  // Learn who this is. The login response carries no user id or role, and the
+  // admin panel is offered only if the server says so.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const me = await api.me(await session.token())
+        session.patch({ userId: me.userId, isAdmin: me.isAdmin })
+      } catch { /* the vault still works; the admin entry just stays hidden */ }
+    })()
+  }, [])
+
+  // /app/admin is a real address, so the back button and a reload behave.
+  useEffect(() => {
+    const onPop = () => setAdminOpen(location.pathname.startsWith('/app/admin'))
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+  const openAdmin = (open: boolean) => {
+    history.pushState(null, '', open ? '/app/admin' : '/app/')
+    setAdminOpen(open)
+  }
 
   const load = useCallback(async () => {
     setError('')
@@ -146,6 +170,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
     setMode({ kind: 'edit', draft: empty(type) })
   }
 
+  if (adminOpen && state.isAdmin) return <Admin state={state} onClose={() => openAdmin(false)} />
+
   const filterTitle = filter === 'all' ? 'All items' : filter === 'favorites' ? 'Favorites' : typeInfo(filter).plural
   const paneOpen = mode.kind === 'edit' || selected !== null
 
@@ -161,6 +187,11 @@ export function Vault({ state }: { state: session.Unlocked }) {
         </div>
         <div className="topbar-actions">
           <button className="btn btn-primary" onClick={startNew}><IconPlus size={16} /><span className="hide-sm">New item</span></button>
+          {state.isAdmin ? (
+            <button className="btn btn-secondary" onClick={() => openAdmin(true)} title="Admin panel">
+              <IconGrid size={16} /><span className="hide-sm">Admin</span>
+            </button>
+          ) : null}
           <div className="account" title={state.email}>
             <span className="account-avatar">{state.email[0]?.toUpperCase()}</span>
             <span className="account-email hide-md">{state.email}</span>

@@ -23,6 +23,16 @@ export interface Unlocked {
   kdf: KdfParams
   /** When the access token stops being accepted, as epoch milliseconds. */
   accessExpiresAt: number
+  /** Whether the server lists this account as an operator. Only decides
+   *  whether the admin panel is offered; every admin route checks again. */
+  isAdmin?: boolean
+}
+
+/** Updates fields of the unlocked state without touching the keys. */
+export function patch(fields: Partial<Pick<Unlocked, 'userId' | 'isAdmin'>>): void {
+  if (!current) return
+  current = { ...current, ...fields }
+  notify()
 }
 
 let current: Unlocked | null = null

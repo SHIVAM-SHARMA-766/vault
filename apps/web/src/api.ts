@@ -98,6 +98,7 @@ export const api = {
     kdf: KdfParams
     wrappedVaultKey: string
     wrappedVaultKeyForRecovery: string
+    inviteCode?: string
   }) => request<Session & { userId: string }>('POST', '/api/auth/register', { body }),
 
   login: (email: string, authKey: string) =>
@@ -117,7 +118,7 @@ export const api = {
     request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { refreshToken } }),
 
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -134,4 +135,76 @@ export const api = {
 
   deleteEntry: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/vault/entries/${encodeURIComponent(id)}`, { token }),
+
+  admin: {
+    overview: (token: string) => request<AdminOverview>('GET', '/api/admin/overview', { token }),
+    users: (token: string) => request<{ users: AdminUser[] }>('GET', '/api/admin/users', { token }),
+    setLabel: (token: string, id: string, label: string) =>
+      request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/label`, { token, body: { label } }),
+    setDisabled: (token: string, id: string, disabled: boolean) =>
+      request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/disabled`, { token, body: { disabled } }),
+    revokeSessions: (token: string, id: string) =>
+      request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/revoke-sessions`, { token }),
+    deleteUser: (token: string, id: string) =>
+      request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/delete`, { token, body: { confirm: id } }),
+    settings: (token: string) =>
+      request<{ registration: RegistrationMode; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+    setRegistration: (token: string, registration: RegistrationMode) =>
+      request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
+    invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),
+    createInvite: (token: string, label: string, days: number) =>
+      request<{ code: string; invite: { id: string; label: string; expiresAt: string } }>(
+        'POST', '/api/admin/invites', { token, body: { label, days } },
+      ),
+    deleteInvite: (token: string, id: string) =>
+      request<{ ok: true }>('DELETE', `/api/admin/invites/${encodeURIComponent(id)}`, { token }),
+    audit: (token: string) => request<{ records: AdminAudit[] }>('GET', '/api/admin/audit', { token }),
+  },
+}
+
+export type RegistrationMode = 'closed' | 'invite' | 'open'
+
+export interface AdminOverview {
+  users: number
+  disabledUsers: number
+  entries: number
+  activeSessions: number
+  activeInvites: number
+  registration: RegistrationMode
+  registrationForcedOpen: boolean
+  lastBackup: { at: string | null; object: string | null; bytes: number | null } | null
+  serverTime: string
+  uptimeSeconds: number
+}
+
+export interface AdminUser {
+  userId: string
+  label: string | null
+  createdAt: string
+  lastLoginAt: string | null
+  disabled: boolean
+  isAdmin: boolean
+  entries: number
+  folders: number
+  sessions: number
+}
+
+export interface AdminInvite {
+  id: string
+  label: string
+  createdAt: string
+  expiresAt: string
+  usedAt: string | null
+  usedBy: string | null
+  status: 'active' | 'used' | 'expired'
+}
+
+export interface AdminAudit {
+  at: string
+  actor: string
+  action: string
+  target: string | null
+  detail: string | null
+  actorLabel: string | null
+  targetLabel: string | null
 }
