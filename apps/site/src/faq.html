@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>FAQ — Vault</title>
+  <meta name="description" content="Answers about accounts, recovery, encryption, and what the server can and cannot see.">
+</head>
+<body>
+<!-- page:faq -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">FAQ</span>
+        <h1>Questions worth asking</h1>
+        <p>Straight answers about what Vault does, what it does not, and why.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="faq">
+          <details>
+            <summary>How do I get an account?</summary>
+            <p>Accounts are currently opened by invitation. The person who runs this Vault creates a single-use
+               code for you; enter it when you sign up. Codes expire, and each one works exactly once.</p>
+          </details>
+          <details>
+            <summary>What happens if I forget my master password?</summary>
+            <p>Use the recovery key you were shown at sign-up. It is the only other way in. There is no password
+               reset, because the server cannot read your vault and so cannot let you back into it.</p>
+          </details>
+          <details>
+            <summary>Can the person who runs Vault read my passwords?</summary>
+            <p>No. The admin panel can see that an account exists, when it was created and last used, and how
+               many items it holds — but not what they are, and not even your email address, which is stored only
+               as a keyed hash.</p>
+          </details>
+
+          <details>
+            <summary>If the server is hacked, what does the attacker get?</summary>
+            <p>Encrypted entries, a hash of each user's login key, and vault keys that are themselves
+               encrypted. To read anything they would have to guess a master password, paying 600,000
+               rounds of key stretching per guess, per account.</p>
+          </details>
+          <details>
+            <summary>Why does unlocking take a second?</summary>
+            <p>That is the key stretching happening on your device. It is deliberately slow, so that
+               guessing passwords is slow too.</p>
+          </details>
+          <details>
+            <summary>Why don't my entries show website icons?</summary>
+            <p>Fetching an icon means asking someone else's server for it, which tells them which sites
+               you have accounts with. Vault shows a coloured initial instead and makes no request to
+               any third party.</p>
+          </details>
+          <details>
+            <summary>Why do I have to unlock again after reloading the page?</summary>
+            <p>Your keys are kept in memory and nowhere else — not in local storage, not in a cookie.
+               A closed tab leaves nothing behind for someone with your laptop to find.</p>
+          </details>
+          <details>
+            <summary>Does the page load anything from other companies?</summary>
+            <p>No. No analytics, no fonts, no CDNs, no trackers. A strict Content-Security-Policy blocks
+               the page from loading anything that does not come from this server.</p>
+          </details>
+          <details>
+            <summary>Is there anything it does not protect against?</summary>
+            <p>Yes, and it is stated plainly on the <a href="/security">security page</a>: a web app is
+               only as trustworthy as the code it is served, and today that rests on a free
+               dynamic-DNS name.</p>
+          </details>
+        </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="final">
+          <h2>Your secrets, readable only by you.</h2>
+          <p>Open your vault in the browser. Nothing to install.</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/app/">Open vault</a>
+            <a class="btn btn-ghost" href="/security">Security details</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

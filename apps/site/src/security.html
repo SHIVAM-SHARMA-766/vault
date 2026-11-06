@@ -1,29 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- include:head -->
   <title>Security — Vault</title>
   <meta name="description" content="How Vault derives keys, what it encrypts, what the server stores, and the risks it does not protect against.">
-  <meta name="theme-color" content="#4f46e5">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-
-  <header class="nav">
-    <div class="wrap">
-      <a class="logo" href="/"><img src="/favicon.svg" alt="" width="30" height="30">Vault</a>
-      <nav class="nav-links" aria-label="Primary">
-        <a href="/#features">Features</a>
-        <a href="/#how">How it works</a>
-        <a href="/security">Security</a>
-        <a href="/#faq">FAQ</a>
-      </nav>
-      <a class="btn btn-primary btn-sm" href="/app/">Open vault</a>
-    </div>
-  </header>
+<!-- page:security -->
+<!-- include:header -->
 
   <main id="main">
     <section class="doc-hero">
@@ -43,6 +27,7 @@
         <a href="#encrypted">What is encrypted</a>
         <a href="#signin">Signing in</a>
         <a href="#recovery">Recovery</a>
+        <a href="#operator">The operator</a>
         <a href="#browser">In the browser</a>
         <a href="#infra">Infrastructure</a>
         <a href="#limits">Known limitations</a>
@@ -107,6 +92,21 @@
         <p>There is no password reset and no support override, because there is nothing the server could
            reset. If both the master password and the recovery key are lost, the vault cannot be opened.</p>
 
+        <h2 id="operator">What the operator can see</h2>
+        <p>Whoever runs this Vault has an admin panel. It exists to manage accounts, not to look inside them,
+           and it is limited by the same design as everything else: the server holds nothing readable to show.</p>
+        <table class="table">
+          <thead><tr><th>The admin panel can</th><th>It cannot</th></tr></thead>
+          <tbody>
+            <tr><td>See that an account exists, when it was created and last signed in</td><td>See its email address — only a keyed hash is stored</td></tr>
+            <tr><td>See how many items an account holds</td><td>See what any item is, or its name</td></tr>
+            <tr><td>Open or close registration, and issue single-use invitations</td><td>Reset a master password or unlock a vault</td></tr>
+            <tr><td>Sign an account out everywhere, disable it, or delete it</td><td>Read, change or export anyone's entries</td></tr>
+          </tbody>
+        </table>
+        <p>Every admin action is written to an audit log before it runs. Admin access is a normal sign-in to an
+           account listed in the server's configuration — there is no separate master key or back door.</p>
+
         <h2 id="browser">In the browser</h2>
         <ul>
           <li><strong>Keys stay in memory.</strong> Nothing sensitive is written to local storage,
@@ -126,8 +126,8 @@
           <li>HTTPS only, with HSTS. TLS 1.0 and 1.1 are refused.</li>
           <li>The API listens on the loopback interface only; it is reachable solely through the web
               server in front of it.</li>
-          <li>The server has no SSH access open to the internet. Access is opened for a single address
-              when needed and closed afterwards.</li>
+          <li>The server has no SSH access open to the internet. New releases are pulled by the server from
+              private storage and checked against a hash before they are installed, so deploying needs no way in.</li>
           <li>The database lives on a private network, not on the web server's disk.</li>
           <li>Encrypted exports are taken daily to private object storage. Restoring them has been
               tested. They contain the same ciphertext as the database and nothing more.</li>
@@ -161,14 +161,6 @@
     </div>
   </main>
 
-  <footer class="footer">
-    <div class="wrap">
-      <p>© 2026 Vault. Built and run by Shivam Sharma.</p>
-      <nav aria-label="Footer">
-        <a href="/">Home</a>
-        <a href="/app/">Sign in</a>
-      </nav>
-    </div>
-  </footer>
+<!-- include:footer -->
 </body>
 </html>

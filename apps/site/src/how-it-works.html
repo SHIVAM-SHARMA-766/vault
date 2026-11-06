@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>How it works — Vault</title>
+  <meta name="description" content="How Vault derives your keys on your device, what it sends to the server, and why a breach of the server reveals nothing readable.">
+</head>
+<body>
+<!-- page:how -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">How it works</span>
+        <h1>Your password never leaves the browser</h1>
+        <p>Signing in proves who you are without sending the secret that proves it. Here is what happens, step by step, and what ends up where.</p>
+      </div>
+    </section>
+
+<section class="section">
+      <div class="wrap">
+        <div class="steps">
+          <article class="step">
+            <h3>You type your master password</h3>
+            <p>Your browser stretches it with 600,000 rounds of PBKDF2 into a master key. That pause
+               before the vault opens is the same pause an attacker pays for every guess.</p>
+            <span class="where where-device">On your device</span>
+          </article>
+          <article class="step">
+            <h3>Two keys split off</h3>
+            <p>One key unlocks your vault and stays put. A second, separate key — one that cannot be
+               worked back to the first — is what the server sees to confirm it is you.</p>
+            <span class="where where-device">On your device</span>
+          </article>
+          <article class="step">
+            <h3>Only ciphertext is stored</h3>
+            <p>Entries are sealed before upload. The server keeps encrypted blobs and a hash of the
+               login key. A full breach of it yields nothing readable.</p>
+            <span class="where where-server">On the server</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    
+<section class="section section-alt">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="kicker">What the server holds</span>
+          <h2>Built so a breach is boring</h2>
+        </div>
+        <div class="compare">
+          <article class="card has">
+            <h3>What the server stores</h3>
+            <ul>
+              <li>Encrypted entries it holds no key for</li>
+              <li>A hash of your login key — not of your password</li>
+              <li>Your vault key, locked with keys only you can derive</li>
+              <li>Your email as a keyed hash, not in plain text</li>
+            </ul>
+          </article>
+          <article class="card hasnt">
+            <h3>What it never sees</h3>
+            <ul>
+              <li>Your master password</li>
+              <li>Your recovery key</li>
+              <li>The names of the sites you use</li>
+              <li>Any password, note, or code in your vault</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    
+    <section class="section">
+      <div class="wrap split split-reverse">
+        <div>
+          <span class="kicker">One key in the middle</span>
+          <h2>Why changing your password is instant</h2>
+          <p class="split-lede">Your entries are not encrypted with your password. They are encrypted with a random
+             vault key, created once when you sign up. Your password only locks that one key.</p>
+          <ul class="ticks">
+            <li>Change your master password and only the vault key is re-locked — your entries are untouched</li>
+            <li>A second copy of the vault key is locked with your recovery key, which is how recovery works</li>
+            <li>Every entry is sealed with AES-256-GCM and a fresh nonce, and bound to its own ID</li>
+          </ul>
+          <p><a href="/security#keys">See the full key hierarchy →</a></p>
+        </div>
+        <div class="diagram diagram-card">Master password
+     │  PBKDF2 · 600,000 rounds
+     ▼
+Master key
+     ├─► Key-encryption key
+     │        └─► unlocks the Vault key
+     │                 └─► encrypts your entries
+     │
+     └─► Login key ─► sent to the server
+              (checked, never usable
+               for decryption)</div>
+      </div>
+    </section>
+
+<section class="section section-alt">
+      <div class="wrap">
+        <div class="callout">
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg></span>
+          <div>
+            <h3>There is no password reset. That is the point.</h3>
+            <p>Because the server cannot read your vault, it cannot let you back in either. When you sign
+               up you get a recovery key, shown once and never sent anywhere. It is the only other way
+               in. Keep it somewhere safe and offline.</p>
+            <p>Lose both the master password and the recovery key, and nobody — including whoever runs
+               the server — can open the vault.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    
+    <section class="section">
+      <div class="wrap">
+        <div class="final">
+          <h2>Your secrets, readable only by you.</h2>
+          <p>Open your vault in the browser. Nothing to install.</p>
+          <div class="cta">
+            <a class="btn btn-primary" href="/app/">Open vault</a>
+            <a class="btn btn-ghost" href="/security">Security details</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

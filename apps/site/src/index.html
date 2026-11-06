@@ -1,29 +1,13 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- include:head -->
   <title>Vault — a password manager that cannot read your passwords</title>
   <meta name="description" content="Vault encrypts every password on your device before it is saved. The server stores ciphertext and holds no key that opens it.">
-  <meta name="theme-color" content="#4f46e5">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/site.css">
 </head>
 <body>
-  <a class="skip" href="#main">Skip to content</a>
-
-  <header class="nav">
-    <div class="wrap">
-      <a class="logo" href="/"><img src="/favicon.svg" alt="" width="30" height="30">Vault</a>
-      <nav class="nav-links" aria-label="Primary">
-        <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a href="/security">Security</a>
-        <a href="#faq">FAQ</a>
-      </nav>
-      <a class="btn btn-primary btn-sm" href="/app/">Open vault</a>
-    </div>
-  </header>
+<!-- page:home -->
+<!-- include:header -->
 
   <main id="main">
     <section class="hero">
@@ -41,7 +25,7 @@
             <a class="btn btn-primary" href="/app/">Open your vault
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             </a>
-            <a class="btn btn-ghost" href="/security">Read how it works</a>
+            <a class="btn btn-ghost" href="/how-it-works">See how it works</a>
           </div>
           <p class="cta-note">Accounts are currently opened by invitation.</p>
         </div>
@@ -52,56 +36,38 @@
       </div>
     </section>
 
-    <section class="section section-alt" id="features">
+    
+    <section class="section section-alt">
       <div class="wrap">
         <div class="section-head">
-          <span class="kicker">Features</span>
-          <h2>Everything you need. Nothing it can see.</h2>
-          <p>The parts of a password manager you use every day, built on the assumption that the server
-             is the first thing an attacker would go after.</p>
+          <span class="kicker">Why Vault</span>
+          <h2>Built on one assumption: the server is the target</h2>
+          <p>Most breaches start on the server. Vault is designed so that winning there gets an attacker nothing they can read.</p>
         </div>
         <div class="grid">
           <article class="card">
             <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-            <h3>Encrypted on your device</h3>
-            <p>AES-256-GCM with a fresh nonce for every write. Keys are derived in the browser and never
-               cross the network.</p>
+            <h3>Zero-knowledge by design</h3>
+            <p>Encryption happens in your browser. The server receives ciphertext and a login key that cannot be turned back into your password.</p>
+            <a class="card-link" href="/how-it-works">How it works <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </article>
           <article class="card">
-            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg></span>
-            <h3>Names and tags too</h3>
-            <p>Not just passwords. Entry names, usernames, websites, notes and tags are all encrypted, so a
-               stolen database does not even list which sites you use.</p>
+            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6A17 17 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M3 3l18 18"/></svg></span>
+            <h3>Nothing to see, even in a breach</h3>
+            <p>Entry names, usernames, websites and tags are encrypted along with the passwords. A stolen database does not list which sites you use.</p>
+            <a class="card-link" href="/security">Security details <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </article>
           <article class="card">
-            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-            <h3>Two-factor codes built in</h3>
-            <p>Store authenticator keys alongside the login they belong to and get live one-time codes,
-               generated locally to the RFC 6238 standard.</p>
-          </article>
-          <article class="card">
-            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11A8 8 0 0 0 6.3 6.3L4 8.5M4 13a8 8 0 0 0 13.7 4.7L20 15.5"/><path d="M4 4v4.5h4.5M20 20v-4.5h-4.5"/></svg></span>
-            <h3>Strong passwords, generated</h3>
-            <p>A generator drawing from the browser's cryptographic random source, with a strength meter
-               on every password you save.</p>
-          </article>
-          <article class="card">
-            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg></span>
-            <h3>Copy that cleans up</h3>
-            <p>Copy a username, password or code in one click. Secrets are cleared from the clipboard
-               after thirty seconds.</p>
-          </article>
-          <article class="card">
-            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
-            <h3>Locks itself</h3>
-            <p>Keys live in memory only — never in browser storage or cookies. Close the tab, reload, or
-               step away for fifteen minutes and the vault is locked.</p>
+            <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+            <h3>Everything you use every day</h3>
+            <p>Search, favourites, one-click copy, two-factor codes and a password generator — in a fast, clean app that works on any device.</p>
+            <a class="card-link" href="/features">All features <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section" id="how">
+<section class="section">
       <div class="wrap">
         <div class="section-head">
           <span class="kicker">How it works</span>
@@ -131,91 +97,17 @@
       </div>
     </section>
 
+    
     <section class="section section-alt">
       <div class="wrap">
-        <div class="section-head">
-          <span class="kicker">What the server holds</span>
-          <h2>Built so a breach is boring</h2>
-        </div>
-        <div class="compare">
-          <article class="card has">
-            <h3>What the server stores</h3>
-            <ul>
-              <li>Encrypted entries it holds no key for</li>
-              <li>A hash of your login key — not of your password</li>
-              <li>Your vault key, locked with keys only you can derive</li>
-              <li>Your email as a keyed hash, not in plain text</li>
-            </ul>
-          </article>
-          <article class="card hasnt">
-            <h3>What it never sees</h3>
-            <ul>
-              <li>Your master password</li>
-              <li>Your recovery key</li>
-              <li>The names of the sites you use</li>
-              <li>Any password, note, or code in your vault</li>
-            </ul>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="wrap">
         <div class="callout">
-          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg></span>
+          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M5 7h14M5 7l-3 6a3 3 0 0 0 6 0L5 7Zm14 0-3 6a3 3 0 0 0 6 0l-3-6Z"/></svg></span>
           <div>
-            <h3>There is no password reset. That is the point.</h3>
-            <p>Because the server cannot read your vault, it cannot let you back in either. When you sign
-               up you get a recovery key, shown once and never sent anywhere. It is the only other way
-               in. Keep it somewhere safe and offline.</p>
-            <p>Lose both the master password and the recovery key, and nobody — including whoever runs
-               the server — can open the vault.</p>
+            <h3>Honest about its limits</h3>
+            <p>A security page that lists only strengths is a marketing page. Vault publishes the risks it does
+               not protect against — including the biggest one — alongside the ones it does.</p>
+            <p><a href="/security#limits">Read the known limitations →</a></p>
           </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section section-alt" id="faq">
-      <div class="wrap">
-        <div class="section-head">
-          <span class="kicker">FAQ</span>
-          <h2>Questions worth asking</h2>
-        </div>
-        <div class="faq">
-          <details>
-            <summary>If the server is hacked, what does the attacker get?</summary>
-            <p>Encrypted entries, a hash of each user's login key, and vault keys that are themselves
-               encrypted. To read anything they would have to guess a master password, paying 600,000
-               rounds of key stretching per guess, per account.</p>
-          </details>
-          <details>
-            <summary>Why does unlocking take a second?</summary>
-            <p>That is the key stretching happening on your device. It is deliberately slow, so that
-               guessing passwords is slow too.</p>
-          </details>
-          <details>
-            <summary>Why don't my entries show website icons?</summary>
-            <p>Fetching an icon means asking someone else's server for it, which tells them which sites
-               you have accounts with. Vault shows a coloured initial instead and makes no request to
-               any third party.</p>
-          </details>
-          <details>
-            <summary>Why do I have to unlock again after reloading the page?</summary>
-            <p>Your keys are kept in memory and nowhere else — not in local storage, not in a cookie.
-               A closed tab leaves nothing behind for someone with your laptop to find.</p>
-          </details>
-          <details>
-            <summary>Does the page load anything from other companies?</summary>
-            <p>No. No analytics, no fonts, no CDNs, no trackers. A strict Content-Security-Policy blocks
-               the page from loading anything that does not come from this server.</p>
-          </details>
-          <details>
-            <summary>Is there anything it does not protect against?</summary>
-            <p>Yes, and it is stated plainly on the <a href="/security">security page</a>: a web app is
-               only as trustworthy as the code it is served, and today that rests on a free
-               dynamic-DNS name.</p>
-          </details>
         </div>
       </div>
     </section>
@@ -232,16 +124,9 @@
         </div>
       </div>
     </section>
+
   </main>
 
-  <footer class="footer">
-    <div class="wrap">
-      <p>© 2026 Vault. Built and run by Shivam Sharma.</p>
-      <nav aria-label="Footer">
-        <a href="/security">Security</a>
-        <a href="/app/">Sign in</a>
-      </nav>
-    </div>
-  </footer>
+<!-- include:footer -->
 </body>
 </html>
