@@ -5,7 +5,7 @@
 // could validate.
 
 import type { App } from '../context.js'
-import { type LambdaEvent, type LambdaResponse, badRequest, json, notFound, parseJsonBody } from '../http.js'
+import { type LambdaEvent, type LambdaResponse, badRequest, conflict, json, notFound, parseJsonBody } from '../http.js'
 import {
   ENTRY_PREFIX,
   FOLDER_PREFIX,
@@ -17,7 +17,7 @@ import {
   isValidId,
   userPk,
 } from '../keys.js'
-import type { Item } from '../store.js'
+import { AlreadyExists, type Item } from '../store.js'
 import { requireSealed } from '../validate.js'
 
 /** Older versions of an entry, so a mistaken edit is recoverable. Capped
@@ -139,3 +139,46 @@ export async function getActivity(app: App, userId: string): Promise<LambdaRespo
 }
 
 export const HISTORY_SK_PREFIX = HISTORY_PREFIX
+
+/** Per-request limits for bulk import. A thousand-entry import is ten
+ *  requests rather than a thousand, which keeps it inside the per-user rate
+ *  limit without loosening that limit for everything else. */
+export const IMPORT_MAX_ENTRIES = 100
+export const IMPORT_MAX_FOLDERS = 50
+
+/** Creates many entries and folders in one request, for import. Never
+ *  overwrites: every id must be new, so a replayed or malicious import cannot
+ *  replace existing items. Items are written one by one; if one fails the
+ *  ones before it stay, and the response says how far it got. */
+export async function bulkImport(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ entries?: unknown; folders?: unknown }>(event)
+  const entries = Array.isArray(body.entries) ? body.entries : []
+  const folders = Array.isArray(body.folders) ? body.folders : []
+  if (entries.length > IMPORT_MAX_ENTRIES || folders.length > IMPORT_MAX_FOLDERS) {
+    throw badRequest(`At most ${IMPORT_MAX_ENTRIES} entries and ${IMPORT_MAX_FOLDERS} folders per request.`)
+  }
+  const parse = (list: unknown[], what: string) => list.map((raw, i) => {
+    const item = raw as { id?: unknown; blob?: unknown }
+    if (!isValidId(item?.id)) throw badRequest(`${what}[${i}].id is not a valid identifier.`)
+    return { id: item.id, blob: requireSealed(item.blob, `${what}[${i}].blob`) }
+  })
+  const fs = parse(folders, 'folders')
+  const es = parse(entries, 'entries')
+  const at = new Date(app.now()).toISOString()
+  let created = 0
+  try {
+    // Folders first, so entries never point at a folder that is not there yet.
+    for (const f of fs) {
+      await app.store.put({ pk: userPk(userId), sk: folderSk(f.id), id: f.id, blob: f.blob, createdAt: at, updatedAt: at }, { mustNotExist: true })
+      created++
+    }
+    for (const e of es) {
+      await app.store.put({ pk: userPk(userId), sk: entrySk(e.id), id: e.id, blob: e.blob, createdAt: at, updatedAt: at }, { mustNotExist: true })
+      created++
+    }
+  } catch (err) {
+    if (err instanceof AlreadyExists) throw conflict(`An item with that id already exists; ${created} item(s) were created before it.`)
+    throw err
+  }
+  return json(201, { folders: fs.length, entries: es.length })
+}

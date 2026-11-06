@@ -39,6 +39,7 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 | PUT/DELETE | `/api/vault/entries/:id` | access | One entry |
 | PUT/DELETE | `/api/vault/folders/:id` | access | One folder |
 | GET/POST | `/api/vault/history/:id` | access | Previous versions, capped at twenty |
+| POST | `/api/vault/import` | access | Creates up to 100 entries and 50 folders at once; never overwrites (409 on an existing id) |
 | GET | `/api/activity` | access | Security events, expired after ninety days |
 
 ## Decisions worth knowing before changing anything

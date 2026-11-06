@@ -48,6 +48,7 @@ export function buildRouter(app: App): Router {
   router.put('/api/vault/folders/:id', authed((u, e, id) => vault.putFolder(app, u, e, id)))
   router.delete('/api/vault/folders/:id', authed((u, _e, id) => vault.deleteFolder(app, u, id)))
   router.get('/api/vault/history/:id', authed((u, _e, id) => vault.getHistory(app, u, id)))
+  router.post('/api/vault/import', authed((u, e) => vault.bulkImport(app, u, e)))
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)))
   router.get('/api/activity', authed((u) => vault.getActivity(app, u)))
 
