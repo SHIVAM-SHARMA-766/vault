@@ -190,6 +190,11 @@ Controls, designed for phase 3 (teams): a public key cannot be replaced once set
 member joining an organization is sealed to only after an admin confirms their fingerprint;
 fingerprints are shown to both people so they can be compared out of band.
 
+**Account changes need the password, not just a session.** Changing the master password
+and issuing a new recovery key both require proof of the current master password (or, for a
+password reset, of the recovery key), checked by the server. A stolen access token can read
+ciphertext for fifteen minutes; it cannot take the account's ways back in away from its owner.
+
 ### A5 — Stolen or shared device
 
 Physical access to an unlocked session.

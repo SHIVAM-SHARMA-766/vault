@@ -52,9 +52,8 @@ each one produced a symptom that pointed somewhere else:
 
 Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In order:
 
-1. **Client architecture** — router and feature modules, so later screens are additions.
-2. **Account settings** — change master password, rotate recovery key, recovery-key sign-in,
-   identity fingerprint. The API for all of it exists.
+1. ~~Client architecture~~ — done 2026-11-06.
+2. ~~Account settings~~ — done 2026-11-06.
 3. **Two-factor sign-in** — TOTP, server-enforced, with recovery codes.
 4. **Folders, entry-type fields, custom fields, password history** in the UI.
 5. **Import and export.**
@@ -80,6 +79,14 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Phase 1, steps 1 and 2.** The client is organised as `lib/` (API, session,
+router), `ui/` (kit, icons, the shared Shell with an account menu) and `features/` (auth,
+vault, admin, settings), with real addresses for every screen and navigation that never
+reloads. Account settings: change master password, issue a new recovery key, identity
+fingerprint, sign out everywhere; and recovery-key sign-in from the sign-in page, which sets a
+new master password. Rotating the recovery key now needs the current password, and a password
+can be reset with the recovery key's proof.
 
 **2026-11-06 — Business model decided: self-hosted.** Customers run Vault on their own
 servers ([0010](decisions/0010-self-hosted-product.md)); the roadmap now puts the installable,
