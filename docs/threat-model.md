@@ -204,6 +204,12 @@ sensitive is written to `localStorage`, `sessionStorage`, or IndexedDB. The cons
 that a page reload requires re-entering the master password, which is a deliberate trade
 against convenience.
 
+Import and export put plaintext on disk only when the user asks for it. Files picked for
+import are read in memory and never uploaded as they are. The encrypted export is the
+default; the plain CSV needs the master password (checked locally, by unwrapping the Vault
+Key) and an explicit acknowledgement, and both screens tell the user to delete the file.
+What happens to a downloaded file afterwards is outside Vault's control.
+
 ### A6 — Credential stuffing and brute force
 
 **With two-factor sign-in on** ([0011](../decisions/0011-two-factor-sign-in.md)), a correct

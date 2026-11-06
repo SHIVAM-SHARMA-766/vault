@@ -56,7 +56,7 @@ Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In ord
 2. ~~Account settings~~ — done 2026-11-06.
 3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
 4. ~~Folders, entry-type fields, custom fields, password history~~ — done 2026-11-06.
-5. **Import and export.**
+5. ~~Import and export~~ — done 2026-11-06.
 6. **Monitoring and alerting**, and the domain.
 
 Then phase 2, the self-hosted product: container image and Compose install, first-run setup,
@@ -79,6 +79,16 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Phase 1, step 5: import and export.** A new Import & export screen
+(`/app/import-export`, also in the account menu and the empty vault). Import reads Chrome /
+Edge / Brave, Firefox, Safari, Bitwarden (JSON and CSV), 1Password, LastPass, KeePass,
+Zoho Vault, our own encrypted export, and other CSVs by column name — parsed in the browser
+by `packages/core`, previewed with counts, duplicates (same name, username, site) skipped,
+folders recreated or reused, then sealed and sent in batches to a new never-overwrite route
+(`POST /api/vault/import`, 100 entries / 50 folders a call). Export is an encrypted file
+(own password, PBKDF2 → HKDF → AES-GCM, AAD `vault.export.v1`) by default, and a plain CSV in
+Bitwarden's layout behind a local master-password check and an explicit acknowledgement.
 
 **2026-11-06 — Phase 1, step 4: the full entry model.** Nested folders (create, rename,
 delete with contents moving up, filter including subfolders); every type has its own fields

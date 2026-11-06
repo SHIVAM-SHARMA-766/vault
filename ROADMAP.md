@@ -62,7 +62,7 @@ where it lands.
 | Recovery without the server | ◐ | ✓ (Emergency Kit) | ✓ (recovery key) | — |
 | Change master password / recovery login in the UI | ✓ | ✓ | ✓ | 1 |
 | Folders, password history, custom fields in the UI | ✓ | ✓ | ✓ | 1 |
-| Import from other managers, export | ✓ | ✓ | — | 1 |
+| Import from other managers, export | ✓ | ✓ | ✓ | 1 |
 | Password health (weak, reused, old) | ✓ | ✓ (Watchtower) | — | 1 |
 | Breach check without revealing passwords | ◐ | ✓ | — | 1 (decision needed) |
 | Two-factor sign-in for the account | ✓ | ✓ | ✓ TOTP | 1 |

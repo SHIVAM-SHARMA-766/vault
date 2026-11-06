@@ -91,6 +91,13 @@ The indirection through the Vault Key is what makes a master password change a *
 write**: re-derive the KEK, rewrap the Vault Key, store the new salt and verifier. Entries
 are untouched and history survives.
 
+**Exports** use a key of their own: PBKDF2 over a password the user picks at export time,
+then HKDF (`vault.export.key.v1`), sealing the items with AAD `vault.export.v1`. The file
+carries its salt and iteration count, so it opens on any Vault server with only that password
+and is unrelated to the account's keys. Imports happen in the browser: a file is parsed by
+`packages/core`, sealed under the Vault Key, and sent to `POST /api/vault/import`, which only
+creates and never overwrites.
+
 The recovery key has a second branch of its own, `vault.recovery.auth.v1`, so it can prove
 itself to the server without revealing the branch that unwraps the vault. Recovery happens
 exactly when the master password is gone, so the usual Auth Key cannot be produced.
@@ -183,7 +190,7 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 |---|---|
 | `packages/crypto/` | Key derivation, wrapping, entry encryption, TOTP. Zero third-party dependencies |
 | `packages/crypto/vectors/` | Test vectors from RFC 6070, RFC 5869, RFC 4231, NIST, RFC 6238 |
-| `packages/core/` | Shared by every client, no UI, no dependencies: the item model (what each entry type holds, folder trees, search) and QR encoding; import/export next |
+| `packages/core/` | Shared by every client, no UI, no dependencies: the item model (what each entry type holds, folder trees, search), import parsers for other managers' files, CSV export, and QR encoding |
 | `services/api/` | The API, and the storage adapters behind one interface |
 | `apps/web/` | The vault client, served at `/app/`, and the Caddyfile. `src/lib` (API client, session, router), `src/ui` (kit, icons, Shell), `src/features/{auth,vault,settings,admin}` |
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
