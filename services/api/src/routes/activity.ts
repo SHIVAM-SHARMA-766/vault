@@ -17,6 +17,7 @@ export type ActivityKind =
   | 'recovery-login'
   | 'change-password'
   | 'rotate-recovery-key'
+  | 'enrol-identity'
 
 const RETENTION_SECONDS = 90 * 24 * 60 * 60
 

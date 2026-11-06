@@ -12,9 +12,14 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:stack": "node scripts/dev-stack.mjs",
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/"
   },
   "engines": {
     "node": ">=20.11"
+  },
+  "devDependencies": {
+    "playwright-core": "1.55.0"
   }
 }

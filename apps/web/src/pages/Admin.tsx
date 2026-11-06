@@ -63,7 +63,7 @@ export function Admin({ state, onClose }: { state: session.Unlocked; onClose: ()
             <span className="account-avatar">{state.email[0]?.toUpperCase()}</span>
             <span className="account-email hide-md">{state.email}</span>
           </div>
-          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault">
+          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault" aria-label="Lock vault">
             <IconLock size={16} /><span className="hide-sm">Lock</span>
           </button>
         </div>

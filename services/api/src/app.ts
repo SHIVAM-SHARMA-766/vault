@@ -36,6 +36,7 @@ export function buildRouter(app: App): Router {
   router.get('/api/auth/me', authed((u) => auth.me(app, u)))
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)))
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)))
+  router.put('/api/keys/identity', authed((u, e) => auth.setIdentity(app, u, e)))
 
   router.get('/api/vault', authed((u) => vault.getVault(app, u)))
   router.put('/api/vault/entries/:id', authed((u, e, id) => vault.putEntry(app, u, e, id)))

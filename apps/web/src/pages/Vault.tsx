@@ -17,6 +17,7 @@ import {
 } from '../icons.js'
 import { CopyButton, Generator, Monogram, StrengthMeter, TYPES, typeInfo, useToast } from '../ui.js'
 import { Admin } from './Admin.js'
+import { newIdentity } from '../identity.js'
 
 interface Decrypted extends EntryContent {
   id: string
@@ -51,6 +52,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
       try {
         const me = await api.me(await session.token())
         session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions })
+        // Accounts from before identity keys get one now, quietly. Nothing
+        // uses it yet; sharing will, and every account must have one by then.
+        if (!me.identity) {
+          try {
+            await api.setIdentity(await session.token(), await newIdentity(state.vaultKey))
+          } catch { /* tried again on the next unlock */ }
+        }
       } catch { /* the vault still works; the admin entry just stays hidden */ }
     })()
   }, [])
@@ -196,7 +204,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <span className="account-avatar">{state.email[0]?.toUpperCase()}</span>
             <span className="account-email hide-md">{state.email}</span>
           </div>
-          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault">
+          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault" aria-label="Lock vault">
             <IconLock size={16} /><span className="hide-sm">Lock</span>
           </button>
         </div>

@@ -82,6 +82,11 @@ Master Password + per-user salt
         └── encrypts every entry field, AES-256-GCM, fresh 96-bit IV
 ```
 
+Each account also has an **identity key pair** (ECDH P-256): the public key in the clear on the
+profile, the private key sealed under the Vault Key. It is what sharing will use to hand a
+collection key to a colleague without the server learning it
+([0009](decisions/0009-identity-keys-and-sharing.md)).
+
 The indirection through the Vault Key is what makes a master password change a **single
 write**: re-derive the KEK, rewrap the Vault Key, store the new salt and verifier. Entries
 are untouched and history survives.
@@ -184,7 +189,8 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `services/backup/` | The daily export and its systemd timer |
 | `services/release/` | The host's pull agent and its systemd timer |
 | `scripts/` | `release.sh` ships code (CI runs it on merge); `setup-ci.sh` creates the CI identity; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
-| `.github/workflows/` | `ci.yml` tests every change; `release.yml` publishes every merge to `main` |
+| `.github/workflows/` | `ci.yml` tests every change, including browser tests; `release.yml` publishes every merge to `main` |
+| `tests/e2e/` | Browser tests: a real Chrome against `scripts/dev-stack.mjs` |
 | `infra/` | Terraform for the instance, the database, both buckets, IAM, and the network |
 | `decisions/` | Architecture decision records |
 | `docs/` | Threat model and runbook |

@@ -2,6 +2,8 @@ import { useState } from 'react'
 
 import { createAccount, deriveRecoveryProof } from '@vault/crypto'
 
+import { newIdentity } from '../identity.js'
+
 import { ApiError, api } from '../api.js'
 import * as session from '../session.js'
 import { IconAlert, IconArrowLeft } from '../icons.js'
@@ -42,6 +44,9 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
       // a key it cannot unwrap.
       const account = await createAccount(password)
       const recoveryProof = await deriveRecoveryProof(account.recoveryKey)
+      // The key pair other people will share with. Made here, with the vault
+      // key, so every new account has one from the start.
+      const identity = await newIdentity(account.vaultKey)
 
       const result = await api.register({
         email,
@@ -51,6 +56,7 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
         wrappedVaultKey: account.wrappedVaultKey,
         wrappedVaultKeyForRecovery: account.wrappedVaultKeyForRecovery,
         ...(inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
+        identity,
       })
 
       // Shown once. It is never transmitted and cannot be recovered from the

@@ -95,6 +95,19 @@ export {
 } from './entry.js'
 
 export {
+  IDENTITY_VERSION,
+  PUBLIC_KEY_BYTES,
+  type IdentityKeyPair,
+  generateIdentityKeyPair,
+  identityFingerprint,
+  isValidPublicKey,
+  openFromSender,
+  sealForRecipient,
+  unwrapIdentityPrivateKey,
+  wrapIdentityPrivateKey,
+} from './identity.js'
+
+export {
   TOTP_DEFAULTS,
   type ParsedOtpauth,
   type TotpAlgorithm,

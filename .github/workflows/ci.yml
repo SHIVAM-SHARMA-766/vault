@@ -98,6 +98,11 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # The API imports @vault/crypto (identity-key validation), whose types
+      # are its compiled output; a clean runner has none until this runs.
+      - name: Build the crypto package
+        run: npm run build --workspace @vault/crypto
+
       - name: Typecheck
         run: npm run typecheck --workspace @vault/api
 
@@ -202,6 +207,30 @@ jobs:
       # defaults that do not satisfy the content schema.
       - name: Render and check
         run: npm run build --workspace @vault/site
+
+  e2e:
+    name: e2e — the product in a real browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      # Everything the dev stack serves: the API, the client, the site.
+      - name: Build
+        run: npm run build
+
+      # Starts scripts/dev-stack.mjs per test and drives the runner's own
+      # Chrome through sign-up, the vault, roles and website publishing, under
+      # the Content-Security-Policy from the Caddyfile.
+      - name: Browser tests
+        run: npm run test:e2e
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
 
   audit:
     name: dependency audit

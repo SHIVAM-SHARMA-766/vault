@@ -28,6 +28,8 @@ someone who would otherwise assume it was an oversight.
 | [0006](0006-admin-panel.md) | An admin panel that cannot read the vault |
 | [0007](0007-roles-and-site-editing.md) | Staff roles, and a website edited from the admin panel |
 | [0008](0008-release-pipeline.md) | Releases are published by CI on every merge to main |
+| [0009](0009-identity-keys-and-sharing.md) | Identity keys, and the shape sharing will take |
+| [0010](0010-self-hosted-product.md) | Vault is a product customers run on their own servers |
 
 ## A note on the numbering
 

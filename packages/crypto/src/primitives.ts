@@ -4,7 +4,8 @@
 // Web Crypto is reached through `globalThis.crypto.subtle`, which resolves to
 // the browser's implementation in a page and to Node's in the API and in tests.
 
-const subtle = (): SubtleCrypto => {
+/** @internal Shared with identity.ts; not part of the package surface. */
+export const subtle = (): SubtleCrypto => {
   const s = globalThis.crypto?.subtle
   if (!s) throw new Error('Web Crypto is unavailable in this environment')
   return s
@@ -12,7 +13,8 @@ const subtle = (): SubtleCrypto => {
 
 /** A view whose backing buffer is a plain ArrayBuffer, which is what Web Crypto
  *  accepts. Copying also detaches the result from any caller-held buffer. */
-function buf(bytes: Uint8Array): ArrayBuffer {
+/** @internal */
+export function buf(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }
 
