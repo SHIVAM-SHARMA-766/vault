@@ -43,8 +43,12 @@ Four documents, in the order worth reading them:
 | [decisions/0006](decisions/0006-admin-panel.md) | What the admin panel can and cannot do |
 | [decisions/0007](decisions/0007-roles-and-site-editing.md) | Staff roles, and editing the website safely on the vault's origin |
 | [decisions/0008](decisions/0008-release-pipeline.md) | Merging to main publishes a release, and what that trusts |
+| [decisions/0009](decisions/0009-identity-keys-and-sharing.md) | Identity keys, and how sharing will work |
+| [decisions/0010](decisions/0010-self-hosted-product.md) | Why customers run Vault on their own servers, and what that commits the product to |
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes the system those add up to.
+[ROADMAP.md](ROADMAP.md) says where it is going: a zero-knowledge password manager for teams,
+that organizations install and run on their own servers.
 [docs/threat-model.md](docs/threat-model.md) says who the adversaries are and which risks
 are accepted rather than mitigated. [docs/runbook.md](docs/runbook.md) covers deploying it
 and what to do when something breaks.
@@ -103,7 +107,10 @@ the runbook.
 
 ```sh
 npm install
-npm test        # 175 tests across the crypto package and the API
+npm test             # 190 tests across the crypto package and the API
+npm run build
+npm run dev:stack    # the whole product on http://localhost:8080, in memory
+npm run test:e2e     # browser tests against it (needs Chrome)
 ```
 
 The API's tests run against an in-memory store, so no cloud account is needed for any of

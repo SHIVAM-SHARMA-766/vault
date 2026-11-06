@@ -167,6 +167,29 @@ page's text is not editable.
 What remains is defacement: misleading text or images on the public site. It is audited,
 and any earlier version can be made live again in one click.
 
+### A12 — A compromised release (the vendor's supply chain)
+
+Vault is installed and run by customers on their own servers
+([0010](../decisions/0010-self-hosted-product.md)). Every install runs code this project
+builds, so an attacker who can alter a release — through the repository, the CI pipeline, a
+dependency, or the registry it is published to — reaches every customer at once, and a
+modified client sees master passwords.
+
+Controls today: CI builds from `main` with a committed lockfile (`npm ci`), a dependency audit
+on every change, and a crypto package with no dependencies at all. Planned for phase 2 and
+required before the first customer install: signed releases verified by the installer and the
+update path, an SBOM per release, reproducible builds, and a published disclosure policy.
+
+### A11 — Public-key substitution (applies once sharing exists)
+
+The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).
+A hostile server could hand out a key it controls in place of a colleague's, and receive
+whatever is shared to "them". Nothing is shared today, so this does not yet apply.
+
+Controls, designed for phase 3 (teams): a public key cannot be replaced once set (enforced now); a
+member joining an organization is sealed to only after an admin confirms their fingerprint;
+fingerprints are shown to both people so they can be compared out of band.
+
 ### A5 — Stolen or shared device
 
 Physical access to an unlocked session.

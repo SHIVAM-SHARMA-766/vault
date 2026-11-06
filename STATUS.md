@@ -50,15 +50,21 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-1. **`prevent_destroy` on the MySQL DB system.** The NoSQL table it replaced had it; the
-   database does not, so a stray `terraform destroy` deletes the vault.
-2. **Remove the AWS resources** left standing from the first deployment. The personal AWS
-   credentials in creds are no longer valid, so this needs new keys first.
-3. **Sign releases**, if anyone besides the operator ever gets write access to the
-   releases bucket ([0005](decisions/0005-pull-based-releases.md)).
+Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In order:
 
-Later: the Android client, and a browser-extension client — the only way to close A3
-without a domain, since its code would not be served by the hostname.
+1. **Client architecture** — router and feature modules, so later screens are additions.
+2. **Account settings** — change master password, rotate recovery key, recovery-key sign-in,
+   identity fingerprint. The API for all of it exists.
+3. **Two-factor sign-in** — TOTP, server-enforced, with recovery codes.
+4. **Folders, entry-type fields, custom fields, password history** in the UI.
+5. **Import and export.**
+6. **Monitoring and alerting**, and the domain.
+
+Then phase 2, the self-hosted product: container image and Compose install, first-run setup,
+PostgreSQL, migrations, backups to any S3-compatible store, signed releases.
+
+Carried over: remove the AWS resources (needs new personal AWS keys); sign releases if anyone
+else gets write access to `main` or the releases bucket.
 
 ## Open questions
 
@@ -74,6 +80,15 @@ without a domain, since its code would not be served by the hostname.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-06 — Business model decided: self-hosted.** Customers run Vault on their own
+servers ([0010](decisions/0010-self-hosted-product.md)); the roadmap now puts the installable,
+signed package (phase 2) before teams (phase 3) and the extension (phase 4).
+
+**2026-11-06 — Phase 0, the foundation.** Identity key pairs on every account, with the
+sharing model designed ([0009](decisions/0009-identity-keys-and-sharing.md)); a one-command
+local stack; browser tests in CI; `prevent_destroy` on the database; [ROADMAP.md](ROADMAP.md)
+for teams, with the browser extension as the next client.
 
 **2026-11-06 — Release pipeline.** Every merge to `main` is published by GitHub Actions as
 `vault-ci`, an OCI user that can write the releases bucket and nothing else

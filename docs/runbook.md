@@ -264,6 +264,20 @@ Owners are the addresses in `ADMIN_EMAILS`. Everyone else's role is set by an ow
 **Users** (the Role column), or carried by an invitation created with **Starts as**. Roles take
 effect on the next request. See the table in [0007](../decisions/0007-roles-and-site-editing.md).
 
+## Developing locally
+
+```sh
+npm install
+npm run build
+npm run dev:stack          # http://localhost:8080 — API, client, site; in-memory, no cloud
+npm test                   # unit and API tests
+npm run test:e2e           # browser tests against a dev stack (needs Chrome; CHROME_PATH)
+```
+
+The dev stack signs nothing up for you: register `owner@example.test` (or `OWNER_EMAIL`) to get
+the owner role. Data is gone when the process stops. It serves with the same
+Content-Security-Policy as production, read from `apps/web/Caddyfile`.
+
 ## Rotating the host key
 
 The public key is instance metadata, so changing it replaces the instance — everything
@@ -394,7 +408,9 @@ server cannot help; that is the design working, not a failure. See
 
 ## Tearing it down
 
-**Nothing currently stops `terraform destroy` from deleting the database.** The NoSQL
-table this replaced carried `prevent_destroy`; `oci_mysql_mysql_db_system.vault` in
-`infra/mysql.tf` does not. Take an export and confirm it is in the bucket before any
-destroy, and treat adding `prevent_destroy` back as open work.
+The MySQL DB system carries `prevent_destroy`, so `terraform destroy` — or any change that
+would replace it — stops at plan time. That is deliberate: it is the vault.
+
+To genuinely remove it, take an export and confirm it is in the bucket, then remove
+`prevent_destroy` from `infra/mysql.tf`, apply, and only then destroy. Three deliberate steps,
+which is the point.
