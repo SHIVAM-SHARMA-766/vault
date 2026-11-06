@@ -39,7 +39,7 @@ import {
   verifyToken,
 } from '../tokens.js'
 import { hashAuthKey, verifyAuthKey } from '../verifier.js'
-import { type KdfParams, requireBase64UrlBytes, requireEmail, requireKdf, requireSealed } from '../validate.js'
+import { type KdfParams, requireBase64UrlBytes, requireEmail, requireIdentity, requireKdf, requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
 import { isStaff, permissionsOf, roleFromDigest } from '../roles.js'
 import {
@@ -60,6 +60,10 @@ interface Profile extends Item {
   recoveryVerifier: string
   wrappedVaultKey: string
   wrappedVaultKeyForRecovery: string
+  /** The account's identity key pair (decisions/0009). Absent on accounts
+   *  created before identity keys existed until their next unlock enrols one. */
+  publicKey?: string
+  wrappedPrivateKey?: string
   createdAt: string
   updatedAt: string
 }
@@ -145,6 +149,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   const wrappedForRecovery = requireSealed(
     body['wrappedVaultKeyForRecovery'], 'wrappedVaultKeyForRecovery', 4096,
   )
+  const identity = body['identity'] === undefined ? undefined : await requireIdentity(body['identity'])
 
   const digest = emailDigest(email, app.config.pepper)
   const userId = randomUUID()
@@ -188,6 +193,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     userId, emailDigest: digest, kdf,
     authVerifier, recoveryVerifier,
     wrappedVaultKey, wrappedVaultKeyForRecovery: wrappedForRecovery,
+    ...(identity ? { publicKey: identity.publicKey, wrappedPrivateKey: identity.wrappedPrivateKey } : {}),
     createdAt: at, updatedAt: at,
   }
   await app.store.put(profile)
@@ -307,7 +313,30 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     role,
     isAdmin: isStaff(role),
     permissions: permissionsOf(role),
+    identity: profile.publicKey && profile.wrappedPrivateKey
+      ? { publicKey: profile.publicKey, wrappedPrivateKey: profile.wrappedPrivateKey }
+      : null,
   })
+}
+
+/** Enrols an identity key pair on an account that has none. Once set it is
+ *  not replaced here: a silent swap of someone's public key is exactly the
+ *  attack sharing has to resist, so rotation, when it exists, will be its own
+ *  deliberate flow that re-shares and is audited. */
+export async function setIdentity(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<Record<string, unknown>>(event)
+  const identity = await requireIdentity(body)
+  const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
+  if (!profile) throw unauthorized()
+  if (profile.publicKey) throw conflict('This account already has an identity key.')
+  await app.store.put({
+    ...profile,
+    publicKey: identity.publicKey,
+    wrappedPrivateKey: identity.wrappedPrivateKey,
+    updatedAt: new Date(app.now()).toISOString(),
+  })
+  await recordActivity(app, userId, 'enrol-identity', event)
+  return json(200, { ok: true })
 }
 
 /** Change the master password.

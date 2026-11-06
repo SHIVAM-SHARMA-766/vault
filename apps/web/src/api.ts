@@ -103,7 +103,12 @@ export const api = {
     wrappedVaultKey: string
     wrappedVaultKeyForRecovery: string
     inviteCode?: string
+    identity?: Identity
   }) => request<Session & { userId: string }>('POST', '/api/auth/register', { body }),
+
+  /** Enrol an identity key pair on an account that has none (decisions/0009). */
+  setIdentity: (token: string, identity: Identity) =>
+    request<{ ok: true }>('PUT', '/api/keys/identity', { token, body: identity }),
 
   login: (email: string, authKey: string) =>
     request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(
@@ -122,7 +127,7 @@ export const api = {
     request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { refreshToken } }),
 
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[] }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -183,6 +188,8 @@ export const api = {
 }
 
 export type RegistrationMode = 'closed' | 'invite' | 'open'
+/** Public key in the clear (base64url, 65 bytes); private key sealed under the vault key. */
+export interface Identity { publicKey: string; wrappedPrivateKey: string }
 export type Role = 'owner' | 'admin' | 'marketing' | 'viewer' | 'user'
 export type Permission =
   | 'overview.read' | 'users.read' | 'users.write' | 'roles.write' | 'invites.read' | 'invites.write'

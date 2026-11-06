@@ -1,3 +1,5 @@
+import { PUBLIC_KEY_BYTES, isValidPublicKey } from '@vault/crypto'
+
 import { badRequest, tooLarge } from './http.js'
 
 /** Generous, because the address is only ever used to derive a digest — this
@@ -37,6 +39,27 @@ export function requireSealed(value: unknown, field: string, maxBytes = 380 * 10
     throw tooLarge(`${field} exceeds the maximum size of ${Math.floor(maxBytes / 1024)} KB.`)
   }
   return value
+}
+
+export interface Identity {
+  publicKey: string
+  wrappedPrivateKey: string
+}
+
+/** An account's identity key pair, as the client sends it: the public key in
+ *  the clear and the private key sealed under the vault key, which the server
+ *  cannot open. The public key is checked to be a real point on P-256, so a
+ *  malformed key is refused here rather than breaking someone's share later.
+ *  See decisions/0009. */
+export async function requireIdentity(value: unknown): Promise<Identity> {
+  if (!value || typeof value !== 'object') throw badRequest('identity must be an object.')
+  const v = value as Record<string, unknown>
+  const publicKey = requireBase64UrlBytes(v['publicKey'], PUBLIC_KEY_BYTES, 'identity.publicKey')
+  if (!(await isValidPublicKey(new Uint8Array(Buffer.from(publicKey, 'base64url'))))) {
+    throw badRequest('identity.publicKey is not a valid P-256 public key.')
+  }
+  const wrappedPrivateKey = requireSealed(v['wrappedPrivateKey'], 'identity.wrappedPrivateKey', 1024)
+  return { publicKey, wrappedPrivateKey }
 }
 
 export interface KdfParams {
