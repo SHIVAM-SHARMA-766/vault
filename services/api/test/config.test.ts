@@ -46,3 +46,14 @@ test('docs/configuration.md lists every variable', () => {
   const doc = readFileSync(join(process.cwd(), '../../docs/configuration.md'), 'utf8')
   for (const v of VARIABLES) assert.ok(doc.includes(`\`${v.name}\``), `${v.name} is not documented`)
 })
+
+test('only server.ts knows which database is behind the Store interface', async () => {
+  const { readdirSync } = await import('node:fs')
+  const src = join(process.cwd(), 'src')
+  const files = [...readdirSync(src).map((f) => f), ...readdirSync(join(src, 'routes')).map((f) => `routes/${f}`)]
+    .filter((f) => f.endsWith('.ts') && f !== 'store-mysql.ts' && f !== 'server.ts')
+  for (const f of files) {
+    const text = readFileSync(join(src, f), 'utf8')
+    assert.ok(!/store-mysql|mysql2|\b(SELECT|INSERT|UPDATE|DELETE)\s+(\*|INTO|FROM|\w+\s+SET)/.test(text), `${f} reaches past the Store interface`)
+  }
+})
