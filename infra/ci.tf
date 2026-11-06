@@ -15,6 +15,15 @@
 # straight into a GitHub Actions secret and is never written to this repository
 # or to Terraform state. With no ci.pub.pem, no CI user exists.
 
+# Identity-domain tenancies require a primary email on every user, even one
+# that only ever signs requests with an API key. A plus-address keeps it
+# unique and delivers anything the identity service sends to the operator.
+variable "ci_user_email" {
+  description = "Primary email for the CI user. Required by identity-domain tenancies; it never signs in."
+  type        = string
+  default     = "developer.shivamsharma+vault-ci@gmail.com"
+}
+
 locals {
   ci_public_key = fileexists("${path.module}/ci.pub.pem") ? trimspace(file("${path.module}/ci.pub.pem")) : ""
   ci_enabled    = local.ci_public_key != ""
@@ -25,6 +34,7 @@ resource "oci_identity_user" "ci" {
   compartment_id = var.tenancy_ocid
   name           = "${local.name}-ci"
   description    = "GitHub Actions: publishes releases to the releases bucket, nothing else."
+  email          = var.ci_user_email
   freeform_tags  = var.default_tags
 }
 

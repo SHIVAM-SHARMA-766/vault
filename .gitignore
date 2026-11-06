@@ -12,6 +12,9 @@ build/
 .env.*
 !.env.example
 *.pem
+# The CI user's public key is public and must be committed: Terraform reads it
+# on every apply (infra/ci.tf). Its private half lives only in GitHub.
+!infra/ci.pub.pem
 *.key
 *.keystore
 
