@@ -31,7 +31,9 @@ export interface Unlocked {
 }
 
 /** Updates fields of the unlocked state without touching the keys. */
-export function patch(fields: Partial<Pick<Unlocked, 'userId' | 'isAdmin' | 'role' | 'permissions'>>): void {
+export function patch(fields: Partial<Pick<Unlocked,
+  'userId' | 'isAdmin' | 'role' | 'permissions' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
+>>): void {
   if (!current) return
   current = { ...current, ...fields }
   notify()

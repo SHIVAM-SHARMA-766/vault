@@ -51,6 +51,7 @@ export async function start({ owner = 'owner@example.test' } = {}) {
     return page
   }
 
+  /** Signs up; returns the recovery key shown once. */
   async function register(page, email, inviteCode) {
     await page.goto(`${base}/app/`)
     await page.getByRole('button', { name: 'Create an account' }).click()
@@ -60,16 +61,24 @@ export async function start({ owner = 'owner@example.test' } = {}) {
     await page.fill('#r-confirm', PASSWORD)
     await page.click('button[type=submit]')
     await page.waitForSelector('.recovery-key', { timeout: 60_000 })
+    const recoveryKey = (await page.textContent('.recovery-key code'))?.trim()
     await page.check('.check input')
     await page.getByRole('button', { name: 'Continue to sign in' }).click()
     await unlock(page, email)
+    return recoveryKey
   }
 
-  async function unlock(page, email) {
+  async function unlock(page, email, password = PASSWORD) {
     await page.fill('#email', email)
-    await page.fill('#password', PASSWORD)
+    await page.fill('#password', password)
     await page.click('button[type=submit]')
     await page.waitForSelector('.topbar', { timeout: 60_000 })
+  }
+
+  /** Opens a screen from the account menu (Vault, Account settings, Admin panel). */
+  async function menu(page, item) {
+    await page.getByRole('button', { name: 'Account menu' }).click()
+    await page.getByRole('menuitem', { name: item }).click()
   }
 
   const setRegistration = (open) => fetch(`${base}/__dev/registration?open=${open ? 1 : 0}`, { method: 'POST' })
@@ -79,5 +88,5 @@ export async function start({ owner = 'owner@example.test' } = {}) {
     stack.kill()
   }
 
-  return { base, person, register, unlock, setRegistration, errors, stop }
+  return { base, person, register, unlock, menu, setRegistration, errors, stop }
 }

@@ -17,14 +17,16 @@ import {
   type RegistrationMode,
   type Role,
   api,
-} from '../api.js'
+} from '../../lib/api.js'
 import { Website } from './Website.js'
-import * as session from '../session.js'
+import * as session from '../../lib/session.js'
 import {
-  IconAlert, IconArrowLeft, IconCheck, IconEdit, IconGlobe, IconGrid, IconKey, IconLock, IconNote,
+  IconAlert, IconCheck, IconEdit, IconGlobe, IconGrid, IconKey, IconNote,
   IconPlus, IconRefresh, IconShield, IconTrash, IconUser, IconX,
-} from '../icons.js'
-import { CopyButton, VaultLink, useToast } from '../ui.js'
+} from '../../ui/icons.js'
+import { CopyButton, useToast } from '../../ui/kit.js'
+import { Shell } from '../../ui/Shell.js'
+import { Link, href, navigate } from '../../lib/router.js'
 
 type Tab = 'overview' | 'website' | 'users' | 'invites' | 'audit'
 
@@ -47,27 +49,16 @@ const ROLE_HELP: Record<Role, string> = {
   user: 'No admin access.',
 }
 
-export function Admin({ state, onClose }: { state: session.Unlocked; onClose: () => void }) {
+export function Admin({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
   const perms = new Set<Permission>(state.permissions ?? [])
   const tabs = TABS.filter((t) => perms.has(t.needs))
-  const [tab, setTab] = useState<Tab>(tabs[0]?.id ?? 'overview')
+  // The tab is part of the address (/app/admin/users), so reload and back work.
+  const tab: Tab = tabs.find((t) => t.id === requested)?.id ?? tabs[0]?.id ?? 'overview'
+  const setTab = (t: Tab) => navigate(href({ name: 'admin', tab: t }))
   const role: Role = state.role ?? 'user'
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand"><span className="brand-mark"><IconShield size={18} /></span>Vault <span className="admin-tag">{ROLE_LABELS[role]}</span></div>
-        <div className="topbar-actions">
-          <button className="btn btn-secondary" onClick={onClose}><IconArrowLeft size={16} /><span className="hide-sm">Back to vault</span></button>
-          <div className="account" title={state.email}>
-            <span className="account-avatar">{state.email[0]?.toUpperCase()}</span>
-            <span className="account-email hide-md">{state.email}</span>
-          </div>
-          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault" aria-label="Lock vault">
-            <IconLock size={16} /><span className="hide-sm">Lock</span>
-          </button>
-        </div>
-      </header>
+    <Shell state={state} tag={ROLE_LABELS[role]}>
 
       <div className="admin-layout">
         <nav className="sidebar" aria-label="Admin sections">
@@ -95,7 +86,7 @@ export function Admin({ state, onClose }: { state: session.Unlocked; onClose: ()
           {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
         </main>
       </div>
-    </div>
+    </Shell>
   )
 }
 
@@ -122,7 +113,7 @@ function Section({ title, sub, actions, children }: { title: string; sub?: strin
       <div className="admin-head">
         <div>
           <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
-            <li><VaultLink>Vault</VaultLink></li>
+            <li><Link to="/app/">Vault</Link></li>
             <li>Admin</li>
             <li aria-current="page">{title}</li>
           </ol>

@@ -22,7 +22,7 @@ test('roles see what they should, and a marketing edit goes live escaped', async
     const owner = await s.person()
     await s.register(owner, 'owner@example.test')
     await s.setRegistration(false)
-    await owner.getByRole('button', { name: 'Admin' }).click()
+    await s.menu(owner, 'Admin panel')
     await owner.waitForSelector('.stats')
     await owner.getByRole('radio', { name: 'Invite only' }).click()
     const marketingCode = await invite(owner, 'SEO agency', 'marketing')
@@ -40,7 +40,7 @@ test('roles see what they should, and a marketing edit goes live escaped', async
 
     const seo = await s.person()
     await s.register(seo, 'seo@example.test', marketingCode)
-    await seo.getByRole('button', { name: 'Admin' }).click()
+    await s.menu(seo, 'Admin panel')
     await seo.waitForSelector('.site-editor')
     const seoTabs = await seo.locator('.sidebar .side-item span').allTextContents()
     assert.deepEqual(seoTabs, ['Website'])
@@ -56,7 +56,7 @@ test('roles see what they should, and a marketing edit goes live escaped', async
 
     const viewer = await s.person()
     await s.register(viewer, 'investor@example.test', viewerCode)
-    await viewer.getByRole('button', { name: 'Admin' }).click()
+    await s.menu(viewer, 'Admin panel')
     await viewer.waitForSelector('.stats')
     await viewer.getByRole('button', { name: 'Website' }).first().click()
     await viewer.waitForSelector('.site-editor')
