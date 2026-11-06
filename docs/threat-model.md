@@ -104,6 +104,13 @@ the code browsers run. The host itself can only read it; write access belongs to
 operator's OCI user alone, and that user's API key is therefore as sensitive as the DuckDNS
 account. The SHA-256 manifest guards against corruption, not against a writer.
 
+**And a third: `main`.** Since [0008](../decisions/0008-release-pipeline.md) every push to
+`main` is published by GitHub Actions as `vault-ci`, which can write the releases bucket.
+Whoever can push to `main`, take over the GitHub account, or read the repository's Actions
+secrets can therefore publish code. Two-factor authentication on GitHub carries the same
+weight as on DuckDNS; the CI key is limited to that one bucket, so a leak of it is bounded to
+publishing a release.
+
 This is accepted knowingly. It is the reason
 [0003](../decisions/0003-running-everything-on-oci.md) keeps buying a domain on the table
 as the cheapest available security improvement, and it is the strongest argument for the
@@ -222,6 +229,7 @@ mistakes silence for coverage.
 |---|---|
 | **The dynamic-DNS name is the entire user-facing trust path (A3).** Whoever controls it can serve modified client code and obtain the master password | Buying a domain removes it for roughly ₹800 a year and remains the cheapest security improvement available. Re-confirmed 2026-11-06: accepted until a domain is bought, and stated on the public security page |
 | **Write access to the releases bucket is equivalent to A3.** Releases are hashed, not signed | One person holds write access. Signing releases with a key the host trusts is the step to take if that ever changes |
+| **Push access to `main` is equivalent to A3** (0008). No branch protection or required approval | Not available for private repositories on the free plan. One collaborator, two-factor authentication, and a CI key limited to one bucket |
 | Structural metadata leaks from a database dump — account count, entries per account, creation and modification times | Closing it requires the single-row model rejected in [0002](../decisions/0002-storage-and-data-model.md) |
 | Browser-delivered crypto is inherently weaker than a native client (A3) | Mitigated by CSP and SRI; the native Android client is the structural answer and is on the roadmap |
 | PBKDF2 rather than Argon2id | Avoids a WebAssembly dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |

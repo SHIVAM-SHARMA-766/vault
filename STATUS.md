@@ -75,6 +75,11 @@ without a domain, since its code would not be served by the hostname.
 
 ## Recently done
 
+**2026-11-06 — Release pipeline.** Every merge to `main` is published by GitHub Actions as
+`vault-ci`, an OCI user that can write the releases bucket and nothing else
+([0008](decisions/0008-release-pipeline.md)). Needs `scripts/setup-ci.sh` once, and
+`deploy.sh` before the first merge that carries the website editor.
+
 **2026-11-06 — Staff roles and website editing.** Owner, admin, marketing and viewer
 roles, granted by the owner or carried by an invitation. The public site's text, search
 details, images and an announcement banner are edited in the admin panel, drafted,

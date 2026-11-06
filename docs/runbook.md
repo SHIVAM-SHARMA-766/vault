@@ -180,7 +180,11 @@ makes this whole section moot.
 ## Deploying code
 
 Code ships as a release the host pulls for itself ([0005](../decisions/0005-pull-based-releases.md)).
-No SSH, no Terraform:
+**Normally that is automatic: merging to `main` runs `.github/workflows/release.yml`**, which
+runs `release.sh` as the `vault-ci` user ([0008](../decisions/0008-release-pipeline.md)). The
+Actions tab shows each run, and **Run workflow** there publishes `main` again by hand.
+
+By hand from a machine with OCI credentials, the same script:
 
 ```sh
 ./scripts/release.sh --dry-run    # build, test and list what would ship; uploads nothing
@@ -202,6 +206,19 @@ journalctl -u vault-pull -n 50 --no-pager     # what happened
 cat /srv/vault/releases/installed /srv/vault/releases/failed
 sudo systemctl start vault-pull.service       # check now instead of waiting
 ```
+
+### Setting up the pipeline
+
+Once, and again to rotate the key:
+
+```sh
+./scripts/setup-ci.sh       # creates vault-ci (infra/ci.tf), sets five GitHub secrets
+git add infra/ci.pub.pem && git commit -m "Add the CI user's public key"
+```
+
+The secrets are `OCI_PRIVATE_KEY`, `OCI_USER_OCID`, `OCI_FINGERPRINT`, `OCI_TENANCY_OCID`
+and `OCI_REGION`. The private key exists only in GitHub after this. To revoke CI entirely,
+delete `infra/ci.pub.pem` and apply: Terraform removes the user, its key and its policy.
 
 ### Setting up the host
 

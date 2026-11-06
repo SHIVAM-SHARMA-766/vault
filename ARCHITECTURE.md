@@ -99,8 +99,11 @@ manifest — to `vault-releases` and points the `current` object at it. On the h
 the Caddyfile, installs, checks the service through Caddy, and reinstalls the previous
 release if anything fails. Nothing inbound is involved; SSH stays closed.
 
-Write access to that bucket decides what browsers run, so it carries the same weight as the
-hostname (A3). The host can only read it.
+Releases are published by GitHub Actions on every merge to `main`
+([0008](decisions/0008-release-pipeline.md)), as `vault-ci`, an OCI user that can write the
+releases bucket and nothing else. Write access to that bucket — and so push access to
+`main` — decides what browsers run, so it carries the same weight as the hostname (A3). The
+host can only read it.
 
 ## The website
 
@@ -180,7 +183,8 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
 | `services/backup/` | The daily export and its systemd timer |
 | `services/release/` | The host's pull agent and its systemd timer |
-| `scripts/` | `release.sh` ships code; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
+| `scripts/` | `release.sh` ships code (CI runs it on merge); `setup-ci.sh` creates the CI identity; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
+| `.github/workflows/` | `ci.yml` tests every change; `release.yml` publishes every merge to `main` |
 | `infra/` | Terraform for the instance, the database, both buckets, IAM, and the network |
 | `decisions/` | Architecture decision records |
 | `docs/` | Threat model and runbook |

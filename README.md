@@ -42,6 +42,7 @@ Four documents, in the order worth reading them:
 | [decisions/0005](decisions/0005-pull-based-releases.md) | How code reaches the host without SSH |
 | [decisions/0006](decisions/0006-admin-panel.md) | What the admin panel can and cannot do |
 | [decisions/0007](decisions/0007-roles-and-site-editing.md) | Staff roles, and editing the website safely on the vault's origin |
+| [decisions/0008](decisions/0008-release-pipeline.md) | Merging to main publishes a release, and what that trusts |
 
 [ARCHITECTURE.md](ARCHITECTURE.md) describes the system those add up to.
 [docs/threat-model.md](docs/threat-model.md) says who the adversaries are and which risks
@@ -108,5 +109,6 @@ npm test        # 175 tests across the crypto package and the API
 The API's tests run against an in-memory store, so no cloud account is needed for any of
 them.
 
-Shipping is `./scripts/release.sh`: it tests, builds, uploads a release, and the host
-installs it within five minutes. See [docs/runbook.md](docs/runbook.md).
+Shipping is merging to `main`: GitHub Actions runs `./scripts/release.sh`, which tests,
+builds and uploads a release, and the host installs it within five minutes. The same script
+runs by hand. See [docs/runbook.md](docs/runbook.md).
