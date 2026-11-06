@@ -7,7 +7,7 @@ import * as session from '../session.js'
 import { IconAlert } from '../icons.js'
 import { PasswordInput } from '../ui.js'
 
-export function Unlock({ onRegister }: { onRegister: () => void }) {
+export function Unlock({ onRegister, forAdmin = false }: { onRegister: () => void; forAdmin?: boolean }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -68,8 +68,17 @@ export function Unlock({ onRegister }: { onRegister: () => void }) {
 
   return (
     <form onSubmit={submit} noValidate={false}>
-      <h2 className="auth-title">Unlock your vault</h2>
-      <p className="auth-sub">Enter your email and master password. Decryption happens in this browser.</p>
+      {forAdmin ? (
+        <>
+          <h2 className="auth-title">Sign in to the admin panel</h2>
+          <p className="auth-sub">Use your Vault account. What you can do in the panel depends on the role the owner gave you.</p>
+        </>
+      ) : (
+        <>
+          <h2 className="auth-title">Unlock your vault</h2>
+          <p className="auth-sub">Enter your email and master password. Decryption happens in this browser.</p>
+        </>
+      )}
 
       <div className="field">
         <label htmlFor="email">Email</label>

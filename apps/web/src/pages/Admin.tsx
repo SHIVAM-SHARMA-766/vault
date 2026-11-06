@@ -24,7 +24,7 @@ import {
   IconAlert, IconArrowLeft, IconCheck, IconEdit, IconGlobe, IconGrid, IconKey, IconLock, IconNote,
   IconPlus, IconRefresh, IconShield, IconTrash, IconUser, IconX,
 } from '../icons.js'
-import { CopyButton, useToast } from '../ui.js'
+import { CopyButton, VaultLink, useToast } from '../ui.js'
 
 type Tab = 'overview' | 'website' | 'users' | 'invites' | 'audit'
 
@@ -121,6 +121,11 @@ function Section({ title, sub, actions, children }: { title: string; sub?: strin
     <section className="admin-section">
       <div className="admin-head">
         <div>
+          <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
+            <li><VaultLink>Vault</VaultLink></li>
+            <li>Admin</li>
+            <li aria-current="page">{title}</li>
+          </ol>
           <h1>{title}</h1>
           {sub ? <p className="muted">{sub}</p> : null}
         </div>

@@ -10,6 +10,21 @@ import {
   IconNote, IconRefresh, IconTerminal, IconUser, IconWifi,
 } from './icons.js'
 
+// ── In-app navigation ─────────────────────────────────────────────────
+
+/** A link back to the vault from inside the admin panel. A real navigation
+ *  would reload the page, and a reload locks the vault — keys live only in
+ *  memory — so this changes the address in place and lets Vault react. */
+export function VaultLink({ children }: { children: ReactNode }) {
+  return (
+    <a href="/app/" onClick={(e) => {
+      e.preventDefault()
+      history.pushState(null, '', '/app/')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    }}>{children}</a>
+  )
+}
+
 // ── Toasts ────────────────────────────────────────────────────────────────
 
 interface Toast { id: number; text: string; tone: 'ok' | 'error' }

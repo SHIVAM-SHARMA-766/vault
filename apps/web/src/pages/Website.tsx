@@ -22,7 +22,7 @@ import * as session from '../session.js'
 import {
   IconAlert, IconCheck, IconDown, IconExternal, IconImage, IconNote, IconPlus, IconRefresh, IconTrash, IconUp, IconX,
 } from '../icons.js'
-import { useToast } from '../ui.js'
+import { VaultLink, useToast } from '../ui.js'
 
 const PAGE_OF: Record<string, string> = {
   global: 'index.html', home: 'index.html', features: 'features.html', how: 'how-it-works.html',
@@ -176,6 +176,11 @@ export function Website({ canWrite, canPublish }: { canWrite: boolean; canPublis
     <section className="admin-section site-editor">
       <div className="admin-head">
         <div>
+          <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
+            <li><VaultLink>Vault</VaultLink></li>
+            <li>Admin</li>
+            <li aria-current="page">Website{view.kind === 'section' ? ` · ${state.schema.sections.find((s) => s.id === view.id)?.label ?? ''}` : view.kind === 'images' ? ' · Images' : ' · History'}</li>
+          </ol>
           <h1>Website</h1>
           <p className="muted">
             {state.live.version

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import * as session from './session.js'
-import { IconLock, IconShield } from './icons.js'
+import { IconArrowLeft, IconLock, IconShield } from './icons.js'
 import { ToastProvider } from './ui.js'
 import { Unlock } from './pages/Unlock.js'
 import { Register } from './pages/Register.js'
@@ -15,6 +15,12 @@ export function App() {
 
   useEffect(() => session.subscribe(setUnlocked), [])
 
+  // /app/admin is the admin panel's address. Signing in there is the same
+  // sign-in, but the page should say where it leads.
+  const forAdmin = location.pathname.startsWith('/app/admin')
+  const place = forAdmin ? 'Admin panel' : 'Vault'
+  const step = view === 'unlock' ? 'Sign in' : 'Create account'
+
   return (
     <ToastProvider>
       {unlocked ? (
@@ -22,7 +28,7 @@ export function App() {
       ) : (
         <div className="auth">
           <aside className="auth-brand">
-            <div className="brand"><span className="brand-mark"><IconShield size={20} /></span>Vault</div>
+            <a className="brand" href="/" title="Go to the Vault website"><span className="brand-mark"><IconShield size={20} /></span>Vault</a>
             <div className="auth-pitch">
               <h1>Your passwords, readable only by you.</h1>
               <p>Every entry is encrypted on this device before it is sent. The server stores
@@ -37,9 +43,17 @@ export function App() {
           </aside>
           <main className="auth-main">
             <div className="auth-card">
-              <div className="brand brand-compact"><span className="brand-mark"><IconShield size={20} /></span>Vault</div>
+              <a className="brand brand-compact" href="/" title="Go to the Vault website"><span className="brand-mark"><IconShield size={20} /></span>Vault</a>
+              <nav className="auth-nav" aria-label="Breadcrumb">
+                <a className="auth-home" href="/"><IconArrowLeft size={15} />Back to website</a>
+                <ol className="crumbs">
+                  <li><a href="/">Home</a></li>
+                  <li>{view === 'register' ? <button type="button" className="crumb-link" onClick={() => setView('unlock')}>{place}</button> : place}</li>
+                  <li aria-current="page">{step}</li>
+                </ol>
+              </nav>
               {view === 'unlock' ? (
-                <Unlock onRegister={() => setView('register')} />
+                <Unlock forAdmin={forAdmin} onRegister={() => setView('register')} />
               ) : (
                 <Register onDone={() => setView('unlock')} onCancel={() => setView('unlock')} />
               )}
