@@ -57,7 +57,7 @@ Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In ord
 3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
 4. ~~Folders, entry-type fields, custom fields, password history~~ — done 2026-11-06.
 5. ~~Import and export~~ — done 2026-11-06.
-6. **Monitoring and alerting**, and the domain.
+6. ~~Monitoring and alerting~~ — done 2026-11-07 (needs `apply.sh` + `deploy.sh` by the operator). **The domain** remains, deferred until one is bought.
 
 Then phase 2, the self-hosted product: container image and Compose install, first-run setup,
 PostgreSQL, migrations, backups to any S3-compatible store, signed releases.
@@ -79,6 +79,14 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 1, step 6: monitoring and alerting.** A probe on the host
+(`services/monitor/vault-probe.sh`, every five minutes) checks the site, client, API and
+certificate through public DNS, plus disk, memory, backup age and failed units, and posts
+them to OCI Monitoring. Eight alarms in `infra/monitoring.tf` — including a heartbeat that
+fires when reports stop, so a dead or reclaimed host is caught — mail the operator through
+OCI Notifications, with six-hourly reminders. All within the always-free allowance. The
+memory metric also answers the idle-reclamation question below once a week of data exists.
 
 **2026-11-06 — Phase 1, step 5: import and export.** A new Import & export screen
 (`/app/import-export`, also in the account menu and the empty vault). Import reads Chrome /

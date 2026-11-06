@@ -162,6 +162,10 @@ uptime                  # load
 vmstat 5 5              # sustained CPU
 ```
 
+The health probe records `memory_used_percent` every five minutes (see Alerts below), so
+the answer is a chart in the console: Monitoring → Metrics Explorer, namespace
+`vault_health`, metric `memory_used_percent`, the last seven days, statistic `min`.
+
 Caddy plus a Node process on a 1 GB instance plausibly holds memory above 20% on its own.
 If several days of measurement say otherwise, a keep-warm loop is the blunt answer:
 
@@ -326,6 +330,42 @@ curl -s https://<hostname>/api/health
 
 A 502 from Caddy means the API is down; a connection refused means Caddy is. A
 certificate error usually means the DuckDNS record is pointing somewhere else.
+
+## Alerts
+
+`vault-probe.timer` runs `/usr/local/bin/vault-probe.sh` every five minutes. It checks the
+public site, the client, the API and the certificate through public DNS, and disk, memory,
+the last verified backup and failed units on the host, and posts each as a metric in the
+`vault_health` namespace. Alarms in `infra/monitoring.tf` watch them and mail everyone in
+`alert_emails` (each address must confirm OCI's subscription mail once). A reminder repeats
+every six hours while an alarm stays firing, and a "resolved" mail follows when it clears.
+
+| Alarm | Fires when | First look |
+|---|---|---|
+| `heartbeat` | no report for 10 minutes | OCI console: is the instance running? Then `systemctl status vault-probe.timer` |
+| `api-down` | `/api/health` failing for 10 minutes | `journalctl -u vault-api -n 100` |
+| `site-down` | `/` or `/app/` not 200 for 10 minutes | `journalctl -u caddy -n 50`; is DuckDNS pointing at the instance? |
+| `certificate` | under 14 days left | `journalctl -u caddy \| grep -i acme` — Caddy renews at 30 |
+| `backup-stale` | no verified backup for 30 hours | `journalctl -u vault-backup -n 100`, then `sudo systemctl start vault-backup` |
+| `disk` | boot disk over 85% | `sudo journalctl --vacuum-size=200M`; `du -sh /srv/vault/*` |
+| `memory` | over 90% for 30 minutes | `ps aux --sort=-rss \| head` |
+| `units-failed` | a `vault-*` unit or Caddy failed | `systemctl --failed` |
+
+On the host:
+
+```sh
+sudo systemctl start vault-probe          # report now
+journalctl -u vault-probe -n 5 -o cat     # the last reports, values included
+sudo -u nobody VAULT_HOSTNAME=<hostname> /usr/local/bin/vault-probe.sh --dry-run   # check without posting
+```
+
+To test delivery end to end, open an alarm in the console (Monitoring → Alarm definitions)
+and lower its threshold for a few minutes, or stop the timer for ten minutes to trip the
+heartbeat. Put it back afterwards.
+
+For push notifications on the phone instead of, or as well as, mail, add an HTTPS endpoint
+that takes a POST to `alert_https_endpoints` — for example an ntfy topic with a long random
+name — and apply.
 
 ## Backups
 

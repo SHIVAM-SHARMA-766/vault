@@ -35,6 +35,11 @@ shape is chosen against.
       MySQL HeatWave                  Object Storage
       ciphertext only                 vault-backups   daily encrypted exports (write)
                                       vault-releases  what the host serves (read-only)
+
+      OCI Monitoring ◄── health metrics every 5 min (vault-probe)
+           │  alarms, including one on the metrics going missing
+           ▼
+      Notifications ──► operator's email (optionally an HTTPS push endpoint)
 ```
 
 Caddy terminates TLS with a certificate it obtains itself, serves the public site and the
@@ -46,6 +51,11 @@ The instance authenticates to Object Storage **as itself**, through a dynamic gr
 matches its OCID. The database is reached inside the VCN with a password that, like the
 email pepper and the token signing key, lives in `/srv/vault/api/run/secrets.env` on the
 host and never in the repository.
+
+**Monitoring** is a probe on the host (`services/monitor`) that checks the service through
+public DNS and the host from inside, and posts the results as custom metrics; thresholds
+live in Terraform as alarms (`infra/monitoring.tf`). A dead host cannot report itself, so
+one alarm fires on the metrics' absence. Everything used is in OCI's always-free allowance.
 
 ## Where trust ends
 
@@ -195,6 +205,7 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `apps/web/` | The vault client, served at `/app/`, and the Caddyfile. `src/lib` (API client, session, router), `src/ui` (kit, icons, Shell), `src/features/{auth,vault,settings,admin}` |
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
 | `services/backup/` | The daily export and its systemd timer |
+| `services/monitor/` | The health probe and its timer; the alarms are in `infra/monitoring.tf` |
 | `services/release/` | The host's pull agent and its systemd timer |
 | `scripts/` | `release.sh` ships code (CI runs it on merge); `setup-ci.sh` creates the CI identity; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
 | `.github/workflows/` | `ci.yml` tests every change, including browser tests; `release.yml` publishes every merge to `main` |
