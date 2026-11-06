@@ -52,6 +52,12 @@ resource "oci_mysql_mysql_db_system" "vault" {
   # ../docs/runbook.md.
 
   lifecycle {
+    # This is the vault. A stray `terraform destroy`, or a change that forces
+    # replacement, must stop at plan time rather than delete every account.
+    # To genuinely remove it: take and verify an export, delete this line,
+    # apply, then destroy (docs/runbook.md, "Tearing it down").
+    prevent_destroy = true
+
     ignore_changes = [
       # The always-free tier forces the newest release, so a new one would
       # otherwise destroy and recreate the system underneath the data.
