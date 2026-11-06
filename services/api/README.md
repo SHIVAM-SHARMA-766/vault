@@ -23,6 +23,18 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 
 ## Routes
 
+The machine-readable list is generated from the routing table: served at
+`/api/openapi.json` and committed as [docs/openapi.json](../../docs/openapi.json). After
+adding or changing a route, run `npm run openapi --workspace @vault/api`; a test fails while
+the committed copy is stale.
+
+**Errors** are `{ "error": <code>, "message": <text>, "details"?, "requestId" }`. Clients
+branch on `error`, never on `message`; the codes are listed, with meanings, in `ERROR_CODES`
+in `src/http.ts` (and the OpenAPI document). **Every response** carries `x-request-id`, and
+the server writes one JSON log line per request with it (method, path, status, duration —
+no body, query string or address), so a reference quoted from an error finds its line:
+`journalctl -u vault-api | grep <id>`.
+
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/api/health` | — | Liveness |

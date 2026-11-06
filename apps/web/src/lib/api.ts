@@ -77,7 +77,10 @@ async function request<T>(
     const error = new ApiError(
       response.status,
       String(payload['error'] ?? 'error'),
-      String(payload['message'] ?? 'Something went wrong.'),
+      // A server fault carries a request id that matches the server's log;
+      // quoting it is how a self-hoster finds the line.
+      String(payload['message'] ?? 'Something went wrong.')
+        + (response.status >= 500 && typeof payload['requestId'] === 'string' ? ` (reference ${String(payload['requestId']).slice(0, 8)})` : ''),
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
     if (Array.isArray(payload['details'])) error.details = payload['details'] as { path: string; message: string }[]

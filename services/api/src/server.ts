@@ -12,11 +12,11 @@ import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { buildRouter } from './app.js'
+import { buildRouter, handleRequest } from './app.js'
 import { loadConfig } from './config.js'
 import { emailDigest } from './identity.js'
 import type { App } from './context.js'
-import { type LambdaEvent, errorResponse } from './http.js'
+import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
 import { MysqlStore } from './store-mysql.js'
 
@@ -118,7 +118,7 @@ export async function start(): Promise<void> {
           },
         }
 
-        const result = await router.handle(event).catch((err: unknown) => errorResponse(err))
+        const result = await handleRequest(router, event, { log: true })
         res.writeHead(result.statusCode, result.headers)
         res.end(result.body)
       })()

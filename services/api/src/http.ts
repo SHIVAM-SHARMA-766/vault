@@ -26,18 +26,39 @@ export interface LambdaResponse {
   body: string
 }
 
+/** Every error code the API returns, and what it means. Clients branch on the
+ *  code, never on the message; the OpenAPI document lists these. Adding a code
+ *  means adding it here, which the type below enforces. */
+export const ERROR_CODES = {
+  bad_request: 'The request is malformed or a field is invalid; `details` may say which.',
+  invalid_content: 'Website content failed validation; `details` lists each field.',
+  unauthorized: 'No valid access token.',
+  invalid_credentials: 'Sign-in failed. Deliberately does not say why.',
+  two_factor_required: 'The password was right; a TOTP or recovery code is needed too.',
+  invalid_two_factor: 'The TOTP or recovery code is wrong or already used.',
+  forbidden: 'Signed in, but not permitted (role, disabled account, closed registration).',
+  not_found: 'No such route or item.',
+  conflict: 'The item already exists, or the change conflicts with the current state.',
+  too_large: 'The body or a stored item exceeds its size limit.',
+  rate_limited: 'Too many requests; wait `retry-after` seconds.',
+  unavailable: 'The feature is not configured on this server.',
+  internal: 'An unexpected error. Quote `requestId` when reporting it.',
+} as const
+
+export type ErrorCode = keyof typeof ERROR_CODES
+
 /** A failure that is safe to report to the caller. Anything else becomes a 500
  *  with no detail, because an unexpected error's message may describe internal
  *  state. */
 export class HttpError extends Error {
   readonly status: number
-  readonly code: string
+  readonly code: ErrorCode
   /** Seconds, for 429 responses. */
   readonly retryAfter: number | undefined
   /** Field-level problems, for a 400 the caller can show next to each field. */
   details: unknown
 
-  constructor(status: number, code: string, message: string, retryAfter?: number) {
+  constructor(status: number, code: ErrorCode, message: string, retryAfter?: number) {
     super(message)
     this.name = 'HttpError'
     this.status = status
@@ -79,14 +100,16 @@ export function json(status: number, body: unknown, extra: Record<string, string
   }
 }
 
-export function errorResponse(err: unknown): LambdaResponse {
+export function errorResponse(err: unknown, requestId?: string): LambdaResponse {
+  const id = requestId ? { requestId } : {}
   if (err instanceof HttpError) {
     const extra = err.retryAfter === undefined ? {} : { 'retry-after': String(err.retryAfter) }
-    return json(err.status, { error: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) }, extra)
+    return json(err.status, { error: err.code, message: err.message, ...(err.details ? { details: err.details } : {}), ...id }, extra)
   }
-  // Unexpected. The detail goes to the log, never to the caller.
-  console.error('unhandled error', err)
-  return json(500, { error: 'internal', message: 'Internal error.' })
+  // Unexpected. The detail goes to the log, never to the caller; the request
+  // id ties the two together.
+  console.error(JSON.stringify({ level: 'error', requestId, message: 'unhandled error', error: err instanceof Error ? err.stack ?? err.message : String(err) }))
+  return json(500, { error: 'internal', message: 'Internal error.', ...id })
 }
 
 export function parseJsonBody<T>(event: LambdaEvent): T {
