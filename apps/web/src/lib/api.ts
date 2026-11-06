@@ -190,6 +190,11 @@ export const api = {
   history: (token: string, id: string) =>
     request<{ versions: { at: string; blob: string }[] }>('GET', `/api/vault/history/${encodeURIComponent(id)}`, { token }),
 
+  /** Creates many sealed items at once; never overwrites. At most 100
+   *  entries and 50 folders per call. */
+  importBulk: (token: string, body: { folders: { id: string; blob: string }[]; entries: { id: string; blob: string }[] }) =>
+    request<{ folders: number; entries: number }>('POST', '/api/vault/import', { token, body }),
+
   addHistory: (token: string, id: string, blob: string) =>
     request<{ at: string }>('POST', `/api/vault/history/${encodeURIComponent(id)}`, { token, body: { blob } }),
 

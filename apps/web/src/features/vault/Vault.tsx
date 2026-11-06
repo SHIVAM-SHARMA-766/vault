@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { descendants, folderPath, matches, subtitle, typeSpec } from '@vault/core'
 
+import { Link } from '../../lib/router.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
 import { Monogram, TYPES, typeInfo, useToast } from '../../ui/kit.js'
@@ -255,6 +256,7 @@ function EmptyState({ hasEntries, onNew }: { hasEntries: boolean; onNew: () => v
           <h3>Your vault is empty</h3>
           <p>Add your first login. It is encrypted on this device before it is saved.</p>
           <button className="btn btn-primary" onClick={onNew}><IconPlus size={16} />Add an item</button>
+          <Link to="/app/import-export" className="btn btn-ghost">Import from another password manager</Link>
         </>
       )}
     </div>

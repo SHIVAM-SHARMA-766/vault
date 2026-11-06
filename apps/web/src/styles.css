@@ -725,3 +725,17 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
   .custom-row { grid-template-columns: 1fr 1fr auto auto; }
   .folder-actions { display: inline-flex; }
 }
+
+/* ── Import & export ───────────────────────────────────────────────── */
+.alert-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.file-drop {
+  display: flex; align-items: center; gap: 14px; padding: 22px 18px; margin: 4px 0 8px;
+  border: 1.5px dashed var(--line-strong); border-radius: 12px; color: var(--accent); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.file-drop:hover, .file-drop:focus-within { border-color: var(--accent); background: var(--accent-soft); }
+.file-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.file-drop > span { display: flex; flex-direction: column; gap: 2px; color: var(--text); }
+.import-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.progress { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.progress > div { height: 100%; background: var(--accent); transition: width .2s; }
