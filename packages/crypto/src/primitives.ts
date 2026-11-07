@@ -4,6 +4,8 @@
 // Web Crypto is reached through `globalThis.crypto.subtle`, which resolves to
 // the browser's implementation in a page and to Node's in the API and in tests.
 
+import { cachedAesKey } from './keycache.js'
+
 /** @internal Shared with identity.ts; not part of the package surface. */
 export const subtle = (): SubtleCrypto => {
   const s = globalThis.crypto?.subtle
@@ -67,6 +69,9 @@ export async function hmacSha256(key: Uint8Array, data: Uint8Array): Promise<Uin
 export const GCM_IV_BYTES = 12
 export const GCM_TAG_BYTES = 16
 
+/** One CryptoKey per raw key buffer, for both directions (keycache.ts). */
+const aesKey = (key: Uint8Array) => cachedAesKey(key, (raw) => subtle().importKey('raw', buf(raw), 'AES-GCM', false, ['encrypt', 'decrypt']))
+
 /** Returns ciphertext with the 16-byte authentication tag appended, which is
  *  how Web Crypto emits it. */
 export async function aesGcmEncrypt(
@@ -77,7 +82,7 @@ export async function aesGcmEncrypt(
 ): Promise<Uint8Array> {
   if (key.length !== 32) throw new Error('AES-256-GCM requires a 32-byte key')
   if (iv.length !== GCM_IV_BYTES) throw new Error(`IV must be ${GCM_IV_BYTES} bytes`)
-  const k = await subtle().importKey('raw', buf(key), 'AES-GCM', false, ['encrypt'])
+  const k = await aesKey(key)
   const params: AesGcmParams = { name: 'AES-GCM', iv: buf(iv), tagLength: GCM_TAG_BYTES * 8 }
   if (aad) params.additionalData = buf(aad)
   return new Uint8Array(await subtle().encrypt(params, k, buf(plaintext)))
@@ -93,7 +98,7 @@ export async function aesGcmDecrypt(
 ): Promise<Uint8Array> {
   if (key.length !== 32) throw new Error('AES-256-GCM requires a 32-byte key')
   if (iv.length !== GCM_IV_BYTES) throw new Error(`IV must be ${GCM_IV_BYTES} bytes`)
-  const k = await subtle().importKey('raw', buf(key), 'AES-GCM', false, ['decrypt'])
+  const k = await aesKey(key)
   const params: AesGcmParams = { name: 'AES-GCM', iv: buf(iv), tagLength: GCM_TAG_BYTES * 8 }
   if (aad) params.additionalData = buf(aad)
   return new Uint8Array(await subtle().decrypt(params, k, buf(ciphertextAndTag)))

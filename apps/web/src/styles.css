@@ -826,3 +826,4 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .emergency-view { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
 .emergency-entry { border-top: 1px solid var(--line); padding: 8px 0; }
 .emergency-entry summary { cursor: pointer; font-weight: 600; }
+.rows-more { height: 1px; }
