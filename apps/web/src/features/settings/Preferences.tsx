@@ -5,8 +5,8 @@
 import { useState } from 'react'
 
 import {
-  CLIPBOARD_CHOICES, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, type Prefs, type Theme,
-  describeMinutes, describeSeconds,
+  CLIPBOARD_CHOICES, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
+  describeMinutes, describeSeconds, passphraseBits,
 } from '@vault/core'
 
 import * as prefs from '../../lib/prefs.js'
@@ -97,7 +97,33 @@ function GeneratorDefaults({ p, saving, change }: { p: Prefs; saving: boolean; c
   return (
     <section className="settings-card" aria-labelledby="p-gen">
       <div className="settings-card-head"><IconKey size={18} /><h2 id="p-gen">Password generator</h2></div>
-      <p className="muted small">What a new generated password looks like. You can still change it each time.</p>
+      <p className="muted small">What the generator offers first. You can still change it each time.</p>
+      <div className="segmented generator-mode" role="radiogroup" aria-label="Generate by default">
+        {(['password', 'passphrase'] as const).map((m) => (
+          <button key={m} type="button" role="radio" aria-checked={g.mode === m} disabled={saving}
+                  className={g.mode === m ? 'seg-active' : ''} onClick={() => set({ mode: m })}>
+            {m === 'password' ? 'Password' : 'Passphrase'}
+          </button>
+        ))}
+      </div>
+      {g.mode === 'passphrase' ? (
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="p-words">Words</label>
+            <select id="p-words" value={g.words} disabled={saving} onChange={(e) => set({ words: Number(e.target.value) })}>
+              {[4, 5, 6, 7, 8, 10, 12].map((n) => <option key={n} value={n}>{n} words (about {Math.round(passphraseBits({ words: n, digit: false }))} bits)</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="p-sep">Between words</label>
+            <select id="p-sep" value={g.separator} disabled={saving} onChange={(e) => set({ separator: e.target.value })}>
+              {SEPARATORS.map((x) => <option key={x} value={x}>{x === ' ' ? 'a space' : x === '-' ? 'a hyphen (-)' : x === '.' ? 'a full stop (.)' : 'an underscore (_)'}</option>)}
+            </select>
+          </div>
+          <Check checked={g.capitalize} onChange={(v) => set({ capitalize: v })}>Capitalise each word</Check>
+          <Check checked={g.digit} onChange={(v) => set({ digit: v })}>Add a digit</Check>
+        </div>
+      ) : (
       <div className="generator-opts">
         <label className="range">
           <span>Length <strong>{length}</strong></span>
@@ -110,6 +136,7 @@ function GeneratorDefaults({ p, saving, change }: { p: Prefs; saving: boolean; c
         <Check checked={g.digits} onChange={(v) => set({ digits: v })}>0–9</Check>
         <Check checked={g.symbols} onChange={(v) => set({ symbols: v })}>!@#</Check>
       </div>
+      )}
     </section>
   )
 }

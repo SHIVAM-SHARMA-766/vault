@@ -9,7 +9,7 @@ import { ISSUES, analyse, descendants, folderPath, matches, subtitle, typeSpec }
 import { Link } from '../../lib/router.js'
 import { api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
-import { IconAlert, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
+import { IconAlert, IconInbox, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
 import { Monogram, TYPES, typeInfo, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { EntryDetail } from './EntryDetail.js'
@@ -57,11 +57,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const folderIds = useMemo(() => new Set(folders.map((f) => f.id)), [folders])
   const inFolder = (e: Decrypted) => (e.folderId && folderIds.has(e.folderId) ? e.folderId : undefined)
 
-  const health = useMemo(() => analyse(entries.filter((e) => !e.unreadable)), [entries])
+  // Archived items stay out of every list, count and check but the Archive.
+  const active = useMemo(() => entries.filter((e) => !e.archived), [entries])
+  const health = useMemo(() => analyse(active.filter((e) => !e.unreadable)), [active])
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: entries.length, favorites: 0, unfiled: 0, health: health.issues.size }
-    for (const e of entries) {
+    const c: Record<string, number> = { all: active.length, favorites: 0, unfiled: 0, health: health.issues.size, archive: entries.length - active.length }
+    for (const e of active) {
       c[e.type] = (c[e.type] ?? 0) + 1
       const sh = sharedOf(e)
       if (sh) c[`coll:${sh.collectionId}`] = (c[`coll:${sh.collectionId}`] ?? 0) + 1
@@ -76,14 +78,15 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const m = new Map<string, number>()
     for (const f of folders) {
       const ids = descendants(folders, f.id)
-      m.set(f.id, entries.filter((e) => e.folderId && ids.has(e.folderId)).length)
+      m.set(f.id, active.filter((e) => e.folderId && ids.has(e.folderId)).length)
     }
     return m
-  }, [entries, folders])
+  }, [active, folders])
 
   const visible = useMemo(() => {
     const scope = filter.kind === 'folder' ? descendants(folders, filter.id) : null
     return entries.filter((e) => {
+      if ((filter.kind === 'archive') !== Boolean(e.archived)) return false
       if (filter.kind === 'favorites' && !e.favorite) return false
       if (filter.kind === 'collection' && sharedOf(e)?.collectionId !== filter.id) return false
       if (filter.kind === 'health') {
@@ -173,7 +176,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
     setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : undefined), ...(collectionId ? { collectionId } : {}) })
   }
 
-  const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites'
+  const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites' : filter.kind === 'archive' ? 'Archive'
     : filter.kind === 'health' ? 'Password health'
     : filter.kind === 'collection' ? (() => { const c = openCollections.find((x) => x.id === filter.id); return c ? `${c.orgName} / ${c.name}` : 'Collection' })()
     : filter.kind === 'unfiled' ? 'No folder' : filter.kind === 'type' ? typeInfo(filter.type as EntryType).plural
@@ -183,6 +186,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
     { f: { kind: 'all' }, label: 'All' }, { f: { kind: 'favorites' }, label: 'Favorites' },
     ...folders.filter((x) => !x.parentId).map((x) => ({ f: { kind: 'folder', id: x.id } as Filter, label: x.name })),
     ...TYPES.map((t) => ({ f: { kind: 'type', type: t.type } as Filter, label: t.plural })),
+    { f: { kind: 'archive' }, label: 'Archive' },
   ]
 
   return (
@@ -241,6 +245,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
           ) : visible.length === 0 && filter.kind === 'health' ? (
             <div className="empty"><div className="empty-icon"><IconShield size={28} /></div><h3>{health.checked ? 'No issues' : 'Nothing to check'}</h3>
               <p>{health.checked ? 'Every password here is unique, strong, recent and used over https.' : 'Logins and Wi-Fi passwords are checked once you add some.'}</p></div>
+          ) : visible.length === 0 && filter.kind === 'archive' ? (
+            <div className="empty"><div className="empty-icon"><IconInbox size={28} /></div><h3>Nothing archived</h3>
+              <p>Archive an item you no longer use but want to keep: it leaves your lists, search and health check until you restore it.</p></div>
           ) : visible.length === 0 ? (
             <EmptyState hasEntries={entries.length > 0} onNew={startNew} />
           ) : (
@@ -279,6 +286,11 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          onBack={() => setSelectedId(null)}
                          onEdit={() => setMode({ kind: 'edit', draft: withTypeDefaults(contentOf(selected)), id: selected.id })}
                          onToggleFavorite={() => { void save({ ...contentOf(selected), favorite: !selected.favorite }, selected.id) }}
+                         onToggleArchive={sharedOf(selected) ? undefined : () => {
+                           const archived = !selected.archived
+                           const { archived: _a, ...rest } = contentOf(selected)
+                           void save(archived ? { ...rest, archived: true } : rest, selected.id).then(() => { toast(archived ? 'Archived' : 'Restored from the archive'); setSelectedId(null) })
+                         }}
                          onDelete={() => remove(selected.id)}
                          loadHistory={() => vault.history(selected.id)}
                          onRestore={async (content) => { await vault.saveEntry({ ...content, favorite: selected.favorite, ...(selected.folderId ? { folderId: selected.folderId } : {}) }, selected.id) }} />

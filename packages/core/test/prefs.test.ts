@@ -10,7 +10,7 @@ test('nothing, or not an object, gives the defaults', () => {
 })
 
 test('valid values are kept', () => {
-  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, generator: { length: 32, upper: false, digits: true, symbols: false } }
+  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
   assert.deepEqual(normalizePrefs(p), p)
 })
 
@@ -51,4 +51,12 @@ test('the wording reads naturally', () => {
 
 test('the defaults cannot be changed by accident', () => {
   assert.throws(() => { (DEFAULT_PREFS as { theme: string }).theme = 'dark' })
+})
+
+test('passphrase settings are checked like the rest', () => {
+  const g = normalizePrefs({ generator: { mode: 'poem', words: 99, separator: '<script>', capitalize: 'yes' } }).generator
+  assert.equal(g.mode, 'password')
+  assert.equal(g.words, 12)
+  assert.equal(g.separator, '-')
+  assert.equal(g.capitalize, false)
 })
