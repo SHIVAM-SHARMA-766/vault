@@ -29,7 +29,7 @@ test('every screen passes axe-core WCAG 2.1 AA, light and dark', async () => {
   try {
     for (const scheme of ['light', 'dark']) {
       const page = await s.person({ scheme, bypassCSP: true })
-      for (const path of ['/', '/features', '/security', '/faq']) { await page.goto(`${s.base}${path}`); await audit(page, `${scheme} site ${path}`, found) }
+      for (const path of ['/', '/features', '/security', '/faq', '/get']) { await page.goto(`${s.base}${path}`); await audit(page, `${scheme} site ${path}`, found) }
       await page.goto(`${s.base}/app/`)
       await audit(page, `${scheme} sign-in`, found)
       await page.getByRole('button', { name: 'Create an account' }).click()

@@ -130,3 +130,19 @@ test('publishing is audited', async () => {
   const records = (await h.request('GET', '/api/admin/audit', { token: owner.token })).body['records'] as Array<Record<string, unknown>>
   assert.ok(records.some((r) => r['action'] === 'site.publish' && r['detail'] === 'launch copy'))
 })
+
+test('the "Run your own" page is published with the install command, and a site saved before it existed still gets it', async () => {
+  const { h, out, owner, content } = await setup()
+  content['get']!['install']!['command'] = 'curl -fsSL https://example.org/install.sh | sh'
+  await h.request('PUT', '/api/admin/site/draft', { token: owner.token, body: { content } })
+  await h.request('POST', '/api/admin/site/publish', { token: owner.token, body: {} })
+  const page = await live(out, 'get.html')
+  assert.match(page, /curl -fsSL https:\/\/example\.org\/install\.sh \| sh/)
+  assert.match(page, /aria-current="page">Run your own</)
+
+  // Content from before the page existed: the defaults fill it in.
+  const { get: _get, ...older } = content
+  await h.request('PUT', '/api/admin/site/draft', { token: owner.token, body: { content: older } })
+  assert.equal((await h.request('POST', '/api/admin/site/publish', { token: owner.token, body: {} })).status, 200)
+  assert.match(await live(out, 'get.html'), /deploy\/install\.sh \| sh/)
+})
