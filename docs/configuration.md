@@ -75,6 +75,16 @@ into an empty database ([INSTALL.md](INSTALL.md#backups-and-restore)).
 | `BACKUP_S3_SECRET_KEY` | — | yes | Its secret |
 | `BACKUP_S3_PREFIX` | `vault/` | | Key prefix |
 
+### Personal backups
+
+Each person can back up their own vault on their own schedule (Settings → Backups;
+[decision 0017](../decisions/0017-personal-backups.md)). These settings bound what they may choose.
+
+| Variable | Default | Secret | Purpose |
+|---|---|---|---|
+| `PERSONAL_BACKUP_REMOTE` | `true` | | `false` keeps personal backups on this server only: no outbound connections to people's S3 buckets or WebDAV folders |
+| `PERSONAL_BACKUP_ALLOW_PRIVATE` | `false` | | `true` lets destinations be private or loopback addresses, over plain http — for a NAS on the LAN. Leave off on a server reachable from the internet |
+
 ## Where they live on the reference instance
 
 | File | Holds | Written by |

@@ -18,6 +18,7 @@ import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
 import { ensureSetup } from './system.js'
 import { createMailer } from './mail.js'
+import { tick as tickPersonalBackups } from './personal-backup.js'
 import { closeStaleTickets } from './routes/desk.js'
 import { migrateItemPartitions } from './routes/orgs.js'
 import { backupsEnabled, runBackup } from './backup.js'
@@ -99,6 +100,11 @@ export async function start(): Promise<void> {
     .catch((err: unknown) => console.error('expiry sweep failed:', (err as Error).message))
   void sweep()
   setInterval(sweep, 15 * 60 * 1000).unref()
+
+  // Personal backups that have fallen due (decisions/0017).
+  const personal = () => tickPersonalBackups(app)
+    .catch((err: unknown) => console.error('personal backups failed:', (err as Error).message))
+  setInterval(personal, 5 * 60 * 1000).unref()
 
   // Render the live website before taking requests, so a new release serves
   // its own templates from the first request. A failure is logged and the
