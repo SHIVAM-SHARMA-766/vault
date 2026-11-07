@@ -9,7 +9,8 @@
 
 import { createConnection, createPool, type Pool, type RowDataPacket } from 'mysql2/promise'
 
-import { AlreadyExists, type Item, type Store } from './store.js'
+import { AlreadyExists, type Item, type ManagedStore } from './store.js'
+import { META_TABLE, pending } from './storage/migrations.js'
 
 export interface MysqlConfig {
   host: string
@@ -40,16 +41,6 @@ const toJson = (item: Item): string => {
 const likePrefix = (prefix: string): string =>
   `${prefix.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
 
-export const SCHEMA = `
-CREATE TABLE IF NOT EXISTS vault (
-  pk         VARCHAR(255) NOT NULL,
-  sk         VARCHAR(255) NOT NULL,
-  data       JSON         NOT NULL,
-  expires_at BIGINT       NULL,
-  PRIMARY KEY (pk, sk),
-  KEY idx_expires (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-`
 
 /** Rows that carry an expiry remove themselves. MySQL has no per-row time to
  *  live, so a scheduled event does the work instead — which is why the column
@@ -60,7 +51,7 @@ ON SCHEDULE EVERY 15 MINUTE
 DO DELETE FROM vault WHERE expires_at IS NOT NULL AND expires_at < UNIX_TIMESTAMP()
 `
 
-export class MysqlStore implements Store {
+export class MysqlStore implements ManagedStore {
   private readonly pool: Pool
   private readonly config: MysqlConfig
 
@@ -99,7 +90,7 @@ export class MysqlStore implements Store {
    *  schema, and every connection in the pool names one. Without this the
    *  service fails at boot with "Unknown database", which reads like a
    *  configuration error rather than an empty server. */
-  async migrate(): Promise<void> {
+  async migrate(): Promise<number> {
     const bootstrap = await createConnection({
       host: this.config.host,
       port: this.config.port ?? 3306,
@@ -121,7 +112,28 @@ export class MysqlStore implements Store {
       await bootstrap.end()
     }
 
-    await this.pool.query(SCHEMA)
+    // Versioned migrations (storage/migrations.ts), under a named lock so two
+    // starting servers cannot both run one. Version 1 adopts a table created
+    // before migrations were versioned.
+    const conn = await this.pool.getConnection()
+    let version = 0
+    try {
+      await conn.query("SELECT GET_LOCK('vault_migrate', 30)")
+      await conn.query(META_TABLE.mysql)
+      const [meta] = await conn.query<RowDataPacket[]>("SELECT v FROM vault_meta WHERE k = 'schema_version'")
+      version = Number(meta[0]?.['v'] ?? 0)
+      for (const m of pending(version)) {
+        // MySQL commits DDL implicitly, so each step must be idempotent on its
+        // own; the version is recorded after all of its statements succeed.
+        for (const sql of m.sql.mysql) await conn.query(sql)
+        await conn.query("INSERT INTO vault_meta (k, v) VALUES ('schema_version', ?) ON DUPLICATE KEY UPDATE v = VALUES(v)", [String(m.version)])
+        version = m.version
+      }
+    } finally {
+      await conn.query("SELECT RELEASE_LOCK('vault_migrate')").catch(() => {})
+      conn.release()
+    }
+
     try {
       await this.pool.query(CLEANUP_EVENT)
 
@@ -143,8 +155,14 @@ export class MysqlStore implements Store {
       // and activity records accumulate until someone notices. That is a
       // degraded vault rather than a broken one, so it warns instead of
       // refusing to start — but it does need attention. See docs/runbook.md.
-      console.warn('expiry is NOT running; rows with an expiry will accumulate:', (err as Error).message)
+      console.warn('the expiry event could not be created; the server sweeps expired rows itself instead:', (err as Error).message)
     }
+    return version
+  }
+
+  async sweepExpired(now = Math.floor(Date.now() / 1000)): Promise<number> {
+    const [res] = await this.pool.query('DELETE FROM vault WHERE expires_at IS NOT NULL AND expires_at < ?', [now])
+    return (res as { affectedRows?: number }).affectedRows ?? 0
   }
 
   async get(pk: string, sk: string): Promise<Item | null> {

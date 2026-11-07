@@ -50,7 +50,7 @@ const app = {
   config: {
     port: PORT, origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: [OWNER],
     site: { sourceDir: '', outputDir: '' },
-    db: { host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0 },
+    db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',
   },
 }

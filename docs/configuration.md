@@ -15,17 +15,22 @@ address.
 | `VAULT_HOSTNAME` | one of these two | — | | The public hostname, e.g. `vault.example.com` |
 | `SITE_ORIGIN` | one of these two | `https://$VAULT_HOSTNAME` | | The public origin with scheme. Only the origin is kept |
 | `PORT` | | `3000` | | Port on 127.0.0.1; the reverse proxy forwards `/api/*` to it |
-| `DB_HOST` | yes | — | | MySQL host |
-| `DB_PORT` | | `3306` | | MySQL port |
-| `DB_USER` | | `vault` | | MySQL user |
-| `DB_NAME` | | `vault` | | MySQL database; its table is created on first start |
-| `DB_PASSWORD` | yes | — | yes | MySQL password |
+| `DB_DRIVER` | | `mysql` | | `sqlite` (one file, no database server — personal installs), `postgres` (business installs, several app instances), or `mysql` (the reference instance) |
+| `DB_PATH` | sqlite | `/var/lib/vault/vault.db` | | The SQLite file. Its directory must be writable and backed up |
+| `DB_HOST` | mysql, postgres | — | | Database host |
+| `DB_PORT` | | `3306` / `5432` | | Database port, by driver |
+| `DB_USER` | | `vault` | | Database user |
+| `DB_NAME` | | `vault` | | Database name; the schema is created and migrated on start |
+| `DB_PASSWORD` | mysql, postgres | — | yes | Database password |
+| `DB_SSL` | | `false` | | PostgreSQL: `true` requires a verified TLS connection |
 | `SERVER_PEPPER` | yes | — | yes | ≥ 32 characters (`openssl rand -base64 32`). Keys address digests; **changing it locks every account out** |
 | `TOKEN_SIGNING_KEY` | yes | — | yes | ≥ 32 characters. Signs session tokens; changing it signs everyone out |
 | `ALLOW_REGISTRATION` | | `false` | | `true` forces registration open over the admin panel's setting. For the first account only |
 | `ADMIN_EMAILS` | | empty | | Comma-separated owner addresses. Kept only as digests |
 | `SITE_SOURCE` | | `site/` beside the server | | Website templates and content |
 | `SITE_ROOT` | | `/srv/vault/site` | | Where the rendered website is written; the proxy serves `current/` |
+
+**Schema migrations** run on every start, under a lock, from `services/api/src/storage/migrations.ts`. A server refuses to start against a database a newer release has already upgraded.
 
 Placeholder-looking secrets (`changeme…`, `test…`, `secret…`, `placeholder…`) are refused.
 

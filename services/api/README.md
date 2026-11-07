@@ -94,12 +94,22 @@ looks wrong.
 
 ## Storage
 
-Everything the API does to storage goes through a five-method `Store` interface:
-`get`, `put`, `delete`, `query`, `increment`. There are two implementations —
-`store-nosql.ts` for Oracle NoSQL, and an in-memory one in the tests.
+Everything the API does to storage goes through a five-method `Store` interface (`get`,
+`put`, `delete`, `query`, `increment`) in `src/store.ts`. Implementations
+([decisions/0012](../../decisions/0012-storage-drivers-and-migrations.md)):
 
-That interface is the reason moving off the previous platform cost an afternoon rather
-than a rewrite. It is worth keeping narrow.
+| File | Driver (`DB_DRIVER`) | For |
+|---|---|---|
+| `src/storage/sqlite.ts` | `sqlite` | Personal installs: one file, no database server |
+| `src/storage/postgres.ts` | `postgres` | Business installs, several app instances |
+| `src/store-mysql.ts` | `mysql` (default) | The reference instance |
+| `src/store-memory.ts` | — | Tests and `npm run dev:stack` |
+
+`src/storage/index.ts` opens the configured one; drivers load lazily. Schema changes are
+numbered migrations in `src/storage/migrations.ts`, run on every start under a lock;
+released versions are never edited. `test/store-contract.test.ts` holds every implementation
+to the same behaviour — SQLite always, MySQL when `DB_HOST` is set, PostgreSQL when `PG_HOST`
+is set (both are in CI). A test fails if any route imports a driver directly.
 
 ## Development
 

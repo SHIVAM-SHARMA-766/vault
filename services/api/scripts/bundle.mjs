@@ -29,6 +29,10 @@ const result = await build({
     ].join('\n'),
   },
   metafile: true,
+  // Native or optional modules that cannot be bundled. The reference release
+  // runs MySQL and never loads them; the container image installs them as
+  // ordinary dependencies (see Dockerfile).
+  external: ['better-sqlite3', 'pg-native'],
 })
 
 const bytes = Object.values(result.metafile.outputs).reduce((n, o) => n + o.bytes, 0)

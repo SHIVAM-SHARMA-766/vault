@@ -16,7 +16,8 @@ import { emailDigest } from './identity.js'
 import type { App } from './context.js'
 import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
-import { MysqlStore } from './store-mysql.js'
+import { openStore } from './storage/index.js'
+import type { ManagedStore } from './store.js'
 
 const HOST = '127.0.0.1'
 
@@ -25,9 +26,9 @@ const HOST = '127.0.0.1'
  *  the memory of a 1 GB host. */
 const MAX_BODY_BYTES = 4 * 1024 * 1024
 
-function buildApp(): { app: App; store: MysqlStore } {
+async function buildApp(): Promise<{ app: App; store: ManagedStore }> {
   const config = loadConfig()
-  const store = new MysqlStore(config.db)
+  const store = await openStore(config)
   const app: App = {
     config,
     store,
@@ -44,12 +45,19 @@ function buildApp(): { app: App; store: MysqlStore } {
 }
 
 export async function start(): Promise<void> {
-  const { app, store } = buildApp()
+  const { app, store } = await buildApp()
 
   // Idempotent, and run on every start so a fresh database needs no manual
   // step. If it fails the process exits rather than serving requests against a
   // schema that may not be there.
-  await store.migrate()
+  const version = await store.migrate()
+  console.log(`storage: ${app.config.db.driver}, schema version ${version}`)
+
+  // Expired rows (sessions, activity, rate windows) are removed here for every
+  // driver. MySQL also has a scheduled event; sweeping twice costs nothing.
+  const sweep = () => store.sweepExpired().catch((err: unknown) => console.error('expiry sweep failed:', (err as Error).message))
+  void sweep()
+  setInterval(sweep, 15 * 60 * 1000).unref()
 
   // Render the live website before taking requests, so a new release serves
   // its own templates from the first request. A failure is logged and the
