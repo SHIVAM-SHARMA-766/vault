@@ -87,6 +87,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/orgs/:org/collections', authedP((u, e, [o]) => orgs.createCollection(app, u, e, o!)), 'Create a collection')
   router.put('/api/orgs/:org/collections/:coll', authedP((u, e, [o, c]) => orgs.renameCollection(app, u, e, o!, c!)), 'Rename a collection')
   router.delete('/api/orgs/:org/collections/:coll', authedP((u, _e, [o, c]) => orgs.deleteCollection(app, u, o!, c!)), 'Delete a collection and its items')
+  router.post('/api/orgs/:org/collections/:coll/rotate', authedP((u, e, [o, c]) => orgs.rotateCollection(app, u, e, o!, c!)), 'Replace a collection key: re-sealed grants and re-encrypted items, all at once')
   router.get('/api/orgs/:org/collections/:coll/access', authedP((u, _e, [o, c]) => orgs.collectionAccess(app, u, o!, c!)), 'Who can open a collection')
   router.put('/api/orgs/:org/collections/:coll/access/:user', authedP((u, e, [o, c, t]) => orgs.grantAccess(app, u, e, o!, c!, t!)), 'Grant or change a member\'s access')
   router.delete('/api/orgs/:org/collections/:coll/access/:user', authedP((u, _e, [o, c, t]) => orgs.revokeAccess(app, u, o!, c!, t!)), 'Revoke a member\'s access')

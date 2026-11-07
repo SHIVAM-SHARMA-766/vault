@@ -138,3 +138,40 @@ test('only confirmed members can be given a key, and items are written under the
   const junk = await h.request('POST', `/api/orgs/${orgId}/members/${bob.userId}/confirm`, { token: alice.token, body: { orgKeyBlob: 'v1.abc.def' } })
   assert.equal(junk.status, 400)
 })
+
+test('rotation re-keys a collection: the removed member\'s old key opens nothing new, and stale requests are refused', async () => {
+  const h = harness()
+  const { alice, orgId, orgKey, collId, collKey } = await orgWithCollection(h)
+  const bob = await person(h, 'bob@example.test')
+  await h.request('POST', `/api/orgs/${orgId}/invites`, { token: alice.token, body: { email: bob.email } })
+  await h.request('POST', `/api/orgs/${orgId}/accept`, { token: bob.token })
+  await h.request('POST', `/api/orgs/${orgId}/members/${bob.userId}/confirm`, { token: alice.token, body: { orgKeyBlob: await sealOrgKey(bob.keys.publicKey, orgKey, orgId) } })
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/access/${bob.userId}`, { token: alice.token, body: { permission: 'view', keyBlob: await sealCollectionKey(bob.keys.publicKey, collKey, collId, 1) } })
+  const itemId = uuid()
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${itemId}`, { token: alice.token, body: { blob: await sealSharedItem(collId, itemId, 1, entry, collKey), keyVersion: 1 } })
+  await h.request('DELETE', `/api/orgs/${orgId}/members/${bob.userId}`, { token: alice.token })
+
+  const newKey = generateCollectionKey()
+  const rotate = async (extra: Record<string, unknown> = {}) => h.request('POST', `/api/orgs/${orgId}/collections/${collId}/rotate`, { token: alice.token, body: {
+    keyVersion: 2,
+    grants: [{ userId: alice.userId, keyBlob: await sealCollectionKey(alice.keys.publicKey, newKey, collId, 2) }],
+    items: [{ id: itemId, blob: await sealSharedItem(collId, itemId, 2, entry, newKey) }],
+    ...extra,
+  } })
+  assert.equal((await rotate({ grants: [] })).status, 409, 'grants must match')
+  assert.equal((await rotate({ items: [] })).status, 409, 'items must match')
+  assert.equal((await rotate()).status, 200)
+  assert.equal((await rotate()).status, 409, 'cannot rotate from a stale version')
+
+  const colls = (await h.request('GET', `/api/orgs/${orgId}/collections`, { token: alice.token })).body['collections'] as { keyVersion: number; rotationNeeded: boolean; access: { keyBlob: string } }[]
+  assert.equal(colls[0]!.keyVersion, 2)
+  assert.equal(colls[0]!.rotationNeeded, false)
+  const k2 = await openCollectionKey(alice.keys.privateKey, alice.keys.publicKey, colls[0]!.access.keyBlob, collId, 2)
+  const items = (await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: alice.token })).body['items'] as { id: string; blob: string; keyVersion: number }[]
+  assert.equal(items[0]!.keyVersion, 2)
+  assert.deepEqual(await openSharedItem(collId, itemId, 2, items[0]!.blob, k2), entry)
+  // Bob's retired key opens nothing written now.
+  await assert.rejects(openSharedItem(collId, itemId, 2, items[0]!.blob, collKey))
+  // Writes at the old version are refused.
+  assert.equal((await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${uuid()}`, { token: alice.token, body: { blob: sealedBlob('x'), keyVersion: 1 } })).status, 409)
+})

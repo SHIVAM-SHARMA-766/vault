@@ -226,6 +226,8 @@ export const api = {
     createCollection: (token: string, org: string, body: { id: string; nameBlob: string; keyBlob: string }) =>
       request<{ id: string }>('POST', `/api/orgs/${org}/collections`, { token, body }),
     deleteCollection: (token: string, org: string, coll: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}`, { token }),
+    rotate: (token: string, org: string, coll: string, body: { keyVersion: number; grants: { userId: string; keyBlob: string }[]; items: { id: string; blob: string }[] }) =>
+      request<{ keyVersion: number }>('POST', `/api/orgs/${org}/collections/${coll}/rotate`, { token, body }),
     access: (token: string, org: string, coll: string) =>
       request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),
     grant: (token: string, org: string, coll: string, user: string, body: { permission: SharePermission; hidePasswords: boolean; keyBlob?: string }) =>

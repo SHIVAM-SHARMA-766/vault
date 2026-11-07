@@ -122,8 +122,14 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
                 <button className="icon-btn icon-danger" aria-label={`Remove ${m.label}`} title="Remove" onClick={async () => {
                   if (!window.confirm(`Remove ${m.label}? They lose access at once.`)) return
                   const r = await api.orgs.removeMember(await session.token(), org.id, m.userId)
-                  toast(r.rotationNeeded.length ? `Removed. ${r.rotationNeeded.length} collection key(s) should be rotated.` : 'Removed')
                   await loadMembers(); await teams.load()
+                  // Re-key what they could open, where this admin can.
+                  let rotated = 0
+                  for (const cid of r.rotationNeeded) {
+                    if (teams.collections.find((c) => c.id === cid)?.permission !== 'manage') continue
+                    try { await teams.rotate(cid); rotated++ } catch { /* left marked; the Rotate button retries */ }
+                  }
+                  toast(r.rotationNeeded.length ? `Removed. ${rotated} of ${r.rotationNeeded.length} collection key(s) rotated.` : 'Removed')
                 }}><IconX size={15} /></button>
               ) : null}
             </div>
@@ -231,7 +237,12 @@ function CollectionRow({ c, teams, members }: { c: CollectionView; teams: Teams;
           </div>
         ) : null}
       </div>
-      {manage ? <button className="btn btn-secondary btn-sm" onClick={async () => { if (!open) await load(); setOpen(!open) }}>{open ? 'Done' : 'Access'}</button> : null}
+      {manage ? <div className="device-actions">
+        {c.rotationNeeded ? <button className="btn btn-primary btn-sm" onClick={async () => {
+          try { await teams.rotate(c.id); toast(`${c.name}: key rotated`) } catch (err) { toast(err instanceof Error ? err.message : 'Could not rotate.', 'error') }
+        }}>Rotate key</button> : null}
+        <button className="btn btn-secondary btn-sm" onClick={async () => { if (!open) await load(); setOpen(!open) }}>{open ? 'Done' : 'Access'}</button>
+      </div> : null}
     </li>
   )
 }

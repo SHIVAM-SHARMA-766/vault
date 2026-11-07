@@ -1462,6 +1462,53 @@
         }
       }
     },
+    "/api/orgs/{org}/collections/{coll}/rotate": {
+      "post": {
+        "summary": "Replace a collection key: re-sealed grants and re-encrypted items, all at once",
+        "operationId": "postOrgsOrgCollectionsCollRotate",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "coll",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/orgs/{org}/collections/{coll}/access": {
       "get": {
         "summary": "Who can open a collection",

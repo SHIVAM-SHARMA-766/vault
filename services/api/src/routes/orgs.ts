@@ -373,6 +373,40 @@ export async function revokeAccess(app: App, userId: string, orgId: string, coll
   return json(200, { ok: true, rotationNeeded: true })
 }
 
+/** Replaces a collection's key in one step: every current grant gets the new
+ *  key sealed to it, every current item is re-encrypted under it, and the
+ *  version moves on. The request must match the collection exactly — any
+ *  grant or item added meanwhile fails it with 409, and the client retries —
+ *  so nothing is left readable only under the retired key. */
+export async function rotateCollection(app: App, userId: string, event: LambdaEvent, orgId: string, collectionId: string): Promise<LambdaResponse> {
+  const { c } = await requireAccess(app, orgId, collectionId, userId, 'manage')
+  const b = body(event)
+  if (b['keyVersion'] !== c.keyVersion + 1) throw new HttpError(409, 'conflict', 'The collection key changed; reload and rotate again.')
+  const grants = Array.isArray(b['grants']) ? b['grants'] as Record<string, unknown>[] : null
+  const itemsIn = Array.isArray(b['items']) ? b['items'] as Record<string, unknown>[] : null
+  if (!grants || !itemsIn) throw badRequest('grants and items are required.')
+  const current = (await app.store.query(orgPk(orgId), accessPrefix(collectionId))) as Access[]
+  const stored = await app.store.query(collectionItemsPk(collectionId), ITEM_PREFIX)
+  const same = (a: string[], b2: string[]) => a.length === b2.length && [...a].sort().join() === [...b2].sort().join()
+  if (!same(current.map((a) => a.userId), grants.map((g) => String(g['userId'])))) throw new HttpError(409, 'conflict', 'Who can open this collection changed; reload and rotate again.')
+  if (!same(stored.map((i) => String(i['id'])), itemsIn.map((i) => String(i['id'])))) throw new HttpError(409, 'conflict', 'The items changed; reload and rotate again.')
+  const version = c.keyVersion + 1
+  const sealedGrants = grants.map((g) => ({ userId: String(g['userId']), keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob') }))
+  const sealedItems = itemsIn.map((i) => ({ id: String(i['id']), blob: requireSealed(i['blob'], 'blob') }))
+  const at = now(app)
+  for (const g of sealedGrants) {
+    const a = current.find((x) => x.userId === g.userId)!
+    await app.store.put({ ...a, keyBlob: g.keyBlob, keyVersion: version })
+  }
+  for (const i of sealedItems) {
+    const old = stored.find((x) => x['id'] === i.id)!
+    await app.store.put({ ...old, blob: i.blob, keyVersion: version, updatedAt: at, updatedBy: userId })
+  }
+  const { rotationNeeded: _r, ...rest } = c
+  await app.store.put({ ...rest, keyVersion: version, rotatedAt: at } as Collection)
+  return json(200, { keyVersion: version })
+}
+
 // ── Items ─────────────────────────────────────────────────────────────────
 
 export async function items(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {

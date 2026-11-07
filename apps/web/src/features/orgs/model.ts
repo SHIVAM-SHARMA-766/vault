@@ -157,6 +157,29 @@ export function useTeams(vaultKey: Uint8Array) {
     })
   }
 
+  /** Re-keys a collection: a new key version, every item re-encrypted under
+   *  it, sealed to every member who still has access (decisions/0015). */
+  async function rotate(collectionId: string) {
+    const c = coll(collectionId)
+    const token = await session.token()
+    const [{ access }, { members }, { items }] = await Promise.all([
+      api.orgs.access(token, c.orgId, c.id), api.orgs.members(token, c.orgId), api.orgs.items(token, c.orgId, c.id),
+    ])
+    const version = c.keyVersion + 1
+    const key = generateCollectionKey()
+    const grants = await Promise.all(access.map(async (a) => {
+      const m = members.find((x) => x.userId === a.userId)
+      if (!m) throw new Error('A member with access has left; reload and try again.')
+      return { userId: a.userId, keyBlob: await sealCollectionKey(fromBase64Url(m.publicKey), key, c.id, version) }
+    }))
+    const resealed = await Promise.all(items.map(async (it) => {
+      const content = await openSharedItem(c.id, it.id, it.keyVersion, it.blob, c.key)
+      return { id: it.id, blob: await sealSharedItem(c.id, it.id, version, content, key) }
+    }))
+    await api.orgs.rotate(token, c.orgId, c.id, { keyVersion: version, grants, items: resealed })
+    await load()
+  }
+
   async function saveShared(collectionId: string, content: EntryContent, id?: string): Promise<string> {
     const c = coll(collectionId)
     const itemId = id ?? crypto.randomUUID()
@@ -174,7 +197,7 @@ export function useTeams(vaultKey: Uint8Array) {
     await load()
   }
 
-  return { orgs, collections, shared, invitations, identity, error, load, createOrg, createCollection, confirm, grant, saveShared, deleteShared }
+  return { orgs, collections, shared, invitations, identity, error, load, createOrg, createCollection, confirm, grant, rotate, saveShared, deleteShared }
 }
 
 export type Teams = ReturnType<typeof useTeams>
