@@ -15,6 +15,7 @@ import { Shell } from '../../ui/Shell.js'
 import { EntryDetail } from './EntryDetail.js'
 import { EntryForm } from './EntryForm.js'
 import { FolderDialog } from './FolderDialog.js'
+import { GettingStarted } from './GettingStarted.js'
 import { type Decrypted, type Folder, emptyEntry, stripMeta, useVault } from './model.js'
 import { type SharedEntry, canEdit, useTeams } from '../orgs/model.js'
 import { type Filter, Sidebar, sameFilter } from './Sidebar.js'
@@ -282,10 +283,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          loadHistory={() => vault.history(selected.id)}
                          onRestore={async (content) => { await vault.saveEntry({ ...content, favorite: selected.favorite, ...(selected.folderId ? { folderId: selected.folderId } : {}) }, selected.id) }} />
           ) : (
-            <div className="pane-empty">
-              <IconShield size={40} />
-              <p>Select an item to see its details</p>
-            </div>
+            state.userId ? <GettingStarted userId={state.userId} hasItems={entries.length > 0} onNew={startNew} /> : null
           )}
         </section>
       </div>

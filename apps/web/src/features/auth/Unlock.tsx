@@ -5,6 +5,7 @@ import { passwordStrength } from '@vault/core'
 import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } from '@vault/crypto'
 
 import { ApiError, type SecondFactor, api } from '../../lib/api.js'
+import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
@@ -13,6 +14,8 @@ import { SecondFactorStep } from '../../ui/SecondFactor.js'
 export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, forAdmin = false }: {
   onRegister: () => void; onRecover: () => void; onRequestAccess: () => void; onSigninHelp: () => void; forAdmin?: boolean
 }) {
+  const instance = useInstance()
+  const mode = instance?.registration
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -152,9 +155,13 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
         <button type="button" className="link" onClick={onSigninHelp}>Lost your authenticator, or can't sign in? Ask for help</button>
       </p>
 
+      {/* Only the ways in this server actually offers (GET /api/instance). */}
       <p className="auth-switch">
-        New here? <button type="button" className="link" onClick={onRegister}>Create an account</button>
-        {' · '}<button type="button" className="link" onClick={onRequestAccess}>Request access</button>
+        {mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>Create an account</button></>
+          : mode === 'closed' && instance?.firstRun ? <>New server? <button type="button" className="link" onClick={onRegister}>Create the owner account</button> with the setup code from its log</>
+          : mode === 'closed' ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>Request access</button></>
+          : <>{mode === 'invite' ? 'Have an invitation?' : 'New here?'} <button type="button" className="link" onClick={onRegister}>Create an account</button>
+            {' · '}<button type="button" className="link" onClick={onRequestAccess}>Request access</button></>}
       </p>
     </form>
   )

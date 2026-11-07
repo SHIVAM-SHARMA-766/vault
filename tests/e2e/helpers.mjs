@@ -57,7 +57,12 @@ export async function start({ owner = 'owner@example.test' } = {}) {
   async function register(page, email, inviteCode) {
     await page.goto(`${base}/app/`)
     await page.getByRole('button', { name: 'Create an account' }).click()
-    if (inviteCode) await page.fill('#r-invite', inviteCode)
+    if (inviteCode) {
+      // On an open server the field is behind a link.
+      await page.waitForSelector('#r-invite, button:has-text("I have an invitation code")')
+      if (!(await page.locator('#r-invite').count())) await page.getByRole('button', { name: 'I have an invitation code' }).click()
+      await page.fill('#r-invite', inviteCode)
+    }
     await page.fill('#r-email', email)
     await page.fill('#r-password', PASSWORD)
     await page.fill('#r-confirm', PASSWORD)

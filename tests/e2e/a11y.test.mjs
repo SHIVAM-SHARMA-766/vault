@@ -30,13 +30,18 @@ test('every screen passes axe-core WCAG 2.1 AA, light and dark', async () => {
     for (const scheme of ['light', 'dark']) {
       const page = await s.person({ scheme, bypassCSP: true })
       for (const path of ['/', '/features', '/security', '/faq', '/get']) { await page.goto(`${s.base}${path}`); await audit(page, `${scheme} site ${path}`, found) }
+      // Closed (once an account exists): sign-in offers a request for access.
+      if (scheme === 'light') { const first = await s.person(); await s.register(first, 'first@example.test') }
+      await s.setRegistration(false)
       await page.goto(`${s.base}/app/`)
       await audit(page, `${scheme} sign-in`, found)
-      await page.getByRole('button', { name: 'Create an account' }).click()
-      await audit(page, `${scheme} register`, found)
-      await page.getByRole('button', { name: 'Back to sign in' }).click()
       await page.getByRole('button', { name: 'Request access' }).click()
       await audit(page, `${scheme} request access`, found)
+      // Open: sign-up.
+      await s.setRegistration(true)
+      await page.goto(`${s.base}/app/`)
+      await page.getByRole('button', { name: 'Create an account' }).click()
+      await audit(page, `${scheme} register`, found)
       await page.getByRole('button', { name: 'Back to sign in' }).click()
 
       const email = scheme === 'light' ? 'owner@example.test' : `dark-${Date.now()}@example.test`

@@ -28,15 +28,18 @@ test('roles see what they should, and a marketing edit goes live escaped', async
     const marketingCode = await invite(owner, 'SEO agency', 'marketing')
     const viewerCode = await invite(owner, 'Investor', 'viewer')
 
-    // Without a code, sign-up is refused.
+    // Without a code, sign-up cannot be sent: on an invite-only server the
+    // code is required, and the sign-in screen says an invitation is needed.
     const stranger = await s.person()
     await stranger.goto(`${s.base}/app/`)
+    await stranger.waitForSelector('.auth-switch:has-text("Have an invitation?")')
     await stranger.getByRole('button', { name: 'Create an account' }).click()
     await stranger.fill('#r-email', 'stranger@example.test')
     await stranger.fill('#r-password', 'a long and unguessable passphrase')
     await stranger.fill('#r-confirm', 'a long and unguessable passphrase')
     await stranger.click('button[type=submit]')
-    await stranger.waitForSelector('.alert-error', { timeout: 60_000 })
+    assert.equal(await stranger.locator('#r-invite:invalid').count(), 1)
+    assert.equal(await stranger.locator('.topbar').count(), 0)
 
     const seo = await s.person()
     await s.register(seo, 'seo@example.test', marketingCode)

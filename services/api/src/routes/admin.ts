@@ -321,6 +321,8 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
     supportUrl: profile.supportUrl,
     registration: app.allowRegistration ? 'open' : registration,
     mail: Boolean(app.mailer),
+    // A new server waiting for its owner: the sign-in screen offers the setup code.
+    firstRun: (await listRegistry(app)).length === 0,
   })
 }
 
