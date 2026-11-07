@@ -41,7 +41,9 @@ flowchart LR
 
 <img src="images/sign-in.png" alt="Sign-in screen" width="820">
 
-1. Open `/app/` and choose **Create an account** (or use the invitation code you were sent).
+1. Open `/app/` and choose **Create an account** — or open the invitation link you were
+   emailed, which fills the code in. (On a brand-new server, the owner uses the setup link
+   from the server's log instead; see [INSTALL.md](INSTALL.md#the-first-account).)
 2. Pick a long master password. The strength meter is a guide; a passphrase of four or more
    unrelated words works well.
 3. **Save the recovery key** shown next — print it or keep it in a safe place off this
@@ -204,7 +206,7 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 | Overview | ✓ | ✓ | | ✓ |
 | Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | read |
 | Change roles | ✓ | | | |
-| Invitations | ✓ | ✓ | | read |
+| Invitations (copy the code, or email it) | ✓ | ✓ | | read |
 | Registration mode (closed / invite / open) | ✓ | ✓ | | read |
 | Website: edit text, SEO, images | ✓ | ✓ | ✓ | read |
 | Website: publish, roll back | ✓ | ✓ | ✓ | |
@@ -215,8 +217,8 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 
 <img src="images/admin.png" alt="Admin overview: accounts, encrypted items, sessions, invitations, backups, registration mode, server" width="820">
 
-Counts, the last verified backup, the registration mode (closed, invite only, open) and the
-server's state. (Taken on the local development stack, which has no backups and forces
+Counts, the last verified backup, the registration mode (closed, invite only, open), whether
+mail is set up (with **Send test**), and the server's state. (Taken on the local development stack, which has no backups and forces
 registration open — hence the two notices.)
 </details>
 

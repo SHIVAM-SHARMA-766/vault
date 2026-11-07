@@ -60,8 +60,16 @@ Obtains a dump of the MySQL table or an export from Object Storage.
 Every entry field is AES-256-GCM ciphertext under a key derived from a password the
 server has never seen ([0001](../decisions/0001-cryptography-and-key-hierarchy.md)). Email
 addresses are HMAC'd under a pepper held outside the table, so the dump does not identify
-whose accounts these are. Backups are exports of already-encrypted data and need no
-separate protection.
+whose accounts these are. The reference instance's exports are dumps of already-encrypted
+data.
+
+Self-hosted backups (`.vbk`, [0013](../decisions/0013-distribution-and-releases.md)) are
+different in one way: they also carry the server pepper and token key, so that a file is a
+complete restore. They are therefore sealed as a whole — AES-256-GCM under a key from scrypt
+over the operator's `BACKUP_PASSPHRASE`, with the header authenticated — and a stolen backup
+without the passphrase yields neither the secrets nor the structure of the data. A stolen
+backup *with* the passphrase is equivalent to A2 plus the pepper: addresses could be tested
+against the digests, but vault contents remain encrypted under each user's own keys.
 
 Offline guessing against the wrapped Vault Key is bounded by PBKDF2 at 600,000
 iterations — tractable only against a weak master password, which is why a strength floor

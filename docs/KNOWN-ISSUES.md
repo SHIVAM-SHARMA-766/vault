@@ -5,7 +5,7 @@ the effect is, why it is the way it is, and what would change it. Plans live in
 [ROADMAP.md](ROADMAP.md); the adversaries behind the security items are in
 [threat-model.md](threat-model.md).
 
-Last revised: 2026-11-07
+Last revised: 2026-11-07 (phase 2)
 
 | Severity | Meaning |
 |---|---|
@@ -123,10 +123,28 @@ storage. Extension: phase 4. Android: phase 5.
 </details>
 
 <details>
-<summary>🟠 <b>Not yet installable by anyone else</b></summary>
+<summary>🟠 <b>Self-hosted releases are not published yet</b></summary>
 
-The reference instance is hand-built on OCI. A container image, first-run setup, PostgreSQL
-and SQLite support, and backups to any S3-compatible store are phase 2.
+The image, install profiles, backups, mail and signed-release workflow exist and are tested
+([INSTALL.md](INSTALL.md)), but no version has been tagged, and the update channel, licence
+and pricing are open decisions. Until then an install builds the image from source, which the
+profiles do by default. The personal profile has not yet been tried on a physical ARM board.
+</details>
+
+<details>
+<summary>🟠 <b>Self-hosted backups are taken in memory</b></summary>
+
+A backup reads every row into memory before sealing it. A vault server with tens of
+thousands of entries is a few tens of MB — fine for the intended sizes, worth streaming
+before very large installs. Off-site retention is the bucket's lifecycle rule, not Vault's.
+</details>
+
+<details>
+<summary>🟠 <b>Mail is tested against a stand-in, not a live SMTP server</b></summary>
+
+The API tests check every message Vault sends through an injected mailer; the SMTP connection
+itself is nodemailer's, configured to refuse plain text. The admin panel's "Send test" is
+the check against a real server.
 </details>
 
 ## The reference instance

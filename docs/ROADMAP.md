@@ -11,15 +11,15 @@ as what.
 | [KNOWN-ISSUES.md](KNOWN-ISSUES.md) | Limits and accepted risks of what exists today |
 | [`decisions/`](../decisions/) | Why things are the way they are |
 
-Last revised: 2026-11-07 (phase 1 closed, phase 2 started)
+Last revised: 2026-11-07 (phase 2 built)
 
 ## At a glance
 
 ```mermaid
 flowchart LR
   p0["Phase 0<br/>Foundation<br/>✅ done"]:::done --> p1["Phase 1<br/>Complete personal vault<br/>✅ closed · domain deferred"]:::done
-  p1 --> p2["Phase 2<br/>Self-hosted product<br/>🟡 in progress"]:::now
-  p2 --> p3["Phase 3<br/>Teams"]:::later
+  p1 --> p2["Phase 2<br/>Self-hosted product<br/>✅ built · 3 decisions open"]:::done
+  p2 --> p3["Phase 3<br/>Teams<br/>⬜ next"]:::next
   p3 --> p4["Phase 4<br/>Browser extension"]:::later
   p4 --> p5["Phase 5<br/>Android"]:::later
   p5 --> p6["Phase 6<br/>Enterprise"]:::later
@@ -33,8 +33,8 @@ flowchart LR
 |---|---|---|
 | 0 — Foundation | Keys for sharing, local stack, browser tests, release pipeline | ✅ Done 2026-11-06 |
 | 1 — Complete personal vault | Everything one person needs, hardened and monitored | ✅ Closed 2026-11-07; domain deferred, operator steps carried |
-| 2 — Self-hosted product | Anyone installs and upgrades it with one command | 🟡 Step 1 of 8 done |
-| 3 — Teams | Organizations, shared collections, policies | ⬜ Planned |
+| 2 — Self-hosted product | Anyone installs and upgrades it with one command | ✅ All 8 steps built 2026-11-07; licence, pricing and update channel still to decide |
+| 3 — Teams | Organizations, shared collections, policies | ⬜ Next |
 | 4 — Browser extension | Autofill, the main way a password manager is used | ⬜ Planned |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
 | 6 — Enterprise | SSO, SCIM, HA | ⬜ Planned |
@@ -67,7 +67,7 @@ by the hostname, which closes the largest accepted risk (threat A3) for everyone
 
 | Area | Today |
 |---|---|
-| Distribution | One hand-built reference instance; not yet installable by a customer (phase 2) |
+| Distribution | A container image and two Compose profiles anyone can install ([INSTALL.md](INSTALL.md)); signed releases on tag |
 | Cryptography | PBKDF2 → HKDF key hierarchy, random vault key, recovery key, AES-256-GCM everywhere, identity key pairs (P-256), encrypted export format ([0001](../decisions/0001-cryptography-and-key-hierarchy.md), [0009](../decisions/0009-identity-keys-and-sharing.md)) |
 | Vault | Seven entry types with their own fields, nested folders, custom fields, password history with restore, search, favourites, TOTP codes, generator, clipboard clearing, auto-lock, password health, import from nine formats, encrypted and CSV export |
 | Account | Change master password, recovery key sign-in and rotation, TOTP two-factor with recovery codes, signed-in devices, security activity |
@@ -75,7 +75,7 @@ by the hostname, which closes the largest accepted risk (threat A3) for everyone
 | API | Typed error codes, request ids, generated OpenAPI document, one configuration module |
 | Delivery | Merge to `main` → CI publishes → host pulls, verifies, rolls back ([0005](../decisions/0005-pull-based-releases.md), [0008](../decisions/0008-release-pipeline.md)) |
 | Operations | Health probe and eight OCI alarms, daily verified export, scripted restore drill |
-| Quality | 305 unit and API tests, 15 browser tests against the real stack, CI on every change |
+| Quality | 327 unit and API tests, 16 browser tests, CI on every change incl. the container, an install profile, backup/restore and upgrades |
 | Infrastructure | One always-free OCI instance, MySQL HeatWave (always free), $0 a month |
 
 ## How it compares
@@ -191,7 +191,7 @@ The core every later phase builds on must be finished and trustworthy first.
 **Decisions this phase still owes** — see [Open decisions](#open-decisions): secret key in the
 KDF, breach checks, Argon2id.
 
-### Phase 2 — The self-hosted product 🟡
+### Phase 2 — The self-hosted product ✅ (built 2026-11-07)
 
 What a customer installs. Built before teams because packaging, configuration and upgrades
 touch every part of the system, and are cheaper to get right while it is small.
@@ -200,39 +200,48 @@ touch every part of the system, and are cheaper to get right while it is small.
 
 | # | Step | State |
 |---|---|---|
-| 1 | Storage: SQLite and PostgreSQL beside MySQL, one contract suite, versioned migrations ([0012](../decisions/0012-storage-drivers-and-migrations.md)) | ✅ 2026-11-07 |
-| 2 | One server process serves the client, the site and the API (no Caddy required), with the same headers | ⬜ next |
-| 3 | Container image: multi-arch (amd64, arm64), non-root, health check | ⬜ |
-| 4 | First-run setup: a one-time token in the log creates the owner | ⬜ |
-| 5 | Install profiles: personal (one container + SQLite + automatic TLS) and business (Compose + PostgreSQL + reverse proxy); install docs | ⬜ |
-| 6 | Backups: scheduled encrypted exports to local disk or any S3-compatible store; restore tested in CI | ⬜ |
-| 7 | Mail: the customer's SMTP for invitations and security notices | ⬜ |
-| 8 | Supply chain and upgrades: signed images, SBOM, security policy, upgrade tested across releases | ⬜ |
+| 1 | Storage: SQLite and PostgreSQL beside MySQL, one contract suite, versioned migrations ([0012](../decisions/0012-storage-drivers-and-migrations.md)) | ✅ |
+| 2 | One server process serves the client, the site and the API, with the Caddyfile's headers | ✅ |
+| 3 | Container image: non-root, `/data` volume, health check, secrets generated on first start | ✅ |
+| 4 | First-run setup: a one-time link in the log creates the owner | ✅ |
+| 5 | Install profiles: personal (SQLite + Caddy) and business (PostgreSQL + Caddy); [INSTALL.md](INSTALL.md) | ✅ |
+| 6 | Backups: encrypted, to disk and any S3-compatible store; restore onto any driver, tested in CI | ✅ |
+| 7 | Mail: the customer's SMTP for invitations and sign-in / recovery notices | ✅ |
+| 8 | Supply chain and upgrades: multi-arch signed images with SBOM and provenance, [SECURITY.md](../SECURITY.md), upgrades tested | ✅ |
+
+All decided in [0013](../decisions/0013-distribution-and-releases.md). **Left for the operator:**
+choose the update channel, licence and pricing; tag the first release (`git tag v1.0.0`),
+which runs the image workflow.
 
 **Scope**
 
-- [ ] **Two install profiles from one image**:
+- [x] **Two install profiles from one image**:
   - *Personal*: one container with SQLite and built-in TLS — small enough for a Raspberry Pi
     or a free cloud VM, started with one command.
   - *Business*: Compose with PostgreSQL and a reverse proxy, documented for HA in phase 6.
   - A tarball with systemd units as the alternative to containers.
-- [ ] **First-run setup**: a one-time token in the server log lets the first visitor create the
+- [x] **First-run setup**: a one-time token in the server log lets the first visitor create the
   owner. Replaces `ALLOW_REGISTRATION` and `ADMIN_EMAILS` for customers.
 - [x] **Storage**: PostgreSQL alongside MySQL; SQLite for a single server. One store contract test
   suite that every adapter passes.
 - [x] **Schema migrations**: versioned, run on start, tested from every supported version.
-- [ ] **Backups**: scheduled encrypted exports to local disk or any S3-compatible store; restore
+- [x] **Backups**: scheduled encrypted exports to local disk or any S3-compatible store; restore
   documented and tested.
-- [ ] **Mail**: the customer's SMTP for invitations and security notices.
-- [ ] **Supply chain**: signed images and tarballs (signing key held outside CI in plain form),
+- [x] **Mail**: the customer's SMTP for invitations and security notices.
+- [x] **Supply chain**: signed images and tarballs (signing key held outside CI in plain form),
   SBOM, reproducible builds, a security policy and disclosure address.
-- [ ] **Admin documentation**: install, configure, upgrade, back up, restore, rotate secrets.
+- [x] **Admin documentation**: install, configure, upgrade, back up, restore, rotate secrets.
 - [ ] **Licensing**, once decided: verified offline, never a run-time dependency.
 
-**Exit criteria:** the personal profile runs on a 1 GB ARM board with one command; a fresh VM
-goes from nothing to a business install with a TLS domain in under fifteen minutes following
-the docs; an install upgrades across three releases without manual
-steps; a restore from backup is tested in CI; a tampered image is refused.
+**Exit criteria**
+
+| Criterion | State |
+|---|---|
+| Personal profile runs on a 1 GB ARM board with one command | ◐ the image is built for arm64 and runs in 218 MB; not yet tried on a real board |
+| Fresh VM to a business install with TLS in under 15 minutes, following the docs | ◐ the profile comes up on TLS in CI and locally in minutes; needs a real domain to time end to end |
+| Upgrades across releases without manual steps | ✅ every earlier schema migrates; CI upgrades the previous image's volume |
+| Restore from backup tested in CI | ✅ in the image job, into a fresh container |
+| A tampered image is refused | ◐ images are signed and `cosign verify` refuses a tampered one; verifying is the customer's step |
 
 ### Phase 3 — Teams
 
@@ -329,9 +338,9 @@ with guidance in the admin documentation.
 | Secret key in the KDF | 1 | Strongest protection against offline guessing after a breach |
 | Breach checks | 1 | Privacy trade-off; k-anonymity at best |
 | Argon2id | 1 | Needs WebAssembly in the crypto package |
-| Licence | 2 | Open source (AGPL, as Bitwarden), source-available, or proprietary with offline keys |
+| Licence | 2 → before the first public release | Open source (AGPL, as Bitwarden), source-available, or proprietary with offline keys |
 | Pricing | 2 | Per user, per server, or support contracts |
-| Update channel | 2 | Public registry, or a private one customers authenticate to |
+| Update channel | 2 → before the first public release | The workflow pushes to GHCR, private while the repo is. Public registry, or authenticated |
 | ~~Supported databases~~ | 2 | Decided: SQLite, PostgreSQL and MySQL 8 ([0012](../decisions/0012-storage-drivers-and-migrations.md)) |
 | Organization recovery | 3 | Opt-in, visible to members, or not offered |
 | iOS | 5 | Needs Apple hardware and an account |
