@@ -212,6 +212,18 @@ wait — the protection is procedural, not cryptographic, and is documented as s
 contacts are confirmed by fingerprint (A11), the grantor chooses the wait, and every request and
 access is recorded in the grantor's activity.
 
+### A15 — A hostile server issuing its own collection keys
+
+A compromised server cannot read anything already shared, but it could create a new key
+version itself, seal it to members' public keys (sealing needs only public keys) and serve it as
+a rotation; members would then encrypt *new* shared items under a key the server knows.
+Fingerprint confirmation (A11) does not cover this, because sealed key grants are not yet signed
+by the member who made them. Mitigation today: a rotation is recorded in the organization's
+audit log with its actor, and a member's app opens only the version the server says is current.
+**Planned fix:** sign every org-key and collection-key grant with the granting member's identity
+(a signing key beside the encryption key) and verify it against confirmed members' keys.
+Found by the phase 3.5 independent review.
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).
@@ -227,6 +239,10 @@ and issuing a new recovery key both require proof of the current master password
 password reset, of the recovery key), checked by the server. A stolen access token can read
 ciphertext for fifteen minutes; it cannot take the account's ways back in away from its owner.
 
+
+Collection items are stored per organization and collection (`COLLI#<org>#<collection>`):
+the independent review found that keying them by collection id alone let a same-id collection
+in another organization reach them; fixed with a one-time migration.
 
 **Now that sharing exists** ([0015](../decisions/0015-organizations-and-collections.md)):
 nothing is sealed to a member until an admin confirms them. The Organizations screen shows the

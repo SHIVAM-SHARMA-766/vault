@@ -290,12 +290,18 @@ phase that adds no new surface and makes everything existing better. A second cl
 multiplies the cost of every rough edge, so they are paid down first.
 
 - [ ] Organization recovery: decide whether to offer it at all ([0016](../decisions/0016-teams-completion.md)).
-- [ ] Security review of everything since phase 1; revisit [KNOWN-ISSUES.md](KNOWN-ISSUES.md)
-  and close what can be closed (the three phase 1 crypto decisions among them).
-- [ ] Performance: unlock and search on a vault of 5,000 items, backup streaming, bundle size.
-- [ ] Accessibility (keyboard, screen readers, contrast) and mobile polish across every screen.
+- [x] Independent security review of everything since phase 1: one critical (cross-organization
+  item access) and five medium/low findings fixed with regression tests; one design gap
+  recorded as threat A15 (signed key grants).
+- [ ] Decide the crypto questions: signed key grants (A15), secret key in the KDF, breach checks,
+  Argon2id.
+- [x] Performance: 5,000-item vault unlocks in **1.1 s** at 4× CPU throttle (was 4.2 s) — imported
+  keys cached (dropped on wipe), long lists drawn incrementally; first load 111 → 77 KB gzipped.
+  `node scripts/bench.mjs`. Backup streaming not needed at intended sizes.
+- [x] Accessibility: every screen passes axe-core WCAG 2.1 AA in light and dark (contrast fixed),
+  checked in CI.
 - [ ] Error messages, empty states and onboarding reviewed end to end.
-- [ ] Test gaps: real export files for import, a live SMTP test, an ARM board, a timed install.
+- [ ] Test gaps: ~~a live SMTP test~~ (done: STARTTLS delivery and plain-text refusal, in CI); real export files for import, an ARM board, a timed install — need the operator.
 - [ ] Documentation and screenshots refreshed.
 
 **Exit criteria:** no open 🔴 item in KNOWN-ISSUES without a recorded decision; every screen

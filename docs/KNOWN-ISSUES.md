@@ -5,7 +5,7 @@ the effect is, why it is the way it is, and what would change it. Plans live in
 [ROADMAP.md](ROADMAP.md); the adversaries behind the security items are in
 [threat-model.md](threat-model.md).
 
-Last revised: 2026-11-07 (phase 2)
+Last revised: 2026-11-07 (phase 3.5 review)
 
 | Severity | Meaning |
 |---|---|
@@ -80,6 +80,15 @@ can read ciphertext in that window; it still needs the vault key to read anythin
 **Changes when** revocation needs to be instant: a per-session check on each request.
 </details>
 
+<details>
+<summary>🔴 <b>Collection key grants are not signed (threat A15)</b></summary>
+
+A compromised server could issue a collection key of its own as a "rotation", and members would
+encrypt new shared items under it. Nothing already shared is exposed. The fix — signing each key
+grant with the granting member's identity and verifying it — needs a signing key on every
+account and is the first item of the open crypto decisions.
+</details>
+
 ## Product gaps
 
 <details>
@@ -129,6 +138,9 @@ recovery is not offered. ([0016](../decisions/0016-teams-completion.md))
 
 <details>
 <summary>🟡 <b>Rotation re-encrypts a collection in one request</b></summary>
+
+(Items the rotating member cannot decrypt are dropped, so a damaged or planted item never
+blocks re-keying.)
 
 A collection is re-keyed in a single request carrying every item, so very large collections
 (several thousand items) approach the request size limit. Fine at intended sizes; batched

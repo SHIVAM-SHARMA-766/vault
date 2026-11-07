@@ -58,8 +58,9 @@ import real export files from three managers; three crypto decisions.
 CI. Left for the operator: decide the update channel, licence and pricing
 ([docs/ROADMAP.md](docs/ROADMAP.md#open-decisions)), then tag the first release.
 
-**Phase 3A — service desk: built** (2026-11-07). **Phase 3B — teams: built** (all 9 steps). **Next: phase 3.5, the improvement pass**, then the
-browser extension. Then **phase 3.5, an improvement pass**,
+**Phase 3A — service desk: built** (2026-11-07). **Phase 3B — teams: built and deployed.** **Phase 3.5 — improvement pass: in progress** —
+performance, accessibility, security review and live-mail tests done; open decisions and
+operator-only test gaps remain. Then **phase 3.5, an improvement pass**,
 before the browser extension ([docs/ROADMAP.md](docs/ROADMAP.md#phase-35--improvement-pass)).
 
 Carried over: remove the AWS resources (needs new personal AWS keys).
@@ -78,6 +79,16 @@ Carried over: remove the AWS resources (needs new personal AWS keys).
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 3.5, first half.** *Security*: an independent review found a **critical**
+flaw — shared items were keyed by collection id alone, so a same-id collection in another
+organization could reach them — fixed (organization-scoped storage, one-time migration) along
+with a desk 2FA reset that ignored rank, registration revealing taken addresses, forged
+`X-Forwarded-For` hops, a TOTP double-use race, and account deletion leaving org memberships.
+One design gap recorded (A15: unsigned key grants). *Performance*: 5,000 items unlock in 1.1 s
+at 4× CPU throttle (was 4.2 s); first load 31% smaller. *Accessibility*: every screen passes
+WCAG 2.1 AA (axe-core) in light and dark, in CI. *Mail*: delivered over STARTTLS to a real SMTP
+server and refused without it, in CI.
 
 **2026-11-07 — Phase 3B, steps 4–9: teams complete.** *Rotation*: re-key a collection in one
 checked request — new version, items re-encrypted, re-sealed to remaining members; automatic
