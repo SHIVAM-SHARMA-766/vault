@@ -892,3 +892,18 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .generator-mode { grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
+
+/* Admin → Invitations → Invite many */
+.bulk-invite { grid-column: 1 / -1; margin-bottom: 14px; }
+.bulk-invite h2 { font-size: 15px; margin-bottom: 10px; }
+.bulk-invite textarea { font-family: var(--mono); font-size: 13px; }
+.bulk-codes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; font-size: 13px; }
+.bulk-codes li { display: flex; gap: 12px; justify-content: space-between; }
+
+/* Admin → Overview → Finish setting up */
+.admin-checklist { margin-bottom: 16px; }
+.admin-checklist .admin-card-head .muted { margin-left: auto; }
+.admin-checklist ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.admin-checklist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+.admin-checklist .gs-mark { width: 18px; height: 18px; }
+.admin-checklist .gs-done > span:last-child { color: var(--muted); text-decoration: line-through; }

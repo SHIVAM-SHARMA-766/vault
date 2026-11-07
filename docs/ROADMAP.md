@@ -321,7 +321,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ⬜ A6 No-domain mode (DuckDNS / Cloudflare Tunnel guide)
 
 **B. An organization on its own server**
-- ⬜ B1 Setup checklist in the admin panel · ⬜ B2 Bulk invite (CSV, group on invite, resend) · ⬜ B3 Branding (logo, colours)
+- ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column; group-on-invite and resend still open) · ⬜ B3 Branding (logo, colours)
 - ⬜ B4 Member onboarding · ⬜ B5 Helm chart and reverse-proxy guides · ⬜ B6 Metrics endpoint and dashboard
 - ⬜ B7 Audit export and SIEM stream · ⬜ B8 SSO (OIDC) · ⬜ B9 Offboarding with automatic rotation
 

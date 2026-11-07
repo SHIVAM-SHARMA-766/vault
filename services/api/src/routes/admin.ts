@@ -334,6 +334,53 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
   })
 }
 
+/** Invitations do not work while registration is closed; say so at the
+ *  moment one is made, rather than when the invitee is refused. */
+async function closedWarning(app: App): Promise<{ warning?: string }> {
+  if (app.allowRegistration) return {}
+  const { registration } = await getSettings(app)
+  return registration === 'closed' ? { warning: 'Registration is closed, so these invitations will not work until you set it to Invite only (Overview → Registration).' } : {}
+}
+
+/** At most this many invitations in one request. */
+export const BULK_INVITE_MAX = 100
+
+/** Many invitations at once: a list of people (an address, and a name the
+ *  admin will recognise), one role and one lifetime. Each address is used to
+ *  send and dropped, as with a single invitation; without mail the codes come
+ *  back for the admin to hand out. Validated whole before anything is made. */
+export async function bulkInviteRoute(app: App, actor: string, actorRole: Role, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ people?: unknown; days?: unknown; role?: unknown }>(event)
+  if (!Array.isArray(body.people) || body.people.length === 0) throw badRequest('people must be a non-empty list.')
+  if (body.people.length > BULK_INVITE_MAX) throw badRequest(`At most ${BULK_INVITE_MAX} people at a time.`)
+  const role = body.role === undefined ? 'user' : body.role
+  if (!(GRANTABLE_ROLES as readonly unknown[]).includes(role)) throw badRequest(`role must be one of: ${GRANTABLE_ROLES.join(', ')}.`)
+  if (role !== 'user' && !can(actorRole, 'roles.write')) throw forbidden()
+  const days = body.days === undefined ? 7 : body.days
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30) throw badRequest('days must be a whole number from 1 to 30.')
+
+  const seen = new Set<string>()
+  const people = body.people.map((p, i) => {
+    const r = (p && typeof p === 'object' ? p : {}) as Record<string, unknown>
+    let email: string
+    try { email = requireEmail(r['email']).trim().toLowerCase() } catch { throw badRequest(`Line ${i + 1}: not an email address.`) }
+    if (seen.has(email)) throw badRequest(`Line ${i + 1}: ${email} is listed twice.`)
+    seen.add(email)
+    const name = typeof r['name'] === 'string' ? r['name'].trim() : ''
+    if (name.length > 80) throw badRequest(`Line ${i + 1}: the name is longer than 80 characters.`)
+    return { email, label: name || `Invitation ${i + 1}` }
+  })
+
+  await audit(app, actor, 'invite.bulk', undefined, `${people.length} (${role as string})`)
+  const results = []
+  for (const p of people) {
+    const { code, invite } = await createInvite(app, actor, p.label, days, role as string)
+    const emailed = await notify(app, { to: p.email, ...inviteMessage(app.config.origin, code, p.label, invite.expiresAt) })
+    results.push({ email: p.email, label: p.label, emailed, expiresAt: invite.expiresAt, ...(emailed ? {} : { code }) })
+  }
+  return json(201, { results, mail: Boolean(app.mailer), ...(await closedWarning(app)) })
+}
+
 export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
   const now = app.now()
   const invites = (await listInvites(app))
@@ -372,7 +419,7 @@ export async function createInviteRoute(app: App, actor: string, actorRole: Role
   // The address is used to send and then dropped; only the label is kept.
   const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
   // The code is returned exactly once. Only its hash is stored.
-  return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role } })
+  return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role }, ...(await closedWarning(app)) })
 }
 
 export async function deleteInviteRoute(app: App, actor: string, id: string): Promise<LambdaResponse> {

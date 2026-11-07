@@ -3733,6 +3733,36 @@
         }
       }
     },
+    "/api/admin/invites/bulk": {
+      "post": {
+        "summary": "Invite many people at once",
+        "operationId": "postAdminInvitesBulk",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "invites.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/invites/{id}": {
       "delete": {
         "summary": "Withdraw an invitation",

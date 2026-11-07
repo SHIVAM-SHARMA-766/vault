@@ -366,8 +366,10 @@ export const api = {
     setRegistration: (token: string, registration: RegistrationMode) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
     invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),
+    bulkInvite: (token: string, people: { email: string; name?: string }[], days: number, role: Role) =>
+      request<{ results: { email: string; label: string; emailed: boolean; expiresAt: string; code?: string }[]; mail: boolean; warning?: string }>('POST', '/api/admin/invites/bulk', { token, body: { people, days, role } }),
     createInvite: (token: string, label: string, days: number, role: Role = 'user', email = '') =>
-      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
+      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role }; warning?: string }>(
         'POST', '/api/admin/invites', { token, body: { label, days, role, ...(email ? { email } : {}) } },
       ),
     orgs: (token: string) => request<{ orgs: AdminOrg[] }>('GET', '/api/admin/orgs', { token }),
