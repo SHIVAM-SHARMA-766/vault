@@ -18,6 +18,7 @@ import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
 import { Activity, Devices } from './Devices.js'
 import { Backups } from './Backups.js'
+import { DeleteAccount } from './DeleteAccount.js'
 import { Emergency } from './Emergency.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
@@ -98,6 +99,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
                 {me?.fingerprint ? <CopyButton value={me.fingerprint} label="Fingerprint" /> : null}
               </div>
             </section>
+            <DeleteAccount state={state} twoFactor={me?.twoFactor.enabled ?? false} />
           </> : null}
 
           {tab === 'security' ? <>

@@ -313,6 +313,8 @@ export const api = {
     request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
   revokeSession: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`, { token }),
+  deleteAccount: (token: string, body: { currentAuthKey: string; confirm: 'DELETE'; totpCode?: string }) =>
+    request<{ ok: true }>('POST', '/api/account/delete', { token, body }),
   /** What anyone may know about this server before signing in. */
   instance: () => request<Instance>('GET', '/api/instance'),
   prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),

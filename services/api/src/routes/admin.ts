@@ -249,12 +249,20 @@ export async function deleteUser(app: App, actor: string, actorRole: Role, event
   const { owned } = await leaveAllOrgs(app, id, true)
   if (owned.length) throw new HttpError(409, 'conflict', `This account owns ${owned.length} organization(s) (${owned.join(', ')}). Delete them first under Organizations.`)
   await audit(app, actor, 'user.delete', id, reg.label)
+  await eraseAccount(app, id, reg.emailDigest)
+  return json(200, { ok: true })
+}
+
+/** Removes an account and everything it holds: its partition (vault,
+ *  history, sessions, preferences, backups), its address pointer, its place
+ *  in the registry, and its backup schedule; it leaves its organizations.
+ *  The caller has already refused when it owns any. */
+export async function eraseAccount(app: App, id: string, emailDigest: string): Promise<void> {
   await leaveAllOrgs(app, id, false)
   for (const item of await app.store.query(userPk(id))) await app.store.delete(item.pk, item.sk)
-  await app.store.delete(emailPk(reg.emailDigest), EMAIL_SK)
+  await app.store.delete(emailPk(emailDigest), EMAIL_SK)
   await app.store.delete(SYSTEM_PK, registrySk(id))
   await app.store.delete(SYSTEM_PK, bkdueSk(id))
-  return json(200, { ok: true })
 }
 
 export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
