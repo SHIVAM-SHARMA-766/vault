@@ -13,6 +13,7 @@ import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
 import * as desk from './routes/desk.js'
+import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
@@ -51,6 +52,7 @@ export function buildRouter(app: App): Router {
     }, { auth: 'access' as const })
 
   router.post('/api/auth/logout', authed((u, e) => auth.logout(app, u, e)), 'Revoke one session, or all of them')
+  router.put('/api/auth/password-score', authed((u, e) => auth.setPasswordScore(app, u, e)), 'Report the master password\'s strength score, for organization policies')
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)), 'Replace the recovery key')
@@ -70,6 +72,18 @@ export function buildRouter(app: App): Router {
   router.post('/api/desk/tickets/:id/messages', authed((u, e, id) => desk.replyAsRequester(app, u, e, id)), 'Reply to my ticket')
   router.post('/api/desk/tickets/:id/close', authed((u, _e, id) => desk.closeAsRequester(app, u, id)), 'Close my ticket')
 
+  // Emergency access (routes/emergency.ts).
+  router.get('/api/emergency', authed((u) => emergency.mine(app, u)), 'People who may request access to my vault')
+  router.post('/api/emergency', authed((u, e) => emergency.create(app, u, e)), 'Name a trusted contact for emergency access')
+  router.get('/api/emergency/trusted', authed((u) => emergency.trusted(app, u)), 'Vaults I may request access to, and invitations')
+  router.post('/api/emergency/:id/accept', authed((u, _e, id) => emergency.accept(app, u, id)), 'Accept being a trusted contact')
+  router.post('/api/emergency/:id/confirm', authed((u, e, id) => emergency.confirm(app, u, e, id)), 'Confirm a contact by fingerprint: seal my vault key to them')
+  router.post('/api/emergency/:id/request', authed((u, e, id) => emergency.request(app, u, e, id)), 'Request emergency access')
+  router.post('/api/emergency/:id/approve', authed((u, _e, id) => emergency.decide(app, u, id, true)), 'Approve a pending request now')
+  router.post('/api/emergency/:id/reject', authed((u, _e, id) => emergency.decide(app, u, id, false)), 'Reject a pending request')
+  router.delete('/api/emergency/:id', authed((u, _e, id) => emergency.revoke(app, u, id)), 'Remove a trusted contact')
+  router.get('/api/emergency/:id/vault', authed((u, e, id) => emergency.vault(app, u, e, id)), 'The grantor\'s sealed vault, read-only, once access is open')
+
   // Organizations, collections and shared items (routes/orgs.ts).
   router.get('/api/orgs', authed((u) => orgs.myOrgs(app, u)), 'My organizations, with my sealed org key')
   router.post('/api/orgs', authed((u, e) => orgs.createOrg(app, u, e)), 'Create an organization')
@@ -83,10 +97,22 @@ export function buildRouter(app: App): Router {
   router.post('/api/orgs/:org/members/:user/confirm', authedP((u, e, [o, t]) => orgs.confirmMember(app, u, e, o!, t!)), 'Confirm a member by fingerprint: send them the org key')
   router.put('/api/orgs/:org/members/:user', authedP((u, e, [o, t]) => orgs.setMemberRole(app, u, e, o!, t!)), 'Change a member\'s role (owner)')
   router.delete('/api/orgs/:org/members/:user', authedP((u, _e, [o, t]) => orgs.removeMember(app, u, o!, t!)), 'Remove a member, or leave')
+  router.put('/api/orgs/:org/policies', authedP((u, e, [o]) => orgs.setPolicies(app, u, e, o!)), 'Set the organization\'s policies')
+  router.get('/api/orgs/:org/compliance', authedP((u, _e, [o]) => orgs.compliance(app, u, o!)), 'Which members do not meet the policies')
+  router.post('/api/orgs/:org/events', authedP((u, e, [o]) => orgs.reportEvent(app, u, e, o!)), 'Report opening, revealing or copying a shared item')
+  router.get('/api/orgs/:org/events', authedP((u, _e, [o]) => orgs.events(app, u, o!)), 'The organization\'s access audit (admins)')
+  router.get('/api/orgs/:org/groups', authedP((u, _e, [o]) => orgs.groups(app, u, o!)), 'Groups, their members and the collections granted to them')
+  router.post('/api/orgs/:org/groups', authedP((u, e, [o]) => orgs.createGroup(app, u, e, o!)), 'Create a group')
+  router.delete('/api/orgs/:org/groups/:group', authedP((u, _e, [o, g]) => orgs.deleteGroup(app, u, o!, g!)), 'Delete a group and the access it granted')
+  router.put('/api/orgs/:org/groups/:group/members/:user', authedP((u, _e, [o, g, t]) => orgs.addGroupMember(app, u, o!, g!, t!)), 'Add a member to a group')
+  router.delete('/api/orgs/:org/groups/:group/members/:user', authedP((u, _e, [o, g, t]) => orgs.removeGroupMember(app, u, o!, g!, t!)), 'Remove a member from a group')
+  router.put('/api/orgs/:org/collections/:coll/groups/:group', authedP((u, e, [o, c, g]) => orgs.grantGroup(app, u, e, o!, c!, g!)), 'Grant a collection to a group')
+  router.delete('/api/orgs/:org/collections/:coll/groups/:group', authedP((u, _e, [o, c, g]) => orgs.revokeGroup(app, u, o!, c!, g!)), 'Revoke a group\'s access to a collection')
   router.get('/api/orgs/:org/collections', authedP((u, _e, [o]) => orgs.collections(app, u, o!)), 'Collections, with my sealed key for each I can open')
   router.post('/api/orgs/:org/collections', authedP((u, e, [o]) => orgs.createCollection(app, u, e, o!)), 'Create a collection')
   router.put('/api/orgs/:org/collections/:coll', authedP((u, e, [o, c]) => orgs.renameCollection(app, u, e, o!, c!)), 'Rename a collection')
   router.delete('/api/orgs/:org/collections/:coll', authedP((u, _e, [o, c]) => orgs.deleteCollection(app, u, o!, c!)), 'Delete a collection and its items')
+  router.post('/api/orgs/:org/collections/:coll/rotate', authedP((u, e, [o, c]) => orgs.rotateCollection(app, u, e, o!, c!)), 'Replace a collection key: re-sealed grants and re-encrypted items, all at once')
   router.get('/api/orgs/:org/collections/:coll/access', authedP((u, _e, [o, c]) => orgs.collectionAccess(app, u, o!, c!)), 'Who can open a collection')
   router.put('/api/orgs/:org/collections/:coll/access/:user', authedP((u, e, [o, c, t]) => orgs.grantAccess(app, u, e, o!, c!, t!)), 'Grant or change a member\'s access')
   router.delete('/api/orgs/:org/collections/:coll/access/:user', authedP((u, _e, [o, c, t]) => orgs.revokeAccess(app, u, o!, c!, t!)), 'Revoke a member\'s access')
@@ -129,6 +155,8 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)), 'Create an invitation code')
   router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)), 'Withdraw an invitation')
   router.post('/api/admin/mail/test', admined('settings.write', (u, e) => admin.testMail(app, u, e)), 'Send a test email')
+  router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
+  router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)), 'Staff audit log')
 
   router.get('/api/admin/desk', admined('desk.read', () => desk.queue(app)), 'The service desk queue')

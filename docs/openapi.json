@@ -42,9 +42,10 @@
               "too_large",
               "rate_limited",
               "unavailable",
+              "policy_required",
               "internal"
             ],
-            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\ninternal: An unexpected error. Quote `requestId` when reporting it."
+            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\npolicy_required: An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.\ninternal: An unexpected error. Quote `requestId` when reporting it."
           },
           "message": {
             "type": "string",
@@ -291,6 +292,35 @@
       "post": {
         "summary": "Revoke one session, or all of them",
         "operationId": "postAuthLogout",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password-score": {
+      "put": {
+        "summary": "Report the master password's strength score, for organization policies",
+        "operationId": "putAuthPasswordScore",
         "tags": [
           "auth"
         ],
@@ -828,6 +858,364 @@
         }
       }
     },
+    "/api/emergency": {
+      "get": {
+        "summary": "People who may request access to my vault",
+        "operationId": "getEmergency",
+        "tags": [
+          "emergency"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Name a trusted contact for emergency access",
+        "operationId": "postEmergency",
+        "tags": [
+          "emergency"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/trusted": {
+      "get": {
+        "summary": "Vaults I may request access to, and invitations",
+        "operationId": "getEmergencyTrusted",
+        "tags": [
+          "emergency"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}/accept": {
+      "post": {
+        "summary": "Accept being a trusted contact",
+        "operationId": "postEmergencyIdAccept",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}/confirm": {
+      "post": {
+        "summary": "Confirm a contact by fingerprint: seal my vault key to them",
+        "operationId": "postEmergencyIdConfirm",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}/request": {
+      "post": {
+        "summary": "Request emergency access",
+        "operationId": "postEmergencyIdRequest",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}/approve": {
+      "post": {
+        "summary": "Approve a pending request now",
+        "operationId": "postEmergencyIdApprove",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}/reject": {
+      "post": {
+        "summary": "Reject a pending request",
+        "operationId": "postEmergencyIdReject",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}": {
+      "delete": {
+        "summary": "Remove a trusted contact",
+        "operationId": "deleteEmergencyId",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/emergency/{id}/vault": {
+      "get": {
+        "summary": "The grantor's sealed vault, read-only, once access is open",
+        "operationId": "getEmergencyIdVault",
+        "tags": [
+          "emergency"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/orgs": {
       "get": {
         "summary": "My organizations, with my sealed org key",
@@ -1294,6 +1682,499 @@
         }
       }
     },
+    "/api/orgs/{org}/policies": {
+      "put": {
+        "summary": "Set the organization's policies",
+        "operationId": "putOrgsOrgPolicies",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/compliance": {
+      "get": {
+        "summary": "Which members do not meet the policies",
+        "operationId": "getOrgsOrgCompliance",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/events": {
+      "post": {
+        "summary": "Report opening, revealing or copying a shared item",
+        "operationId": "postOrgsOrgEvents",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "The organization's access audit (admins)",
+        "operationId": "getOrgsOrgEvents",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/groups": {
+      "get": {
+        "summary": "Groups, their members and the collections granted to them",
+        "operationId": "getOrgsOrgGroups",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a group",
+        "operationId": "postOrgsOrgGroups",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/groups/{group}": {
+      "delete": {
+        "summary": "Delete a group and the access it granted",
+        "operationId": "deleteOrgsOrgGroupsGroup",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/groups/{group}/members/{user}": {
+      "put": {
+        "summary": "Add a member to a group",
+        "operationId": "putOrgsOrgGroupsGroupMembersUser",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove a member from a group",
+        "operationId": "deleteOrgsOrgGroupsGroupMembersUser",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/collections/{coll}/groups/{group}": {
+      "put": {
+        "summary": "Grant a collection to a group",
+        "operationId": "putOrgsOrgCollectionsCollGroupsGroup",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "coll",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Revoke a group's access to a collection",
+        "operationId": "deleteOrgsOrgCollectionsCollGroupsGroup",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "coll",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "group",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/orgs/{org}/collections": {
       "get": {
         "summary": "Collections, with my sealed key for each I can open",
@@ -1419,6 +2300,53 @@
       "delete": {
         "summary": "Delete a collection and its items",
         "operationId": "deleteOrgsOrgCollectionsColl",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "coll",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/collections/{coll}/rotate": {
+      "post": {
+        "summary": "Replace a collection key: re-sealed grants and re-encrypted items, all at once",
+        "operationId": "postOrgsOrgCollectionsCollRotate",
         "tags": [
           "orgs"
         ],
@@ -2556,6 +3484,76 @@
           }
         ],
         "x-permission": "settings.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/orgs": {
+      "get": {
+        "summary": "Every organization, by counts (operator view)",
+        "operationId": "getAdminOrgs",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/orgs/{org}": {
+      "delete": {
+        "summary": "Delete an organization and everything in it (operator, audited)",
+        "operationId": "deleteAdminOrgsOrg",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
         "responses": {
           "2XX": {
             "description": "Success. JSON."

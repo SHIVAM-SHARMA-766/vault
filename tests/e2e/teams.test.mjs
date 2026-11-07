@@ -72,11 +72,19 @@ test('share a collection between two people, confirmed by fingerprint, then remo
     await bob.waitForSelector('.detail .badge:has-text("View only")')
     assert.equal(await bob.getByRole('button', { name: 'Edit' }).isDisabled(), true)
 
-    // Alice removes Bob; he loses the collection.
+    // Alice removes Bob; he loses the collection. First, the audit shows he opened it.
     await orgsPage(s, alice)
+    await alice.getByRole('button', { name: 'Activity…' }).click()
+    await alice.waitForSelector('.audit li:has-text("Bob opened AWS root in Finance")')
     alice.once('dialog', (d) => d.accept())
     await alice.getByRole('button', { name: 'Remove Bob' }).click()
-    await alice.waitForSelector('.collection-row:has-text("Key rotation due")')
+    // Removal re-keys the collection automatically: Bob's old key is retired.
+    await alice.waitForSelector('text=1 of 1 collection key(s) rotated')
+    assert.equal(await alice.locator('.collection-row:has-text("Key rotation due")').count(), 0)
+    await s.menu(alice, 'Vault')
+    await alice.getByRole('button', { name: /Finance/ }).click()
+    await alice.locator('.row-item', { hasText: 'AWS root' }).click()
+    await alice.waitForSelector('.detail h2:has-text("AWS root")')
     await bob.reload(); await s.unlock(bob, 'bob@example.test')
     await s.menu(bob, 'Vault')
     await bob.waitForSelector('.sidebar')

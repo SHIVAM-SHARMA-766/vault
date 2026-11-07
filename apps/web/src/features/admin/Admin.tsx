@@ -30,13 +30,14 @@ import { CopyButton, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { href, navigate } from '../../lib/router.js'
 
-type Tab = 'overview' | 'desk' | 'website' | 'users' | 'invites' | 'audit'
+type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit'
 
 const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => JSX.Element }[] = [
   { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
   { id: 'desk', label: 'Service desk', needs: 'desk.read', Icon: IconInbox },
   { id: 'website', label: 'Website', needs: 'site.read', Icon: IconGlobe },
   { id: 'users', label: 'Users', needs: 'users.read', Icon: IconUser },
+  { id: 'orgs', label: 'Organizations', needs: 'users.read', Icon: IconGrid },
   { id: 'invites', label: 'Invitations', needs: 'invites.read', Icon: IconKey },
   { id: 'audit', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
 ]
@@ -87,6 +88,7 @@ export function Admin({ state, tab: requested }: { state: session.Unlocked; tab:
           {tab === 'desk' && perms.has('desk.read') ? <Desk selfId={state.userId} canWrite={perms.has('desk.write')} canApprove={perms.has('invites.write')} canReset={perms.has('users.write')} /> : null}
           {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
           {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
+          {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} /> : null}
           {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
           {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
         </main>
@@ -458,6 +460,41 @@ const ACTIONS: Record<string, string> = {
   'site.discard-draft': 'Discarded the website draft',
   'media.upload': 'Uploaded an image',
   'media.delete': 'Deleted an image',
+}
+
+const loadOrgs = (t: string) => api.admin.orgs(t)
+
+function AdminOrgs({ canWrite }: { canWrite: boolean }) {
+  const toast = useToast()
+  const { data, error, reload } = useAdminData(loadOrgs)
+  return (
+    <Section title="Organizations" sub="Every organization on this server, by counts. Names, collections and items are encrypted for their members; nobody here can open them.">
+      <ErrorBox error={error} />
+      {!data ? <div className="skeletons"><div className="skeleton" /></div> : data.orgs.length === 0 ? <div className="empty"><h3>No organizations yet</h3><p>Members create them from Account menu → Organizations.</p></div> : (
+        <div className="table-wrap">
+          <table className="data">
+            <thead><tr><th>Name (as typed by its creator)</th><th className="num">Members</th><th className="num">Collections</th><th className="num">Items</th><th>Policies</th><th>Created</th>{canWrite ? <th aria-label="Actions" /> : null}</tr></thead>
+            <tbody>
+              {data.orgs.map((o) => (
+                <tr key={o.id}>
+                  <td>{o.hint || <span className="muted">Unnamed</span>}{o.rotationDue ? <span className="pill pill-danger" title="A collection key should be rotated by one of its managers">{o.rotationDue} key rotation due</span> : null}</td>
+                  <td className="num" title={`${o.awaiting} awaiting confirmation, ${o.pending} invited`}>{o.members}{o.awaiting + o.pending ? <span className="muted"> +{o.awaiting + o.pending}</span> : null}</td>
+                  <td className="num">{o.collections}</td>
+                  <td className="num">{o.items}</td>
+                  <td>{[o.policies.requireTwoFactor && '2FA', o.policies.minPasswordScore > 0 && 'password', o.policies.maxIdleMinutes && `${o.policies.maxIdleMinutes} min lock`].filter(Boolean).join(' · ') || <span className="muted">none</span>}</td>
+                  <td>{when(o.createdAt)}</td>
+                  {canWrite ? <td><button className="icon-btn icon-danger" aria-label={`Delete ${o.hint}`} title="Delete organization" onClick={async () => {
+                    if (!window.confirm(`Delete "${o.hint}" and everything in it — its collections and their items — for all its members? This cannot be undone and is recorded in the audit log.`)) return
+                    if (await run(toast, (t) => api.admin.deleteOrg(t, o.id), 'Organization deleted')) await reload()
+                  }}><IconTrash size={15} /></button></td> : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Section>
+  )
 }
 
 function Audit() {

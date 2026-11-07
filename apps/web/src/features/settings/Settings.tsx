@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { passwordStrength } from '@vault/core'
 import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey } from '@vault/crypto'
 
 import { ApiError, api } from '../../lib/api.js'
@@ -14,6 +15,7 @@ import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../..
 import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
 import { Activity, Devices } from './Devices.js'
+import { Emergency } from './Emergency.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 
 const MIN_LENGTH = 12
@@ -65,6 +67,7 @@ export function Settings({ state }: { state: session.Unlocked }) {
           </div>
         </section>
 
+        <Emergency state={state} />
         <Devices />
         <Activity />
       </main>
@@ -98,6 +101,7 @@ function ChangePassword({ state }: { state: session.Unlocked }) {
         kdf: changed.kdf, accessToken: res.accessToken, refreshToken: res.refreshToken,
         accessExpiresAt: session.expiresAtFrom(res),
       })
+      void api.passwordScore(res.accessToken, passwordStrength(next).score).catch(() => {})
       setCurrent(''); setNext(''); setConfirm('')
       toast('Master password changed. Other devices have been signed out.')
     } catch (err) {

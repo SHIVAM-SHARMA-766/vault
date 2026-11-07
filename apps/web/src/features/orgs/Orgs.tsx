@@ -84,6 +84,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
   const [email, setEmail] = useState('')
   const [label, setLabel] = useState('')
   const [collName, setCollName] = useState('')
+  const [groupsList, setGroupsList] = useState<GroupView[]>([])
   const colls = teams.collections.filter((c) => c.orgId === org.id)
 
   const loadMembers = async () => {
@@ -106,6 +107,9 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
     <section className="settings-card org-card" aria-label={org.name}>
       <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill pill-accent">{org.role}</span></div>
 
+      {org.policyGap ? <p className="alert alert-warn"><IconAlert size={16} />{org.policyGap} Until then, its collections stay closed to you.</p> : null}
+      {admin ? <PoliciesForm org={org} teams={teams} /> : <PolicySummary org={org} />}
+
       <h3 className="small-head">Members</h3>
       <ul className="device-list">
         {members.map((m) => (
@@ -122,8 +126,14 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
                 <button className="icon-btn icon-danger" aria-label={`Remove ${m.label}`} title="Remove" onClick={async () => {
                   if (!window.confirm(`Remove ${m.label}? They lose access at once.`)) return
                   const r = await api.orgs.removeMember(await session.token(), org.id, m.userId)
-                  toast(r.rotationNeeded.length ? `Removed. ${r.rotationNeeded.length} collection key(s) should be rotated.` : 'Removed')
                   await loadMembers(); await teams.load()
+                  // Re-key what they could open, where this admin can.
+                  let rotated = 0
+                  for (const cid of r.rotationNeeded) {
+                    if (teams.collections.find((c) => c.id === cid)?.permission !== 'manage') continue
+                    try { await teams.rotate(cid); rotated++ } catch { /* left marked; the Rotate button retries */ }
+                  }
+                  toast(r.rotationNeeded.length ? `Removed. ${rotated} of ${r.rotationNeeded.length} collection key(s) rotated.` : 'Removed')
                 }}><IconX size={15} /></button>
               ) : null}
             </div>
@@ -164,10 +174,14 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
         </form>
       ) : null}
 
+      {admin ? <Activity org={org} teams={teams} members={members} /> : null}
+
+      <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
+
       <h3 className="small-head">Collections</h3>
       {colls.length === 0 ? <p className="muted small">No collections yet.</p> : (
         <ul className="device-list">
-          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={members} />)}
+          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={members} groups={groupsList} />)}
         </ul>
       )}
       {admin ? (
@@ -184,13 +198,14 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
   )
 }
 
-function CollectionRow({ c, teams, members }: { c: CollectionView; teams: Teams; members: OrgMember[] }) {
+function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams: Teams; members: OrgMember[]; groups: { id: string; name: string }[] }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [grants, setGrants] = useState<{ userId: string; permission: SharePermission; hidePasswords: boolean }[]>([])
   const [who, setWho] = useState('')
   const [perm, setPerm] = useState<SharePermission>('view')
   const [hide, setHide] = useState(false)
+  const [group, setGroup] = useState('')
   const manage = c.permission === 'manage'
   const load = async () => setGrants((await api.orgs.access(await session.token(), c.orgId, c.id)).access)
 
@@ -227,11 +242,176 @@ function CollectionRow({ c, teams, members }: { c: CollectionView; teams: Teams;
               <label className="check"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /><span>Hide passwords</span></label>
               <button className="btn btn-secondary btn-sm" type="submit" disabled={!who}>Share</button>
             </form>
+            {groups.length ? (
+              <form className="inline-form" onSubmit={async (e) => {
+                e.preventDefault()
+                try { await teams.grantGroup(c.id, group, perm, hide); toast('Group given access'); setGroup(''); await load() }
+                catch (err) { toast(err instanceof Error ? err.message : 'Could not share.', 'error') }
+              }}>
+                <select aria-label="Group" required value={group} onChange={(e) => setGroup(e.target.value)}>
+                  <option value="">Give access to a group…</option>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+                <button className="btn btn-secondary btn-sm" type="submit" disabled={!group}>Share with group</button>
+              </form>
+            ) : null}
             <p className="hint">"Hide passwords" is a policy the app follows, not encryption: anyone who can open a collection holds its key.</p>
           </div>
         ) : null}
       </div>
-      {manage ? <button className="btn btn-secondary btn-sm" onClick={async () => { if (!open) await load(); setOpen(!open) }}>{open ? 'Done' : 'Access'}</button> : null}
+      {manage ? <div className="device-actions">
+        {c.rotationNeeded ? <button className="btn btn-primary btn-sm" onClick={async () => {
+          try { await teams.rotate(c.id); toast(`${c.name}: key rotated`) } catch (err) { toast(err instanceof Error ? err.message : 'Could not rotate.', 'error') }
+        }}>Rotate key</button> : null}
+        <button className="btn btn-secondary btn-sm" onClick={async () => { if (!open) await load(); setOpen(!open) }}>{open ? 'Done' : 'Access'}</button>
+      </div> : null}
     </li>
+  )
+}
+
+interface GroupView { id: string; name: string; members: string[] }
+
+function Groups({ org, teams, members, admin, list, setList }: {
+  org: OrgView; teams: Teams; members: OrgMember[]; admin: boolean; list: GroupView[]; setList: (l: GroupView[]) => void
+}) {
+  const toast = useToast()
+  const [name, setName] = useState('')
+  const [adding, setAdding] = useState<Record<string, string>>({})
+  const load = async () => {
+    const { groups } = await api.orgs.groups(await session.token(), org.id)
+    const named = await Promise.all(groups.map(async (g) => ({ id: g.id, members: g.members, name: await teams.groupName(org.id, g.id, g.nameBlob) })))
+    setList(named)
+  }
+  useEffect(() => { void load() }, [org.id, teams.collections.length])
+  const label = (u: string) => members.find((m) => m.userId === u)?.label ?? 'Member'
+
+  if (!admin && list.length === 0) return null
+  return (
+    <>
+      <h3 className="small-head">Groups</h3>
+      {list.length === 0 ? <p className="muted small">No groups yet. A group lets you give a whole team access to a collection at once.</p> : (
+        <ul className="device-list">
+          {list.map((g) => (
+            <li key={g.id} className="device-row group-row">
+              <div className="device-text">
+                <span className="device-name"><IconUser size={15} /> {g.name}</span>
+                <span className="group-members">
+                  {g.members.length === 0 ? <span className="muted small">No members</span> : g.members.map((u) => (
+                    <span key={u} className="pill">{label(u)}
+                      {admin ? <button className="pill-x" aria-label={`Remove ${label(u)} from ${g.name}`} onClick={async () => {
+                        const r = await api.orgs.removeFromGroup(await session.token(), org.id, g.id, u)
+                        await teams.load()
+                        for (const cid of r.rotationNeeded) { try { await teams.rotate(cid) } catch { /* stays marked */ } }
+                        toast(`${label(u)} removed from ${g.name}`); await load()
+                      }}>×</button> : null}
+                    </span>
+                  ))}
+                </span>
+              </div>
+              {admin ? (
+                <form className="inline-form" onSubmit={async (e) => {
+                  e.preventDefault()
+                  const u = adding[g.id]; const m = members.find((x) => x.userId === u)
+                  if (!m) return
+                  try {
+                    const r = await teams.addToGroup(org.id, g.id, m.userId, m.publicKey)
+                    toast(r.skipped ? `${m.label} added; ${r.skipped} collection(s) need someone who can manage them to share` : `${m.label} added to ${g.name}`)
+                    setAdding({ ...adding, [g.id]: '' }); await load(); await teams.load()
+                  } catch (err) { toast(err instanceof Error ? err.message : 'Could not add.', 'error') }
+                }}>
+                  <select aria-label={`Add to ${g.name}`} value={adding[g.id] ?? ''} onChange={(e) => setAdding({ ...adding, [g.id]: e.target.value })}>
+                    <option value="">Add member…</option>
+                    {members.filter((m) => m.status === 'confirmed' && !g.members.includes(m.userId)).map((m) => <option key={m.userId} value={m.userId}>{m.label}</option>)}
+                  </select>
+                  <button className="btn btn-secondary btn-sm" type="submit" disabled={!adding[g.id]}>Add</button>
+                </form>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {admin ? (
+        <form className="inline-form" onSubmit={async (e) => {
+          e.preventDefault()
+          try { await teams.createGroup(org.id, name.trim()); setName(''); await load(); toast('Group created') }
+          catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
+        }}>
+          <input required placeholder="New group, e.g. Engineering" aria-label="New group name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="btn btn-secondary btn-sm" type="submit"><IconPlus size={14} />Add group</button>
+        </form>
+      ) : null}
+    </>
+  )
+}
+
+function PolicySummary({ org }: { org: OrgView }) {
+  const p = org.policies
+  const rules = [p.requireTwoFactor && 'two-factor sign-in', p.minPasswordScore > 0 && `a master password rated at least ${STRENGTH[p.minPasswordScore]}`, p.maxIdleMinutes && `locking after ${p.maxIdleMinutes} minutes idle`].filter(Boolean)
+  return rules.length ? <p className="muted small">This organization requires {rules.join(', ')}.</p> : null
+}
+
+const STRENGTH = ['', 'Weak', 'Fair', 'Strong', 'Excellent']
+
+function PoliciesForm({ org, teams }: { org: OrgView; teams: Teams }) {
+  const toast = useToast()
+  const [p, setP] = useState(org.policies)
+  const [open, setOpen] = useState(false)
+  if (!open) return <div className="policy-line"><PolicySummary org={org} /><button className="link small" onClick={() => setOpen(true)}>Policies…</button></div>
+  return (
+    <form className="policies" onSubmit={async (e) => {
+      e.preventDefault()
+      try { await api.orgs.setPolicies(await session.token(), org.id, p); toast('Policies saved'); setOpen(false); await teams.load() }
+      catch (err) { toast(err instanceof Error ? err.message : 'Could not save.', 'error') }
+    }}>
+      <h3 className="small-head">Policies</h3>
+      <label className="check"><input type="checkbox" checked={p.requireTwoFactor} onChange={(e) => setP({ ...p, requireTwoFactor: e.target.checked })} /><span>Require two-factor sign-in (checked by the server)</span></label>
+      <div className="field"><label htmlFor={`pol-pw-${org.id}`}>Minimum master password strength</label>
+        <select id={`pol-pw-${org.id}`} value={p.minPasswordScore} onChange={(e) => setP({ ...p, minPasswordScore: Number(e.target.value) })}>
+          <option value={0}>No minimum</option>{[2, 3, 4].map((n) => <option key={n} value={n}>{STRENGTH[n]}</option>)}
+        </select>
+        <p className="hint">Rated by each member's app when they unlock — the server never sees a master password, so this is self-reported.</p>
+      </div>
+      <div className="field"><label htmlFor={`pol-idle-${org.id}`}>Lock after idle</label>
+        <select id={`pol-idle-${org.id}`} value={p.maxIdleMinutes ?? ''} onChange={(e) => setP({ ...p, maxIdleMinutes: e.target.value ? Number(e.target.value) : null })}>
+          <option value="">15 minutes (default)</option>{[1, 5, 10].map((n) => <option key={n} value={n}>{n} minutes</option>)}
+        </select>
+      </div>
+      <p className="alert alert-warn"><IconAlert size={16} />Policies apply to everyone here, you included. Members who do not meet them cannot open the organization's collections until they do.</p>
+      <div className="settings-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary btn-sm">Save policies</button></div>
+    </form>
+  )
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  'item.view': 'opened', 'item.reveal': 'revealed a secret in', 'item.copy': 'copied from', 'item.create': 'added', 'item.edit': 'edited', 'item.delete': 'deleted',
+  'access.grant': 'gave access to', 'access.change': 'changed access to', 'access.revoke': 'removed access to', 'access.grant-group': 'gave a group access to',
+  'collection.create': 'created', 'collection.delete': 'deleted', 'collection.rotate': 'rotated the key of',
+  'member.invite': 'invited', 'member.confirm': 'confirmed', 'member.remove': 'removed', 'member.leave': 'left', 'policies.change': 'changed the policies',
+}
+
+function Activity({ org, teams, members }: { org: OrgView; teams: Teams; members: OrgMember[] }) {
+  const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState<Awaited<ReturnType<typeof api.orgs.events>>['events']>([])
+  const who = (u: string | null) => members.find((m) => m.userId === u)?.label ?? (u ? 'A former member' : '—')
+  const item = (id: string | null) => teams.shared.find((e) => e.id === id)?.name ?? (id ? 'an item' : '')
+  const coll = (id: string | null) => teams.collections.find((c) => c.id === id)?.name ?? ''
+  return (
+    <div className="policy-line">
+      <button className="link small" onClick={async () => { if (!open) setEvents((await api.orgs.events(await session.token(), org.id)).events); setOpen(!open) }}>{open ? 'Hide activity' : 'Activity…'}</button>
+      {open ? (
+        <div className="audit">
+          <p className="muted small">Who did what, for a year. Opening, revealing and copying are reported by each member's app.</p>
+          <ul className="activity-list">
+            {events.length === 0 ? <li className="muted small">Nothing yet.</li> : events.map((e, i) => {
+              const target = e.action.startsWith('item.') ? `${item(e.itemId)} in ${coll(e.collectionId)}`
+                : e.action.startsWith('access.') || e.action.startsWith('collection.') ? coll(e.collectionId) + (e.target && e.action !== 'access.grant-group' ? ` (${who(e.target)})` : '')
+                : e.action.startsWith('member.') ? (members.find((m) => m.userId === e.target)?.label ?? e.target ?? '') : ''
+              return <li key={i}><span><strong>{who(e.actor)}</strong> {ACTION_LABEL[e.action] ?? e.action} {target}</span>
+                <span className="muted small">{new Date(e.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}{e.reported ? ' · reported by app' : ''}</span></li>
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   )
 }

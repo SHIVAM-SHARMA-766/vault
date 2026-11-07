@@ -814,3 +814,15 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .access-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .access-list li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
 .access-panel .inline-form { flex-wrap: wrap; gap: 6px; }
+.group-members { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.pill-x { background: none; border: 0; padding: 0 0 0 4px; cursor: pointer; color: inherit; font: inherit; }
+.group-row { align-items: flex-start; }
+.policies { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+.list-alert { margin: 0 12px 8px; }
+.policy-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
+.policy-line p { margin: 0; }
+.audit { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; max-height: 360px; overflow-y: auto; }
+.emergency-form { margin-top: 10px; }
+.emergency-view { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
+.emergency-entry { border-top: 1px solid var(--line); padding: 8px 0; }
+.emergency-entry summary { cursor: pointer; font-weight: 600; }

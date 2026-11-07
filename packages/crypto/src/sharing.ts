@@ -45,6 +45,7 @@ export interface CollectionMeta { name: string; parentId?: string }
 
 const orgMetaAad = (orgId: string) => utf8Encode(`vault.org.v1:${orgId}`)
 const collectionMetaAad = (orgId: string, collectionId: string) => utf8Encode(`vault.collection.v1:${orgId}:${collectionId}`)
+const groupMetaAad = (orgId: string, groupId: string) => utf8Encode(`vault.group.v1:${orgId}:${groupId}`)
 const itemAad = (collectionId: string, itemId: string, version: number) => utf8Encode(`vault.collection-item.v1:${collectionId}:${itemId}:v${version}`)
 
 export const sealOrgMeta = (orgId: string, meta: OrgMeta, orgKey: Uint8Array) => sealJson(orgKey, meta, orgMetaAad(orgId))
@@ -55,9 +56,20 @@ export const sealCollectionMeta = (orgId: string, collectionId: string, meta: Co
 export const openCollectionMeta = (orgId: string, collectionId: string, blob: string, orgKey: Uint8Array) =>
   unsealJson<CollectionMeta>(orgKey, blob, collectionMetaAad(orgId, collectionId))
 
+export interface GroupMeta { name: string }
+export const sealGroupMeta = (orgId: string, groupId: string, meta: GroupMeta, orgKey: Uint8Array) => sealJson(orgKey, meta, groupMetaAad(orgId, groupId))
+export const openGroupMeta = (orgId: string, groupId: string, blob: string, orgKey: Uint8Array) => unsealJson<GroupMeta>(orgKey, blob, groupMetaAad(orgId, groupId))
+
 /** An item in a collection: the same content as a personal entry, under the
  *  collection key, bound to its collection, its id and the key version. */
 export const sealSharedItem = (collectionId: string, itemId: string, version: number, content: EntryContent, key: Uint8Array) =>
   sealJson(key, content, itemAad(collectionId, itemId, version))
 export const openSharedItem = (collectionId: string, itemId: string, version: number, blob: string, key: Uint8Array) =>
   unsealJson<EntryContent>(key, blob, itemAad(collectionId, itemId, version))
+
+/** Emergency access: an account's vault key, sealed to a trusted contact's
+ *  public key, bound to that emergency grant. */
+export const sealEmergencyKey = (granteePublicKey: Uint8Array, vaultKey: Uint8Array, grantId: string): Promise<string> =>
+  sealForRecipient(granteePublicKey, vaultKey, `emergency-access:${grantId}`)
+export const openEmergencyKey = (privateKey: Uint8Array, ownPublicKey: Uint8Array, blob: string, grantId: string): Promise<Uint8Array> =>
+  openFromSender(privateKey, ownPublicKey, blob, `emergency-access:${grantId}`)

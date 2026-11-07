@@ -19,8 +19,8 @@ Last revised: 2026-11-07 (phase 2 built)
 flowchart LR
   p0["Phase 0<br/>Foundation<br/>✅ done"]:::done --> p1["Phase 1<br/>Complete personal vault<br/>✅ closed · domain deferred"]:::done
   p1 --> p2["Phase 2<br/>Self-hosted product<br/>✅ built · 3 decisions open"]:::done
-  p2 --> p3["Phase 3<br/>Service desk ✅ · teams 3 of 9<br/>🟡 in progress"]:::now
-  p3 --> p35["Phase 3.5<br/>Improvement pass"]:::next
+  p2 --> p3["Phase 3<br/>Service desk · teams<br/>✅ built"]:::done
+  p3 --> p35["Phase 3.5<br/>Improvement pass<br/>⬜ next"]:::next
   p35 --> p4["Phase 4<br/>Browser extension"]:::later
   p4 --> p5["Phase 5<br/>Android"]:::later
   p5 --> p6["Phase 6<br/>Enterprise"]:::later
@@ -35,8 +35,8 @@ flowchart LR
 | 0 — Foundation | Keys for sharing, local stack, browser tests, release pipeline | ✅ Done 2026-11-06 |
 | 1 — Complete personal vault | Everything one person needs, hardened and monitored | ✅ Closed 2026-11-07; domain deferred, operator steps carried |
 | 2 — Self-hosted product | Anyone installs and upgrades it with one command | ✅ All 8 steps built 2026-11-07; licence, pricing and update channel still to decide |
-| 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | 🟡 Service desk built; teams steps 1–3 of 9 built |
-| 3.5 — Improvement pass | Harden, polish and speed up everything built so far, before a second client | ⬜ Planned |
+| 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | ✅ Built 2026-11-07 |
+| 3.5 — Improvement pass | Harden, polish and speed up everything built so far, before a second client | ⬜ Next |
 | 4 — Browser extension | Autofill, the main way a password manager is used | ⬜ Planned |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
 | 6 — Enterprise | SSO, SCIM, HA | ⬜ Planned |
@@ -100,11 +100,11 @@ where it lands.
 | Two-factor sign-in for the account | ✓ | ✓ | ✓ TOTP | 1 |
 | Device and session management | ✓ | ✓ | ✓ | 1 |
 | Secret key mixed into the KDF | — | ✓ | — | 1 (decision needed) |
-| Organizations, teams, shared collections | ✓ | ✓ | ◐ keys only | 3 |
-| Per-collection permissions, hide-password | ✓ | ✓ | — | 3 |
-| Organization policies (password strength, 2FA required) | ✓ | ✓ | — | 3 |
-| Per-item access audit | ✓ | ✓ | ◐ admin actions only | 3 |
-| Emergency / break-glass access | ✓ | ✓ | — | 3 |
+| Organizations, teams, shared collections | ✓ | ✓ | ✓ | 3 |
+| Per-collection permissions, hide-password | ✓ | ✓ | ✓ | 3 |
+| Organization policies (password strength, 2FA required) | ✓ | ✓ | ✓ | 3 |
+| Per-item access audit | ✓ | ✓ | ✓ | 3 |
+| Emergency / break-glass access | ✓ | ✓ | ✓ | 3 |
 | Browser extension with autofill | ✓ | ✓ | — | 4 |
 | Passkeys | ◐ | ✓ | — | 4–5 |
 | Mobile apps with autofill and biometrics | ✓ | ✓ | — | 5 |
@@ -245,7 +245,7 @@ which runs the image workflow.
 | Restore from backup tested in CI | ✅ in the image job, into a fresh container |
 | A tampered image is refused | ◐ images are signed and `cosign verify` refuses a tampered one; verifying is the customer's step |
 
-### Phase 3 — Service desk, then teams
+### Phase 3 — Service desk, then teams ✅ (built 2026-11-07)
 
 **Part A — Service desk (ITSM) ✅ built 2026-11-07** ([0014](../decisions/0014-service-desk.md)). Requested by the operator on 2026-11-07: the
 product needs its own help and support, so access requests, sign-in problems and questions
@@ -272,12 +272,12 @@ generate exactly these requests, and because a company evaluating Vault expects 
 | 1 | Organizations: create, invite by address, accept, **confirm by fingerprint**, remove | ✅ 2026-11-07 |
 | 2 | Collections: create, seal the key to members, move items in and out, shared items in the vault | ✅ 2026-11-07 |
 | 3 | Permissions per collection: view, edit, manage; hide passwords as a labelled policy | ✅ 2026-11-07 |
-| 4 | Removal rotates collection keys and re-encrypts | ⬜ next |
-| 5 | Groups, so collections are granted to teams | ⬜ |
-| 6 | Organization policies: 2FA required, master password strength, session length | ⬜ |
-| 7 | Access audit: who opened, copied, edited or shared which item | ⬜ |
-| 8 | Emergency access; organization recovery as an opt-in, visible policy | ⬜ |
-| 9 | Organization administration grows in the admin panel; operator roles stay for running the service | ⬜ |
+| 4 | Removal rotates collection keys and re-encrypts | ✅ 2026-11-07 |
+| 5 | Groups, so collections are granted to teams | ✅ 2026-11-07 |
+| 6 | Organization policies: 2FA required, master password strength, session length | ✅ 2026-11-07 |
+| 7 | Access audit: who opened, copied, edited or shared which item | ✅ 2026-11-07 |
+| 8 | Emergency access ✅; organization recovery — not built, an open decision for 3.5 ([0016](../decisions/0016-teams-completion.md)) | ✅ 2026-11-07 |
+| 9 | Organization administration grows in the admin panel; operator roles stay for running the service | ✅ 2026-11-07 |
 
 **Exit criteria:** two people in an organization share a collection, one is removed and cannot
 read anything added after; every step has browser tests with two browsers; threat A11 is
@@ -289,6 +289,7 @@ Requested by the operator on 2026-11-07: once teams are done and before the exte
 phase that adds no new surface and makes everything existing better. A second client
 multiplies the cost of every rough edge, so they are paid down first.
 
+- [ ] Organization recovery: decide whether to offer it at all ([0016](../decisions/0016-teams-completion.md)).
 - [ ] Security review of everything since phase 1; revisit [KNOWN-ISSUES.md](KNOWN-ISSUES.md)
   and close what can be closed (the three phase 1 crypto decisions among them).
 - [ ] Performance: unlock and search on a vault of 5,000 items, backup streaming, bundle size.
@@ -379,7 +380,7 @@ with guidance in the admin documentation.
 | Pricing | 2 | Per user, per server, or support contracts |
 | Update channel | 2 → before the first public release | The workflow pushes to GHCR, private while the repo is. Public registry, or authenticated |
 | ~~Supported databases~~ | 2 | Decided: SQLite, PostgreSQL and MySQL 8 ([0012](../decisions/0012-storage-drivers-and-migrations.md)) |
-| Organization recovery | 3 | Opt-in, visible to members, or not offered |
+| Organization recovery | 3.5 | Not built ([0016](../decisions/0016-teams-completion.md)). Opt-in, visible to members, or not offered |
 | iOS | 5 | Needs Apple hardware and an account |
 
 ## Risks

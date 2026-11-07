@@ -12,6 +12,7 @@ import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { inviteMessage, notify } from '../mail.js'
 import { openTicketCount } from './desk.js'
+import { purgeOrg } from './orgs.js'
 import { requireEmail } from '../validate.js'
 import {
   BACKUP_SK,
@@ -137,6 +138,15 @@ export async function testMail(app: App, actor: string, event: LambdaEvent): Pro
     throw new HttpError(400, 'bad_request', `The mail server refused it: ${(err as Error).message}`)
   }
   return json(200, { sent: true })
+}
+
+export async function deleteOrgAsOperator(app: App, actor: string, orgId: string): Promise<LambdaResponse> {
+  if (!isValidId(orgId)) throw notFound()
+  const meta = await app.store.get(`ORG#${orgId}`, 'META')
+  if (!meta) throw notFound()
+  await audit(app, actor, 'org.delete', orgId, String(meta['hint'] ?? ''))
+  await purgeOrg(app, orgId)
+  return json(200, { ok: true })
 }
 
 export async function listUsers(app: App): Promise<LambdaResponse> {

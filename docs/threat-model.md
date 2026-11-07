@@ -202,6 +202,16 @@ requests are rate-limited and reveal nothing about whether an address has an acc
 reset never touches the master password or the vault key: the attacker still needs the master
 password.
 
+### A14 — Emergency access released early
+
+A trusted contact, alone or with a compromised server, tries to read a grantor's vault without
+waiting. The contact cannot: the sealed vault key is withheld until the grantor approves or the
+waiting period after a visible request has passed, and the grantor is shown the request in
+Settings and in their security activity. A **server** that colludes with the contact can skip the
+wait — the protection is procedural, not cryptographic, and is documented as such. Mitigations:
+contacts are confirmed by fingerprint (A11), the grantor chooses the wait, and every request and
+access is recorded in the grantor's activity.
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

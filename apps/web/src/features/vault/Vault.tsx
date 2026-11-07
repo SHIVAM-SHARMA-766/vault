@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ISSUES, analyse, descendants, folderPath, matches, subtitle, typeSpec } from '@vault/core'
 
 import { Link } from '../../lib/router.js'
+import { api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
 import { Monogram, TYPES, typeInfo, useToast } from '../../ui/kit.js'
@@ -212,6 +213,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
           </div>
 
           {vault.error ? <p className="alert alert-error"><IconAlert size={16} />{vault.error}</p> : null}
+          {teams.orgs.filter((o) => o.policyGap).map((o) => <p key={o.id} className="alert alert-warn list-alert"><IconAlert size={16} />{o.name}: {o.policyGap}</p>)}
 
           {vault.loading ? (
             <div className="skeletons">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="skeleton" />)}</div>
@@ -251,6 +253,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: `${c.orgName} / ${c.name}` }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}
                          onUnshare={() => { const sh = sharedOf(selected); if (sh) void moveToVault(sh) }}
+                         onAudit={(action) => { const sh = sharedOf(selected); if (sh) void session.token().then((t) => api.orgs.report(t, sh.orgId, action, sh.collectionId, sh.id)).catch(() => {}) }}
                          onBack={() => setSelectedId(null)}
                          onEdit={() => setMode({ kind: 'edit', draft: withTypeDefaults(contentOf(selected)), id: selected.id })}
                          onToggleFavorite={() => { void save({ ...contentOf(selected), favorite: !selected.favorite }, selected.id) }}
