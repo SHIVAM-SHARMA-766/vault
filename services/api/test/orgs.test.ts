@@ -267,3 +267,19 @@ test('the access audit records writes and grants itself, and the opens and copie
   assert.equal(copy.actor, bob.userId)
   assert.equal(copy.reported, true)
 })
+
+test('the server operator sees organizations by counts only, and can delete one (audited)', async () => {
+  const h = harness()
+  const { alice, orgId } = await orgWithCollection(h)
+  const { emailDigest } = await import('../src/identity.js')
+  h.app.adminDigests = new Set([emailDigest('op@example.test', h.app.config.pepper)])
+  const op = await person(h, 'op@example.test')
+  const list = (await h.request('GET', '/api/admin/orgs', { token: op.token })).body['orgs'] as { id: string; hint: string; members: number; collections: number; ownerId: string }[]
+  assert.deepEqual(list.map((o) => [o.id, o.hint, o.members, o.collections, o.ownerId]), [[orgId, 'Acme', 1, 1, alice.userId]])
+  assert.equal(JSON.stringify(list).includes('nameBlob'), false, 'no sealed blobs are sent to the operator')
+  assert.equal((await h.request('GET', '/api/admin/orgs', { token: alice.token })).status, 403, 'not for ordinary members')
+  assert.equal((await h.request('DELETE', `/api/admin/orgs/${orgId}`, { token: op.token })).status, 200)
+  assert.equal(((await h.request('GET', '/api/orgs', { token: alice.token })).body['orgs'] as unknown[]).length, 0)
+  const audit = (await h.request('GET', '/api/admin/audit', { token: op.token })).body['records'] as { action: string }[]
+  assert.ok(audit.some((r) => r.action === 'org.delete'))
+})

@@ -22,7 +22,7 @@ import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, conflict,
 import { emailDigest } from '../identity.js'
 import {
   COLLECTION_PREFIX, ITEM_PREFIX, ORG_INVITE_PREFIX, ORG_MEMBER_PREFIX, ORG_META_SK, ORG_PENDING_PREFIX, PROFILE_SK, USER_ORG_PREFIX,
-  GROUP_ACCESS_PREFIX, GROUP_PREFIX, ORG_EVENT_PREFIX, orgEventSk, accessPrefix, accessSk, collectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
+  GROUP_ACCESS_PREFIX, GROUP_PREFIX, ORG_EVENT_PREFIX, SYSTEM_ORG_PREFIX, SYSTEM_PK, orgEventSk, systemOrgSk, accessPrefix, accessSk, collectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
   orgPk, userOrgSk, userPk,
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
@@ -213,6 +213,7 @@ export async function createOrg(app: App, userId: string, event: LambdaEvent): P
   const owner: Member = { pk: orgPk(orgId), sk: orgMemberSk(userId), userId, role: 'owner', status: 'confirmed', label: label(b['label']) || 'Owner', publicKey, orgKeyBlob, joinedAt: at, confirmedAt: at }
   await app.store.put(owner)
   await app.store.put({ pk: userPk(userId), sk: userOrgSk(orgId), orgId })
+  await app.store.put({ pk: SYSTEM_PK, sk: systemOrgSk(orgId), orgId, createdAt: at, createdBy: userId })
   return json(201, { id: orgId })
 }
 
@@ -235,6 +236,12 @@ export async function myOrgs(app: App, userId: string): Promise<LambdaResponse> 
 
 export async function deleteOrg(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
   await requireMember(app, orgId, userId, { owner: true })
+  await purgeOrg(app, orgId)
+  return json(200, { ok: true })
+}
+
+/** Removes an organization and everything in it. */
+export async function purgeOrg(app: App, orgId: string): Promise<void> {
   for (const c of await app.store.query(orgPk(orgId), COLLECTION_PREFIX)) {
     for (const i of await app.store.query(collectionItemsPk(String(c['id'])))) await app.store.delete(i.pk, i.sk)
   }
@@ -243,7 +250,33 @@ export async function deleteOrg(app: App, userId: string, orgId: string): Promis
     if (row.sk.startsWith(ORG_PENDING_PREFIX)) await app.store.delete(emailPk(row.sk.slice(ORG_PENDING_PREFIX.length)), orgInviteSk(orgId))
     await app.store.delete(row.pk, row.sk)
   }
-  return json(200, { ok: true })
+  await app.store.delete(SYSTEM_PK, systemOrgSk(orgId))
+}
+
+/** For the server operator: every organization, by counts and the display
+ *  name its creator typed — never its contents, which they cannot open. */
+export async function adminList(app: App): Promise<LambdaResponse> {
+  const index = await app.store.query(SYSTEM_PK, SYSTEM_ORG_PREFIX)
+  const out = []
+  for (const ix of index) {
+    const orgId = String(ix['orgId'])
+    const rows = await app.store.query(orgPk(orgId))
+    const meta = rows.find((r) => r.sk === ORG_META_SK)
+    if (!meta) continue
+    const members = rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[]
+    const colls = rows.filter((r) => r.sk.startsWith(COLLECTION_PREFIX)) as Collection[]
+    let items = 0
+    for (const c of colls) items += (await app.store.query(collectionItemsPk(c.id), ITEM_PREFIX)).length
+    out.push({
+      id: orgId, hint: meta['hint'] ?? '', createdAt: meta['createdAt'], ownerId: members.find((m) => m.role === 'owner')?.userId ?? null,
+      members: members.filter((m) => m.status === 'confirmed').length, awaiting: members.filter((m) => m.status !== 'confirmed').length,
+      pending: rows.filter((r) => r.sk.startsWith(ORG_PENDING_PREFIX)).length, collections: colls.length, items,
+      rotationDue: colls.filter((c) => c.rotationNeeded).length,
+      policies: { ...DEFAULT_POLICIES, ...((meta['policies'] as Partial<Policies>) ?? {}) },
+    })
+  }
+  out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+  return json(200, { orgs: out })
 }
 
 export async function setPolicies(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {

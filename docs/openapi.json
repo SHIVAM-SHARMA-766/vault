@@ -3501,6 +3501,76 @@
         }
       }
     },
+    "/api/admin/orgs": {
+      "get": {
+        "summary": "Every organization, by counts (operator view)",
+        "operationId": "getAdminOrgs",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/orgs/{org}": {
+      "delete": {
+        "summary": "Delete an organization and everything in it (operator, audited)",
+        "operationId": "deleteAdminOrgsOrg",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/audit": {
       "get": {
         "summary": "Staff audit log",

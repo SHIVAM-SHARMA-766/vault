@@ -317,6 +317,8 @@ export const api = {
       request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
         'POST', '/api/admin/invites', { token, body: { label, days, role, ...(email ? { email } : {}) } },
       ),
+    orgs: (token: string) => request<{ orgs: AdminOrg[] }>('GET', '/api/admin/orgs', { token }),
+    deleteOrg: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/admin/orgs/${id}`, { token }),
     desk: (token: string) => request<{ tickets: StaffTicket[]; counts: Record<TicketStatus, number> }>('GET', '/api/admin/desk', { token }),
     ticket: (token: string, id: string) =>
       request<{ ticket: StaffTicket; messages: TicketMessage[] }>('GET', `/api/admin/desk/${encodeURIComponent(id)}`, { token }),
@@ -351,6 +353,10 @@ export const api = {
 
 export interface EmergencyGrant { id: string; label: string; waitDays: number; status: string; granteePublicKey: string | null; requestedAt: string | null; opensAt: string | null }
 export interface EmergencyTrust { id: string; fromName: string; waitDays: number; status: string; requestedAt: string | null; opensAt: string | null }
+export interface AdminOrg {
+  id: string; hint: string; createdAt: string; ownerId: string | null; members: number; awaiting: number; pending: number
+  collections: number; items: number; rotationDue: number; policies: OrgPolicies
+}
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }

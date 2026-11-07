@@ -155,6 +155,8 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)), 'Create an invitation code')
   router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)), 'Withdraw an invitation')
   router.post('/api/admin/mail/test', admined('settings.write', (u, e) => admin.testMail(app, u, e)), 'Send a test email')
+  router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
+  router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)), 'Staff audit log')
 
   router.get('/api/admin/desk', admined('desk.read', () => desk.queue(app)), 'The service desk queue')

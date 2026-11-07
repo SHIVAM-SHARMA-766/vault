@@ -98,3 +98,6 @@ export const emergencyInviteSk = (id: string) => `EMINVITE#${id}`
 export const EMERGENCY_INVITE_PREFIX = 'EMINVITE#'
 export const emergencyTrustSk = (id: string) => `EMTRUST#${id}`
 export const EMERGENCY_TRUST_PREFIX = 'EMTRUST#'
+/** The operator's index of organizations, in the SYSTEM partition. */
+export const systemOrgSk = (orgId: string) => `ORG#${orgId}`
+export const SYSTEM_ORG_PREFIX = 'ORG#'
