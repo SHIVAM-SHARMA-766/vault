@@ -293,3 +293,26 @@ jobs:
           [ "$(docker exec vault id -u)" = 10001 ] || { echo "::error::running as root"; exit 1; }
           [ "$(docker exec vault stat -c %a /data/secrets.env)" = 600 ] || { echo "::error::secrets file not private"; exit 1; }
           docker logs vault 2>&1 | grep -q 'schema version' || { echo "::error::no migration log"; exit 1; }
+
+  profiles:
+    name: install profile — business (PostgreSQL + Caddy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The business profile exactly as a customer starts it, on localhost
+      # (Caddy's local CA): healthy over TLS, migrated on PostgreSQL, and
+      # printing a first-run setup link.
+      - name: Up
+        working-directory: deploy/business
+        run: |
+          printf 'VAULT_HOSTNAME=localhost\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 16)" > .env
+          docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Check
+        working-directory: deploy/business
+        run: |
+          curl -skf https://localhost/api/health | grep -q '"ok"' || { docker compose logs; exit 1; }
+          curl -skI https://localhost/app/ | grep -qi "content-security-policy" || { echo "::error::no CSP through Caddy"; exit 1; }
+          docker compose logs vault | grep -q 'storage: postgres' || { echo "::error::not on postgres"; exit 1; }
+          docker compose logs vault | grep -q '/app/?setup=' || { echo "::error::no setup link"; exit 1; }
