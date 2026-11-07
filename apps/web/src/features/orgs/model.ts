@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   type EntryContent, fromBase64Url, generateCollectionKey, generateOrgKey, identityFingerprint, isWithinSizeLimit,
   openCollectionKey, openCollectionMeta, openOrgKey, openOrgMeta, openSharedItem, sealCollectionKey,
-  sealCollectionMeta, sealOrgKey, sealOrgMeta, sealSharedItem, unwrapIdentityPrivateKey, wipe,
+  sealCollectionMeta, sealOrgKey, sealOrgMeta, sealSharedItem, unwrapIdentityPrivateKey, wipe, openGroupMeta, sealGroupMeta,
 } from '@vault/crypto'
 
 import { type OrgInvitation, type OrgRole, type SharePermission, api } from '../../lib/api.js'
@@ -150,11 +150,51 @@ export function useTeams(vaultKey: Uint8Array) {
     await api.orgs.confirm(await session.token(), orgId, userId, await sealOrgKey(fromBase64Url(publicKey), org.key, orgId))
   }
 
-  async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean) {
+  async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean, viaGroup?: string) {
     const c = coll(collectionId)
     await api.orgs.grant(await session.token(), c.orgId, c.id, userId, {
-      permission, hidePasswords, keyBlob: await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion),
+      permission, hidePasswords, keyBlob: await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion), ...(viaGroup ? { viaGroup } : {}),
     })
+  }
+
+  async function createGroup(orgId: string, name: string) {
+    const org = orgs.find((o) => o.id === orgId)
+    if (!org?.key) throw new Error('You cannot open that organization.')
+    const id = crypto.randomUUID()
+    await api.orgs.createGroup(await session.token(), orgId, id, await sealGroupMeta(orgId, id, { name }, org.key))
+  }
+
+  async function groupName(orgId: string, groupId: string, blob: string): Promise<string> {
+    const org = orgs.find((o) => o.id === orgId)
+    if (!org?.key) return 'Group'
+    return (await openGroupMeta(orgId, groupId, blob, org.key).catch(() => ({ name: 'Unreadable group' }))).name
+  }
+
+  /** Grants a collection to a group: the key sealed to each member who lacks it. */
+  async function grantGroup(collectionId: string, groupId: string, permission: SharePermission, hidePasswords: boolean) {
+    const c = coll(collectionId)
+    const token = await session.token()
+    const [{ groups }, { members }, { access }] = await Promise.all([api.orgs.groups(token, c.orgId), api.orgs.members(token, c.orgId), api.orgs.access(token, c.orgId, c.id)])
+    const g = groups.find((x) => x.id === groupId)
+    if (!g) throw new Error('That group is gone.')
+    const grants = await Promise.all(g.members.filter((u) => !access.some((a) => a.userId === u)).map(async (u) => {
+      const m = members.find((x) => x.userId === u)!
+      return { userId: u, keyBlob: await sealCollectionKey(fromBase64Url(m.publicKey), c.key, c.id, c.keyVersion) }
+    }))
+    await api.orgs.grantGroup(token, c.orgId, c.id, groupId, { permission, hidePasswords, grants })
+  }
+
+  /** Adds a member to a group and seals the group's collections to them —
+   *  those this admin can open; the rest wait for someone who can. */
+  async function addToGroup(orgId: string, groupId: string, userId: string, publicKey: string): Promise<{ granted: number; skipped: number }> {
+    const r = await api.orgs.addToGroup(await session.token(), orgId, groupId, userId)
+    let granted = 0
+    for (const gc of r.collections) {
+      if (!collections.find((c) => c.id === gc.collectionId && c.permission === 'manage')) continue
+      await grant(gc.collectionId, userId, publicKey, gc.permission, gc.hidePasswords, groupId)
+      granted++
+    }
+    return { granted, skipped: r.collections.length - granted }
   }
 
   /** Re-keys a collection: a new key version, every item re-encrypted under
@@ -197,7 +237,7 @@ export function useTeams(vaultKey: Uint8Array) {
     await load()
   }
 
-  return { orgs, collections, shared, invitations, identity, error, load, createOrg, createCollection, confirm, grant, rotate, saveShared, deleteShared }
+  return { orgs, collections, shared, invitations, identity, error, load, createOrg, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
 }
 
 export type Teams = ReturnType<typeof useTeams>

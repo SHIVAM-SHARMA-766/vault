@@ -20,7 +20,7 @@ import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, conflict,
 import { emailDigest } from '../identity.js'
 import {
   COLLECTION_PREFIX, ITEM_PREFIX, ORG_INVITE_PREFIX, ORG_MEMBER_PREFIX, ORG_META_SK, ORG_PENDING_PREFIX, PROFILE_SK, USER_ORG_PREFIX,
-  accessPrefix, accessSk, collectionItemsPk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
+  GROUP_ACCESS_PREFIX, GROUP_PREFIX, accessPrefix, accessSk, collectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
   orgPk, userOrgSk, userPk,
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
@@ -51,6 +51,21 @@ interface Access extends Item {
   userId: string
   keyBlob: string
   keyVersion: number
+  permission: Permission
+  hidePasswords: boolean
+  /** Granted because the member is in this group; removed with it. */
+  viaGroup?: string
+}
+
+interface Group extends Item {
+  id: string
+  nameBlob: string
+  members: string[]
+}
+
+interface GroupAccess extends Item {
+  collectionId: string
+  groupId: string
   permission: Permission
   hidePasswords: boolean
 }
@@ -282,6 +297,9 @@ export async function removeMember(app: App, userId: string, orgId: string, targ
     await app.store.put({ ...c, rotationNeeded: true })
     rotate.push(c.id)
   }
+  for (const g of (await app.store.query(orgPk(orgId), GROUP_PREFIX)) as Group[]) {
+    if (g.members.includes(target)) await app.store.put({ ...g, members: g.members.filter((x) => x !== target) })
+  }
   await app.store.delete(orgPk(orgId), orgMemberSk(target))
   await app.store.delete(userPk(target), userOrgSk(orgId))
   return json(200, { ok: true, rotationNeeded: rotate })
@@ -341,7 +359,7 @@ export async function deleteCollection(app: App, userId: string, orgId: string, 
 export async function collectionAccess(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {
   await requireAccess(app, orgId, collectionId, userId, 'manage')
   const grants = (await app.store.query(orgPk(orgId), accessPrefix(collectionId))) as Access[]
-  return json(200, { access: grants.map((a) => ({ userId: a.userId, permission: a.permission, hidePasswords: a.hidePasswords, keyVersion: a.keyVersion })) })
+  return json(200, { access: grants.map((a) => ({ userId: a.userId, permission: a.permission, hidePasswords: a.hidePasswords, keyVersion: a.keyVersion, viaGroup: a.viaGroup ?? null })) })
 }
 
 /** Grants or changes a member's access. A new grant must carry the
@@ -359,6 +377,7 @@ export async function grantAccess(app: App, userId: string, event: LambdaEvent, 
     pk: orgPk(orgId), sk: accessSk(collectionId, target), collectionId, userId: target, keyBlob,
     keyVersion: b['keyBlob'] === undefined && existing ? existing.keyVersion : c.keyVersion,
     permission: b['permission'] as Permission, hidePasswords: b['hidePasswords'] === true,
+    ...(typeof b['viaGroup'] === 'string' && isValidId(b['viaGroup']) ? { viaGroup: b['viaGroup'] } : existing?.viaGroup ? { viaGroup: existing.viaGroup } : {}),
   }
   await app.store.put(a)
   return json(200, { ok: true })
@@ -405,6 +424,110 @@ export async function rotateCollection(app: App, userId: string, event: LambdaEv
   const { rotationNeeded: _r, ...rest } = c
   await app.store.put({ ...rest, keyVersion: version, rotatedAt: at } as Collection)
   return json(200, { keyVersion: version })
+}
+
+// ── Groups ────────────────────────────────────────────────────────────────
+// A group is a named set of confirmed members. Granting a collection to a
+// group gives each member their own sealed key (tagged viaGroup); adding a
+// member to the group later is followed by the client sealing the group's
+// collections to them; removing one revokes those grants and marks the
+// collections for rotation.
+
+async function requireGroup(app: App, orgId: string, groupId: string): Promise<Group> {
+  if (!isValidId(groupId)) throw notFound()
+  const g = (await app.store.get(orgPk(orgId), groupSk(groupId))) as Group | null
+  if (!g) throw notFound()
+  return g
+}
+
+async function revokeVia(app: App, orgId: string, groupId: string, collectionId?: string, userId?: string): Promise<string[]> {
+  const rotate = new Set<string>()
+  const rows = (await app.store.query(orgPk(orgId), collectionId ? accessPrefix(collectionId) : 'ACCESS#')) as Access[]
+  for (const a of rows) {
+    if (a.viaGroup !== groupId || (userId && a.userId !== userId)) continue
+    await app.store.delete(a.pk, a.sk)
+    rotate.add(a.collectionId)
+  }
+  for (const cid of rotate) {
+    const c = (await app.store.get(orgPk(orgId), collectionSk(cid))) as Collection | null
+    if (c) await app.store.put({ ...c, rotationNeeded: true })
+  }
+  return [...rotate]
+}
+
+export async function groups(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { confirmed: true })
+  const rows = await app.store.query(orgPk(orgId))
+  const gs = rows.filter((r) => r.sk.startsWith(GROUP_PREFIX)) as Group[]
+  const ga = rows.filter((r) => r.sk.startsWith(GROUP_ACCESS_PREFIX)) as GroupAccess[]
+  return json(200, { groups: gs.map((g) => ({
+    id: g.id, nameBlob: g.nameBlob, members: g.members,
+    collections: ga.filter((x) => x.groupId === g.id).map((x) => ({ collectionId: x.collectionId, permission: x.permission, hidePasswords: x.hidePasswords })),
+  })) })
+}
+
+export async function createGroup(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const b = body(event)
+  const groupId = id(b['id'], 'id')
+  const g: Group = { pk: orgPk(orgId), sk: groupSk(groupId), id: groupId, nameBlob: requireSealed(b['nameBlob'], 'nameBlob', 4096), members: [] }
+  try { await app.store.put(g, { mustNotExist: true }) } catch (err) { if (err instanceof AlreadyExists) throw conflict('That group exists.'); throw err }
+  return json(201, { id: groupId })
+}
+
+export async function deleteGroup(app: App, userId: string, orgId: string, groupId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  await requireGroup(app, orgId, groupId)
+  const rotate = await revokeVia(app, orgId, groupId)
+  for (const r of await app.store.query(orgPk(orgId), GROUP_ACCESS_PREFIX)) if (r['groupId'] === groupId) await app.store.delete(r.pk, r.sk)
+  await app.store.delete(orgPk(orgId), groupSk(groupId))
+  return json(200, { ok: true, rotationNeeded: rotate })
+}
+
+export async function addGroupMember(app: App, userId: string, orgId: string, groupId: string, target: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const g = await requireGroup(app, orgId, groupId)
+  const t = await member(app, orgId, target)
+  if (!t || t.status !== 'confirmed') throw new HttpError(409, 'conflict', 'Only confirmed members can join a group.')
+  if (!g.members.includes(target)) await app.store.put({ ...g, members: [...g.members, target] })
+  // The client now seals the group's collections to them (grantAccess with viaGroup).
+  const pendingCollections = ((await app.store.query(orgPk(orgId), GROUP_ACCESS_PREFIX)) as GroupAccess[]).filter((x) => x.groupId === groupId)
+  return json(200, { ok: true, collections: pendingCollections.map((x) => ({ collectionId: x.collectionId, permission: x.permission, hidePasswords: x.hidePasswords })) })
+}
+
+export async function removeGroupMember(app: App, userId: string, orgId: string, groupId: string, target: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const g = await requireGroup(app, orgId, groupId)
+  await app.store.put({ ...g, members: g.members.filter((m) => m !== target) })
+  return json(200, { ok: true, rotationNeeded: await revokeVia(app, orgId, groupId, undefined, target) })
+}
+
+/** Grants a collection to a group: one sealed key per member who does not
+ *  already have access, all in this request. */
+export async function grantGroup(app: App, userId: string, event: LambdaEvent, orgId: string, collectionId: string, groupId: string): Promise<LambdaResponse> {
+  const { c } = await requireAccess(app, orgId, collectionId, userId, 'manage')
+  const g = await requireGroup(app, orgId, groupId)
+  const b = body(event)
+  if (!(PERMISSIONS as readonly unknown[]).includes(b['permission'])) throw badRequest('permission must be view, edit or manage.')
+  const permission = b['permission'] as Permission
+  const hidePasswords = b['hidePasswords'] === true
+  const sealed = (Array.isArray(b['grants']) ? b['grants'] : []) as Record<string, unknown>[]
+  const need: string[] = []
+  for (const m of g.members) if (!(await access(app, orgId, collectionId, m))) need.push(m)
+  const given = new Map(sealed.map((x) => [String(x['userId']), requireSharedKey(x['keyBlob'], 'keyBlob')]))
+  const missing = need.filter((m) => !given.has(m))
+  if (missing.length) throw new HttpError(409, 'conflict', 'The group\'s members changed; reload and try again.')
+  await app.store.put({ pk: orgPk(orgId), sk: groupAccessSk(collectionId, groupId), collectionId, groupId, permission, hidePasswords })
+  for (const m of need) {
+    await app.store.put({ pk: orgPk(orgId), sk: accessSk(collectionId, m), collectionId, userId: m, keyBlob: given.get(m)!, keyVersion: c.keyVersion, permission, hidePasswords, viaGroup: groupId } as Access)
+  }
+  return json(200, { ok: true, granted: need.length })
+}
+
+export async function revokeGroup(app: App, userId: string, orgId: string, collectionId: string, groupId: string): Promise<LambdaResponse> {
+  await requireAccess(app, orgId, collectionId, userId, 'manage')
+  await app.store.delete(orgPk(orgId), groupAccessSk(collectionId, groupId))
+  return json(200, { ok: true, rotationNeeded: await revokeVia(app, orgId, groupId, collectionId) })
 }
 
 // ── Items ─────────────────────────────────────────────────────────────────

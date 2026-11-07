@@ -82,3 +82,7 @@ export const userOrgSk = (orgId: string) => `ORG#${orgId}`
 export const USER_ORG_PREFIX = 'ORG#'
 export const orgInviteSk = (orgId: string) => `ORGINVITE#${orgId}`
 export const ORG_INVITE_PREFIX = 'ORGINVITE#'
+export const groupSk = (groupId: string) => `GROUP#${groupId}`
+export const GROUP_PREFIX = 'GROUP#'
+export const groupAccessSk = (collectionId: string, groupId: string) => `GACCESS#${collectionId}#${groupId}`
+export const GROUP_ACCESS_PREFIX = 'GACCESS#'

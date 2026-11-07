@@ -84,6 +84,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
   const [email, setEmail] = useState('')
   const [label, setLabel] = useState('')
   const [collName, setCollName] = useState('')
+  const [groupsList, setGroupsList] = useState<GroupView[]>([])
   const colls = teams.collections.filter((c) => c.orgId === org.id)
 
   const loadMembers = async () => {
@@ -170,10 +171,12 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
         </form>
       ) : null}
 
+      <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
+
       <h3 className="small-head">Collections</h3>
       {colls.length === 0 ? <p className="muted small">No collections yet.</p> : (
         <ul className="device-list">
-          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={members} />)}
+          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={members} groups={groupsList} />)}
         </ul>
       )}
       {admin ? (
@@ -190,13 +193,14 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
   )
 }
 
-function CollectionRow({ c, teams, members }: { c: CollectionView; teams: Teams; members: OrgMember[] }) {
+function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams: Teams; members: OrgMember[]; groups: { id: string; name: string }[] }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [grants, setGrants] = useState<{ userId: string; permission: SharePermission; hidePasswords: boolean }[]>([])
   const [who, setWho] = useState('')
   const [perm, setPerm] = useState<SharePermission>('view')
   const [hide, setHide] = useState(false)
+  const [group, setGroup] = useState('')
   const manage = c.permission === 'manage'
   const load = async () => setGrants((await api.orgs.access(await session.token(), c.orgId, c.id)).access)
 
@@ -233,6 +237,19 @@ function CollectionRow({ c, teams, members }: { c: CollectionView; teams: Teams;
               <label className="check"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /><span>Hide passwords</span></label>
               <button className="btn btn-secondary btn-sm" type="submit" disabled={!who}>Share</button>
             </form>
+            {groups.length ? (
+              <form className="inline-form" onSubmit={async (e) => {
+                e.preventDefault()
+                try { await teams.grantGroup(c.id, group, perm, hide); toast('Group given access'); setGroup(''); await load() }
+                catch (err) { toast(err instanceof Error ? err.message : 'Could not share.', 'error') }
+              }}>
+                <select aria-label="Group" required value={group} onChange={(e) => setGroup(e.target.value)}>
+                  <option value="">Give access to a group…</option>
+                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+                <button className="btn btn-secondary btn-sm" type="submit" disabled={!group}>Share with group</button>
+              </form>
+            ) : null}
             <p className="hint">"Hide passwords" is a policy the app follows, not encryption: anyone who can open a collection holds its key.</p>
           </div>
         ) : null}
@@ -244,5 +261,80 @@ function CollectionRow({ c, teams, members }: { c: CollectionView; teams: Teams;
         <button className="btn btn-secondary btn-sm" onClick={async () => { if (!open) await load(); setOpen(!open) }}>{open ? 'Done' : 'Access'}</button>
       </div> : null}
     </li>
+  )
+}
+
+interface GroupView { id: string; name: string; members: string[] }
+
+function Groups({ org, teams, members, admin, list, setList }: {
+  org: OrgView; teams: Teams; members: OrgMember[]; admin: boolean; list: GroupView[]; setList: (l: GroupView[]) => void
+}) {
+  const toast = useToast()
+  const [name, setName] = useState('')
+  const [adding, setAdding] = useState<Record<string, string>>({})
+  const load = async () => {
+    const { groups } = await api.orgs.groups(await session.token(), org.id)
+    const named = await Promise.all(groups.map(async (g) => ({ id: g.id, members: g.members, name: await teams.groupName(org.id, g.id, g.nameBlob) })))
+    setList(named)
+  }
+  useEffect(() => { void load() }, [org.id, teams.collections.length])
+  const label = (u: string) => members.find((m) => m.userId === u)?.label ?? 'Member'
+
+  if (!admin && list.length === 0) return null
+  return (
+    <>
+      <h3 className="small-head">Groups</h3>
+      {list.length === 0 ? <p className="muted small">No groups yet. A group lets you give a whole team access to a collection at once.</p> : (
+        <ul className="device-list">
+          {list.map((g) => (
+            <li key={g.id} className="device-row group-row">
+              <div className="device-text">
+                <span className="device-name"><IconUser size={15} /> {g.name}</span>
+                <span className="group-members">
+                  {g.members.length === 0 ? <span className="muted small">No members</span> : g.members.map((u) => (
+                    <span key={u} className="pill">{label(u)}
+                      {admin ? <button className="pill-x" aria-label={`Remove ${label(u)} from ${g.name}`} onClick={async () => {
+                        const r = await api.orgs.removeFromGroup(await session.token(), org.id, g.id, u)
+                        await teams.load()
+                        for (const cid of r.rotationNeeded) { try { await teams.rotate(cid) } catch { /* stays marked */ } }
+                        toast(`${label(u)} removed from ${g.name}`); await load()
+                      }}>×</button> : null}
+                    </span>
+                  ))}
+                </span>
+              </div>
+              {admin ? (
+                <form className="inline-form" onSubmit={async (e) => {
+                  e.preventDefault()
+                  const u = adding[g.id]; const m = members.find((x) => x.userId === u)
+                  if (!m) return
+                  try {
+                    const r = await teams.addToGroup(org.id, g.id, m.userId, m.publicKey)
+                    toast(r.skipped ? `${m.label} added; ${r.skipped} collection(s) need someone who can manage them to share` : `${m.label} added to ${g.name}`)
+                    setAdding({ ...adding, [g.id]: '' }); await load(); await teams.load()
+                  } catch (err) { toast(err instanceof Error ? err.message : 'Could not add.', 'error') }
+                }}>
+                  <select aria-label={`Add to ${g.name}`} value={adding[g.id] ?? ''} onChange={(e) => setAdding({ ...adding, [g.id]: e.target.value })}>
+                    <option value="">Add member…</option>
+                    {members.filter((m) => m.status === 'confirmed' && !g.members.includes(m.userId)).map((m) => <option key={m.userId} value={m.userId}>{m.label}</option>)}
+                  </select>
+                  <button className="btn btn-secondary btn-sm" type="submit" disabled={!adding[g.id]}>Add</button>
+                </form>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {admin ? (
+        <form className="inline-form" onSubmit={async (e) => {
+          e.preventDefault()
+          try { await teams.createGroup(org.id, name.trim()); setName(''); await load(); toast('Group created') }
+          catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
+        }}>
+          <input required placeholder="New group, e.g. Engineering" aria-label="New group name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
+          <button className="btn btn-secondary btn-sm" type="submit"><IconPlus size={14} />Add group</button>
+        </form>
+      ) : null}
+    </>
   )
 }

@@ -175,3 +175,42 @@ test('rotation re-keys a collection: the removed member\'s old key opens nothing
   // Writes at the old version are refused.
   assert.equal((await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${uuid()}`, { token: alice.token, body: { blob: sealedBlob('x'), keyVersion: 1 } })).status, 409)
 })
+
+test('groups: granting a collection to a group gives each member a key; leaving the group revokes it and flags rotation', async () => {
+  const h = harness()
+  const { alice, orgId, orgKey, collId, collKey } = await orgWithCollection(h)
+  const people = []
+  for (const email of ['bob@example.test', 'cara@example.test']) {
+    const p = await person(h, email)
+    await h.request('POST', `/api/orgs/${orgId}/invites`, { token: alice.token, body: { email } })
+    await h.request('POST', `/api/orgs/${orgId}/accept`, { token: p.token })
+    await h.request('POST', `/api/orgs/${orgId}/members/${p.userId}/confirm`, { token: alice.token, body: { orgKeyBlob: await sealOrgKey(p.keys.publicKey, orgKey, orgId) } })
+    people.push(p)
+  }
+  const [bob, cara] = people as [Awaited<ReturnType<typeof person>>, Awaited<ReturnType<typeof person>>]
+  const groupId = uuid()
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/groups`, { token: alice.token, body: { id: groupId, nameBlob: sealedBlob('g') } })).status, 201)
+  await h.request('PUT', `/api/orgs/${orgId}/groups/${groupId}/members/${bob.userId}`, { token: alice.token })
+  await h.request('PUT', `/api/orgs/${orgId}/groups/${groupId}/members/${cara.userId}`, { token: alice.token })
+
+  // Missing a sealed key for a member: refused.
+  const partial = await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/groups/${groupId}`, { token: alice.token, body: {
+    permission: 'view', grants: [{ userId: bob.userId, keyBlob: await sealCollectionKey(bob.keys.publicKey, collKey, collId, 1) }],
+  } })
+  assert.equal(partial.status, 409)
+  const ok = await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/groups/${groupId}`, { token: alice.token, body: {
+    permission: 'view', grants: await Promise.all([bob, cara].map(async (p) => ({ userId: p.userId, keyBlob: await sealCollectionKey(p.keys.publicKey, collKey, collId, 1) }))),
+  } })
+  assert.equal(ok.body['granted'], 2)
+  const cc = (await h.request('GET', `/api/orgs/${orgId}/collections`, { token: cara.token })).body['collections'] as { access: { keyBlob: string } }[]
+  assert.deepEqual(await openCollectionKey(cara.keys.privateKey, cara.keys.publicKey, cc[0]!.access.keyBlob, collId, 1), collKey)
+
+  // Cara leaves the group: her access goes and the collection needs a new key.
+  const left = await h.request('DELETE', `/api/orgs/${orgId}/groups/${groupId}/members/${cara.userId}`, { token: alice.token })
+  assert.deepEqual(left.body['rotationNeeded'], [collId])
+  assert.equal((await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: cara.token })).status, 404)
+  assert.equal((await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: bob.token })).status, 200)
+  const gs = (await h.request('GET', `/api/orgs/${orgId}/groups`, { token: alice.token })).body['groups'] as { members: string[]; collections: unknown[] }[]
+  assert.deepEqual(gs[0]!.members, [bob.userId])
+  assert.equal(gs[0]!.collections.length, 1)
+})

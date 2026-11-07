@@ -130,7 +130,10 @@ export {
 } from './totp.js'
 export {
   type CollectionMeta,
+  type GroupMeta,
   type OrgMeta,
+  openGroupMeta,
+  sealGroupMeta,
   SHARED_KEY_BYTES,
   generateCollectionKey,
   generateOrgKey,
