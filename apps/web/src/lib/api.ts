@@ -229,10 +229,11 @@ export const api = {
     setRegistration: (token: string, registration: RegistrationMode) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
     invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),
-    createInvite: (token: string, label: string, days: number, role: Role = 'user') =>
-      request<{ code: string; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
-        'POST', '/api/admin/invites', { token, body: { label, days, role } },
+    createInvite: (token: string, label: string, days: number, role: Role = 'user', email = '') =>
+      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
+        'POST', '/api/admin/invites', { token, body: { label, days, role, ...(email ? { email } : {}) } },
       ),
+    testMail: (token: string, to: string) => request<{ sent: true }>('POST', '/api/admin/mail/test', { token, body: { to } }),
     deleteInvite: (token: string, id: string) =>
       request<{ ok: true }>('DELETE', `/api/admin/invites/${encodeURIComponent(id)}`, { token }),
     audit: (token: string) => request<{ records: AdminAudit[] }>('GET', '/api/admin/audit', { token }),
@@ -290,6 +291,7 @@ export interface AdminOverview {
   registration: RegistrationMode
   registrationForcedOpen: boolean
   lastBackup: { at: string | null; object: string | null; bytes: number | null } | null
+  mail: boolean
   serverTime: string
   uptimeSeconds: number
 }

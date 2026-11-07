@@ -39,6 +39,22 @@ address.
 
 Placeholder-looking secrets (`changeme…`, `test…`, `secret…`, `placeholder…`) are refused.
 
+### Mail
+
+Optional. With SMTP configured, admins can email invitations, everyone gets a notice on each
+sign-in (and always when their recovery key is used), and the admin panel can send a test
+message. Vault stores no addresses — only keyed digests — so mail is sent only when a request
+carries the address, and the address is not kept.
+
+| Variable | Default | Secret | What it does |
+|---|---|---|---|
+| `SMTP_HOST` | — | | Your mail server. Mail is off without it |
+| `SMTP_PORT` | `587` | | `587` (STARTTLS, required) or `465` (TLS). Plain-text SMTP is refused |
+| `SMTP_USER` | — | | User name, if needed |
+| `SMTP_PASSWORD` | — | yes | Password |
+| `MAIL_FROM` | — | | Sender, e.g. `Vault <vault@example.com>`. Required with `SMTP_HOST` |
+| `MAIL_SIGNIN_NOTICES` | `true` | | `false` stops the per-sign-in email; recovery-key sign-ins are always notified |
+
 ### Backups
 
 Backups are off until `BACKUP_PASSPHRASE` and a destination are set. Each is one encrypted

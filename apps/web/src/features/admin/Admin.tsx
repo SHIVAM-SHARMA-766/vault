@@ -225,6 +225,8 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
               ) : null}
             </div>
 
+            <MailCard on={data.mail} canWrite={canWrite} />
+
             <div className="admin-card">
               <div className="admin-card-head"><span className="dot dot-ok" /><h2>Server</h2></div>
               <p className="big">Running</p>
@@ -234,6 +236,25 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
         </>
       )}
     </Section>
+  )
+}
+
+function MailCard({ on, canWrite }: { on: boolean; canWrite: boolean }) {
+  const toast = useToast()
+  const [to, setTo] = useState('')
+  return (
+    <div className="admin-card">
+      <div className="admin-card-head"><span className={`dot ${on ? 'dot-ok' : 'dot-muted'}`} /><h2>Mail</h2></div>
+      <p className="big">{on ? 'Set up' : 'Off'}</p>
+      {on ? (
+        canWrite ? (
+          <form className="inline-form" onSubmit={async (e) => { e.preventDefault(); if (await run(toast, (t) => api.admin.testMail(t, to), `Test message sent to ${to}`)) setTo('') }}>
+            <input type="email" required placeholder="Send a test to…" aria-label="Test email address" value={to} onChange={(e) => setTo(e.target.value)} />
+            <button className="btn btn-secondary btn-sm" type="submit">Send test</button>
+          </form>
+        ) : <p className="muted small">Invitations can be emailed; sign-in notices are sent.</p>
+      ) : <p className="muted small">Set SMTP_HOST and MAIL_FROM to email invitations and sign-in notices. See docs/configuration.md.</p>}
+    </div>
   )
 }
 
@@ -386,17 +407,20 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
   const { data, error, reload } = useAdminData(loadInvites)
   const [label, setLabel] = useState('')
   const [days, setDays] = useState(7)
-  const [issued, setIssued] = useState<{ code: string; label: string; expiresAt: string } | null>(null)
+  const [email, setEmail] = useState('')
+  const [issued, setIssued] = useState<{ code: string; label: string; expiresAt: string; emailedTo?: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
   async function create(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     try {
-      const res = await api.admin.createInvite(await session.token(), label.trim(), days, role)
-      setIssued({ code: res.code, label: res.invite.label, expiresAt: res.invite.expiresAt })
+      const res = await api.admin.createInvite(await session.token(), label.trim(), days, role, email.trim())
+      setIssued({ code: res.code, label: res.invite.label, expiresAt: res.invite.expiresAt, ...(res.emailed ? { emailedTo: email.trim() } : {}) })
+      if (email.trim() && !res.emailed) toast('The invitation was created, but the email could not be sent. Copy the code instead.', 'error')
       setRole('user')
       setLabel('')
+      setEmail('')
       await reload()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Could not create the invitation.', 'error')
@@ -420,6 +444,10 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
             {[1, 3, 7, 14, 30].map((d) => <option key={d} value={d}>{d} day{d > 1 ? 's' : ''}</option>)}
           </select>
         </div>
+        <div className="field">
+          <label htmlFor="inv-email">Email it to <span className="muted">(optional)</span></label>
+          <input id="inv-email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
         {canRoles ? (
           <div className="field">
             <label htmlFor="inv-role">Starts as</label>
@@ -433,7 +461,7 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
 
       {issued ? (
         <div className="issued">
-          <p><strong>Invitation for {issued.label}</strong> — expires {when(issued.expiresAt)}. This code is shown once; only its hash is stored.</p>
+          <p><strong>Invitation for {issued.label}</strong> — expires {when(issued.expiresAt)}. {issued.emailedTo ? `Emailed to ${issued.emailedTo}, with a link. ` : ''}This code is shown once; only its hash is stored.</p>
           <div className="recovery-key"><code>{issued.code}</code><CopyButton value={issued.code} label="Invitation code" /></div>
           <button className="link" onClick={() => setIssued(null)}>Done</button>
         </div>

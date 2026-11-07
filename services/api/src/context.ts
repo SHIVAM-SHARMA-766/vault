@@ -2,6 +2,7 @@
 
 import { type LambdaEvent, unauthorized } from './http.js'
 import type { Config } from './config.js'
+import type { Mailer } from './mail.js'
 import { userPk } from './keys.js'
 import type { SiteConfig } from './site.js'
 import type { Store } from './store.js'
@@ -12,6 +13,8 @@ export interface App {
   config: Config
   /** Injected so tests can pin the clock. */
   now: () => number
+  /** Present when SMTP is configured (mail.ts). */
+  mailer?: Mailer
   /** Forces registration open regardless of the stored setting. Exists for
    *  bootstrapping the first account, before anyone can reach the admin panel
    *  to open it; scripts/registration.sh manages it. */

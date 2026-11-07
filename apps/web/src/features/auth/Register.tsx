@@ -13,7 +13,7 @@ import { Check, CopyButton, PasswordInput, StrengthMeter } from '../../ui/kit.js
  *  are doing work rather than papering over a guessable secret. */
 const MIN_LENGTH = 12
 
-export function Register({ onDone, onCancel, setupCode = '' }: { onDone: () => void; onCancel: () => void; setupCode?: string }) {
+export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited = '' }: { onDone: () => void; onCancel: () => void; setupCode?: string; inviteCode?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -21,7 +21,7 @@ export function Register({ onDone, onCancel, setupCode = '' }: { onDone: () => v
   const [error, setError] = useState('')
   const [recoveryKey, setRecoveryKey] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
-  const [inviteCode, setInviteCode] = useState(setupCode.toUpperCase())
+  const [inviteCode, setInviteCode] = useState((setupCode || invited).toUpperCase())
   const owner = setupCode !== ''
 
   async function submit(event: React.FormEvent) {

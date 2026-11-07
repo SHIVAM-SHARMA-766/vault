@@ -17,6 +17,7 @@ import type { App } from './context.js'
 import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
 import { ensureSetup } from './system.js'
+import { createMailer } from './mail.js'
 import { backupsEnabled, runBackup } from './backup.js'
 import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
@@ -32,10 +33,12 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024
 async function buildApp(): Promise<{ app: App; store: ManagedStore }> {
   const config = loadConfig()
   const store = await openStore(config)
+  const mailer = await createMailer(config)
   const app: App = {
     config,
     store,
     now: () => Date.now(),
+    ...(mailer ? { mailer } : {}),
     // Closed unless explicitly opened (config.ts), so a missing or misspelled
     // setting refuses registration rather than leaving the vault open.
     allowRegistration: config.allowRegistration,
@@ -66,6 +69,8 @@ export async function start(): Promise<void> {
   } else if (!backupsEnabled(app.config)) {
     console.log('backups: off (set BACKUP_PASSPHRASE and BACKUP_DIR or BACKUP_S3_*; see docs/INSTALL.md)')
   }
+
+  console.log(app.mailer ? `mail: via ${app.config.mail.host}:${app.config.mail.port}` : 'mail: off (set SMTP_HOST and MAIL_FROM to send invitations and security notices)')
 
   // A brand-new server: say how to create the owner account.
   const setupCode = await ensureSetup(app)

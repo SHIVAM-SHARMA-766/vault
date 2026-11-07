@@ -16,11 +16,13 @@
     "@vault/site": "*",
     "better-sqlite3": "^11.7.0",
     "mysql2": "^3.11.0",
+    "nodemailer": "^10.2.1",
     "pg": "^8.13.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^20.14.0",
+    "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.10",
     "esbuild": "^0.25.0",
     "typescript": "^5.5.0"

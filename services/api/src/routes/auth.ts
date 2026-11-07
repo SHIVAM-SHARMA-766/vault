@@ -20,6 +20,7 @@ import {
   unauthorized,
 } from '../http.js'
 import { describeDevice } from '../device.js'
+import { notify, signInNotice } from '../mail.js'
 import { decoySalt, emailDigest } from '../identity.js'
 import {
   EMAIL_SK,
@@ -128,6 +129,13 @@ async function issueSession(app: App, userId: string, event: LambdaEvent, family
     refreshToken: refresh.token,
     expiresIn: ACCESS_TTL_SECONDS,
   }
+}
+
+/** Fire and forget: the address is in this request and nowhere else. */
+function sendSignInNotice(app: App, email: string, event: LambdaEvent, recovery: boolean): void {
+  if (!app.mailer) return
+  const at = new Date(app.now()).toUTCString()
+  void notify(app.mailer, { to: email, ...signInNotice(app.config.origin, describeDevice(event.requestContext.http.userAgent), event.requestContext.http.sourceIp, at, recovery) })
 }
 
 export async function revokeAllSessions(app: App, userId: string): Promise<void> {
@@ -269,6 +277,7 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   await requireSecondFactor(app, profile, body, event)
 
   await touchLogin(app, profile.userId, profile)
+  if (app.config.mail.signInNotices) sendSignInNotice(app, email, event, false)
   await recordActivity(app, profile.userId, 'login', event)
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
@@ -301,6 +310,7 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
   // existing session is dropped, because the next step is to set a new one.
   await revokeAllSessions(app, profile.userId)
   await recordActivity(app, profile.userId, 'recovery-login', event)
+  sendSignInNotice(app, email, event, true)
 
   return json(200, {
     wrappedVaultKeyForRecovery: profile.wrappedVaultKeyForRecovery,

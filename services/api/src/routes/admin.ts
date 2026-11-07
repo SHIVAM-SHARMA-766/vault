@@ -9,7 +9,9 @@
 // decisions/0006-admin-panel.md and 0007-roles-and-site-editing.md.
 
 import type { App } from '../context.js'
-import { type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
+import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
+import { inviteMessage, notify } from '../mail.js'
+import { requireEmail } from '../validate.js'
 import {
   BACKUP_SK,
   EMAIL_SK,
@@ -116,9 +118,23 @@ export async function overview(app: App): Promise<LambdaResponse> {
     lastBackup: backup
       ? { at: backup['at'] ?? null, object: backup['object'] ?? null, bytes: backup['bytes'] ?? null }
       : null,
+    mail: !!app.mailer,
     serverTime: new Date(now).toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
   })
+}
+
+/** Sends a test message, so an operator can check the SMTP settings. */
+export async function testMail(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
+  if (!app.mailer) throw new HttpError(503, 'unavailable', 'Mail is not set up on this server (SMTP_HOST).')
+  const to = requireEmail(parseJsonBody<{ to?: unknown }>(event).to)
+  await audit(app, actor, 'mail.test')
+  try {
+    await app.mailer.send({ to, subject: 'Vault test message', text: `This is a test message from the Vault server at ${app.config.origin}. Mail is working.` })
+  } catch (err) {
+    throw new HttpError(400, 'bad_request', `The mail server refused it: ${(err as Error).message}`)
+  }
+  return json(200, { sent: true })
 }
 
 export async function listUsers(app: App): Promise<LambdaResponse> {
@@ -254,7 +270,9 @@ export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
 }
 
 export async function createInviteRoute(app: App, actor: string, actorRole: Role, event: LambdaEvent): Promise<LambdaResponse> {
-  const body = parseJsonBody<{ label?: unknown; days?: unknown; role?: unknown }>(event)
+  const body = parseJsonBody<{ label?: unknown; days?: unknown; role?: unknown; email?: unknown }>(event)
+  const email = body.email === undefined || body.email === '' ? '' : requireEmail(body.email)
+  if (email && !app.mailer) throw new HttpError(503, 'unavailable', 'Mail is not set up on this server (SMTP_HOST). Copy the code and send it yourself.')
   const role = body.role === undefined ? 'user' : body.role
   if (!(GRANTABLE_ROLES as readonly unknown[]).includes(role)) {
     throw badRequest(`role must be one of: ${GRANTABLE_ROLES.join(', ')}.`)
@@ -269,8 +287,10 @@ export async function createInviteRoute(app: App, actor: string, actorRole: Role
   }
   await audit(app, actor, 'invite.create', undefined, role === 'user' ? label : `${label} (${role})`)
   const { code, invite } = await createInvite(app, actor, label, days, role as string)
+  // The address is used to send and then dropped; only the label is kept.
+  const emailed = email ? await notify(app.mailer, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
   // The code is returned exactly once. Only its hash is stored.
-  return json(201, { code, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role } })
+  return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role } })
 }
 
 export async function deleteInviteRoute(app: App, actor: string, id: string): Promise<LambdaResponse> {

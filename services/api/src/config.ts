@@ -52,6 +52,7 @@ export interface Config {
    *  the addresses are not kept. */
   adminEmails: string[]
   site: { sourceDir: string; outputDir: string }
+  mail: { host: string; port: number; user: string; password: string; from: string; signInNotices: boolean }
   backup: {
     passphrase: string
     dir: string
@@ -92,6 +93,12 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'ADMIN_EMAILS', required: false, default: '', description: 'Comma-separated addresses that are owners. The first account is usually the only one.' },
   { name: 'SITE_SOURCE', required: false, description: 'Website templates and content. Defaults to the site/ directory shipped beside the server.' },
   { name: 'SITE_ROOT', required: false, default: '/srv/vault/site', description: 'Where the rendered website is written; the reverse proxy serves its current/ directory.' },
+  { name: 'SMTP_HOST', required: false, description: 'Your mail server, for invitations and security notices. Mail is off without it.' },
+  { name: 'SMTP_PORT', required: false, default: '587', description: '587 (STARTTLS, required) or 465 (TLS). Plain-text SMTP is refused.' },
+  { name: 'SMTP_USER', required: false, description: 'SMTP user name, if the server needs one.' },
+  { name: 'SMTP_PASSWORD', required: false, secret: true, description: 'SMTP password.' },
+  { name: 'MAIL_FROM', required: false, description: 'The sender, e.g. "Vault <vault@example.com>". Required with SMTP_HOST.' },
+  { name: 'MAIL_SIGNIN_NOTICES', required: false, default: 'true', description: '"false" stops the email sent on every sign-in. Recovery-key sign-ins are always notified.' },
   { name: 'BACKUP_PASSPHRASE', required: false, secret: true, description: 'Turns scheduled backups on (with BACKUP_DIR or BACKUP_S3_*). At least 16 characters. Keep a copy away from the server: a backup and this passphrase are a complete restore, and without it a backup cannot be opened.' },
   { name: 'BACKUP_DIR', required: false, description: 'Directory for backup files. The container image uses /data/backups.' },
   { name: 'BACKUP_KEEP', required: false, default: '14', description: 'How many backup files to keep in BACKUP_DIR. Use the bucket\'s lifecycle rules for S3.' },
@@ -163,7 +170,15 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     adminEmails: get('ADMIN_EMAILS').split(',').map((e) => e.trim()).filter(Boolean),
     site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },
     backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
+    mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
   }
+  const smtpHost = get('SMTP_HOST')
+  if (smtpHost && !get('MAIL_FROM')) problems.push('MAIL_FROM is required with SMTP_HOST')
+  config.mail = {
+    host: smtpHost, port: number('SMTP_PORT'), user: get('SMTP_USER'), password: get('SMTP_PASSWORD'),
+    from: get('MAIL_FROM'), signInNotices: get('MAIL_SIGNIN_NOTICES') !== 'false',
+  }
+
   const passphrase = get('BACKUP_PASSPHRASE')
   if (passphrase && passphrase.length < 16) problems.push('BACKUP_PASSPHRASE must be at least 16 characters')
   const s3Fields = ['BACKUP_S3_ENDPOINT', 'BACKUP_S3_BUCKET', 'BACKUP_S3_ACCESS_KEY', 'BACKUP_S3_SECRET_KEY']
