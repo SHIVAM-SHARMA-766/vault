@@ -130,3 +130,6 @@ export const IconHelp = (p: P) => (
 export const IconInbox = (p: P) => (
   <Svg {...p}><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5 5h14l2 8v6H3v-6Z" /></Svg>
 )
+export const IconUsers = (p: P) => (
+  <Svg {...p}><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M16 4.5a3.5 3.5 0 0 1 0 7" /><path d="M18 14a6 6 0 0 1 3.5 6" /></Svg>
+)

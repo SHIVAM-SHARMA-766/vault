@@ -202,7 +202,7 @@ requests are rate-limited and reveal nothing about whether an address has an acc
 reset never touches the master password or the vault key: the attacker still needs the master
 password.
 
-### A11 — Public-key substitution (applies once sharing exists)
+### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).
 A hostile server could hand out a key it controls in place of a colleague's, and receive
@@ -217,6 +217,14 @@ and issuing a new recovery key both require proof of the current master password
 password reset, of the recovery key), checked by the server. A stolen access token can read
 ciphertext for fifteen minutes; it cannot take the account's ways back in away from its owner.
 
+
+**Now that sharing exists** ([0015](../decisions/0015-organizations-and-collections.md)):
+nothing is sealed to a member until an admin confirms them. The Organizations screen shows the
+admin the fingerprint of the key the member accepted with, and tells them to compare it with
+the member reading their own fingerprint aloud — on a call or in person, not over a channel the
+server could also control. The server refuses to confirm if the member's key has changed since
+they accepted. A server that substituted its own key would be caught at that comparison; one
+that substituted it later gains nothing, because keys are sealed only to the recorded key.
 ### A5 — Stolen or shared device
 
 Physical access to an unlocked session.

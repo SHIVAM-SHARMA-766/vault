@@ -11,9 +11,11 @@ import { IconEye, IconEyeOff, IconPlus, IconX } from '../../ui/icons.js'
 import { FieldInput } from './fields.js'
 import type { Folder } from './model.js'
 
-export function EntryForm({ initial, id, folders, onCancel, onSave }: {
+export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false }: {
   initial: EntryContent
   id?: string | undefined
+  /** A shared item: no personal folder; encrypted under its collection's key. */
+  shared?: boolean
   folders: Folder[]
   onCancel: () => void
   onSave: (content: EntryContent, id?: string) => Promise<boolean>
@@ -104,7 +106,7 @@ export function EntryForm({ initial, id, folders, onCancel, onSave }: {
         </div>
 
         <div className="grid-2">
-          <div className="field">
+          {shared ? <div className="field"><label>Folder</label><p className="muted small">Shared items live in their collection.</p></div> : <div className="field">
             <label htmlFor="f-folder">Folder</label>
             <select id="f-folder" value={draft.folderId ?? ''} onChange={(e) => set('folderId', e.target.value || undefined)}>
               <option value="">No folder</option>
@@ -112,13 +114,13 @@ export function EntryForm({ initial, id, folders, onCancel, onSave }: {
                 <option key={n.folder.id} value={n.folder.id}>{'  '.repeat(n.depth)}{n.folder.name}</option>
               ))}
             </select>
-          </div>
+          </div>}
           <div className="field">
             <label htmlFor="f-tags">Tags</label>
             <input id="f-tags" placeholder="work, personal" value={tagText} onChange={(e) => setTagText(e.target.value)} />
           </div>
         </div>
-        <p className="hint">Everything here — names, folders, tags and fields — is encrypted before it is saved.</p>
+        <p className="hint">{shared ? 'Encrypted with the collection’s key before it is saved: readable by the people who can open the collection, never by the server.' : 'Everything here — names, folders, tags and fields — is encrypted before it is saved.'}</p>
       </div>
 
       <div className="editor-foot">

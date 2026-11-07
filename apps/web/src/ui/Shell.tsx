@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import * as session from '../lib/session.js'
 import { Link, navigate } from '../lib/router.js'
-import { IconGrid, IconKey, IconLock, IconShield, IconHelp, IconSwap, IconUser } from './icons.js'
+import { IconGrid, IconKey, IconLock, IconShield, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer' }
 
@@ -74,6 +74,7 @@ function AccountMenu({ state }: { state: session.Unlocked }) {
           </div>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/')}><IconKey size={15} />Vault</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/settings')}><IconUser size={15} />Account settings</button>
+          <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />Organizations</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/import-export')}><IconSwap size={15} />Import &amp; export</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/support')}><IconHelp size={15} />Help &amp; support</button>
           {state.isAdmin ? (

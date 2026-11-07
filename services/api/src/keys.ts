@@ -59,3 +59,26 @@ export const ticketPk = (id: string) => `DESKT#${id}`
 export const messageSk = (seq: number) => `MSG#${String(seq).padStart(8, '0')}`
 export const MESSAGE_SEQ_SK = 'SEQ'
 export const MESSAGE_PREFIX = 'MSG#'
+
+/** Organizations (routes/orgs.ts, decisions/0015). One partition per
+ *  organization for its members, pending invitations and collections; one
+ *  per collection for its items; and pointers so a user's organizations and
+ *  an address's invitations are each one query. */
+export const orgPk = (orgId: string) => `ORG#${orgId}`
+export const ORG_META_SK = 'META'
+export const orgMemberSk = (userId: string) => `MEMBER#${userId}`
+export const ORG_MEMBER_PREFIX = 'MEMBER#'
+export const orgPendingSk = (digest: string) => `PENDING#${digest}`
+export const ORG_PENDING_PREFIX = 'PENDING#'
+export const collectionSk = (collectionId: string) => `COLL#${collectionId}`
+export const COLLECTION_PREFIX = 'COLL#'
+export const accessSk = (collectionId: string, userId: string) => `ACCESS#${collectionId}#${userId}`
+export const accessPrefix = (collectionId: string) => `ACCESS#${collectionId}#`
+export const ACCESS_PREFIX = 'ACCESS#'
+export const collectionItemsPk = (collectionId: string) => `COLLI#${collectionId}`
+export const itemSk = (itemId: string) => `ITEM#${itemId}`
+export const ITEM_PREFIX = 'ITEM#'
+export const userOrgSk = (orgId: string) => `ORG#${orgId}`
+export const USER_ORG_PREFIX = 'ORG#'
+export const orgInviteSk = (orgId: string) => `ORGINVITE#${orgId}`
+export const ORG_INVITE_PREFIX = 'ORGINVITE#'

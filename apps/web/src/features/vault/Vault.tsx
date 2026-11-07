@@ -15,16 +15,22 @@ import { EntryDetail } from './EntryDetail.js'
 import { EntryForm } from './EntryForm.js'
 import { FolderDialog } from './FolderDialog.js'
 import { type Decrypted, type Folder, emptyEntry, stripMeta, useVault } from './model.js'
+import { type SharedEntry, canEdit, useTeams } from '../orgs/model.js'
 import { type Filter, Sidebar, sameFilter } from './Sidebar.js'
 import type { EntryContent, EntryType } from '@vault/crypto'
 
-type Mode = { kind: 'view' } | { kind: 'edit'; draft: EntryContent; id?: string }
+type Mode = { kind: 'view' } | { kind: 'edit'; draft: EntryContent; id?: string; collectionId?: string }
 type Dialog = { kind: 'new'; parentId?: string } | { kind: 'rename'; folder: Folder } | { kind: 'delete'; folder: Folder } | null
 
 export function Vault({ state }: { state: session.Unlocked }) {
   const toast = useToast()
   const vault = useVault(state.vaultKey)
-  const { entries, folders } = vault
+  const teams = useTeams(state.vaultKey)
+  const { folders } = vault
+  // Personal entries and the shared items this account can open, together.
+  const entries: (Decrypted | SharedEntry)[] = useMemo(() => [...vault.entries, ...teams.shared].sort((a, b) => a.name.localeCompare(b.name)), [vault.entries, teams.shared])
+  const openCollections = useMemo(() => teams.collections.filter((c) => c.key), [teams.collections])
+  const sharedOf = (e: Decrypted | null | undefined): SharedEntry | null => (e && 'collectionId' in e ? (e as SharedEntry) : null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>({ kind: 'view' })
   const [filter, setFilter] = useState<Filter>({ kind: 'all' })
@@ -55,8 +61,10 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const c: Record<string, number> = { all: entries.length, favorites: 0, unfiled: 0, health: health.issues.size }
     for (const e of entries) {
       c[e.type] = (c[e.type] ?? 0) + 1
+      const sh = sharedOf(e)
+      if (sh) c[`coll:${sh.collectionId}`] = (c[`coll:${sh.collectionId}`] ?? 0) + 1
       if (e.favorite) c['favorites']! += 1
-      if (!inFolder(e)) c['unfiled']! += 1
+      if (!inFolder(e) && !sharedOf(e)) c['unfiled']! += 1
     }
     return c
   }, [entries, folderIds, health])
@@ -75,12 +83,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const scope = filter.kind === 'folder' ? descendants(folders, filter.id) : null
     return entries.filter((e) => {
       if (filter.kind === 'favorites' && !e.favorite) return false
+      if (filter.kind === 'collection' && sharedOf(e)?.collectionId !== filter.id) return false
       if (filter.kind === 'health') {
         const found = health.issues.get(e.id)
         if (!found || (filter.issue && !found.includes(filter.issue))) return false
       }
       if (filter.kind === 'type' && e.type !== filter.type) return false
-      if (filter.kind === 'unfiled' && inFolder(e)) return false
+      if (filter.kind === 'unfiled' && (inFolder(e) || sharedOf(e))) return false
       if (scope && !(e.folderId && scope.has(e.folderId))) return false
       return matches(e, query, folderPath(folders, inFolder(e)))
     })
@@ -88,9 +97,10 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
 
-  async function save(content: EntryContent, id?: string): Promise<boolean> {
+  async function save(content: EntryContent, id?: string, collectionId?: string): Promise<boolean> {
     try {
-      const entryId = await vault.saveEntry(content, id)
+      const target = collectionId ?? sharedOf(entries.find((e) => e.id === id))?.collectionId
+      const entryId = target ? await teams.saveShared(target, content, id) : await vault.saveEntry(content, id)
       setSelectedId(entryId)
       setMode({ kind: 'view' })
       return true
@@ -102,7 +112,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   async function remove(id: string) {
     try {
-      await vault.deleteEntry(id)
+      const sh = sharedOf(entries.find((e) => e.id === id))
+      if (sh) await teams.deleteShared(sh.collectionId, id)
+      else await vault.deleteEntry(id)
       setSelectedId(null)
       setMode({ kind: 'view' })
       toast('Entry deleted')
@@ -111,14 +123,37 @@ export function Vault({ state }: { state: session.Unlocked }) {
     }
   }
 
+  /** Sharing an item moves it: re-encrypted under the collection key, then
+   *  removed from the personal vault — an item lives in one place (0009). */
+  async function moveToCollection(entry: Decrypted, collectionId: string) {
+    try {
+      const { folderId: _f, ...content } = contentOf(entry)
+      const id = await teams.saveShared(collectionId, content)
+      await vault.deleteEntry(entry.id)
+      setSelectedId(id)
+      toast(`Moved to ${openCollections.find((c) => c.id === collectionId)?.name ?? 'the collection'}`)
+    } catch (err) { toast(err instanceof Error ? err.message : 'Could not move it.', 'error') }
+  }
+
+  async function moveToVault(entry: SharedEntry) {
+    try {
+      const id = await vault.saveEntry(contentOf(entry))
+      await teams.deleteShared(entry.collectionId, entry.id)
+      setSelectedId(id)
+      toast('Moved to your vault')
+    } catch (err) { toast(err instanceof Error ? err.message : 'Could not move it.', 'error') }
+  }
+
   function startNew() {
     const type = (filter.kind === 'type' ? filter.type : 'login') as EntryType
     setSelectedId(null)
-    setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : undefined) })
+    const collectionId = filter.kind === 'collection' && canEdit(openCollections.find((c) => c.id === filter.id)?.permission) ? filter.id : undefined
+    setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : undefined), ...(collectionId ? { collectionId } : {}) })
   }
 
   const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites'
     : filter.kind === 'health' ? 'Password health'
+    : filter.kind === 'collection' ? (() => { const c = openCollections.find((x) => x.id === filter.id); return c ? `${c.orgName} / ${c.name}` : 'Collection' })()
     : filter.kind === 'unfiled' ? 'No folder' : filter.kind === 'type' ? typeInfo(filter.type as EntryType).plural
     : folderPath(folders, filter.id) || 'Folder'
   const paneOpen = mode.kind === 'edit' || selected !== null
@@ -143,6 +178,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
     >
       <div className={`layout ${paneOpen ? 'pane-open' : ''}`}>
         <Sidebar filter={filter} setFilter={setFilter} counts={counts} folders={folders} folderCounts={folderCounts}
+                 collections={openCollections.map((c) => ({ id: c.id, label: c.name, group: c.orgName }))}
                  onNewFolder={(parentId) => setDialog({ kind: 'new', ...(parentId ? { parentId } : {}) })}
                  onRenameFolder={(folder) => setDialog({ kind: 'rename', folder })}
                  onDeleteFolder={(folder) => setDialog({ kind: 'delete', folder })} />
@@ -207,12 +243,17 @@ export function Vault({ state }: { state: session.Unlocked }) {
         <section className="pane" aria-label="Details">
           {mode.kind === 'edit' ? (
             <EntryForm key={mode.id ?? 'new'} initial={mode.draft} id={mode.id} folders={folders}
-                       onCancel={() => setMode({ kind: 'view' })} onSave={save} />
+                       shared={!!(mode.collectionId ?? sharedOf(entries.find((e) => e.id === mode.id)))}
+                       onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
             <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []}
+                         shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? { where: `${c.orgName} / ${c.name}`, permission: sh.permission, hidePasswords: sh.hidePasswords } : null })()}
+                         shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: `${c.orgName} / ${c.name}` }))}
+                         onShare={(collectionId) => void moveToCollection(selected, collectionId)}
+                         onUnshare={() => { const sh = sharedOf(selected); if (sh) void moveToVault(sh) }}
                          onBack={() => setSelectedId(null)}
-                         onEdit={() => setMode({ kind: 'edit', draft: withTypeDefaults(stripMeta(selected)), id: selected.id })}
-                         onToggleFavorite={() => { void save({ ...stripMeta(selected), favorite: !selected.favorite }, selected.id) }}
+                         onEdit={() => setMode({ kind: 'edit', draft: withTypeDefaults(contentOf(selected)), id: selected.id })}
+                         onToggleFavorite={() => { void save({ ...contentOf(selected), favorite: !selected.favorite }, selected.id) }}
                          onDelete={() => remove(selected.id)}
                          loadHistory={() => vault.history(selected.id)}
                          onRestore={async (content) => { await vault.saveEntry({ ...content, favorite: selected.favorite, ...(selected.folderId ? { folderId: selected.folderId } : {}) }, selected.id) }} />
@@ -267,6 +308,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
       ) : null}
     </Shell>
   )
+}
+
+/** The stored content of an entry, personal or shared: without the fields
+ *  this client adds to know where a shared item lives. */
+function contentOf(e: Decrypted): EntryContent {
+  const { orgId: _o, collectionId: _c, permission: _p, hidePasswords: _h, ...rest } = e as SharedEntry
+  return stripMeta(rest as Decrypted)
 }
 
 /** Older entries predate type fields; give the editor an object to write into. */

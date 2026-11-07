@@ -19,7 +19,7 @@ Last revised: 2026-11-07 (phase 2 built)
 flowchart LR
   p0["Phase 0<br/>Foundation<br/>✅ done"]:::done --> p1["Phase 1<br/>Complete personal vault<br/>✅ closed · domain deferred"]:::done
   p1 --> p2["Phase 2<br/>Self-hosted product<br/>✅ built · 3 decisions open"]:::done
-  p2 --> p3["Phase 3<br/>Service desk ✅, then teams<br/>🟡 teams next"]:::now
+  p2 --> p3["Phase 3<br/>Service desk ✅ · teams 3 of 9<br/>🟡 in progress"]:::now
   p3 --> p35["Phase 3.5<br/>Improvement pass"]:::next
   p35 --> p4["Phase 4<br/>Browser extension"]:::later
   p4 --> p5["Phase 5<br/>Android"]:::later
@@ -35,7 +35,7 @@ flowchart LR
 | 0 — Foundation | Keys for sharing, local stack, browser tests, release pipeline | ✅ Done 2026-11-06 |
 | 1 — Complete personal vault | Everything one person needs, hardened and monitored | ✅ Closed 2026-11-07; domain deferred, operator steps carried |
 | 2 — Self-hosted product | Anyone installs and upgrades it with one command | ✅ All 8 steps built 2026-11-07; licence, pricing and update channel still to decide |
-| 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | 🟡 Service desk built; teams next |
+| 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | 🟡 Service desk built; teams steps 1–3 of 9 built |
 | 3.5 — Improvement pass | Harden, polish and speed up everything built so far, before a second client | ⬜ Planned |
 | 4 — Browser extension | Autofill, the main way a password manager is used | ⬜ Planned |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
@@ -265,21 +265,19 @@ generate exactly these requests, and because a company evaluating Vault expects 
   to put a password in it); a requester's email address is kept only while the ticket is
   open and erased when it closes; resolved tickets close themselves after seven days.
 
-**Part B — Teams.**
+**Part B — Teams** ([0015](../decisions/0015-organizations-and-collections.md)).
 
-The business core. Built on the model in [0009](../decisions/0009-identity-keys-and-sharing.md).
-
-- [ ] Organizations: create, invite members, accept, **confirm by fingerprint**, remove.
-- [ ] Collections: create, nest, seal the collection key to members, move items in and out.
-- [ ] Permissions per collection: view, edit, manage; can-see-password as a labelled policy.
-- [ ] Removal rotates collection keys and re-encrypts.
-- [ ] Groups, so collections are granted to teams rather than person by person.
-- [ ] Organization policies: minimum master password strength, 2FA required, session length.
-- [ ] Access audit: who opened, copied, edited or shared which item — recorded by the server as
-  events on ciphertext it cannot read.
-- [ ] Emergency access between individuals; organization recovery as an opt-in, visible policy.
-- [ ] The admin panel grows from operator tooling into organization administration; the current
-  operator roles stay for running the service.
+| # | Step | State |
+|---|---|---|
+| 1 | Organizations: create, invite by address, accept, **confirm by fingerprint**, remove | ✅ 2026-11-07 |
+| 2 | Collections: create, seal the key to members, move items in and out, shared items in the vault | ✅ 2026-11-07 |
+| 3 | Permissions per collection: view, edit, manage; hide passwords as a labelled policy | ✅ 2026-11-07 |
+| 4 | Removal rotates collection keys and re-encrypts | ⬜ next |
+| 5 | Groups, so collections are granted to teams | ⬜ |
+| 6 | Organization policies: 2FA required, master password strength, session length | ⬜ |
+| 7 | Access audit: who opened, copied, edited or shared which item | ⬜ |
+| 8 | Emergency access; organization recovery as an opt-in, visible policy | ⬜ |
+| 9 | Organization administration grows in the admin panel; operator roles stay for running the service | ⬜ |
 
 **Exit criteria:** two people in an organization share a collection, one is removed and cannot
 read anything added after; every step has browser tests with two browsers; threat A11 is

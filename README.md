@@ -7,7 +7,7 @@ Everything is encrypted in your browser; the server stores ciphertext it holds n
 
 [![CI](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml/badge.svg)](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml)
 ![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM%20in%20the%20browser-4f46e5)
-![Tests](https://img.shields.io/badge/tests-334%20unit%20%C2%B7%2017%20browser-16a34a)
+![Tests](https://img.shields.io/badge/tests-342%20unit%20%C2%B7%2018%20browser-16a34a)
 ![Running cost](https://img.shields.io/badge/running%20cost-%240%20a%20month-0ea5e9)
 
 [**Live instance**](https://vault-shivam.duckdns.org) · [Install your own](docs/INSTALL.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
@@ -37,14 +37,14 @@ own fields; custom and hidden fields; folders four levels deep; live one-time co
 </td>
 </tr>
 <tr>
-<td valign="top">
+<td width="50%" valign="top">
 
 ### 🩺 Password health
 Weak, reused, year-old and `http://`-only passwords, scored out of 100 with advice on each
 item — computed in your browser.
 
 </td>
-<td valign="top">
+<td width="50%" valign="top">
 
 ### 🔁 Import from nine formats
 Chrome, Edge, Brave, Firefox, Safari, Bitwarden, 1Password, LastPass, KeePass and Zoho Vault,
@@ -53,34 +53,50 @@ previewed before saving, duplicates skipped. Encrypted export to move between se
 </td>
 </tr>
 <tr>
-<td valign="top">
+<td width="50%" valign="top">
 
 ### 🕘 History you can restore
 Every edit keeps the previous version, encrypted like the item, up to twenty per item. See
 the old password; restore it in one click.
 
 </td>
-<td valign="top">
+<td width="50%" valign="top">
+
+### 👥 Share with your team
+Organizations and collections, each with its own key, sealed to every member you confirm by
+fingerprint. View, edit or manage per collection. The server still reads nothing.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
 ### 🛡️ Account security
 Two-factor sign-in with recovery codes, a recovery key instead of a password reset,
 signed-in devices you can name and sign out, and ninety days of security activity.
 
 </td>
-</tr>
-<tr>
-<td valign="top">
+<td width="50%" valign="top">
 
 ### 🧑‍💼 Admin panel and service desk
 Roles, invitations, an audit log and a website editor — plus a built-in help desk for access
 requests, lost authenticators and support tickets. None of it can read a vault.
 
 </td>
-<td valign="top">
+</tr>
+<tr>
+<td width="50%" valign="top">
 
 ### 🏠 Runs on your server
 One container, SQLite or PostgreSQL, HTTPS by Caddy. A setup link creates the owner,
 secrets generate themselves, and encrypted backups go to disk or any S3-compatible store.
+
+</td>
+<td width="50%" valign="top">
+
+### 🧾 Backups that restore anywhere
+One encrypted file holds everything; restore it onto SQLite or PostgreSQL, from disk or any
+S3-compatible store. Tested in CI on every change.
 
 </td>
 </tr>
@@ -127,6 +143,12 @@ secrets generate themselves, and encrypted backups go to disk or any S3-compatib
 &nbsp;
 <img src="docs/images/mobile-detail.png" alt="Phone: an item" width="260">
 </p>
+</details>
+
+<details>
+<summary><b>Organizations</b> — sharing, confirmed by fingerprint</summary>
+<br>
+<img src="docs/images/organizations.png" alt="Organizations with members and collections" width="860">
 </details>
 
 <details>
@@ -201,8 +223,8 @@ npm run dev:stack      # the whole product on http://localhost:8080, in memory �
 <summary>Tests, screenshots and the API description</summary>
 
 ```sh
-npm test               # crypto, core and API — 334 tests
-npm run test:e2e       # 17 browser tests against the real stack (needs Chrome)
+npm test               # crypto, core and API — 342 tests
+npm run test:e2e       # 18 browser tests against the real stack (needs Chrome)
 npm run screenshots    # regenerate docs/images from the running product
 npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 ```

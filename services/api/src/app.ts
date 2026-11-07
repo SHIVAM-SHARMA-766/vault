@@ -13,6 +13,7 @@ import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
 import * as desk from './routes/desk.js'
+import * as orgs from './routes/orgs.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -40,6 +41,15 @@ export function buildRouter(app: App): Router {
       return handler(userId, event, param)
     }, { auth: 'access' as const })
 
+  // The same, for routes with several path parameters.
+  const authedP =
+    (handler: (userId: string, event: LambdaEvent, params: string[]) => Promise<LambdaResponse>) =>
+    Object.assign(async ({ event, params }: { event: LambdaEvent; params: string[] }) => {
+      const userId = requireUser(app, event)
+      await enforce(app.store, 'api', userId, API_LIMIT, app.now())
+      return handler(userId, event, params)
+    }, { auth: 'access' as const })
+
   router.post('/api/auth/logout', authed((u, e) => auth.logout(app, u, e)), 'Revoke one session, or all of them')
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
@@ -59,6 +69,30 @@ export function buildRouter(app: App): Router {
   router.get('/api/desk/tickets/:id', authed((u, _e, id) => desk.getMyTicket(app, u, id)), 'One of my tickets and its conversation')
   router.post('/api/desk/tickets/:id/messages', authed((u, e, id) => desk.replyAsRequester(app, u, e, id)), 'Reply to my ticket')
   router.post('/api/desk/tickets/:id/close', authed((u, _e, id) => desk.closeAsRequester(app, u, id)), 'Close my ticket')
+
+  // Organizations, collections and shared items (routes/orgs.ts).
+  router.get('/api/orgs', authed((u) => orgs.myOrgs(app, u)), 'My organizations, with my sealed org key')
+  router.post('/api/orgs', authed((u, e) => orgs.createOrg(app, u, e)), 'Create an organization')
+  router.get('/api/orgs/invitations', authed((u) => orgs.myInvitations(app, u)), 'Invitations waiting for me')
+  router.delete('/api/orgs/:org', authedP((u, _e, [o]) => orgs.deleteOrg(app, u, o!)), 'Delete an organization (owner)')
+  router.post('/api/orgs/:org/accept', authedP((u, _e, [o]) => orgs.acceptInvite(app, u, o!)), 'Accept an invitation')
+  router.post('/api/orgs/:org/decline', authedP((u, _e, [o]) => orgs.declineInvite(app, u, o!)), 'Decline an invitation')
+  router.get('/api/orgs/:org/members', authedP((u, _e, [o]) => orgs.members(app, u, o!)), 'Members, with public keys, and pending invitations')
+  router.post('/api/orgs/:org/invites', authedP((u, e, [o]) => orgs.invite(app, u, e, o!)), 'Invite someone by email address')
+  router.delete('/api/orgs/:org/invites/:digest', authedP((u, _e, [o, d]) => orgs.withdrawInvite(app, u, o!, d!)), 'Withdraw an invitation')
+  router.post('/api/orgs/:org/members/:user/confirm', authedP((u, e, [o, t]) => orgs.confirmMember(app, u, e, o!, t!)), 'Confirm a member by fingerprint: send them the org key')
+  router.put('/api/orgs/:org/members/:user', authedP((u, e, [o, t]) => orgs.setMemberRole(app, u, e, o!, t!)), 'Change a member\'s role (owner)')
+  router.delete('/api/orgs/:org/members/:user', authedP((u, _e, [o, t]) => orgs.removeMember(app, u, o!, t!)), 'Remove a member, or leave')
+  router.get('/api/orgs/:org/collections', authedP((u, _e, [o]) => orgs.collections(app, u, o!)), 'Collections, with my sealed key for each I can open')
+  router.post('/api/orgs/:org/collections', authedP((u, e, [o]) => orgs.createCollection(app, u, e, o!)), 'Create a collection')
+  router.put('/api/orgs/:org/collections/:coll', authedP((u, e, [o, c]) => orgs.renameCollection(app, u, e, o!, c!)), 'Rename a collection')
+  router.delete('/api/orgs/:org/collections/:coll', authedP((u, _e, [o, c]) => orgs.deleteCollection(app, u, o!, c!)), 'Delete a collection and its items')
+  router.get('/api/orgs/:org/collections/:coll/access', authedP((u, _e, [o, c]) => orgs.collectionAccess(app, u, o!, c!)), 'Who can open a collection')
+  router.put('/api/orgs/:org/collections/:coll/access/:user', authedP((u, e, [o, c, t]) => orgs.grantAccess(app, u, e, o!, c!, t!)), 'Grant or change a member\'s access')
+  router.delete('/api/orgs/:org/collections/:coll/access/:user', authedP((u, _e, [o, c, t]) => orgs.revokeAccess(app, u, o!, c!, t!)), 'Revoke a member\'s access')
+  router.get('/api/orgs/:org/collections/:coll/items', authedP((u, _e, [o, c]) => orgs.items(app, u, o!, c!)), 'The sealed items in a collection')
+  router.put('/api/orgs/:org/collections/:coll/items/:item', authedP((u, e, [o, c, i]) => orgs.putItem(app, u, e, o!, c!, i!)), 'Create or replace a sealed item')
+  router.delete('/api/orgs/:org/collections/:coll/items/:item', authedP((u, _e, [o, c, i]) => orgs.deleteItem(app, u, o!, c!, i!)), 'Delete an item')
 
   router.get('/api/vault', authed((u) => vault.getVault(app, u)), 'Every sealed entry and folder')
   router.put('/api/vault/entries/:id', authed((u, e, id) => vault.putEntry(app, u, e, id)), 'Create or replace a sealed entry')

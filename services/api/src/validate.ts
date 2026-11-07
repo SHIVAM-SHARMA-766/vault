@@ -31,6 +31,16 @@ const SEALED_PATTERN = /^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
 /** The server cannot read a sealed blob, so this checks only that it has the
  *  shape the client produces. Anything else would be stored and then fail to
  *  decrypt later, which is a much worse way to find out. */
+const SHARED_PATTERN = /^pk1\.[A-Za-z0-9_-]{80,96}\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+
+/** A key sealed to a member's public key (packages/crypto sealForRecipient). */
+export function requireSharedKey(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.length > 1024 || !SHARED_PATTERN.test(value)) {
+    throw badRequest(`${field} must be a key sealed to a member.`)
+  }
+  return value
+}
+
 export function requireSealed(value: unknown, field: string, maxBytes = 380 * 1024): string {
   if (typeof value !== 'string' || !SEALED_PATTERN.test(value)) {
     throw badRequest(`${field} must be a sealed blob.`)

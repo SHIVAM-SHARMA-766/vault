@@ -1,12 +1,14 @@
-// A router small enough to read. Paths are matched exactly or with a single
-// parameter segment, in any position; there is no pattern language to get wrong.
+// A router small enough to read. Paths are matched exactly, with `:name`
+// segments captured in order; there is no pattern language to get wrong.
 
 import { type LambdaEvent, type LambdaResponse, notFound } from './http.js'
 
 export interface RouteContext {
   event: LambdaEvent
-  /** The value captured by a `:param` segment, when the route has one. */
+  /** The value captured by the first `:param` segment, when the route has one. */
   param: string
+  /** Every `:param` value, in order. */
+  params: string[]
 }
 
 export type Handler = (ctx: RouteContext) => Promise<LambdaResponse>
@@ -69,13 +71,13 @@ export class Router {
       if (route.method !== method) continue
       if (route.segments.length !== segments.length) continue
 
-      let param = ''
+      const params: string[] = []
       let matched = true
       for (let i = 0; i < route.segments.length; i++) {
         const expected = route.segments[i]!
         const actual = segments[i]!
         if (expected.startsWith(':')) {
-          param = decodeURIComponent(actual)
+          params.push(decodeURIComponent(actual))
           continue
         }
         if (expected !== actual) {
@@ -83,7 +85,7 @@ export class Router {
           break
         }
       }
-      if (matched) return route.handler({ event, param })
+      if (matched) return route.handler({ event, param: params[0] ?? '', params })
     }
 
     throw notFound()

@@ -18,6 +18,7 @@ import { Settings } from './features/settings/Settings.js'
 import { Transfer } from './features/transfer/Transfer.js'
 import { PublicRequest } from './features/desk/PublicRequest.js'
 import { Support } from './features/desk/Support.js'
+import { Orgs } from './features/orgs/Orgs.js'
 import { Vault } from './features/vault/Vault.js'
 
 type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-help'
@@ -58,6 +59,7 @@ function Signed({ state }: { state: session.Unlocked }) {
   if (route.name === 'settings') return <Settings state={state} />
   if (route.name === 'transfer') return <Transfer state={state} />
   if (route.name === 'support') return <Support state={state} />
+  if (route.name === 'orgs') return <Orgs state={state} />
   if (route.name === 'admin') {
     // The role arrives a moment after unlock; until it does, say so rather
     // than flash the vault or a refusal.

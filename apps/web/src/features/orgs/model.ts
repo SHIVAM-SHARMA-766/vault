@@ -1,0 +1,180 @@
+// Organizations and shared collections, decrypted in this browser
+// (decisions/0009, 0015). The identity private key is unwrapped with the vault
+// key when first needed and kept only in memory, like the vault key; it opens
+// the org keys and collection keys sealed to this account, which open names
+// and items. The server sees none of them.
+
+import { useCallback, useEffect, useState } from 'react'
+
+import {
+  type EntryContent, fromBase64Url, generateCollectionKey, generateOrgKey, identityFingerprint, isWithinSizeLimit,
+  openCollectionKey, openCollectionMeta, openOrgKey, openOrgMeta, openSharedItem, sealCollectionKey,
+  sealCollectionMeta, sealOrgKey, sealOrgMeta, sealSharedItem, unwrapIdentityPrivateKey, wipe,
+} from '@vault/crypto'
+
+import { type OrgInvitation, type OrgRole, type SharePermission, api } from '../../lib/api.js'
+import * as session from '../../lib/session.js'
+import type { Decrypted } from '../vault/model.js'
+
+export interface Identity { publicKey: Uint8Array; privateKey: Uint8Array; fingerprint: string }
+
+let cached: { vaultKey: Uint8Array; identity: Identity } | null = null
+
+// Locking forgets the private key with everything else.
+session.subscribe((state) => {
+  if (!state && cached) { wipe(cached.identity.privateKey); cached = null }
+})
+
+/** This account's identity key pair, unwrapped once per unlock. */
+export async function myIdentity(vaultKey: Uint8Array): Promise<Identity> {
+  if (cached && cached.vaultKey === vaultKey) return cached.identity
+  const me = await api.me(await session.token())
+  if (!me.identity) throw new Error('Your identity key is being created; unlock again in a moment.')
+  const publicKey = fromBase64Url(me.identity.publicKey)
+  const privateKey = await unwrapIdentityPrivateKey(me.identity.wrappedPrivateKey, vaultKey)
+  cached = { vaultKey, identity: { publicKey, privateKey, fingerprint: await identityFingerprint(publicKey) } }
+  return cached.identity
+}
+
+export interface OrgView {
+  id: string
+  name: string
+  role: OrgRole
+  status: 'accepted' | 'confirmed'
+  key?: Uint8Array
+}
+
+export interface CollectionView {
+  orgId: string
+  orgName: string
+  id: string
+  name: string
+  keyVersion: number
+  rotationNeeded: boolean
+  key?: Uint8Array
+  permission?: SharePermission
+  hidePasswords: boolean
+}
+
+/** A shared item, in the same shape as a personal entry plus where it lives. */
+export interface SharedEntry extends Decrypted {
+  orgId: string
+  collectionId: string
+  permission: SharePermission
+  hidePasswords: boolean
+}
+
+export const canEdit = (p?: SharePermission) => p === 'edit' || p === 'manage'
+
+export function useTeams(vaultKey: Uint8Array) {
+  const [orgs, setOrgs] = useState<OrgView[]>([])
+  const [collections, setCollections] = useState<CollectionView[]>([])
+  const [shared, setShared] = useState<SharedEntry[]>([])
+  const [invitations, setInvitations] = useState<OrgInvitation[]>([])
+  const [identity, setIdentity] = useState<Identity | null>(null)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    try {
+      const me = await myIdentity(vaultKey)
+      setIdentity(me)
+      const token = await session.token()
+      const [{ orgs: rows }, { invitations: invs }] = await Promise.all([api.orgs.list(token), api.orgs.invitations(token)])
+      setInvitations(invs)
+      const views: OrgView[] = []
+      const colls: CollectionView[] = []
+      const entries: SharedEntry[] = []
+      for (const row of rows) {
+        if (row.status !== 'confirmed' || !row.orgKeyBlob) { views.push({ id: row.id, name: row.hint || 'Organization', role: row.role, status: row.status }); continue }
+        const key = await openOrgKey(me.privateKey, me.publicKey, row.orgKeyBlob, row.id)
+        const name = (await openOrgMeta(row.id, row.nameBlob, key)).name
+        views.push({ id: row.id, name, role: row.role, status: row.status, key })
+        for (const c of (await api.orgs.collections(token, row.id)).collections) {
+          const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
+          const view: CollectionView = { orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
+          if (c.access && c.access.keyVersion === c.keyVersion) {
+            view.key = await openCollectionKey(me.privateKey, me.publicKey, c.access.keyBlob, c.id, c.keyVersion)
+            view.permission = c.access.permission
+            for (const it of (await api.orgs.items(token, row.id, c.id)).items) {
+              try {
+                const content = await openSharedItem(c.id, it.id, it.keyVersion, it.blob, view.key)
+                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords })
+              } catch { /* an item under an older key; rotation re-seals it */ }
+            }
+          }
+          colls.push(view)
+        }
+      }
+      entries.sort((a, b) => a.name.localeCompare(b.name))
+      setOrgs(views); setCollections(colls); setShared(entries); setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load organizations.')
+    }
+  }, [vaultKey])
+
+  useEffect(() => { void load() }, [load])
+
+  const coll = (id: string) => {
+    const c = collections.find((x) => x.id === id)
+    if (!c?.key) throw new Error('You cannot open that collection.')
+    return c as CollectionView & { key: Uint8Array }
+  }
+
+  async function createOrg(name: string, label: string): Promise<string> {
+    const me = await myIdentity(vaultKey)
+    const id = crypto.randomUUID()
+    const key = generateOrgKey()
+    await api.orgs.create(await session.token(), { id, hint: name.slice(0, 80), label, nameBlob: await sealOrgMeta(id, { name }, key), orgKeyBlob: await sealOrgKey(me.publicKey, key, id) })
+    await load()
+    return id
+  }
+
+  async function createCollection(orgId: string, name: string): Promise<string> {
+    const me = await myIdentity(vaultKey)
+    const org = orgs.find((o) => o.id === orgId)
+    if (!org?.key) throw new Error('You cannot open that organization.')
+    const id = crypto.randomUUID()
+    const key = generateCollectionKey()
+    await api.orgs.createCollection(await session.token(), orgId, {
+      id, nameBlob: await sealCollectionMeta(orgId, id, { name }, org.key), keyBlob: await sealCollectionKey(me.publicKey, key, id, 1),
+    })
+    await load()
+    return id
+  }
+
+  /** Confirms a member: the admin has compared fingerprints; seal the org key
+   *  to the public key the server says the member accepted with. */
+  async function confirm(orgId: string, userId: string, publicKey: string) {
+    const org = orgs.find((o) => o.id === orgId)
+    if (!org?.key) throw new Error('You cannot open that organization.')
+    await api.orgs.confirm(await session.token(), orgId, userId, await sealOrgKey(fromBase64Url(publicKey), org.key, orgId))
+  }
+
+  async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean) {
+    const c = coll(collectionId)
+    await api.orgs.grant(await session.token(), c.orgId, c.id, userId, {
+      permission, hidePasswords, keyBlob: await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion),
+    })
+  }
+
+  async function saveShared(collectionId: string, content: EntryContent, id?: string): Promise<string> {
+    const c = coll(collectionId)
+    const itemId = id ?? crypto.randomUUID()
+    const { folderId: _f, ...rest } = content
+    const blob = await sealSharedItem(c.id, itemId, c.keyVersion, rest, c.key)
+    if (!isWithinSizeLimit(blob)) throw new Error('That item is too large to store.')
+    await api.orgs.putItem(await session.token(), c.orgId, c.id, itemId, blob, c.keyVersion)
+    await load()
+    return itemId
+  }
+
+  async function deleteShared(collectionId: string, id: string) {
+    const c = coll(collectionId)
+    await api.orgs.deleteItem(await session.token(), c.orgId, c.id, id)
+    await load()
+  }
+
+  return { orgs, collections, shared, invitations, identity, error, load, createOrg, createCollection, confirm, grant, saveShared, deleteShared }
+}
+
+export type Teams = ReturnType<typeof useTeams>
