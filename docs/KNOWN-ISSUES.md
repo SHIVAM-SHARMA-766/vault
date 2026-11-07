@@ -107,11 +107,22 @@ whether to offer it, and how, is an open decision.
 </details>
 
 <details>
-<summary>🟠 <b>No sharing or teams yet</b></summary>
+<summary>🔴 <b>Removing a member does not yet rotate collection keys</b></summary>
 
-Every account has an identity key pair ready for it, and the model is designed
-([0009](../decisions/0009-identity-keys-and-sharing.md)); organizations and shared
-collections are phase 3.
+Removal stops the server serving anything to that person at once, and marks each collection
+they could open "Key rotation due". Until rotation ships (phase 3B step 4), someone removed who
+kept a copy of a collection key could read items still under it if they also obtained the
+ciphertext some other way. Nothing added through the server reaches them.
+</details>
+
+<details>
+<summary>🟠 <b>Teams are partly built</b></summary>
+
+Organizations, fingerprint-confirmed members, collections, shared items and per-collection
+permissions work. Still to come in phase 3B: key rotation, groups, organization policies,
+access audit, emergency access. Shared items have no version history yet, and organization
+admins see the names of every collection (they hold the org key) though they open only those
+they were granted. ([0015](../decisions/0015-organizations-and-collections.md))
 </details>
 
 <details>

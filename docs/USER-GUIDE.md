@@ -14,6 +14,7 @@ data, taken by `npm run screenshots` (see [Keeping these screenshots current](#k
 - [Import and export](#import-and-export)
 - [Account settings](#account-settings)
 - [Devices and activity](#devices-and-activity)
+- [Sharing with an organization](#sharing-with-an-organization)
 - [Help and support](#help-and-support)
 - [On a phone, and in dark mode](#on-a-phone-and-in-dark-mode)
 - [For owners: the admin panel](#for-owners-the-admin-panel)
@@ -186,6 +187,32 @@ your passwords in plain text.
 - **Security activity** shows sign-ins and account changes from the last 90 days.
 
 If you see a device you do not recognise: sign it out, then change your master password.
+
+## Sharing with an organization
+
+Account menu → **Organizations**.
+
+<img src="images/organizations.png" alt="Organizations: your fingerprint, an organization's members and collections" width="820">
+
+1. **Create an organization** and add **collections** — "Finance", "Home & streaming".
+2. **Invite** people by email address. They see the invitation when they next sign in, and
+   **Accept**.
+3. **Confirm them.** Ask them to read out the fingerprint shown at the top of their
+   Organizations page — on a call or in person — and press **Confirm…** next to their name.
+   Confirm only if it matches what you see. This is what stops anyone, the server included,
+   from slipping in a key of their own.
+4. Open a collection's **Access** and give confirmed members **Can view**, **Can edit** or
+   **Can manage** (manage lets them share it onward). **Hide passwords** lets someone use a
+   login without seeing its password in the app — a policy, not encryption.
+
+**Share an item** by opening it and choosing **Share** → a collection. It moves into the
+collection, re-encrypted with the collection's key; everyone with access sees it under
+**Shared** in the sidebar. **Move to my vault** takes it back.
+
+<img src="images/shared-item.png" alt="A shared item with its collection badge, and the Shared section in the sidebar" width="820">
+
+**Removing someone** cuts their access at once. The collections they could open are marked
+"Key rotation due".
 
 ## Help and support
 

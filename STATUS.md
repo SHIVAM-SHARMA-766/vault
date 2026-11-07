@@ -58,8 +58,9 @@ import real export files from three managers; three crypto decisions.
 CI. Left for the operator: decide the update channel, licence and pricing
 ([docs/ROADMAP.md](docs/ROADMAP.md#open-decisions)), then tag the first release.
 
-**Phase 3A — service desk: built** (2026-11-07). **Next: phase 3B, teams** — organizations,
-shared collections, permissions, groups, policies. Then **phase 3.5, an improvement pass**,
+**Phase 3A — service desk: built** (2026-11-07). **Phase 3B — teams: steps 1–3 of 9 built**
+(organizations, fingerprint confirmation, collections, sharing, permissions); next is step 4,
+key rotation on removal. Then **phase 3.5, an improvement pass**,
 before the browser extension ([docs/ROADMAP.md](docs/ROADMAP.md#phase-3--service-desk-then-teams)).
 
 Carried over: remove the AWS resources (needs new personal AWS keys).
@@ -78,6 +79,21 @@ Carried over: remove the AWS resources (needs new personal AWS keys).
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Merged PRs #19–#22 and deployed;** the reference instance runs the release with
+migration 2 applied.
+
+**2026-11-07 — Phase 3B, steps 1–3: teams.** Organizations with an org key sealed to each
+confirmed member; invitations by address digest (no account-existence leak); accept, then an
+admin **confirms by fingerprint** before anything is sealed to the member (threat A11), and the
+server refuses if the key changed meanwhile. Collections with their own key, sealed per grant,
+at a version; items bound to collection, id and version. View / edit / manage and hide
+passwords. Items move between personal and shared; shared items appear in the vault under
+**Shared**. Removal cuts access at once and marks collections for rotation. The router learned
+multiple path parameters. Two-browser test: create → invite → accept → confirm (fingerprints
+match) → share → Bob reads view-only → removed → gone. Testing also fixed: shared items counted
+under "No folder", and the dev stack gave every browser one address, so per-address rate limits
+tripped in multi-person tests. [0015](decisions/0015-organizations-and-collections.md).
 
 **2026-11-07 — Phase 3A: the service desk.** From the sign-in screen, anyone can **request
 access** or ask for **help signing in** (lost authenticator) without an account; signed-in

@@ -216,6 +216,23 @@ the `current` symlink, which is what Caddy serves at `/`. Uploaded images are st
 table and written to `/srv/vault/site/media/`. The renderer escapes every value and accepts
 no markup, because the site shares an origin with the vault client.
 
+## Organizations and sharing
+
+Built on the identity keys every account has ([0009](decisions/0009-identity-keys-and-sharing.md),
+[0015](decisions/0015-organizations-and-collections.md)).
+
+```mermaid
+flowchart LR
+  ok["Org key"] -- "sealed to each<br/>confirmed member" --> m1["Alice"] & m2["Bob"]
+  ok -- encrypts --> names["Org and collection names"]
+  ck["Collection key v1"] -- "sealed to members<br/>with access" --> m1 & m2
+  ck -- encrypts --> items["Shared items<br/>(bound to collection, id, version)"]
+```
+
+Members are invited by address digest, accept, and are confirmed by an admin comparing their
+key fingerprint out of band; only then is anything sealed to them. The server enforces
+view / edit / manage per collection and serves ciphertext; it holds no key that opens any of it.
+
 ## Service desk
 
 Help and support inside the product ([0014](decisions/0014-service-desk.md)): public
@@ -260,6 +277,10 @@ a `vault_meta` table beside it records the schema version.
 | `DESK` | `TICKET#<id>` / `SEQ` | A service desk ticket (kind, status, requester — email only while open) / the ticket number counter |
 | `DESKT#<id>` | `MSG#<seq>` | One message on a ticket, numbered; staff notes flagged internal |
 | `USER#<id>` | `TICKET#<id>` | Pointer to a ticket the user opened |
+| `ORG#<id>` | `META` / `MEMBER#<user>` / `PENDING#<digest>` | Organization (name sealed under the org key) / a member: role, status, recorded public key, sealed org key / an invitation not yet accepted |
+| `ORG#<id>` | `COLL#<coll>` / `ACCESS#<coll>#<user>` | A collection: name sealed under the org key, key version / a member's grant: permission, hide-passwords, collection key sealed to them |
+| `COLLI#<coll>` | `ITEM#<id>` | A shared item, sealed under the collection key at a version |
+| `USER#<id>` · `EMAIL#<digest>` | `ORG#<org>` · `ORGINVITE#<org>` | Pointers: my organizations; invitations waiting for an address |
 
 Unlocking is one query. Everything after that — search, filter, sort, folder resolution —
 happens in the client, because the server cannot read what it is storing.
