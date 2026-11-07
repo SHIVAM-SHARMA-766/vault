@@ -136,7 +136,7 @@ async function issueSession(app: App, userId: string, event: LambdaEvent, family
 function sendSignInNotice(app: App, email: string, event: LambdaEvent, recovery: boolean): void {
   if (!app.mailer) return
   const at = new Date(app.now()).toUTCString()
-  void notify(app.mailer, { to: email, ...signInNotice(app.config.origin, describeDevice(event.requestContext.http.userAgent), event.requestContext.http.sourceIp, at, recovery) })
+  void notify(app, { to: email, ...signInNotice(app.config.origin, describeDevice(event.requestContext.http.userAgent), event.requestContext.http.sourceIp, at, recovery) })
 }
 
 export async function revokeAllSessions(app: App, userId: string): Promise<void> {
