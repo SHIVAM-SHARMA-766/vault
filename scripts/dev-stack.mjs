@@ -43,11 +43,13 @@ const app = {
   now: () => Date.now(),
   // Open so the first account can be made; the admin panel can close it, and
   // POST /__dev/registration?open=0 does the same from a test.
-  allowRegistration: process.env.REGISTRATION !== 'closed',
-  adminDigests: new Set([emailDigest(OWNER, PEPPER)]),
+  allowRegistration: OWNER !== '' && process.env.REGISTRATION !== 'closed',
+  // OWNER_EMAIL= (empty) starts like a brand-new server: no owner, closed,
+  // and a first-run setup code in the log.
+  adminDigests: new Set(OWNER ? [emailDigest(OWNER, PEPPER)] : []),
   site: { sourceDir: join(ROOT, 'apps/site'), outputDir: mkdtempSync(join(tmpdir(), 'vault-dev-site-')), origin: `http://localhost:${PORT}` },
   config: {
-    port: PORT, host: '127.0.0.1', trustProxy: true, serveStatic: true, webRoot: '', origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: [OWNER],
+    port: PORT, host: '127.0.0.1', trustProxy: true, serveStatic: true, webRoot: '', origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: OWNER ? [OWNER] : [],
     site: { sourceDir: '', outputDir: '' },
     db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',
@@ -55,6 +57,9 @@ const app = {
 }
 const router = buildRouter(app)
 await publishToDisk(app, app.site)
+const { ensureSetup } = await import(join(API, 'system.js'))
+const setupCode = await ensureSetup(app)
+if (setupCode) console.log(`setup code: ${setupCode}`)
 
 const WEB = join(ROOT, 'apps/web/dist')
 

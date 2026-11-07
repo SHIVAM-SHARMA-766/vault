@@ -65,7 +65,10 @@ function Signed({ state }: { state: session.Unlocked }) {
 }
 
 function AuthScreen() {
-  const [view, setView] = useState<AuthView>('unlock')
+  // A first-run setup link (/app/?setup=CODE, printed in the server's log)
+  // opens account creation with the code filled in.
+  const [setupCode] = useState(() => new URLSearchParams(location.search).get('setup') ?? '')
+  const [view, setView] = useState<AuthView>(setupCode ? 'register' : 'unlock')
   // /app/admin is the admin panel's address. Signing in there is the same
   // sign-in, but the page should say where it leads.
   const forAdmin = location.pathname.startsWith('/app/admin')
@@ -102,7 +105,8 @@ function AuthScreen() {
           {view === 'unlock' ? (
             <Unlock forAdmin={forAdmin} onRegister={() => setView('register')} onRecover={() => setView('recover')} />
           ) : view === 'register' ? (
-            <Register onDone={() => setView('unlock')} onCancel={() => setView('unlock')} />
+            <Register setupCode={setupCode} onCancel={() => setView('unlock')}
+                      onDone={() => { if (setupCode) history.replaceState(null, '', '/app/'); setView('unlock') }} />
           ) : (
             <Recover onCancel={() => setView('unlock')} />
           )}

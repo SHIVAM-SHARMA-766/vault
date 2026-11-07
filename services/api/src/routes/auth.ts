@@ -60,6 +60,7 @@ import {
   getRegistry,
   getSettings,
   hashInviteCode,
+  listRegistry,
   putRegistry,
   touchLogin,
 } from '../system.js'
@@ -162,19 +163,21 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   // than silently leaving the vault open to anyone who finds the URL. The
   // environment override exists only to bootstrap the first account.
   const { registration: mode } = await getSettings(app)
-  const open = app.allowRegistration || mode === 'open'
-  if (!open && mode !== 'invite') throw forbidden()
-
   const body = parseJsonBody<Record<string, unknown>>(event)
   const inviteCode = typeof body['inviteCode'] === 'string' ? body['inviteCode'].trim() : ''
-  if (!open) {
-    // Checked before anything is written; claimed after, atomically.
-    if (!inviteCode || inviteCode.length > 64) throw forbidden()
-    const pending = await app.store.get(SYSTEM_PK, inviteSk(hashInviteCode(inviteCode)))
-    if (!pending || pending['usedAt'] || Date.parse(String(pending['expiresAt'])) <= app.now()) {
-      throw forbidden()
-    }
-  }
+  // Checked before anything is written; claimed after, atomically.
+  const pending = inviteCode && inviteCode.length <= 64
+    ? await app.store.get(SYSTEM_PK, inviteSk(hashInviteCode(inviteCode)))
+    : null
+  const usable = !!pending && !pending['usedAt'] && Date.parse(String(pending['expiresAt'])) > app.now()
+  // A first-run setup code works whatever the registration mode: on a new
+  // server, it is how the owner gets in.
+  const setup = usable && pending!['setup'] === true
+  // A setup code only ever creates the first account.
+  if (setup && (await listRegistry(app)).length > 0) throw forbidden()
+  const open = !setup && (app.allowRegistration || mode === 'open')
+  if (!open && !setup && mode !== 'invite') throw forbidden()
+  if (!open && !usable) throw forbidden()
 
   const email = requireEmail(body['email'])
   await limitAuth(app, event, email)

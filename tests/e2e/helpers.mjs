@@ -88,5 +88,5 @@ export async function start({ owner = 'owner@example.test' } = {}) {
     stack.kill()
   }
 
-  return { base, person, register, unlock, menu, setRegistration, errors, stop }
+  return { base, person, register, unlock, menu, setRegistration, errors, stop, log: () => log }
 }

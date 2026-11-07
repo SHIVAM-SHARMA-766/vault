@@ -16,6 +16,7 @@ import { emailDigest } from './identity.js'
 import type { App } from './context.js'
 import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
+import { ensureSetup } from './system.js'
 import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
 import type { ManagedStore } from './store.js'
@@ -53,6 +54,22 @@ export async function start(): Promise<void> {
   // schema that may not be there.
   const version = await store.migrate()
   console.log(`storage: ${app.config.db.driver}, schema version ${version}`)
+
+  // A brand-new server: say how to create the owner account.
+  const setupCode = await ensureSetup(app)
+  if (setupCode) {
+    console.log([
+      '',
+      '  ┌─ First-run setup ─────────────────────────────────────────────',
+      '  │ No accounts exist yet. Open this link to create the owner:',
+      `  │   ${app.config.origin}/app/?setup=${encodeURIComponent(setupCode)}`,
+      `  │ or choose "Create an account" and enter the code ${setupCode}`,
+      '  │ It works once, for 7 days; a new one is printed on every start',
+      '  │ until it is used.',
+      '  └───────────────────────────────────────────────────────────────',
+      '',
+    ].join('\n'))
+  }
 
   // Expired rows (sessions, activity, rate windows) are removed here for every
   // driver. MySQL also has a scheduled event; sweeping twice costs nothing.
