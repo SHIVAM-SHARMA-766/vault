@@ -1,10 +1,18 @@
-// Entry point. Kept to one line of logic so that nothing about starting the
-// process is hidden inside a module that also does something else.
+// Entry point. With no arguments it starts the server; `backup` and `restore`
+// are the operator commands in cli.ts.
+import { backupCommand, restoreCommand } from './cli.js'
 import { start } from './server.js'
 
-start().catch((err: unknown) => {
+const [command, ...args] = process.argv.slice(2)
+
+const run = command === 'backup' ? backupCommand()
+  : command === 'restore' ? restoreCommand(args)
+  : command ? Promise.reject(new Error(`unknown command "${command}"; use backup or restore`))
+  : start()
+
+run.catch((err: unknown) => {
   // Refusing to start is the correct answer to a missing secret or an
   // unreachable database. Exiting non-zero is what tells systemd to retry.
-  console.error('failed to start:', err)
+  console.error(command ? `${command} failed:` : 'failed to start:', err instanceof Error ? err.message : err)
   process.exit(1)
 })

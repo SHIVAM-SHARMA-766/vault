@@ -13,7 +13,7 @@ import { Check, CopyButton, PasswordInput, StrengthMeter } from '../../ui/kit.js
  *  are doing work rather than papering over a guessable secret. */
 const MIN_LENGTH = 12
 
-export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited = '' }: { onDone: () => void; onCancel: () => void; setupCode?: string; inviteCode?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -21,7 +21,8 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
   const [error, setError] = useState('')
   const [recoveryKey, setRecoveryKey] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
-  const [inviteCode, setInviteCode] = useState('')
+  const [inviteCode, setInviteCode] = useState((setupCode || invited).toUpperCase())
+  const owner = setupCode !== ''
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -124,19 +125,20 @@ export function Register({ onDone, onCancel }: { onDone: () => void; onCancel: (
     <form onSubmit={submit}>
       <button type="button" className="back-link" onClick={onCancel}><IconArrowLeft size={16} />Back to sign in</button>
       <span className="step">Step 1 of 2</span>
-      <h2 className="auth-title">Create your vault</h2>
+      <h2 className="auth-title">{owner ? 'Create the owner account' : 'Create your vault'}</h2>
       <p className="auth-sub">
+        {owner ? 'This is a new Vault server. The account you create now owns it: you can invite people and manage the server from the admin panel. ' : ''}
         There is no password reset. The server cannot read your vault, so it cannot help you
         back in — the recovery key issued next is the only other way.
       </p>
 
-      <div className="field">
+      {owner ? null : <div className="field">
         <label htmlFor="r-invite">Invitation code</label>
         <input id="r-invite" autoComplete="off" spellCheck={false} className="mono"
                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
                value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
         <p className="hint">Accounts are opened by invitation. Leave blank only if registration is open.</p>
-      </div>
+      </div>}
 
       <div className="field">
         <label htmlFor="r-email">Email</label>

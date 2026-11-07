@@ -162,6 +162,27 @@ The recovery key has a second branch of its own, `vault.recovery.auth.v1`, so it
 itself to the server without revealing the branch that unwraps the vault. Recovery happens
 exactly when the master password is gone, so the usual Auth Key cannot be produced.
 
+## Self-hosted installs
+
+The same code, packaged ([0013](decisions/0013-distribution-and-releases.md)). One image runs
+one Node process that serves the client, the website and the API (`SERVE_STATIC`), with the
+reference Caddyfile's headers; Caddy in front only terminates TLS.
+
+```mermaid
+flowchart LR
+  user["Browser"] -- HTTPS --> caddy["Caddy<br/>automatic certificate"]
+  caddy --> vault["vault container<br/>client · site · API<br/>non-root, port 8080"]
+  vault --> db[("SQLite in /data<br/>or PostgreSQL")]
+  vault -- "daily, encrypted .vbk" --> disk["/data/backups"]
+  vault -. "optional" .-> s3[("S3-compatible bucket")]
+  vault -. "optional" .-> smtp["SMTP: invitations,<br/>sign-in notices"]
+```
+
+On first start the server generates its secrets into `/data/secrets.env`, migrates the
+database, and — if no account exists — prints a one-time setup link that creates the owner.
+Releases are images built for amd64 and arm64 on a version tag, with an SBOM and provenance,
+signed keylessly with Sigstore. Install guide: [docs/INSTALL.md](docs/INSTALL.md).
+
 ## Releases
 
 Code reaches the host by the host pulling it ([0005](decisions/0005-pull-based-releases.md)).
@@ -284,6 +305,8 @@ Everything this project is lives here. Nothing about it lives anywhere else.
 | `apps/site/` | The public website: templates, content schema and defaults, static files, and the renderer the build and the API share |
 | `services/backup/` | The daily export and its systemd timer, and the restore drill |
 | `services/monitor/` | The health probe and its timer; the alarms are in `infra/monitoring.tf` |
+| `deploy/` | Self-hosted install profiles (Compose): personal and business |
+| `Dockerfile` | The self-hosted image |
 | `services/release/` | The host's pull agent and its systemd timer |
 | `scripts/` | `release.sh` ships code (CI runs it on merge); `setup-ci.sh` creates the CI identity; `deploy.sh` sets up the host; `apply.sh` guards Terraform |
 | `.github/workflows/` | `ci.yml` tests every change, including browser tests; `release.yml` publishes every merge to `main` |

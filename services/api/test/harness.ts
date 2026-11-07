@@ -10,6 +10,7 @@ import { dispatch } from '../src/app.js'
 import type { App } from '../src/context.js'
 import type { LambdaEvent, LambdaResponse } from '../src/http.js'
 import { emailDigest } from '../src/identity.js'
+import type { Message } from '../src/mail.js'
 import { MemoryStore } from '../src/store-memory.js'
 
 export { MemoryStore }
@@ -18,6 +19,8 @@ import { AUTH_HEADER } from '../src/tokens.js'
 export interface Harness {
   app: App
   store: MemoryStore
+  /** Mail "sent" when the harness was made with { mail: true }. */
+  outbox: Message[]
   request(method: string, path: string, options?: RequestOptions): Promise<Parsed>
   setNow(ms: number): void
 }
@@ -37,18 +40,25 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string } = {}): Harness {
+export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean } = {}): Harness {
   const store = new MemoryStore()
+  const outbox: Message[] = []
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
 
   const app: App = {
     store,
     config: {
       port: 3000,
+      host: '127.0.0.1',
+      trustProxy: true,
+      serveStatic: false,
+      webRoot: '',
       origin: 'https://vault.test',
       allowRegistration: false,
       adminEmails: [],
       site: { sourceDir: '', outputDir: '' },
+      backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
+      mail: { host: options.mail ? 'smtp.test' : '', port: 587, user: '', password: '', from: 'Vault <vault@vault.test>', signInNotices: true },
       db: {
         driver: 'mysql',
         ssl: false,
@@ -63,6 +73,7 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
       tokenKey: 'test-token-key-not-a-real-secret',
     },
     now: () => now,
+    ...(options.mail ? { mailer: { send: async (m: Message) => { outbox.push(m) } } } : {}),
     allowRegistration: options.allowRegistration ?? true,
     adminDigests: new Set((options.adminEmails ?? []).map((e) => emailDigest(e, 'test-pepper-not-a-real-secret'))),
     ...(options.siteOutput
@@ -90,7 +101,7 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
     }
   }
 
-  return { app, store, request, setNow: (ms) => { now = ms } }
+  return { app, store, outbox, request, setNow: (ms) => { now = ms } }
 }
 
 /** Deterministic stand-in bytes.

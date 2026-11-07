@@ -28,10 +28,13 @@ export interface Store {
 /** What the server needs from a store beyond the routes' five methods. */
 export interface ManagedStore extends Store {
   /** Brings the schema up to date; returns the schema version. Idempotent. */
-  migrate(): Promise<number>
+  migrate(target?: number): Promise<number>
   /** Removes rows whose expiry has passed; returns how many. */
   sweepExpired(now?: number): Promise<number>
   close(): Promise<void>
+  /** Every row in the table, for backups only — no route can reach this,
+   *  because routes are given the five-method Store. */
+  scan(): Promise<Item[]>
 }
 
 /** Raised by `put` when `mustNotExist` was requested and the item was there. */

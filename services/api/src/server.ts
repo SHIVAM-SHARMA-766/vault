@@ -16,10 +16,14 @@ import { emailDigest } from './identity.js'
 import type { App } from './context.js'
 import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
+import { ensureSetup } from './system.js'
+import { createMailer } from './mail.js'
+import { backupsEnabled, runBackup } from './backup.js'
+import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
 import type { ManagedStore } from './store.js'
 
-const HOST = '127.0.0.1'
+const HOST = 'localhost'
 
 /** Bodies are small — one sealed entry, or one image of at most 2 MB sent as
  *  base64 from the admin panel. A cap stops a single request from consuming
@@ -29,10 +33,12 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024
 async function buildApp(): Promise<{ app: App; store: ManagedStore }> {
   const config = loadConfig()
   const store = await openStore(config)
+  const mailer = await createMailer(config)
   const app: App = {
     config,
     store,
     now: () => Date.now(),
+    ...(mailer ? { mailer } : {}),
     // Closed unless explicitly opened (config.ts), so a missing or misspelled
     // setting refuses registration rather than leaving the vault open.
     allowRegistration: config.allowRegistration,
@@ -53,6 +59,35 @@ export async function start(): Promise<void> {
   const version = await store.migrate()
   console.log(`storage: ${app.config.db.driver}, schema version ${version}`)
 
+  // Scheduled backups (backup.ts), when a passphrase and a destination are set.
+  if (backupsEnabled(app.config) && app.config.backup.intervalHours > 0) {
+    const backup = () => runBackup(store, app.config)
+      .then((r) => console.log(`backup written: ${r.name} (${r.rows} rows, ${r.bytes} bytes)`))
+      .catch((err: unknown) => console.error('backup FAILED:', (err as Error).message))
+    setTimeout(() => { void backup(); setInterval(backup, app.config.backup.intervalHours * 3_600_000).unref() }, 5 * 60_000).unref()
+    console.log(`backups: every ${app.config.backup.intervalHours} h${app.config.backup.dir ? `, to ${app.config.backup.dir}` : ''}${app.config.backup.s3 ? `, to s3://${app.config.backup.s3.bucket}` : ''}; first in 5 minutes`)
+  } else if (!backupsEnabled(app.config)) {
+    console.log('backups: off (set BACKUP_PASSPHRASE and BACKUP_DIR or BACKUP_S3_*; see docs/INSTALL.md)')
+  }
+
+  console.log(app.mailer ? `mail: via ${app.config.mail.host}:${app.config.mail.port}` : 'mail: off (set SMTP_HOST and MAIL_FROM to send invitations and security notices)')
+
+  // A brand-new server: say how to create the owner account.
+  const setupCode = await ensureSetup(app)
+  if (setupCode) {
+    console.log([
+      '',
+      '  ┌─ First-run setup ─────────────────────────────────────────────',
+      '  │ No accounts exist yet. Open this link to create the owner:',
+      `  │   ${app.config.origin}/app/?setup=${encodeURIComponent(setupCode)}`,
+      `  │ or choose "Create an account" and enter the code ${setupCode}`,
+      '  │ It works once, for 7 days; a new one is printed on every start',
+      '  │ until it is used.',
+      '  └───────────────────────────────────────────────────────────────',
+      '',
+    ].join('\n'))
+  }
+
   // Expired rows (sessions, activity, rate windows) are removed here for every
   // driver. MySQL also has a scheduled event; sweeping twice costs nothing.
   const sweep = () => store.sweepExpired().catch((err: unknown) => console.error('expiry sweep failed:', (err as Error).message))
@@ -72,7 +107,17 @@ export async function start(): Promise<void> {
 
   const router = buildRouter(app)
 
+  const { config } = app
+  const roots = { web: config.webRoot, site: config.site.outputDir, origin: config.origin }
+
   const server = createServer((req, res) => {
+    // Not the API: the client, the website and media, when this process
+    // serves them itself (src/web.ts). Otherwise a proxy in front does.
+    if (!(req.url ?? '/').startsWith('/api/')) {
+      if (config.serveStatic) serveStatic(req, res, roots)
+      else { res.writeHead(404, { 'content-type': 'application/json' }); res.end('{"error":"not_found","message":"Not found."}') }
+      return
+    }
     const chunks: Buffer[] = []
     let size = 0
     let aborted = false
@@ -101,10 +146,14 @@ export async function start(): Promise<void> {
           requestContext: {
             http: {
               method: req.method ?? 'GET',
-              // Caddy sets X-Forwarded-For; without it every request would
-              // appear to come from the loopback address and per-address rate
-              // limiting would apply to everyone at once.
-              sourceIp: (req.headers['x-forwarded-for'] ?? '').toString().split(',')[0]?.trim() || '127.0.0.1',
+              // Behind a proxy (TRUST_PROXY=true), the client is the first
+              // address in X-Forwarded-For; without it every request would
+              // seem to come from the proxy and per-address rate limits
+              // would apply to everyone at once. Exposed directly, that
+              // header is whatever the client says, so the socket is used.
+              sourceIp: config.trustProxy
+                ? (req.headers['x-forwarded-for'] ?? '').toString().split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1'
+                : req.socket.remoteAddress || '127.0.0.1',
               ...(req.headers['user-agent'] ? { userAgent: req.headers['user-agent'] } : {}),
             },
           },
@@ -117,8 +166,8 @@ export async function start(): Promise<void> {
     })
   })
 
-  server.listen(app.config.port, HOST, () => {
-    console.log(`vault api listening on ${HOST}:${app.config.port}`)
+  server.listen(app.config.port, app.config.host, () => {
+    console.log(`vault api listening on ${app.config.host}:${app.config.port}${app.config.serveStatic ? ' (serving client and site)' : ''}`)
   })
 
   // systemd restarts on failure; the job here is to exit rather than linger in

@@ -7,10 +7,10 @@ Everything is encrypted in your browser; the server stores ciphertext it holds n
 
 [![CI](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml/badge.svg)](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml)
 ![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM%20in%20the%20browser-4f46e5)
-![Tests](https://img.shields.io/badge/tests-305%20unit%20%C2%B7%2015%20browser-16a34a)
+![Tests](https://img.shields.io/badge/tests-327%20unit%20%C2%B7%2016%20browser-16a34a)
 ![Running cost](https://img.shields.io/badge/running%20cost-%240%20a%20month-0ea5e9)
 
-[**Live instance**](https://vault-shivam.duckdns.org) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
+[**Live instance**](https://vault-shivam.duckdns.org) · [Install your own](docs/INSTALL.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
 
 <img src="docs/images/vault.png" alt="The Vault web app: folders and types on the left, items in the middle, a login with a live one-time code on the right" width="900">
 
@@ -78,9 +78,9 @@ and an editor for the public website — none of which can read a vault.
 </td>
 <td valign="top">
 
-### 🚀 Ships itself
-Merge to `main` and the server installs the release within five minutes, verifies it, and
-rolls back on failure. Health is watched and alarms reach the operator.
+### 🏠 Runs on your server
+One container, SQLite or PostgreSQL, HTTPS by Caddy. A setup link creates the owner,
+secrets generate themselves, and encrypted backups go to disk or any S3-compatible store.
 
 </td>
 </tr>
@@ -165,7 +165,25 @@ The full design: [ARCHITECTURE.md](ARCHITECTURE.md) and the
 [decision records](decisions/). Adversaries and mitigations:
 [threat model](docs/threat-model.md).
 
-## Run it locally
+## Run it on your own server
+
+```sh
+git clone https://github.com/SHIVAM-SHARMA-766/vault.git && cd vault/deploy/personal
+cp .env.example .env          # set VAULT_HOSTNAME and BACKUP_PASSPHRASE
+docker compose up -d
+docker compose logs vault | grep -A6 "First-run setup"   # open the link, create the owner
+```
+
+| | Personal | Business |
+|---|---|---|
+| For | You, your family, a small team | A company |
+| Runs | Vault + SQLite + Caddy | Vault + PostgreSQL + Caddy |
+| Hardware | 1 GB RAM, amd64 or arm64 | Your choice |
+
+Everything is in the [install guide](docs/INSTALL.md): backups and restore, mail, upgrades,
+verifying signed images, running behind your own proxy.
+
+## Run it locally (development)
 
 ```sh
 npm install
@@ -177,8 +195,8 @@ npm run dev:stack      # the whole product on http://localhost:8080, in memory �
 <summary>Tests, screenshots and the API description</summary>
 
 ```sh
-npm test               # crypto, core and API — 305 tests
-npm run test:e2e       # 15 browser tests against the real stack (needs Chrome)
+npm test               # crypto, core and API — 327 tests
+npm run test:e2e       # 16 browser tests against the real stack (needs Chrome)
 npm run screenshots    # regenerate docs/images from the running product
 npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 ```
@@ -197,6 +215,7 @@ npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 | [`apps/site/`](apps/site/) | The public website: templates, editable content, renderer |
 | [`services/`](services/) | Backup and restore drill, release pull agent, health probe |
 | [`infra/`](infra/) | Terraform for everything the reference instance runs on |
+| [`deploy/`](deploy/) | Install profiles: personal and business Compose files |
 | [`scripts/`](scripts/) | Release, host setup, dev stack, screenshots |
 | [`decisions/`](decisions/) | Why things are the way they are |
 | [`docs/`](docs/) | User guide, runbook, configuration, threat model, roadmap |
@@ -209,7 +228,9 @@ npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 |---|---|---|
 | 📘 | [User guide](docs/USER-GUIDE.md) | Using Vault, screen by screen |
 | 🏗️ | [Architecture](ARCHITECTURE.md) | How the system fits together, with diagrams |
+| 🏠 | [Install guide](docs/INSTALL.md) | Running your own Vault: install, backups, mail, upgrades |
 | ⚙️ | [Configuration](docs/configuration.md) | Every server setting |
+| 🛡️ | [Security policy](SECURITY.md) | Reporting a vulnerability; verifying releases |
 | 🔌 | [API](services/api/README.md) · [OpenAPI](docs/openapi.json) | Routes, errors, request ids |
 | 🛠️ | [Runbook](docs/runbook.md) | Deploying, alerts, backups, restore drill, recovery |
 | 🔒 | [Threat model](docs/threat-model.md) | Adversaries, mitigations, accepted risks |

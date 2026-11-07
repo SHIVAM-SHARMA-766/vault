@@ -1,0 +1,14 @@
+# TLS in front of Vault, for both install profiles. Caddy obtains and renews a
+# certificate for VAULT_HOSTNAME by itself (ports 80 and 443 must reach this
+# machine), with no account or email needed. For "localhost" or an IP address
+# it uses its own local CA instead.
+#
+# Vault sets every security header itself; this only terminates TLS and
+# forwards. X-Forwarded-For is set by Caddy, which is why the image runs with
+# TRUST_PROXY=true.
+
+{$VAULT_HOSTNAME} {
+	encode zstd gzip
+	reverse_proxy vault:8080
+	header -Server
+}

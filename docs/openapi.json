@@ -1401,6 +1401,36 @@
         }
       }
     },
+    "/api/admin/mail/test": {
+      "post": {
+        "summary": "Send a test email",
+        "operationId": "postAdminMailTest",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "settings.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/audit": {
       "get": {
         "summary": "Staff audit log",

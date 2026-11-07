@@ -137,6 +137,8 @@ export interface Invite extends Item {
   usedBy?: string
   /** The role the new account starts with. Absent means a plain user. */
   role?: string
+  /** First-run setup: creates the owner, even while registration is closed. */
+  setup?: boolean
 }
 
 export async function createInvite(
@@ -184,6 +186,26 @@ export async function claimInvite(app: App, code: string, userId: string): Promi
   const at = new Date(app.now()).toISOString()
   await app.store.put({ ...invite, usedAt: at, usedBy: userId })
   return invite
+}
+
+// ── First-run setup ─────────────────────────────────────────────────────
+
+const SETUP_DAYS = 7
+
+/** On a server with no accounts and no ADMIN_EMAILS, issues a one-time code
+ *  that creates the owner account, and returns it for the log. Only its hash
+ *  is stored, so a new code is issued on every start until one is used — the
+ *  person who can read the server's log is the person who runs it. Returns
+ *  null once any account exists, and withdraws unused setup codes then. */
+export async function ensureSetup(app: App): Promise<string | null> {
+  const stale = (await listInvites(app)).filter((i) => i.setup && !i.usedAt)
+  for (const i of stale) await deleteInvite(app, i.id)
+  if (app.adminDigests.size > 0) return null
+  if ((await listRegistry(app)).length > 0) return null
+  const { code } = await createInvite(app, 'system', 'First-run setup', SETUP_DAYS, 'owner')
+  const setup = (await app.store.get(SYSTEM_PK, inviteSk(hashInviteCode(code)))) as Invite
+  await app.store.put({ ...setup, setup: true })
+  return code
 }
 
 // ── Audit ─────────────────────────────────────────────────────────────────

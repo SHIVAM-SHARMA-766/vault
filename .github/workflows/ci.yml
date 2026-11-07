@@ -130,8 +130,21 @@ jobs:
       - name: Typecheck
         run: npm run typecheck --workspace @vault/api
 
+      # An S3-compatible server that verifies signatures, for the backup
+      # upload test (test/backup.test.ts). Started here rather than as a
+      # service because it needs arguments.
+      - name: Start an S3-compatible server
+        run: |
+          docker run -d --name s3 -p 9000:7070 -e ROOT_ACCESS_KEY=ci-s3-access -e ROOT_SECRET_KEY=ci-s3-secret-not-real --tmpfs /data versity/versitygw:v1.0.9 posix /data
+          for _ in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:9000 && break; sleep 1; done
+
       - name: Test
         run: npm test --workspace @vault/api
+        env:
+          S3_TEST_ENDPOINT: http://127.0.0.1:9000
+          S3_TEST_ACCESS_KEY: ci-s3-access
+          S3_TEST_SECRET_KEY: ci-s3-secret-not-real
+          S3_TEST_CREATE_BUCKET: 'true'
 
       # A bundle that compiles but will not start is a deploy that fails after
       # the service has already been replaced. This starts the real bundle
@@ -267,3 +280,106 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=moderate
+
+  image:
+    name: image — build and run the container
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image customers install, built from this commit and run for real:
+      # it must come up healthy on SQLite, serve the client and the site with
+      # the security headers, generate its secrets privately, and not be root.
+      - name: Build
+        run: docker build -t vault:ci --build-arg VERSION=ci-${GITHUB_SHA::12} .
+
+      - name: Run and check
+        run: |
+          docker run -d --name vault -p 8080:8080 -e VAULT_HOSTNAME=localhost vault:ci
+          for _ in $(seq 1 60); do curl -sf localhost:8080/api/health >/dev/null && break; sleep 1; done
+          curl -sf localhost:8080/api/health | grep -q '"ok"' || { docker logs vault; echo "::error::not healthy"; exit 1; }
+          for p in / /app/ /app/settings; do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080$p)" = 200 ] || { echo "::error::$p"; exit 1; }
+          done
+          [ "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/app/assets/missing.js)" = 404 ] || { echo "::error::missing asset not 404"; exit 1; }
+          curl -sI localhost:8080/app/ | grep -qi "content-security-policy: default-src 'none'" || { echo "::error::no CSP"; exit 1; }
+          [ "$(docker exec vault id -u)" = 10001 ] || { echo "::error::running as root"; exit 1; }
+          [ "$(docker exec vault stat -c %a /data/secrets.env)" = 600 ] || { echo "::error::secrets file not private"; exit 1; }
+          docker logs vault 2>&1 | grep -q 'schema version' || { echo "::error::no migration log"; exit 1; }
+
+      # Restore, tested: back up the running container's data, restore it
+      # into a brand-new volume, start a second container on it, and check
+      # the restored server has the same data and secrets.
+      - name: Backup and restore
+        run: |
+          P='ci backup passphrase not secret'
+          docker exec -e BACKUP_PASSPHRASE="$P" -e BACKUP_DIR=/data/backups vault node index.mjs backup
+          file=$(docker exec vault sh -c 'ls /data/backups/*.vbk | head -1')
+          docker cp "vault:$file" ./backup.vbk && chmod 644 backup.vbk   # encrypted; the container user must read it
+          docker volume create restored
+          docker run --rm -v restored:/data -v "$PWD/backup.vbk:/tmp/backup.vbk:ro" -e VAULT_HOSTNAME=localhost -e BACKUP_PASSPHRASE="$P" vault:ci node index.mjs restore /tmp/backup.vbk
+          [ "$(docker exec vault grep '^SERVER_PEPPER=' /data/secrets.env)" = "$(docker run --rm -v restored:/data vault:ci grep '^SERVER_PEPPER=' /data/secrets.env)" ] || { echo "::error::secrets not restored"; exit 1; }
+          docker run -d --name restored -p 8081:8080 -v restored:/data -e VAULT_HOSTNAME=localhost vault:ci
+          for _ in $(seq 1 60); do curl -sf localhost:8081/api/health >/dev/null && break; sleep 1; done
+          curl -sf localhost:8081/api/health | grep -q '"ok"' || { docker logs restored; exit 1; }
+
+  profiles:
+    name: install profile — business (PostgreSQL + Caddy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The business profile exactly as a customer starts it, on localhost
+      # (Caddy's local CA): healthy over TLS, migrated on PostgreSQL, and
+      # printing a first-run setup link.
+      - name: Up
+        working-directory: deploy/business
+        run: |
+          printf 'VAULT_HOSTNAME=localhost\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 16)" > .env
+          docker compose up -d --build --wait --wait-timeout 300
+
+      - name: Check
+        working-directory: deploy/business
+        run: |
+          curl -skf https://localhost/api/health | grep -q '"ok"' || { docker compose logs; exit 1; }
+          curl -skI https://localhost/app/ | grep -qi "content-security-policy" || { echo "::error::no CSP through Caddy"; exit 1; }
+          docker compose logs vault | grep -q 'storage: postgres' || { echo "::error::not on postgres"; exit 1; }
+          docker compose logs vault | grep -q '/app/?setup=' || { echo "::error::no setup link"; exit 1; }
+
+  upgrade:
+    name: upgrade — previous image, then this one, on the same data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The release before this change, as the base branch has it. Its server
+      # creates and fills the data volume; this commit's server must then
+      # start on it, migrate it, and serve it. Skipped until the base branch
+      # has a Dockerfile.
+      - name: Build the previous image
+        id: prev
+        run: |
+          base="origin/${GITHUB_BASE_REF:-main}"
+          if ! git cat-file -e "$base:Dockerfile" 2>/dev/null; then echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git worktree add ../previous "$base"
+          docker build -t vault:previous ../previous
+
+      - name: Build this image
+        if: steps.prev.outputs.skip != 'true'
+        run: docker build -t vault:next .
+
+      - name: Upgrade
+        if: steps.prev.outputs.skip != 'true'
+        run: |
+          docker run -d --name old -v data:/data -e VAULT_HOSTNAME=localhost -p 8080:8080 vault:previous
+          for _ in $(seq 1 60); do curl -sf localhost:8080/api/health >/dev/null && break; sleep 1; done
+          curl -sf localhost:8080/api/health || { docker logs old; exit 1; }
+          pepper=$(docker exec old grep '^SERVER_PEPPER=' /data/secrets.env)
+          docker rm -f old
+          docker run -d --name new -v data:/data -e VAULT_HOSTNAME=localhost -p 8080:8080 vault:next
+          for _ in $(seq 1 60); do curl -sf localhost:8080/api/health >/dev/null && break; sleep 1; done
+          curl -sf localhost:8080/api/health || { docker logs new; exit 1; }
+          [ "$(docker exec new grep '^SERVER_PEPPER=' /data/secrets.env)" = "$pepper" ] || { echo "::error::secrets changed across upgrade"; exit 1; }
+          docker logs new 2>&1 | grep 'schema version'

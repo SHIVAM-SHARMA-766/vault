@@ -54,16 +54,12 @@ each one produced a symptom that pointed somewhere else:
 blocking: run `apply.sh`, confirm the alert mail, `deploy.sh`, the first restore drill;
 import real export files from three managers; three crypto decisions.
 
-**Phase 2 — the self-hosted product** ([docs/ROADMAP.md](docs/ROADMAP.md#phase-2--the-self-hosted-product-)):
+**Phase 2 — the self-hosted product: built** (2026-11-07). All eight steps are done and in
+CI. Left for the operator: decide the update channel, licence and pricing
+([docs/ROADMAP.md](docs/ROADMAP.md#open-decisions)), then tag the first release.
 
-1. ~~Storage: SQLite, PostgreSQL, MySQL; versioned migrations~~ — done 2026-11-07.
-2. **One server process serves client, site and API** — next.
-3. Container image (multi-arch, non-root).
-4. First-run setup token.
-5. Install profiles (personal, business) and install docs.
-6. Backups to disk or S3-compatible storage; restore tested in CI.
-7. SMTP mail.
-8. Signed images, SBOM, upgrade tests.
+**Next: phase 3, teams** — organizations, shared collections, permissions, groups, policies
+([docs/ROADMAP.md](docs/ROADMAP.md#phase-3--teams)).
 
 Carried over: remove the AWS resources (needs new personal AWS keys).
 
@@ -81,6 +77,30 @@ Carried over: remove the AWS resources (needs new personal AWS keys).
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 2, steps 2–8: Vault is installable.**
+- *One process*: with `SERVE_STATIC=true` the server serves the client, site and media with
+  the Caddyfile's exact headers and caching (a test compares them), and refuses path
+  traversal.
+- *Image*: `Dockerfile` — non-root, `/data` volume, health check, SQLite by default, secrets
+  generated on first start (`SECRETS_FILE`), 218 MB.
+- *First-run setup*: a fresh server prints a one-time link that creates the owner, even with
+  registration closed, and only for the first account.
+- *Profiles*: `deploy/personal` (SQLite + Caddy) and `deploy/business` (PostgreSQL + Caddy),
+  both brought up over TLS; a full browser run on the business profile stored an entry that
+  appears nowhere in plain text in PostgreSQL.
+- *Backups*: one encrypted `.vbk` file (every row + server secrets, scrypt + AES-256-GCM) to
+  disk and any S3-compatible store; `backup` / `restore` commands; restore onto any driver.
+  The S3 signer reproduces AWS's published example and was tested against a real
+  S3-compatible server.
+- *Mail*: the customer's SMTP for emailed invitations and sign-in / recovery notices, with a
+  test button; addresses still never stored. nodemailer pinned past its advisories.
+- *Supply chain and upgrades*: a tag-triggered workflow builds amd64 + arm64 with SBOM and
+  provenance and signs keylessly with Sigstore; `SECURITY.md`; every earlier schema upgrades;
+  CI upgrades the previous image's volume. Checked locally from the step-3 image.
+- CI now also builds and runs the container, brings up the business profile, round-trips a
+  backup, and runs the upgrade. [INSTALL.md](docs/INSTALL.md),
+  [0013](decisions/0013-distribution-and-releases.md).
 
 **2026-11-07 — Phase 2, step 1: three storage drivers.** `DB_DRIVER` chooses SQLite (one
 file, for personal installs), PostgreSQL (business) or MySQL (the reference instance, still

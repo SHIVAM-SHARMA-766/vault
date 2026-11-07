@@ -1,0 +1,74 @@
+# Vault, business profile: Vault on PostgreSQL, and Caddy for HTTPS.
+# For a company: the database is one your team can back up, monitor and run
+# on separate storage, and more Vault instances can share it later.
+#
+#   cp .env.example .env    # set VAULT_HOSTNAME and POSTGRES_PASSWORD
+#   docker compose up -d
+#   docker compose logs vault | grep -A6 "First-run setup"   # the owner link
+#
+# Back up the postgres-data and vault-data volumes (vault-data holds the
+# server secrets). See docs/INSTALL.md.
+
+name: vault
+
+services:
+  vault:
+    image: ${VAULT_IMAGE:-vault:local}
+    build: ../..
+    restart: unless-stopped
+    # Every setting in .env reaches Vault (backups, mail — docs/configuration.md).
+    env_file: [.env]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      VAULT_HOSTNAME: ${VAULT_HOSTNAME:?set VAULT_HOSTNAME in .env}
+      # Only when HTTPS is not on 443, e.g. https://vault.example.com:8443
+      SITE_ORIGIN: ${SITE_ORIGIN:-}
+      DB_DRIVER: postgres
+      DB_HOST: postgres
+      DB_NAME: vault
+      DB_USER: vault
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - vault-data:/data
+    expose:
+      - "8080"
+
+  postgres:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vault
+      POSTGRES_USER: vault
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vault -d vault"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_HOSTNAME: ${VAULT_HOSTNAME}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ../Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  vault-data:
+  postgres-data:
+  caddy-data:
+  caddy-config:

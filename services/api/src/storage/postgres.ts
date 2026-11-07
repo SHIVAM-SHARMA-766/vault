@@ -38,14 +38,15 @@ export class PostgresStore implements Store {
     return store
   }
 
-  async migrate(): Promise<number> {
+  /** `target` stops at an earlier version; tests use it to build old databases. */
+  async migrate(target?: number): Promise<number> {
     const client = await this.pool.connect()
     try {
       await client.query('SELECT pg_advisory_lock($1)', [MIGRATION_LOCK])
       await client.query(META_TABLE.postgres)
       const row = (await client.query<{ v: string }>("SELECT v FROM vault_meta WHERE k = 'schema_version'")).rows[0]
       let version = Number(row?.v ?? 0)
-      for (const m of pending(version)) {
+      for (const m of pending(version, target)) {
         await client.query('BEGIN')
         try {
           for (const sql of m.sql.postgres) await client.query(sql)
@@ -109,6 +110,10 @@ export class PostgresStore implements Store {
       [pk, sk, expiresAt],
     )
     return Number(rows[0]?.count ?? 1)
+  }
+
+  async scan(): Promise<Item[]> {
+    return (await this.pool.query('SELECT pk, sk, data FROM vault ORDER BY pk, sk')).rows.map(fromRow)
   }
 
   async sweepExpired(now = Math.floor(Date.now() / 1000)): Promise<number> {

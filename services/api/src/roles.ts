@@ -56,6 +56,9 @@ export const outranks = (actor: Role, target: Role): boolean =>
 
 export function roleFromDigest(app: App, digest: string, stored: unknown): Role {
   if (app.adminDigests.has(digest)) return 'owner'
+  // Stored only by first-run setup (system.ts, ensureSetup): no route can
+  // grant it, because the role routes accept GRANTABLE_ROLES alone.
+  if (stored === 'owner') return 'owner'
   return (GRANTABLE_ROLES as readonly string[]).includes(stored as string) ? (stored as GrantableRole) : 'user'
 }
 
