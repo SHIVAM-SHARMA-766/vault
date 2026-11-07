@@ -342,19 +342,23 @@ jobs:
           curl -sf localhost:8081/api/health | grep -q '"ok"' || { docker logs restored; exit 1; }
 
   profiles:
-    name: install profile — business (PostgreSQL + Caddy)
+    name: install — one-line installer, business profile (PostgreSQL + Caddy)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # The business profile exactly as a customer starts it, on localhost
-      # (Caddy's local CA): healthy over TLS, migrated on PostgreSQL, and
-      # printing a first-run setup link.
-      - name: Up
-        working-directory: deploy/business
+      - name: Installer tests (dry run)
+        run: node --test tests/install/
+
+      # The business profile exactly as a customer starts it — through the
+      # one-line installer, on localhost (Caddy's local CA): healthy over TLS,
+      # migrated on PostgreSQL, and printing a first-run setup link.
+      - name: Up, through deploy/install.sh
         run: |
-          printf 'VAULT_HOSTNAME=localhost\nPOSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 16)" > .env
-          docker compose up -d --build --wait --wait-timeout 300
+          VAULT_DIR="$PWD" VAULT_SKIP_FETCH=1 VAULT_YES=1 VAULT_PROFILE=business \
+            VAULT_HOSTNAME=localhost sh deploy/install.sh | tee install.log
+          grep -q '/app/?setup=' install.log || { echo "::error::the installer did not print the setup link"; exit 1; }
+          stat -c %a deploy/business/.env | grep -qx 600 || { echo "::error::.env is not mode 600"; exit 1; }
 
       - name: Check
         working-directory: deploy/business
