@@ -69,18 +69,6 @@ were created and changed. Never names, URLs, usernames or contents — those are
 </details>
 
 <details>
-<summary>🟠 <b>A signed-out device keeps working for up to fifteen minutes</b></summary>
-
-**Effect.** Signing a device out (or "sign out everywhere") stops its refresh token at once,
-but an access token it already holds stays valid until it expires, at most 15 minutes. It
-can read ciphertext in that window; it still needs the vault key to read anything.
-
-**Why.** Access tokens are verified by signature alone, with no database read per request.
-
-**Changes when** revocation needs to be instant: a per-session check on each request.
-</details>
-
-<details>
 <summary>🔴 <b>Collection key grants are not signed (threat A15)</b></summary>
 
 A compromised server could issue a collection key of its own as a "rotation", and members would

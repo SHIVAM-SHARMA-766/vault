@@ -2,8 +2,9 @@
 //
 // A device is a family of refresh-token records sharing one `sid` (see
 // SessionRecord in auth.ts). Signing a device out deletes its record, so its
-// refresh token stops working at once; an access token it already holds
-// lasts out its fifteen minutes, as with every other revocation.
+// refresh token stops working at once, and so does any access token it holds:
+// every authenticated request checks the session still exists
+// (requireLiveSession in context.ts).
 
 import { requireSession, type App } from '../context.js'
 import { type LambdaEvent, type LambdaResponse, badRequest, json, notFound, parseJsonBody } from '../http.js'

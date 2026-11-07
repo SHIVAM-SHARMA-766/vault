@@ -4,11 +4,12 @@
 import { randomUUID } from 'node:crypto'
 
 import type { App } from './context.js'
-import { requireUser } from './context.js'
+import { requireLiveSession } from './context.js'
 import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './http.js'
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { Router } from './router.js'
 import { openapi } from './openapi.js'
+import * as account from './routes/account.js'
 import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
@@ -40,7 +41,7 @@ export function buildRouter(app: App): Router {
   const authed =
     (handler: (userId: string, event: LambdaEvent, param: string) => Promise<LambdaResponse>) =>
     Object.assign(async ({ event, param }: { event: LambdaEvent; param: string }) => {
-      const userId = requireUser(app, event)
+      const { userId } = await requireLiveSession(app, event)
       await enforce(app.store, 'api', userId, API_LIMIT, app.now())
       return handler(userId, event, param)
     }, { auth: 'access' as const })
@@ -49,7 +50,7 @@ export function buildRouter(app: App): Router {
   const authedP =
     (handler: (userId: string, event: LambdaEvent, params: string[]) => Promise<LambdaResponse>) =>
     Object.assign(async ({ event, params }: { event: LambdaEvent; params: string[] }) => {
-      const userId = requireUser(app, event)
+      const { userId } = await requireLiveSession(app, event)
       await enforce(app.store, 'api', userId, API_LIMIT, app.now())
       return handler(userId, event, params)
     }, { auth: 'access' as const })
@@ -59,6 +60,7 @@ export function buildRouter(app: App): Router {
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)), 'Replace the recovery key')
+  router.post('/api/account/delete', authed((u, e) => account.deleteOwnAccount(app, u, e)), 'Delete my own account (master password and second factor required)')
   router.put('/api/keys/identity', authed((u, e) => auth.setIdentity(app, u, e)), 'Store the identity key pair (once)')
   router.post('/api/auth/2fa/setup', authed((u, e) => auth.setupTwoFactor(app, u, e)), 'Start TOTP enrolment')
   router.post('/api/auth/2fa/enable', authed((u, e) => auth.enableTwoFactor(app, u, e)), 'Confirm TOTP enrolment; returns recovery codes')

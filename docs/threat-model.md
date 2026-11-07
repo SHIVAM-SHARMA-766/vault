@@ -257,7 +257,7 @@ fingerprints are shown to both people so they can be compared out of band.
 **Account changes need the password, not just a session.** Changing the master password
 and issuing a new recovery key both require proof of the current master password (or, for a
 password reset, of the recovery key), checked by the server. A stolen access token can read
-ciphertext for fifteen minutes; it cannot take the account's ways back in away from its owner.
+ciphertext for at most fifteen minutes, and not at all once its device is signed out (every request checks the session); it cannot take the account's ways back in away from its owner.
 
 
 Collection items are stored per organization and collection (`COLLI#<org>#<collection>`):

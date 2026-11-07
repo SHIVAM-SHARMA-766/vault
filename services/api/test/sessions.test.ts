@@ -57,10 +57,28 @@ test('signing a device out stops its refresh token at once', async () => {
   const other = (await rows(h, first.accessToken)).find((r) => !r.current)!
   assert.equal((await h.request('DELETE', `/api/sessions/${other.id}`, { token: first.accessToken })).status, 200)
   assert.equal((await rows(h, first.accessToken)).length, 1)
-  assert.equal((await h.request('POST', '/api/auth/refresh', { body: { refreshToken: second.refreshToken } })).status, 401)
-  assert.equal((await h.request('DELETE', `/api/sessions/${other.id}`, { token: first.accessToken })).status, 404)
   const activity = (await h.request('GET', '/api/activity', { token: first.accessToken })).body['events'] as { kind: string }[]
   assert.ok(activity.some((e) => e.kind === 'revoke-session'))
+  assert.equal((await h.request('DELETE', `/api/sessions/${other.id}`, { token: first.accessToken })).status, 404)
+  // Presenting the signed-out refresh token looks like theft: every session
+  // ends, and with the per-request check, every access token stops at once.
+  assert.equal((await h.request('POST', '/api/auth/refresh', { body: { refreshToken: second.refreshToken } })).status, 401)
+  assert.equal((await h.request('GET', '/api/vault', { token: first.accessToken })).status, 401)
+})
+
+test('a signed-out device is refused at once, not when its access token expires', async () => {
+  const { h, first, second } = await twoDevices()
+  assert.equal((await h.request('GET', '/api/vault', { token: second.accessToken })).status, 200)
+  const other = (await rows(h, first.accessToken)).find((r) => !r.current)!
+  await h.request('DELETE', `/api/sessions/${other.id}`, { token: first.accessToken })
+  assert.equal((await h.request('GET', '/api/vault', { token: second.accessToken })).status, 401)
+  assert.equal((await h.request('GET', '/api/vault', { token: first.accessToken })).status, 200, 'the other device carries on')
+})
+
+test('sign out everywhere stops every access token at once', async () => {
+  const { h, first, second } = await twoDevices()
+  assert.equal((await h.request('POST', '/api/auth/logout', { token: first.accessToken, body: { all: true } })).status, 200)
+  for (const t of [first.accessToken, second.accessToken]) assert.equal((await h.request('GET', '/api/vault', { token: t })).status, 401)
 })
 
 test("one account cannot see or sign out another's devices", async () => {
