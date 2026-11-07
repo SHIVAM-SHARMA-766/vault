@@ -111,8 +111,32 @@ async function access(app: App, orgId: string, collectionId: string, userId: str
   return (await app.store.get(orgPk(orgId), accessSk(collectionId, userId))) as Access | null
 }
 
+export interface Policies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
+const DEFAULT_POLICIES: Policies = { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null }
+
+async function policiesOf(app: App, orgId: string): Promise<Policies> {
+  const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
+  return { ...DEFAULT_POLICIES, ...((meta?.['policies'] as Partial<Policies>) ?? {}) }
+}
+
+/** What stops this account meeting the organization's policies, if anything. */
+async function policyGap(app: App, orgId: string, userId: string): Promise<string | null> {
+  const p = await policiesOf(app, orgId)
+  if (!p.requireTwoFactor && !p.minPasswordScore) return null
+  const profile = await app.store.get(userPk(userId), PROFILE_SK)
+  if (p.requireTwoFactor && !profile?.['totp']) return 'This organization requires two-factor sign-in. Turn it on in Settings.'
+  if (p.minPasswordScore && Number(profile?.['passwordScore'] ?? 0) < p.minPasswordScore) return 'This organization requires a stronger master password. Change it in Settings.'
+  return null
+}
+
+async function requireCompliant(app: App, orgId: string, userId: string): Promise<void> {
+  const gap = await policyGap(app, orgId, userId)
+  if (gap) throw new HttpError(403, 'policy_required', gap)
+}
+
 async function requireAccess(app: App, orgId: string, collectionId: string, userId: string, at: Permission): Promise<{ m: Member; a: Access; c: Collection }> {
   const m = await requireMember(app, orgId, userId, { confirmed: true })
+  await requireCompliant(app, orgId, userId)
   if (!isValidId(collectionId)) throw notFound()
   const c = (await app.store.get(orgPk(orgId), collectionSk(collectionId))) as Collection | null
   if (!c) throw notFound()
@@ -158,7 +182,12 @@ export async function myOrgs(app: App, userId: string): Promise<LambdaResponse> 
     const orgId = String(p['orgId'])
     const [meta, m] = await Promise.all([app.store.get(orgPk(orgId), ORG_META_SK), member(app, orgId, userId)])
     if (!meta || !m) continue
-    orgs.push({ id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', role: m.role, status: m.status, ...(m.orgKeyBlob ? { orgKeyBlob: m.orgKeyBlob } : {}) })
+    const policies = { ...DEFAULT_POLICIES, ...((meta['policies'] as Partial<Policies>) ?? {}) }
+    orgs.push({
+      id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', role: m.role, status: m.status, policies,
+      policyGap: m.status === 'confirmed' ? await policyGap(app, orgId, userId) : null,
+      ...(m.orgKeyBlob ? { orgKeyBlob: m.orgKeyBlob } : {}),
+    })
   }
   return json(200, { orgs })
 }
@@ -174,6 +203,30 @@ export async function deleteOrg(app: App, userId: string, orgId: string): Promis
     await app.store.delete(row.pk, row.sk)
   }
   return json(200, { ok: true })
+}
+
+export async function setPolicies(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const b = body(event)
+  const score = Number(b['minPasswordScore'] ?? 0)
+  const idle = b['maxIdleMinutes'] === null || b['maxIdleMinutes'] === undefined ? null : Number(b['maxIdleMinutes'])
+  if (!Number.isInteger(score) || score < 0 || score > 4) throw badRequest('minPasswordScore must be 0 to 4.')
+  if (idle !== null && (!Number.isInteger(idle) || idle < 1 || idle > 15)) throw badRequest('maxIdleMinutes must be 1 to 15, or null.')
+  const policies: Policies = { requireTwoFactor: b['requireTwoFactor'] === true, minPasswordScore: score, maxIdleMinutes: idle }
+  const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
+  if (!meta) throw notFound()
+  await app.store.put({ ...meta, policies })
+  return json(200, { policies })
+}
+
+/** For admins: which members do not meet the policies (never why in detail
+ *  beyond the policy name). */
+export async function compliance(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const ms = (await app.store.query(orgPk(orgId), ORG_MEMBER_PREFIX)) as Member[]
+  const out = []
+  for (const m of ms) out.push({ userId: m.userId, gap: m.status === 'confirmed' ? await policyGap(app, orgId, m.userId) : null })
+  return json(200, { members: out })
 }
 
 // ── Invitations and membership ────────────────────────────────────────────
@@ -309,6 +362,7 @@ export async function removeMember(app: App, userId: string, orgId: string, targ
 
 export async function collections(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
   const me = await requireMember(app, orgId, userId, { confirmed: true })
+  await requireCompliant(app, orgId, userId)
   const all = await app.store.query(orgPk(orgId), COLLECTION_PREFIX) as Collection[]
   const out = []
   for (const c of all) {

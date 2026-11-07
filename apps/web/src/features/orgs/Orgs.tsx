@@ -107,6 +107,9 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
     <section className="settings-card org-card" aria-label={org.name}>
       <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill pill-accent">{org.role}</span></div>
 
+      {org.policyGap ? <p className="alert alert-warn"><IconAlert size={16} />{org.policyGap} Until then, its collections stay closed to you.</p> : null}
+      {admin ? <PoliciesForm org={org} teams={teams} /> : <PolicySummary org={org} />}
+
       <h3 className="small-head">Members</h3>
       <ul className="device-list">
         {members.map((m) => (
@@ -336,5 +339,43 @@ function Groups({ org, teams, members, admin, list, setList }: {
         </form>
       ) : null}
     </>
+  )
+}
+
+function PolicySummary({ org }: { org: OrgView }) {
+  const p = org.policies
+  const rules = [p.requireTwoFactor && 'two-factor sign-in', p.minPasswordScore > 0 && `a master password rated at least ${STRENGTH[p.minPasswordScore]}`, p.maxIdleMinutes && `locking after ${p.maxIdleMinutes} minutes idle`].filter(Boolean)
+  return rules.length ? <p className="muted small">This organization requires {rules.join(', ')}.</p> : null
+}
+
+const STRENGTH = ['', 'Weak', 'Fair', 'Strong', 'Excellent']
+
+function PoliciesForm({ org, teams }: { org: OrgView; teams: Teams }) {
+  const toast = useToast()
+  const [p, setP] = useState(org.policies)
+  const [open, setOpen] = useState(false)
+  if (!open) return <div className="policy-line"><PolicySummary org={org} /><button className="link small" onClick={() => setOpen(true)}>Policies…</button></div>
+  return (
+    <form className="policies" onSubmit={async (e) => {
+      e.preventDefault()
+      try { await api.orgs.setPolicies(await session.token(), org.id, p); toast('Policies saved'); setOpen(false); await teams.load() }
+      catch (err) { toast(err instanceof Error ? err.message : 'Could not save.', 'error') }
+    }}>
+      <h3 className="small-head">Policies</h3>
+      <label className="check"><input type="checkbox" checked={p.requireTwoFactor} onChange={(e) => setP({ ...p, requireTwoFactor: e.target.checked })} /><span>Require two-factor sign-in (checked by the server)</span></label>
+      <div className="field"><label htmlFor={`pol-pw-${org.id}`}>Minimum master password strength</label>
+        <select id={`pol-pw-${org.id}`} value={p.minPasswordScore} onChange={(e) => setP({ ...p, minPasswordScore: Number(e.target.value) })}>
+          <option value={0}>No minimum</option>{[2, 3, 4].map((n) => <option key={n} value={n}>{STRENGTH[n]}</option>)}
+        </select>
+        <p className="hint">Rated by each member's app when they unlock — the server never sees a master password, so this is self-reported.</p>
+      </div>
+      <div className="field"><label htmlFor={`pol-idle-${org.id}`}>Lock after idle</label>
+        <select id={`pol-idle-${org.id}`} value={p.maxIdleMinutes ?? ''} onChange={(e) => setP({ ...p, maxIdleMinutes: e.target.value ? Number(e.target.value) : null })}>
+          <option value="">15 minutes (default)</option>{[1, 5, 10].map((n) => <option key={n} value={n}>{n} minutes</option>)}
+        </select>
+      </div>
+      <p className="alert alert-warn"><IconAlert size={16} />Policies apply to everyone here, you included. Members who do not meet them cannot open the organization's collections until they do.</p>
+      <div className="settings-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary btn-sm">Save policies</button></div>
+    </form>
   )
 }

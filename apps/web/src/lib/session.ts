@@ -45,6 +45,12 @@ let idleTimer: ReturnType<typeof setTimeout> | null = null
 /** Long enough not to interrupt ordinary use, short enough that a vault left
  *  open on an unattended screen does not stay open. */
 const IDLE_MS = 15 * 60 * 1000
+/** An organization may ask for a shorter idle lock (its policy). */
+let idleMs = IDLE_MS
+export function setIdleLimit(minutes: number | null): void {
+  const next = minutes ? Math.min(IDLE_MS, minutes * 60_000) : IDLE_MS
+  if (next !== idleMs) { idleMs = next; if (current) resetIdleTimer() }
+}
 
 type Listener = (state: Unlocked | null) => void
 const listeners = new Set<Listener>()
@@ -90,7 +96,7 @@ export function lock(): void {
 
 export function resetIdleTimer(): void {
   if (idleTimer) clearTimeout(idleTimer)
-  idleTimer = setTimeout(lock, IDLE_MS)
+  idleTimer = setTimeout(lock, idleMs)
 }
 
 /** An access token good for at least the next minute, refreshing it if not.

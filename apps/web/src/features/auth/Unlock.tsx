@@ -1,5 +1,7 @@
 import { useState } from 'react'
 
+import { passwordStrength } from '@vault/core'
+
 import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } from '@vault/crypto'
 
 import { ApiError, type SecondFactor, api } from '../../lib/api.js'
@@ -53,6 +55,9 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       kdf: result.kdf,
       accessExpiresAt: session.expiresAtFrom(result),
     })
+    // Organization policies may ask for a strong master password; the
+    // server never sees it, so this app reports its score.
+    void api.passwordScore(result.accessToken, passwordStrength(password).score).catch(() => {})
   }
 
   async function submit(event: React.FormEvent) {

@@ -367,6 +367,19 @@ export async function logout(app: App, userId: string, event: LambdaEvent): Prom
   return json(200, { ok: true })
 }
 
+/** The strength score (0–4, packages/core passwordStrength) of the master
+ *  password, as this account's own app computed it at unlock or change.
+ *  Self-reported — the server never sees the password — and used only for
+ *  organization policies, which say so. */
+export async function setPasswordScore(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const score = parseJsonBody<{ score?: unknown }>(event).score
+  if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > 4) throw badRequest('score must be 0 to 4.')
+  const profile = await app.store.get(userPk(userId), PROFILE_SK)
+  if (!profile) throw unauthorized()
+  if (profile['passwordScore'] !== score) await app.store.put({ ...profile, passwordScore: score })
+  return json(200, { ok: true })
+}
+
 export async function me(app: App, userId: string): Promise<LambdaResponse> {
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()

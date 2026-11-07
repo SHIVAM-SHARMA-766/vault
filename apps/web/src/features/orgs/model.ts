@@ -12,7 +12,7 @@ import {
   sealCollectionMeta, sealOrgKey, sealOrgMeta, sealSharedItem, unwrapIdentityPrivateKey, wipe, openGroupMeta, sealGroupMeta,
 } from '@vault/crypto'
 
-import { type OrgInvitation, type OrgRole, type SharePermission, api } from '../../lib/api.js'
+import { type OrgInvitation, type OrgPolicies, type OrgRole, type SharePermission, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import type { Decrypted } from '../vault/model.js'
 
@@ -42,6 +42,9 @@ export interface OrgView {
   role: OrgRole
   status: 'accepted' | 'confirmed'
   key?: Uint8Array
+  policies: OrgPolicies
+  /** Why this account cannot open the organization's collections, if it cannot. */
+  policyGap: string | null
 }
 
 export interface CollectionView {
@@ -85,10 +88,12 @@ export function useTeams(vaultKey: Uint8Array) {
       const colls: CollectionView[] = []
       const entries: SharedEntry[] = []
       for (const row of rows) {
-        if (row.status !== 'confirmed' || !row.orgKeyBlob) { views.push({ id: row.id, name: row.hint || 'Organization', role: row.role, status: row.status }); continue }
+        const base = { id: row.id, role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap }
+        if (row.status !== 'confirmed' || !row.orgKeyBlob) { views.push({ ...base, name: row.hint || 'Organization' }); continue }
         const key = await openOrgKey(me.privateKey, me.publicKey, row.orgKeyBlob, row.id)
         const name = (await openOrgMeta(row.id, row.nameBlob, key)).name
-        views.push({ id: row.id, name, role: row.role, status: row.status, key })
+        views.push({ ...base, name, key })
+        if (row.policyGap) continue
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
           const view: CollectionView = { orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
@@ -106,6 +111,9 @@ export function useTeams(vaultKey: Uint8Array) {
         }
       }
       entries.sort((a, b) => a.name.localeCompare(b.name))
+      // The strictest idle policy among confirmed organizations sets the lock.
+      const idle = rows.map((r) => (r.status === 'confirmed' ? r.policies.maxIdleMinutes : null)).filter((m): m is number => !!m)
+      session.setIdleLimit(idle.length ? Math.min(...idle) : null)
       setOrgs(views); setCollections(colls); setShared(entries); setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load organizations.')

@@ -164,6 +164,8 @@ export const api = {
   logout: (token: string, refreshToken: string) =>
     request<{ ok: true }>('POST', '/api/auth/logout', { token, body: { refreshToken } }),
 
+  /** Self-reported strength (0–4) of the master password, for organization policies. */
+  passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
     request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number } }>(
       'GET', '/api/auth/me', { token },
@@ -226,6 +228,7 @@ export const api = {
     createCollection: (token: string, org: string, body: { id: string; nameBlob: string; keyBlob: string }) =>
       request<{ id: string }>('POST', `/api/orgs/${org}/collections`, { token, body }),
     deleteCollection: (token: string, org: string, coll: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}`, { token }),
+    setPolicies: (token: string, org: string, policies: OrgPolicies) => request<{ policies: OrgPolicies }>('PUT', `/api/orgs/${org}/policies`, { token, body: policies }),
     groups: (token: string, org: string) => request<{ groups: GroupRow[] }>('GET', `/api/orgs/${org}/groups`, { token }),
     createGroup: (token: string, org: string, id: string, nameBlob: string) => request<{ id: string }>('POST', `/api/orgs/${org}/groups`, { token, body: { id, nameBlob } }),
     deleteGroup: (token: string, org: string, group: string) => request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/groups/${group}`, { token }),
@@ -331,7 +334,8 @@ export const api = {
 
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type SharePermission = 'view' | 'edit' | 'manage'
-export interface OrgRow { id: string; nameBlob: string; hint: string; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string }
+export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
+export interface OrgRow { id: string; nameBlob: string; hint: string; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
 export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
 export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null }
 export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string }

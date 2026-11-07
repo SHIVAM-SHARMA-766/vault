@@ -42,9 +42,10 @@
               "too_large",
               "rate_limited",
               "unavailable",
+              "policy_required",
               "internal"
             ],
-            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\ninternal: An unexpected error. Quote `requestId` when reporting it."
+            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\npolicy_required: An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.\ninternal: An unexpected error. Quote `requestId` when reporting it."
           },
           "message": {
             "type": "string",
@@ -291,6 +292,35 @@
       "post": {
         "summary": "Revoke one session, or all of them",
         "operationId": "postAuthLogout",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password-score": {
+      "put": {
+        "summary": "Report the master password's strength score, for organization policies",
+        "operationId": "putAuthPasswordScore",
         "tags": [
           "auth"
         ],
@@ -1265,6 +1295,84 @@
           },
           {
             "name": "user",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/policies": {
+      "put": {
+        "summary": "Set the organization's policies",
+        "operationId": "putOrgsOrgPolicies",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orgs/{org}/compliance": {
+      "get": {
+        "summary": "Which members do not meet the policies",
+        "operationId": "getOrgsOrgCompliance",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
             "in": "path",
             "required": true,
             "schema": {

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { passwordStrength } from '@vault/core'
 import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey } from '@vault/crypto'
 
 import { ApiError, api } from '../../lib/api.js'
@@ -98,6 +99,7 @@ function ChangePassword({ state }: { state: session.Unlocked }) {
         kdf: changed.kdf, accessToken: res.accessToken, refreshToken: res.refreshToken,
         accessExpiresAt: session.expiresAtFrom(res),
       })
+      void api.passwordScore(res.accessToken, passwordStrength(next).score).catch(() => {})
       setCurrent(''); setNext(''); setConfirm('')
       toast('Master password changed. Other devices have been signed out.')
     } catch (err) {

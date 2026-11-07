@@ -51,6 +51,7 @@ export function buildRouter(app: App): Router {
     }, { auth: 'access' as const })
 
   router.post('/api/auth/logout', authed((u, e) => auth.logout(app, u, e)), 'Revoke one session, or all of them')
+  router.put('/api/auth/password-score', authed((u, e) => auth.setPasswordScore(app, u, e)), 'Report the master password\'s strength score, for organization policies')
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)), 'Replace the recovery key')
@@ -83,6 +84,8 @@ export function buildRouter(app: App): Router {
   router.post('/api/orgs/:org/members/:user/confirm', authedP((u, e, [o, t]) => orgs.confirmMember(app, u, e, o!, t!)), 'Confirm a member by fingerprint: send them the org key')
   router.put('/api/orgs/:org/members/:user', authedP((u, e, [o, t]) => orgs.setMemberRole(app, u, e, o!, t!)), 'Change a member\'s role (owner)')
   router.delete('/api/orgs/:org/members/:user', authedP((u, _e, [o, t]) => orgs.removeMember(app, u, o!, t!)), 'Remove a member, or leave')
+  router.put('/api/orgs/:org/policies', authedP((u, e, [o]) => orgs.setPolicies(app, u, e, o!)), 'Set the organization\'s policies')
+  router.get('/api/orgs/:org/compliance', authedP((u, _e, [o]) => orgs.compliance(app, u, o!)), 'Which members do not meet the policies')
   router.get('/api/orgs/:org/groups', authedP((u, _e, [o]) => orgs.groups(app, u, o!)), 'Groups, their members and the collections granted to them')
   router.post('/api/orgs/:org/groups', authedP((u, e, [o]) => orgs.createGroup(app, u, e, o!)), 'Create a group')
   router.delete('/api/orgs/:org/groups/:group', authedP((u, _e, [o, g]) => orgs.deleteGroup(app, u, o!, g!)), 'Delete a group and the access it granted')

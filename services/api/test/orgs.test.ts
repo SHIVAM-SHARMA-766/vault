@@ -214,3 +214,34 @@ test('groups: granting a collection to a group gives each member a key; leaving 
   assert.deepEqual(gs[0]!.members, [bob.userId])
   assert.equal(gs[0]!.collections.length, 1)
 })
+
+test('policies: 2FA required and a minimum password score gate collections until met', async () => {
+  const h = harness()
+  const { alice, orgId, orgKey, collId, collKey } = await orgWithCollection(h)
+  const bob = await person(h, 'bob@example.test')
+  await h.request('POST', `/api/orgs/${orgId}/invites`, { token: alice.token, body: { email: bob.email } })
+  await h.request('POST', `/api/orgs/${orgId}/accept`, { token: bob.token })
+  await h.request('POST', `/api/orgs/${orgId}/members/${bob.userId}/confirm`, { token: alice.token, body: { orgKeyBlob: await sealOrgKey(bob.keys.publicKey, orgKey, orgId) } })
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/access/${bob.userId}`, { token: alice.token, body: { permission: 'view', keyBlob: await sealCollectionKey(bob.keys.publicKey, collKey, collId, 1) } })
+
+  assert.equal((await h.request('PUT', `/api/orgs/${orgId}/policies`, { token: bob.token, body: { requireTwoFactor: true } })).status, 403, 'members cannot set policies')
+  assert.equal((await h.request('PUT', `/api/orgs/${orgId}/policies`, { token: alice.token, body: { requireTwoFactor: true, minPasswordScore: 3, maxIdleMinutes: 5 } })).status, 200)
+
+  const blocked = await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: bob.token })
+  assert.equal(blocked.status, 403)
+  assert.equal(blocked.body['error'], 'policy_required')
+  assert.match(String(blocked.body['message']), /two-factor/)
+  const mine = ((await h.request('GET', '/api/orgs', { token: bob.token })).body['orgs'] as { policyGap: string; policies: { maxIdleMinutes: number } }[])[0]!
+  assert.match(mine.policyGap, /two-factor/)
+  assert.equal(mine.policies.maxIdleMinutes, 5)
+
+  // Bob turns on 2FA (stand-in: the profile flag), then is told about the password.
+  await h.store.put({ ...(await h.store.get(`USER#${bob.userId}`, 'PROFILE'))!, totp: 'sealed' })
+  assert.match(String((await h.request('GET', `/api/orgs/${orgId}/collections`, { token: bob.token })).body['message']), /stronger master password/)
+  assert.equal((await h.request('PUT', '/api/auth/password-score', { token: bob.token, body: { score: 7 } })).status, 400)
+  await h.request('PUT', '/api/auth/password-score', { token: bob.token, body: { score: 4 } })
+  assert.equal((await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: bob.token })).status, 200)
+
+  const comp = (await h.request('GET', `/api/orgs/${orgId}/compliance`, { token: alice.token })).body['members'] as { userId: string; gap: string | null }[]
+  assert.equal(comp.find((m) => m.userId === bob.userId)!.gap, null)
+})
