@@ -58,10 +58,9 @@ import real export files from three managers; three crypto decisions.
 CI. Left for the operator: decide the update channel, licence and pricing
 ([docs/ROADMAP.md](docs/ROADMAP.md#open-decisions)), then tag the first release.
 
-**Phase 3A — service desk: built** (2026-11-07). **Phase 3B — teams: steps 1–3 of 9 built**
-(organizations, fingerprint confirmation, collections, sharing, permissions); next is step 4,
-key rotation on removal. Then **phase 3.5, an improvement pass**,
-before the browser extension ([docs/ROADMAP.md](docs/ROADMAP.md#phase-3--service-desk-then-teams)).
+**Phase 3A — service desk: built** (2026-11-07). **Phase 3B — teams: built** (all 9 steps). **Next: phase 3.5, the improvement pass**, then the
+browser extension. Then **phase 3.5, an improvement pass**,
+before the browser extension ([docs/ROADMAP.md](docs/ROADMAP.md#phase-35--improvement-pass)).
 
 Carried over: remove the AWS resources (needs new personal AWS keys).
 
@@ -79,6 +78,17 @@ Carried over: remove the AWS resources (needs new personal AWS keys).
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 3B, steps 4–9: teams complete.** *Rotation*: re-key a collection in one
+checked request — new version, items re-encrypted, re-sealed to remaining members; automatic
+after a removal. *Groups*: encrypted names; collections granted to a group reach each member;
+leaving revokes and re-keys. *Policies*: 2FA required (server), minimum master password strength
+(self-reported score), idle lock (app); non-compliant members are told why and kept out.
+*Audit*: server-recorded writes, grants and membership, app-reported opens, reveals and copies,
+an Activity view for admins. *Emergency access*: fingerprint-confirmed trusted contacts, a
+waiting period the grantor can cut short or refuse, read-only access. *Operator view*:
+organizations by counts in the admin panel, audited deletion. Organization recovery is
+deliberately not built. [0016](decisions/0016-teams-completion.md), threat A14.
 
 **2026-11-07 — Merged PRs #19–#22 and deployed;** the reference instance runs the release with
 migration 2 applied.

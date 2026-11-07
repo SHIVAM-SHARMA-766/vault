@@ -211,8 +211,29 @@ collection, re-encrypted with the collection's key; everyone with access sees it
 
 <img src="images/shared-item.png" alt="A shared item with its collection badge, and the Shared section in the sidebar" width="820">
 
-**Removing someone** cuts their access at once. The collections they could open are marked
-"Key rotation due".
+**Removing someone** cuts their access at once, and your app re-keys every collection they
+could open (a new key, every item re-encrypted) so a copy they kept opens nothing new. If you
+cannot manage one of them, it shows **Rotate key** for someone who can.
+
+**Groups** — "Parents", "Engineering" — let you give a whole team access to a collection at
+once: create a group, add confirmed members, then in a collection's **Access** choose **Give
+access to a group**. People added to the group later get the group's collections.
+
+**Policies…** (admins) can require two-factor sign-in, a minimum master password strength and a
+shorter idle lock. They apply to everyone in the organization, you included; anyone who does
+not meet them is told why and cannot open its collections until they do.
+
+**Activity…** (admins) shows who opened, copied, edited, shared or removed what, for a year.
+
+### Emergency access
+
+Settings → **Emergency access**: choose someone you trust and a waiting period. After they
+accept, confirm their fingerprint. If they ever request access, you will see it in Settings —
+**Reject** it, or **Approve now**; if you do nothing, they get a read-only view of your vault
+when the waiting period ends. Use this for the person who should be able to get in if something
+happens to you.
+
+<img src="images/emergency.png" alt="Emergency access in Settings: a trusted contact and the form to add one" width="820">
 
 ## Help and support
 
@@ -271,6 +292,15 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 Counts, the last verified backup, the registration mode (closed, invite only, open), whether
 mail is set up (with **Send test**), and the server's state. (Taken on the local development stack, which has no backups and forces
 registration open — hence the two notices.)
+</details>
+
+<details>
+<summary>Organizations (operator view)</summary>
+
+<img src="images/admin-orgs.png" alt="The admin panel's organizations list, by counts" width="820">
+
+Every organization on the server, by counts and the name its creator typed. You can delete one
+(recorded in the audit log); you cannot open anything in it.
 </details>
 
 <details>

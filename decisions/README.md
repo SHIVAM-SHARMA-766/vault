@@ -35,6 +35,7 @@ someone who would otherwise assume it was an oversight.
 | [0013](0013-distribution-and-releases.md) | One image, two install profiles, generated secrets, setup link, signed releases |
 | [0014](0014-service-desk.md) | The built-in service desk: access requests, sign-in help, support |
 | [0015](0015-organizations-and-collections.md) | Organizations and collections as built: org key, invitations by digest, confirmation, key versions |
+| [0016](0016-teams-completion.md) | Key rotation, groups, policies, access audit, emergency access, operator view |
 
 ## A note on the numbering
 

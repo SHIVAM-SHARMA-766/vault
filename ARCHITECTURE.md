@@ -232,6 +232,10 @@ flowchart LR
 Members are invited by address digest, accept, and are confirmed by an admin comparing their
 key fingerprint out of band; only then is anything sealed to them. The server enforces
 view / edit / manage per collection and serves ciphertext; it holds no key that opens any of it.
+Removal re-keys collections (new version, items re-encrypted, re-sealed); groups grant
+collections to sets of members; policies gate access; an audit log records who did what; and
+emergency access lets a trusted contact read a vault after a waiting period
+([0016](decisions/0016-teams-completion.md)).
 
 ## Service desk
 
@@ -281,6 +285,11 @@ a `vault_meta` table beside it records the schema version.
 | `ORG#<id>` | `COLL#<coll>` / `ACCESS#<coll>#<user>` | A collection: name sealed under the org key, key version / a member's grant: permission, hide-passwords, collection key sealed to them |
 | `COLLI#<coll>` | `ITEM#<id>` | A shared item, sealed under the collection key at a version |
 | `USER#<id>` · `EMAIL#<digest>` | `ORG#<org>` · `ORGINVITE#<org>` | Pointers: my organizations; invitations waiting for an address |
+| `ORG#<id>` | `GROUP#<g>` / `GACCESS#<coll>#<g>` | A group (name sealed, member ids) / a collection granted to a group |
+| `ORG#<id>` | `EVENT#<ts>#<n>` | Access audit event: actor, action, collection, item id; expires after a year |
+| `USER#<grantor>` | `EMGRANT#<id>` | Emergency access grant: contact, wait, status, grantor's vault key sealed to the contact |
+| `EMAIL#<digest>` · `USER#<contact>` | `EMINVITE#<id>` · `EMTRUST#<id>` | Emergency invitation waiting for an address · pointer for the contact |
+| `SYSTEM` | `ORG#<id>` | The operator's index of organizations |
 
 Unlocking is one query. Everything after that — search, filter, sort, folder resolution —
 happens in the client, because the server cannot read what it is storing.

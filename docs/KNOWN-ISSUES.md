@@ -107,22 +107,32 @@ whether to offer it, and how, is an open decision.
 </details>
 
 <details>
-<summary>🔴 <b>Removing a member does not yet rotate collection keys</b></summary>
+<summary>🔴 <b>Emergency access trusts the server to keep the waiting period</b></summary>
 
-Removal stops the server serving anything to that person at once, and marks each collection
-they could open "Key rotation due". Until rotation ships (phase 3B step 4), someone removed who
-kept a copy of a collection key could read items still under it if they also obtained the
-ciphertext some other way. Nothing added through the server reaches them.
+A grantor's vault key is sealed to their trusted contact when the contact is confirmed; the
+server holds that sealed copy and releases it only after a request and the waiting period (or the
+grantor's approval). A server colluding with the contact could release it early. The vault key
+never rotates, so removing a contact cannot recall a key they already opened. Choose contacts
+accordingly. ([0016](../decisions/0016-teams-completion.md), threat A14)
 </details>
 
 <details>
-<summary>🟠 <b>Teams are partly built</b></summary>
+<summary>🟠 <b>Some team controls are self-reported or app-side</b></summary>
 
-Organizations, fingerprint-confirmed members, collections, shared items and per-collection
-permissions work. Still to come in phase 3B: key rotation, groups, organization policies,
-access audit, emergency access. Shared items have no version history yet, and organization
-admins see the names of every collection (they hold the org key) though they open only those
-they were granted. ([0015](../decisions/0015-organizations-and-collections.md))
+The minimum master password strength policy uses a score each member's app reports (the server
+never sees a master password); the idle-lock policy is applied by the app; opening, revealing and
+copying are audited only as reported by the app. "Hide passwords" is a policy, not encryption.
+A modified app could bypass these. Two-factor policy, permissions, writes, grants and membership
+are enforced and recorded by the server. Shared items have no version history yet; organization
+recovery is not offered. ([0016](../decisions/0016-teams-completion.md))
+</details>
+
+<details>
+<summary>🟡 <b>Rotation re-encrypts a collection in one request</b></summary>
+
+A collection is re-keyed in a single request carrying every item, so very large collections
+(several thousand items) approach the request size limit. Fine at intended sizes; batched
+rotation is phase 3.5 work.
 </details>
 
 <details>
