@@ -128,3 +128,20 @@ export {
   parseOtpauthUri,
   totpFromBytes,
 } from './totp.js'
+export {
+  type CollectionMeta,
+  type OrgMeta,
+  SHARED_KEY_BYTES,
+  generateCollectionKey,
+  generateOrgKey,
+  openCollectionKey,
+  openCollectionMeta,
+  openOrgKey,
+  openOrgMeta,
+  openSharedItem,
+  sealCollectionKey,
+  sealCollectionMeta,
+  sealOrgKey,
+  sealOrgMeta,
+  sealSharedItem,
+} from './sharing.js'
