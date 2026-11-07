@@ -50,6 +50,9 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
       adminEmails: [],
       site: { sourceDir: '', outputDir: '' },
       db: {
+        driver: 'mysql',
+        ssl: false,
+        path: '',
         host: '127.0.0.1',
         user: 'vault',
         password: 'not-used-by-the-in-memory-store',

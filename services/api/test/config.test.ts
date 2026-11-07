@@ -20,7 +20,7 @@ test('a minimal configuration gets its defaults', () => {
   const c = parseConfig(good, '/srv/vault/api')
   assert.equal(c.origin, 'https://vault.example.com')
   assert.equal(c.port, 3000)
-  assert.deepEqual(c.db, { host: '10.0.0.5', user: 'vault', password: 'db-password', database: 'vault', port: 3306 })
+  assert.deepEqual(c.db, { driver: 'mysql', host: '10.0.0.5', user: 'vault', password: 'db-password', database: 'vault', port: 3306, ssl: false, path: '/var/lib/vault/vault.db' })
   assert.equal(c.allowRegistration, false)
   assert.deepEqual(c.adminEmails, [])
   assert.deepEqual(c.site, { sourceDir: '/srv/vault/api/site', outputDir: '/srv/vault/site' })
@@ -35,7 +35,7 @@ test('SITE_ORIGIN overrides the hostname, and admin addresses are split', () => 
 
 test('every problem is reported at once, and there is no default address', () => {
   assert.throws(() => parseConfig({ SERVER_PEPPER: 'short', TOKEN_SIGNING_KEY: 'changeme'.padEnd(40, 'x'), PORT: 'abc' }), (e: Error) => {
-    for (const s of ['DB_HOST is required', 'DB_PASSWORD is required', 'SERVER_PEPPER is too short', 'TOKEN_SIGNING_KEY still holds a placeholder', 'PORT must be a port number', 'VAULT_HOSTNAME (or SITE_ORIGIN) is required']) {
+    for (const s of ['DB_HOST is required for mysql', 'DB_PASSWORD is required for mysql', 'SERVER_PEPPER is too short', 'TOKEN_SIGNING_KEY still holds a placeholder', 'PORT must be a port number', 'VAULT_HOSTNAME (or SITE_ORIGIN) is required']) {
       assert.ok(e.message.includes(s), `missing: ${s}\n${e.message}`)
     }
     return true

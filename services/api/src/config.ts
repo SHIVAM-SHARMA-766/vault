@@ -21,11 +21,16 @@ export interface Config {
    *  on the rendered website. */
   origin: string
   db: {
+    driver: 'mysql' | 'postgres' | 'sqlite'
     host: string
     user: string
     password: string
     database: string
     port: number
+    /** TLS to the database server (postgres). */
+    ssl: boolean
+    /** The database file (sqlite). */
+    path: string
   }
   /** HMAC key for email digests and decoy salts. */
   pepper: string
@@ -51,11 +56,14 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'VAULT_HOSTNAME', required: false, description: 'The public hostname, e.g. vault.example.com. Either this or SITE_ORIGIN is required.' },
   { name: 'SITE_ORIGIN', required: false, description: 'The public origin with scheme, e.g. https://vault.example.com. Overrides https://VAULT_HOSTNAME.' },
   { name: 'PORT', required: false, default: '3000', description: 'Port the API listens on, on 127.0.0.1 only. The reverse proxy forwards /api/* to it.' },
-  { name: 'DB_HOST', required: true, description: 'MySQL host.' },
-  { name: 'DB_PORT', required: false, default: '3306', description: 'MySQL port.' },
-  { name: 'DB_USER', required: false, default: 'vault', description: 'MySQL user.' },
-  { name: 'DB_NAME', required: false, default: 'vault', description: 'MySQL database. Its table is created on first start.' },
-  { name: 'DB_PASSWORD', required: true, secret: true, description: 'MySQL password.' },
+  { name: 'DB_DRIVER', required: false, default: 'mysql', description: 'mysql, postgres or sqlite. SQLite needs no database server; PostgreSQL suits several app instances.' },
+  { name: 'DB_PATH', required: false, default: '/var/lib/vault/vault.db', description: 'SQLite only: the database file. Its directory must be writable and backed up.' },
+  { name: 'DB_HOST', required: false, description: 'MySQL or PostgreSQL host. Required for those drivers.' },
+  { name: 'DB_PORT', required: false, description: 'Database port. Defaults to 3306 for MySQL, 5432 for PostgreSQL.' },
+  { name: 'DB_USER', required: false, default: 'vault', description: 'Database user.' },
+  { name: 'DB_NAME', required: false, default: 'vault', description: 'Database name. The schema is created and migrated on start.' },
+  { name: 'DB_PASSWORD', required: false, secret: true, description: 'Database password. Required for MySQL and PostgreSQL.' },
+  { name: 'DB_SSL', required: false, default: 'false', description: 'PostgreSQL only: "true" to require a verified TLS connection.' },
   { name: 'SERVER_PEPPER', required: true, secret: true, description: 'At least 32 characters (openssl rand -base64 32). Keys the address digests. Changing it locks every account out.' },
   { name: 'TOKEN_SIGNING_KEY', required: true, secret: true, description: 'At least 32 characters. Signs session tokens. Changing it signs everyone out.' },
   { name: 'ALLOW_REGISTRATION', required: false, default: 'false', description: '"true" forces registration open, overriding the admin panel. For creating the first account only.' },
@@ -98,10 +106,21 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     try { origin = new URL(origin).origin } catch { problems.push(`SITE_ORIGIN is not a URL: ${origin}`) }
   }
 
+  const driver = get('DB_DRIVER')
+  if (!['mysql', 'postgres', 'sqlite'].includes(driver)) problems.push(`DB_DRIVER must be mysql, postgres or sqlite, not "${driver}"`)
+  const server = driver === 'mysql' || driver === 'postgres'
+  if (server && !get('DB_HOST')) problems.push(`DB_HOST is required for ${driver}`)
+  if (server && !get('DB_PASSWORD')) problems.push(`DB_PASSWORD is required for ${driver}`)
+  if (!env['DB_PORT']) env = { ...env, DB_PORT: driver === 'postgres' ? '5432' : '3306' }
+
   const config: Config = {
     port: number('PORT'),
     origin,
-    db: { host: get('DB_HOST'), user: get('DB_USER'), password: get('DB_PASSWORD'), database: get('DB_NAME'), port: number('DB_PORT') },
+    db: {
+      driver: driver as Config['db']['driver'],
+      host: get('DB_HOST'), user: get('DB_USER'), password: get('DB_PASSWORD'), database: get('DB_NAME'),
+      port: number('DB_PORT'), ssl: get('DB_SSL') === 'true', path: get('DB_PATH'),
+    },
     pepper: secret('SERVER_PEPPER'),
     tokenKey: secret('TOKEN_SIGNING_KEY'),
     allowRegistration: get('ALLOW_REGISTRATION') === 'true',

@@ -73,11 +73,24 @@ jobs:
     name: api — typecheck, test, bundle
     runs-on: ubuntu-latest
 
-    # A real MySQL, so the storage adapter is tested rather than assumed. The
-    # routes are tested against an in-memory store, which is only honest if
-    # that store behaves like this one — test/store-contract.test.ts runs the
-    # same assertions against both.
+    # A real MySQL and a real PostgreSQL, so the storage adapters are tested
+    # rather than assumed (SQLite needs no service). The routes are tested
+    # against an in-memory store, which is only honest if that store behaves
+    # like these — test/store-contract.test.ts runs the same assertions
+    # against every one.
     services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: ci-not-a-real-password
+          POSTGRES_DB: vault
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
       mysql:
         image: mysql:8.4
         env:
@@ -96,6 +109,10 @@ jobs:
       DB_USER: root
       DB_PASSWORD: ci-not-a-real-password
       DB_NAME: vault
+      PG_HOST: 127.0.0.1
+      PG_USER: postgres
+      PG_PASSWORD: ci-not-a-real-password
+      PG_DATABASE: vault
 
     steps:
       - uses: actions/checkout@v4

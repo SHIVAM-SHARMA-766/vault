@@ -1,8 +1,10 @@
 # Architecture
 
 One always-free virtual machine, one always-free MySQL HeatWave database holding a single
-table, one object storage bucket. No
-CDN, no serverless functions, no second provider. The whole system is small enough that a
+table, object storage for backups and releases. No
+CDN, no serverless functions, no second provider. (That is the reference instance. A
+self-hosted install can use SQLite or PostgreSQL instead —
+[0012](decisions/0012-storage-drivers-and-migrations.md).) The whole system is small enough that a
 new reader can hold all of it at once, which is deliberate.
 
 This describes the system as built. [STATUS.md](STATUS.md) is the running log, [docs/ROADMAP.md](docs/ROADMAP.md) the plan, and [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) the limits.
@@ -207,7 +209,8 @@ a vault or show an address — there is nothing readable on the server for it to
 ## Data
 
 One table. One partition per user. No secondary indexes, because the only two reads are a
-shard-key query and a point lookup.
+shard-key query and a point lookup. The same table exists in MySQL, PostgreSQL or SQLite;
+a `vault_meta` table beside it records the schema version.
 
 | `pk` | `sk` | Holds |
 |---|---|---|

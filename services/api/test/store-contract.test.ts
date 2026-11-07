@@ -1,13 +1,14 @@
-// One contract, two implementations.
+// One contract, every implementation.
 //
 // The routes are tested against the in-memory store, which is only honest if
 // that store behaves like the real one. These tests state the behaviour both
 // must have and run them against each — so a difference between them shows up
 // here rather than in production.
 //
-// The MySQL half runs only when DB_HOST is set, which it is in CI and is not
-// on a laptop. Skipping is deliberate: a test that needs a database should not
-// stop someone running the suite without one.
+// SQLite always runs (it needs no server). MySQL runs when DB_HOST is set and
+// PostgreSQL when PG_HOST is set, as they are in CI. Skipping is deliberate: a
+// test that needs a database server should not stop someone running the suite
+// without one.
 
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -43,6 +44,38 @@ if (process.env['DB_HOST']) {
       await store.migrate()
       // Each run starts from nothing, so an earlier failure cannot make a
       // later one pass.
+      for (const pk of ['USER#a', 'USER#b', 'RATE#t']) {
+        for (const item of await store.query(pk)) await store.delete(item.pk, item.sk)
+      }
+      return { store, done: () => store.close() }
+    },
+  })
+}
+
+candidates.push({
+  name: 'sqlite',
+  make: async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { SqliteStore } = await import('../src/storage/sqlite.js')
+    const dir = mkdtempSync(join(tmpdir(), 'vault-sqlite-'))
+    const store = await SqliteStore.open(join(dir, 'vault.db'))
+    await store.migrate()
+    return { store, done: async () => { await store.close(); rmSync(dir, { recursive: true, force: true }) } }
+  },
+})
+
+if (process.env['PG_HOST']) {
+  candidates.push({
+    name: 'postgres',
+    make: async () => {
+      const { PostgresStore } = await import('../src/storage/postgres.js')
+      const store = await PostgresStore.open({
+        host: process.env['PG_HOST']!, port: Number(process.env['PG_PORT'] ?? 5432),
+        user: process.env['PG_USER'] ?? 'postgres', password: process.env['PG_PASSWORD'] ?? '', database: process.env['PG_DATABASE'] ?? 'vault',
+      })
+      await store.migrate()
       for (const pk of ['USER#a', 'USER#b', 'RATE#t']) {
         for (const item of await store.query(pk)) await store.delete(item.pk, item.sk)
       }
@@ -159,6 +192,16 @@ for (const candidate of candidates) {
       assert.equal(await store.increment('RATE#t', 'w1', expiresAt), 2)
       assert.equal(await store.increment('RATE#t', 'w1', expiresAt), 3)
       assert.equal(await store.increment('RATE#t', 'w2', expiresAt), 1, 'separate windows')
+    } finally {
+      await done()
+    }
+  })
+
+  test(`${candidate.name}: a prefix is case-sensitive`, async () => {
+    const { store, done } = await candidate.make()
+    try {
+      await store.put({ pk: 'USER#a', sk: 'ENTRY#1', blob: 'v1.AAAA.upper' })
+      assert.deepEqual((await store.query('USER#a', 'entry#')).map((i) => i.sk), [], 'lower case does not match ENTRY#')
     } finally {
       await done()
     }

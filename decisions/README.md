@@ -31,6 +31,7 @@ someone who would otherwise assume it was an oversight.
 | [0009](0009-identity-keys-and-sharing.md) | Identity keys, and the shape sharing will take |
 | [0010](0010-self-hosted-product.md) | Vault is a product customers run on their own servers |
 | [0011](0011-two-factor-sign-in.md) | Two-factor sign-in |
+| [0012](0012-storage-drivers-and-migrations.md) | SQLite, PostgreSQL and MySQL, and versioned schema migrations |
 
 ## A note on the numbering
 

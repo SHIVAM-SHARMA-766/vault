@@ -50,31 +50,22 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-Phase 1 of [docs/ROADMAP.md](docs/ROADMAP.md): a complete, hardened personal vault. In order:
+**Phase 1 is closed** (2026-11-07), with the domain deferred by the operator. Carried, not
+blocking: run `apply.sh`, confirm the alert mail, `deploy.sh`, the first restore drill;
+import real export files from three managers; three crypto decisions.
 
-1. ~~Client architecture~~ — done 2026-11-06.
-2. ~~Account settings~~ — done 2026-11-06.
-3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
-4. ~~Folders, entry-type fields, custom fields, password history~~ — done 2026-11-06.
-5. ~~Import and export~~ — done 2026-11-06.
-6. ~~Monitoring and alerting~~ — done 2026-11-07 (needs `apply.sh` + `deploy.sh` by the operator).
-7. ~~Signed-in devices and security activity~~ — done 2026-11-07.
-8. ~~Password health~~ — done 2026-11-07.
-9. ~~API: error codes, request ids, OpenAPI~~ — done 2026-11-07.
-10. ~~One configuration module; storage boundary tested~~ — done 2026-11-07.
-11. ~~Restore drill, scripted and reminded by an alarm~~ — done 2026-11-07 (first scripted run is the operator's).
+**Phase 2 — the self-hosted product** ([docs/ROADMAP.md](docs/ROADMAP.md#phase-2--the-self-hosted-product-)):
 
-**What still stands between phase 1 and done** — none of it code:
-- **The domain** (threat A3), deferred until one is bought.
-- **Import tested with real export files** from three managers (exit criterion).
-- **Alerts reaching a phone**: apply, confirm the subscription mail, deploy, trip one alarm.
-- **Three decisions**: secret key in the KDF, breach checks, Argon2id (see ROADMAP).
+1. ~~Storage: SQLite, PostgreSQL, MySQL; versioned migrations~~ — done 2026-11-07.
+2. **One server process serves client, site and API** — next.
+3. Container image (multi-arch, non-root).
+4. First-run setup token.
+5. Install profiles (personal, business) and install docs.
+6. Backups to disk or S3-compatible storage; restore tested in CI.
+7. SMTP mail.
+8. Signed images, SBOM, upgrade tests.
 
-Then phase 2, the self-hosted product: container image and Compose install, first-run setup,
-PostgreSQL, migrations, backups to any S3-compatible store, signed releases.
-
-Carried over: remove the AWS resources (needs new personal AWS keys); sign releases if anyone
-else gets write access to `main` or the releases bucket.
+Carried over: remove the AWS resources (needs new personal AWS keys).
 
 ## Open questions
 
@@ -90,6 +81,15 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 2, step 1: three storage drivers.** `DB_DRIVER` chooses SQLite (one
+file, for personal installs), PostgreSQL (business) or MySQL (the reference instance, still
+the default). One contract suite runs against all of them plus the in-memory store — 41 tests,
+against real MySQL 8.4 and PostgreSQL 16 in CI. Schema migrations are numbered, run on start
+under a lock, and refuse a database newer than the server. Writing the case-sensitivity test
+found that the live MySQL table compares keys case-insensitively; migration 2 makes them
+exact, tested as an upgrade of a table built like the live one, data intact. Expired rows are
+swept by the server for every driver. [0012](decisions/0012-storage-drivers-and-migrations.md).
 
 **2026-11-07 — Documentation with screenshots.** README rebuilt as a showcase; a
 [user guide](docs/USER-GUIDE.md) screen by screen; the roadmap moved to

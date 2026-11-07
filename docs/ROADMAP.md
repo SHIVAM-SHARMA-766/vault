@@ -11,14 +11,14 @@ as what.
 | [KNOWN-ISSUES.md](KNOWN-ISSUES.md) | Limits and accepted risks of what exists today |
 | [`decisions/`](../decisions/) | Why things are the way they are |
 
-Last revised: 2026-11-07
+Last revised: 2026-11-07 (phase 1 closed, phase 2 started)
 
 ## At a glance
 
 ```mermaid
 flowchart LR
-  p0["Phase 0<br/>Foundation<br/>✅ done"]:::done --> p1["Phase 1<br/>Complete personal vault<br/>🟡 code done · 4 ops items left"]:::now
-  p1 --> p2["Phase 2<br/>Self-hosted product<br/>⬜ next"]:::next
+  p0["Phase 0<br/>Foundation<br/>✅ done"]:::done --> p1["Phase 1<br/>Complete personal vault<br/>✅ closed · domain deferred"]:::done
+  p1 --> p2["Phase 2<br/>Self-hosted product<br/>🟡 in progress"]:::now
   p2 --> p3["Phase 3<br/>Teams"]:::later
   p3 --> p4["Phase 4<br/>Browser extension"]:::later
   p4 --> p5["Phase 5<br/>Android"]:::later
@@ -32,8 +32,8 @@ flowchart LR
 | Phase | Goal | State |
 |---|---|---|
 | 0 — Foundation | Keys for sharing, local stack, browser tests, release pipeline | ✅ Done 2026-11-06 |
-| 1 — Complete personal vault | Everything one person needs, hardened and monitored | 🟡 All code merged-ready (PR #19); 4 operator items left |
-| 2 — Self-hosted product | Anyone installs and upgrades it with one command | ⬜ Next |
+| 1 — Complete personal vault | Everything one person needs, hardened and monitored | ✅ Closed 2026-11-07; domain deferred, operator steps carried |
+| 2 — Self-hosted product | Anyone installs and upgrades it with one command | 🟡 Step 1 of 8 done |
 | 3 — Teams | Organizations, shared collections, policies | ⬜ Planned |
 | 4 — Browser extension | Autofill, the main way a password manager is used | ⬜ Planned |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
@@ -75,7 +75,7 @@ by the hostname, which closes the largest accepted risk (threat A3) for everyone
 | API | Typed error codes, request ids, generated OpenAPI document, one configuration module |
 | Delivery | Merge to `main` → CI publishes → host pulls, verifies, rolls back ([0005](../decisions/0005-pull-based-releases.md), [0008](../decisions/0008-release-pipeline.md)) |
 | Operations | Health probe and eight OCI alarms, daily verified export, scripted restore drill |
-| Quality | 290 unit and API tests, 15 browser tests against the real stack, CI on every change |
+| Quality | 305 unit and API tests, 15 browser tests against the real stack, CI on every change |
 | Infrastructure | One always-free OCI instance, MySQL HeatWave (always free), $0 a month |
 
 ## How it compares
@@ -141,7 +141,10 @@ empty.
 - [x] `prevent_destroy` on the database; CI green on a clean checkout
 - [x] Release pipeline live (merge → publish → host pulls)
 
-### Phase 1 — A complete, hardened personal vault 🟡
+### Phase 1 — A complete, hardened personal vault ✅ (closed 2026-11-07)
+
+Closed by the operator with the domain deferred. The open operator items below carry
+forward and do not block phase 2.
 
 The core every later phase builds on must be finished and trustworthy first.
 
@@ -173,7 +176,7 @@ The core every later phase builds on must be finished and trustworthy first.
 - [x] Monitoring and alerting on the free tier: health probe, eight alarms incl. a heartbeat ([runbook](runbook.md#alerts))
 - [x] Restore drill, scripted, with a reminder alarm ([runbook](runbook.md#the-quarterly-restore-drill))
 - [ ] **Operator:** `apply.sh`, confirm the alert mail, `deploy.sh`, run the first drill
-- [ ] **Operator:** buy a domain and move the reference instance to it (threat A3)
+- [ ] **Operator:** buy a domain and move the reference instance to it (threat A3) — *deferred 2026-11-07*
 
 **Exit criteria**
 
@@ -183,15 +186,30 @@ The core every later phase builds on must be finished and trustworthy first.
 | 2FA works end to end | ✅ browser-tested |
 | Import from three managers tested with **real** export files | ⬜ tested with fixtures in each published format; real files still needed |
 | Alerts reach a phone | ⬜ built; needs the operator steps above |
-| The domain is live | ⬜ deferred until bought |
+| The domain is live | ⏸ deferred by the operator (2026-11-07) |
 
 **Decisions this phase still owes** — see [Open decisions](#open-decisions): secret key in the
 KDF, breach checks, Argon2id.
 
-### Phase 2 — The self-hosted product ⬜ next
+### Phase 2 — The self-hosted product 🟡
 
 What a customer installs. Built before teams because packaging, configuration and upgrades
 touch every part of the system, and are cheaper to get right while it is small.
+
+**Steps, in order**
+
+| # | Step | State |
+|---|---|---|
+| 1 | Storage: SQLite and PostgreSQL beside MySQL, one contract suite, versioned migrations ([0012](../decisions/0012-storage-drivers-and-migrations.md)) | ✅ 2026-11-07 |
+| 2 | One server process serves the client, the site and the API (no Caddy required), with the same headers | ⬜ next |
+| 3 | Container image: multi-arch (amd64, arm64), non-root, health check | ⬜ |
+| 4 | First-run setup: a one-time token in the log creates the owner | ⬜ |
+| 5 | Install profiles: personal (one container + SQLite + automatic TLS) and business (Compose + PostgreSQL + reverse proxy); install docs | ⬜ |
+| 6 | Backups: scheduled encrypted exports to local disk or any S3-compatible store; restore tested in CI | ⬜ |
+| 7 | Mail: the customer's SMTP for invitations and security notices | ⬜ |
+| 8 | Supply chain and upgrades: signed images, SBOM, security policy, upgrade tested across releases | ⬜ |
+
+**Scope**
 
 - [ ] **Two install profiles from one image**:
   - *Personal*: one container with SQLite and built-in TLS — small enough for a Raspberry Pi
@@ -200,9 +218,9 @@ touch every part of the system, and are cheaper to get right while it is small.
   - A tarball with systemd units as the alternative to containers.
 - [ ] **First-run setup**: a one-time token in the server log lets the first visitor create the
   owner. Replaces `ALLOW_REGISTRATION` and `ADMIN_EMAILS` for customers.
-- [ ] **Storage**: PostgreSQL alongside MySQL; SQLite for a single server. One store contract test
+- [x] **Storage**: PostgreSQL alongside MySQL; SQLite for a single server. One store contract test
   suite that every adapter passes.
-- [ ] **Schema migrations**: versioned, run on start, tested from every supported version.
+- [x] **Schema migrations**: versioned, run on start, tested from every supported version.
 - [ ] **Backups**: scheduled encrypted exports to local disk or any S3-compatible store; restore
   documented and tested.
 - [ ] **Mail**: the customer's SMTP for invitations and security notices.
@@ -307,14 +325,14 @@ with guidance in the admin documentation.
 
 | Decision | Phase | Notes |
 |---|---|---|
-| Buy a domain | 1 | Planned by the operator. Removes the dynamic-DNS risk (A3). Accepted until then (2026-11-06) |
+| Buy a domain | — | Deferred by the operator (2026-11-07). Removes the dynamic-DNS risk (A3); accepted until then |
 | Secret key in the KDF | 1 | Strongest protection against offline guessing after a breach |
 | Breach checks | 1 | Privacy trade-off; k-anonymity at best |
 | Argon2id | 1 | Needs WebAssembly in the crypto package |
 | Licence | 2 | Open source (AGPL, as Bitwarden), source-available, or proprietary with offline keys |
 | Pricing | 2 | Per user, per server, or support contracts |
 | Update channel | 2 | Public registry, or a private one customers authenticate to |
-| Supported databases | 2 | PostgreSQL and SQLite alongside MySQL, or fewer |
+| ~~Supported databases~~ | 2 | Decided: SQLite, PostgreSQL and MySQL 8 ([0012](../decisions/0012-storage-drivers-and-migrations.md)) |
 | Organization recovery | 3 | Opt-in, visible to members, or not offered |
 | iOS | 5 | Needs Apple hardware and an account |
 
