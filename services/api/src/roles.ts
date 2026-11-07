@@ -12,9 +12,9 @@ import { forbidden } from './http.js'
 import { PROFILE_SK, userPk } from './keys.js'
 import { getRegistry } from './system.js'
 
-export type Role = 'owner' | 'admin' | 'marketing' | 'viewer' | 'user'
+export type Role = 'owner' | 'admin' | 'support' | 'marketing' | 'viewer' | 'user'
 /** The roles an owner can grant. Owner itself is not among them. */
-export const GRANTABLE_ROLES = ['admin', 'marketing', 'viewer', 'user'] as const
+export const GRANTABLE_ROLES = ['admin', 'support', 'marketing', 'viewer', 'user'] as const
 export type GrantableRole = (typeof GRANTABLE_ROLES)[number]
 
 export type Permission =
@@ -29,18 +29,23 @@ export type Permission =
   | 'site.read'
   | 'site.write'
   | 'site.publish'
+  | 'desk.read'
+  | 'desk.write'
 
 const PERMISSIONS: Record<Role, readonly Permission[]> = {
   owner: [
     'overview.read', 'users.read', 'users.write', 'roles.write', 'invites.read', 'invites.write',
-    'settings.write', 'audit.read', 'site.read', 'site.write', 'site.publish',
+    'settings.write', 'audit.read', 'site.read', 'site.write', 'site.publish', 'desk.read', 'desk.write',
   ],
   admin: [
     'overview.read', 'users.read', 'users.write', 'invites.read', 'invites.write',
-    'settings.write', 'audit.read', 'site.read', 'site.write', 'site.publish',
+    'settings.write', 'audit.read', 'site.read', 'site.write', 'site.publish', 'desk.read', 'desk.write',
   ],
+  // Works the service desk: answers tickets and issues invitations. Cannot
+  // change accounts — a two-factor reset is escalated to an admin.
+  support: ['desk.read', 'desk.write', 'invites.read', 'invites.write'],
   marketing: ['site.read', 'site.write', 'site.publish'],
-  viewer: ['overview.read', 'users.read', 'invites.read', 'audit.read', 'site.read'],
+  viewer: ['overview.read', 'users.read', 'invites.read', 'audit.read', 'site.read', 'desk.read'],
   user: [],
 }
 
@@ -50,7 +55,7 @@ export const isStaff = (role: Role): boolean => role !== 'user'
 
 /** Higher outranks lower. An admin may manage marketing, viewers and users,
  *  never another admin or an owner. */
-const RANK: Record<Role, number> = { owner: 4, admin: 3, marketing: 2, viewer: 1, user: 0 }
+const RANK: Record<Role, number> = { owner: 5, admin: 4, support: 3, marketing: 2, viewer: 1, user: 0 }
 export const outranks = (actor: Role, target: Role): boolean =>
   actor === 'owner' ? target !== 'owner' : RANK[actor] > RANK[target]
 

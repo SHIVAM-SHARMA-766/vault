@@ -45,3 +45,17 @@ const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/
 export function isValidId(id: unknown): id is string {
   return typeof id === 'string' && ID_PATTERN.test(id)
 }
+
+/** The service desk (routes/desk.ts): one partition of tickets, one per
+ *  ticket for its messages, and a pointer from each requester's own
+ *  partition so "my tickets" is one query. */
+export const DESK_PK = 'DESK'
+export const DESK_SEQ_SK = 'SEQ'
+export const ticketSk = (id: string) => `TICKET#${id}`
+export const TICKET_PREFIX = 'TICKET#'
+export const ticketPk = (id: string) => `DESKT#${id}`
+/** Numbered per ticket, so a conversation reads in order even when two
+ *  messages land in the same millisecond. */
+export const messageSk = (seq: number) => `MSG#${String(seq).padStart(8, '0')}`
+export const MESSAGE_SEQ_SK = 'SEQ'
+export const MESSAGE_PREFIX = 'MSG#'

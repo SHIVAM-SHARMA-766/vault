@@ -237,6 +237,31 @@
         }
       }
     },
+    "/api/desk/requests": {
+      "post": {
+        "summary": "Ask for access, or for help signing in (no account needed)",
+        "operationId": "postDeskRequests",
+        "tags": [
+          "desk"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/signout": {
       "post": {
         "summary": "End the session a refresh token belongs to",
@@ -597,6 +622,179 @@
         "operationId": "deleteSessionsId",
         "tags": [
           "sessions"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/tickets": {
+      "get": {
+        "summary": "My support tickets",
+        "operationId": "getDeskTickets",
+        "tags": [
+          "desk"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Open a support ticket",
+        "operationId": "postDeskTickets",
+        "tags": [
+          "desk"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/tickets/{id}": {
+      "get": {
+        "summary": "One of my tickets and its conversation",
+        "operationId": "getDeskTicketsId",
+        "tags": [
+          "desk"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/tickets/{id}/messages": {
+      "post": {
+        "summary": "Reply to my ticket",
+        "operationId": "postDeskTicketsIdMessages",
+        "tags": [
+          "desk"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desk/tickets/{id}/close": {
+      "post": {
+        "summary": "Close my ticket",
+        "operationId": "postDeskTicketsIdClose",
+        "tags": [
+          "desk"
         ],
         "parameters": [
           {
@@ -1444,6 +1642,234 @@
           }
         ],
         "x-permission": "audit.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/desk": {
+      "get": {
+        "summary": "The service desk queue",
+        "operationId": "getAdminDesk",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "desk.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/desk/{id}": {
+      "get": {
+        "summary": "A ticket with every message, internal notes included",
+        "operationId": "getAdminDeskId",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "desk.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change a ticket's status, priority or assignee",
+        "operationId": "putAdminDeskId",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "desk.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/desk/{id}/messages": {
+      "post": {
+        "summary": "Reply to a ticket, or add an internal note",
+        "operationId": "postAdminDeskIdMessages",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "desk.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/desk/{id}/approve": {
+      "post": {
+        "summary": "Approve an access request: issue and email an invitation",
+        "operationId": "postAdminDeskIdApprove",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "invites.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/desk/{id}/reset-2fa": {
+      "post": {
+        "summary": "Reset two-factor sign-in for a verified sign-in request",
+        "operationId": "postAdminDeskIdReset2fa",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
         "responses": {
           "2XX": {
             "description": "Success. JSON."

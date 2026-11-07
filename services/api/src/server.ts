@@ -18,6 +18,7 @@ import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
 import { ensureSetup } from './system.js'
 import { createMailer } from './mail.js'
+import { closeStaleTickets } from './routes/desk.js'
 import { backupsEnabled, runBackup } from './backup.js'
 import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
@@ -90,7 +91,8 @@ export async function start(): Promise<void> {
 
   // Expired rows (sessions, activity, rate windows) are removed here for every
   // driver. MySQL also has a scheduled event; sweeping twice costs nothing.
-  const sweep = () => store.sweepExpired().catch((err: unknown) => console.error('expiry sweep failed:', (err as Error).message))
+  const sweep = () => Promise.all([store.sweepExpired(), closeStaleTickets(app)])
+    .catch((err: unknown) => console.error('expiry sweep failed:', (err as Error).message))
   void sweep()
   setInterval(sweep, 15 * 60 * 1000).unref()
 
