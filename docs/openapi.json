@@ -3844,6 +3844,36 @@
         }
       }
     },
+    "/api/admin/update": {
+      "get": {
+        "summary": "This version, and whether a newer release is out",
+        "operationId": "getAdminUpdate",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "overview.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/audit": {
       "get": {
         "summary": "Staff audit log",

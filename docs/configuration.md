@@ -75,6 +75,14 @@ into an empty database ([INSTALL.md](INSTALL.md#backups-and-restore)).
 | `BACKUP_S3_SECRET_KEY` | — | yes | Its secret |
 | `BACKUP_S3_PREFIX` | `vault/` | | Key prefix |
 
+### Version and updates
+
+| Variable | Default | Secret | Purpose |
+|---|---|---|---|
+| `VAULT_VERSION` | `dev` | | This build's version. The container image sets it |
+| `UPDATE_CHECK` | `true` | | `false` stops the admin panel checking for a newer release. When on, the server asks the release feed at most every 12 hours, with a generic client name and nothing about this install |
+| `UPDATE_CHECK_URL` | GitHub latest-release API for this project | | Another feed, for a fork or a mirror |
+
 ### Personal backups
 
 Each person can back up their own vault on their own schedule (Settings → Backups;

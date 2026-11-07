@@ -52,6 +52,7 @@ LABEL org.opencontainers.image.title="Vault" \
       org.opencontainers.image.version="${VERSION}"
 
 ENV NODE_ENV=production \
+    VAULT_VERSION=${VERSION} \
     HOST=0.0.0.0 \
     PORT=8080 \
     SERVE_STATIC=true \

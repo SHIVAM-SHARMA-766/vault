@@ -54,6 +54,8 @@ const app = {
     backup: { passphrase: '', dir: '', keep: 14, intervalHours: 0 },
     // Personal backups: remote destinations on; private addresses off, as in production.
     personalBackup: { remote: true, allowPrivate: false },
+    // No calls to the release feed from a development stack.
+    version: 'dev', updateCheck: { enabled: false, url: '' },
     mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
     db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',

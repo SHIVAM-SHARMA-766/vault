@@ -28,6 +28,7 @@ import {
   userPk,
 } from '../keys.js'
 import { bkdueSk } from '../personal-backup.js'
+import { updateStatus } from '../updates.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
@@ -126,6 +127,7 @@ export async function overview(app: App): Promise<LambdaResponse> {
     openTickets: await openTicketCount(app),
     serverTime: new Date(now).toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
+    version: app.config.version,
   })
 }
 
@@ -302,6 +304,12 @@ export function requireProfile(value: unknown): InstanceProfile {
     if (!ok) throw badRequest('profile.supportUrl must be an http(s) address.')
   }
   return { name, supportEmail, supportUrl }
+}
+
+/** Staff only: this version and whether a newer one is out. */
+export async function updateRoute(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const force = new URLSearchParams(event.rawQueryString ?? '').get('refresh') === '1'
+  return json(200, await updateStatus(app, { force }))
 }
 
 /** What anyone may know about this server before signing in. */
