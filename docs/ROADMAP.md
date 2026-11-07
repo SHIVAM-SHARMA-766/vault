@@ -331,9 +331,9 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ⬜ C7 Server backup settings in the admin UI
 
 **D. Features others have**
-- ⬜ D1 More item types · ⬜ D2 File attachments · ⬜ D3 Secure share links · ⬜ D4 Archive
+- ⬜ D1 More item types · ⬜ D2 File attachments · ⬜ D3 Secure share links · ✅ D4 Archive
 - ⬜ D5 Breach check and a Watchtower-style dashboard · ⬜ D6 Expiry and rotation reminders · ⬜ D7 Access requests (check-out)
-- ⬜ D8 Passphrase generator · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
+- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
 - ⬜ D11 Share one item with one person · ⬜ D12 Notify on access to a sensitive item
 
 **E. UI/UX**
@@ -343,7 +343,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **F. Personal settings**
 - ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults
-- ⬜ F4 Reveal and count options · ⬜ F5 Email alerts · ⬜ F6 Default folder · ⬜ F7 Date, time and language · ⬜ F8 Delete my account
+- ⬜ F4 Reveal and count options · ⬜ F5 Email alerts · ⬜ F6 Default folder · ⬜ F7 Date, time and language · ✅ F8 Delete my account
 
 **G. Administrator settings**
 - ⬜ G1 Session policy · ⬜ G2 IP allow-list · ⬜ G3 Password policy · ⬜ G4 Sharing policy

@@ -101,6 +101,15 @@ Copying a password clears the clipboard after a short time. **Favorite** an item
 star to pin it under Favorites.
 </details>
 
+**Archive.** An item you no longer use but want to keep: open it and choose **Archive**. It
+leaves your lists, counts, search and the health check, and waits under **Archive** in the
+sidebar until you **Restore** it. (Shared items cannot be archived — that would hide them from
+everyone.)
+
+**Passwords or passphrases.** The generator makes either. A passphrase is several random words
+from the EFF list (six words ≈ 78 bits), easier to type on a phone or read out. Pick which one it
+offers first, and its shape, in Settings → Preferences.
+
 ## Folders and history
 
 <img src="images/folders.png" alt="Nested folders: Work contains Servers; an item shows its folder path" width="820">
@@ -177,7 +186,7 @@ link such as `/app/settings/security` opens the right one after you unlock.
 
 | Section | What is in it |
 |---|---|
-| **Account** | Your details; change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; your identity-key fingerprint |
+| **Account** | Your details; delete your account (master password, two-factor code and a typed DELETE; export first); change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; your identity-key fingerprint |
 | **Security** | Two-factor sign-in (TOTP with any authenticator app, plus ten single-use recovery codes); signed-in devices; security activity |
 | **Preferences** | Theme, auto-lock, clipboard clearing and the password generator's defaults — see below |
 | **Backups** | Your own encrypted backups, on your schedule, here or in your own storage — see below |
