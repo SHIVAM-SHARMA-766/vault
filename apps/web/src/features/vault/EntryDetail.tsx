@@ -13,7 +13,7 @@ import type { Decrypted, Folder, Version } from './model.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
 
-export function EntryDetail({ entry, folders, issues, shared = null, shareTargets = [], onShare, onUnshare, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, issues, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
@@ -21,6 +21,8 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
   shareTargets?: { id: string; label: string }[]
   onShare?: (collectionId: string) => void
   onUnshare?: () => void
+  /** For shared items: report opening, revealing and copying to the organization's audit. */
+  onAudit?: (action: 'view' | 'reveal' | 'copy') => void
   onBack: () => void
   onEdit: () => void
   onToggleFavorite: () => void
@@ -35,6 +37,15 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
   const readOnly = shared?.permission === 'view'
   const hidden = shared?.hidePasswords === true
   const secretKinds = new Set(['secret', 'secretBlock', 'totp'])
+  useEffect(() => { if (shared) onAudit?.('view') }, [entry.id])
+  // Reveal and copy buttons live inside the field components; one listener
+  // here hears them all for the audit.
+  const auditClick = (e: React.MouseEvent) => {
+    if (!shared) return
+    const label = (e.target as HTMLElement).closest('button')?.getAttribute('aria-label') ?? ''
+    if (/^Copy /.test(label)) onAudit?.('copy')
+    else if (/^Reveal /.test(label)) onAudit?.('reveal')
+  }
   const info = typeInfo(entry.type)
   const spec = typeSpec(entry.type)
   const path = folderPath(folders, entry.folderId)
@@ -110,7 +121,7 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
 
       {showHistory ? <History entry={entry} load={loadHistory} onRestore={onRestore} /> : null}
 
-      <div className="fields">
+      <div className="fields" onClickCapture={auditClick}>
         {spec.fields.map((field) => hidden && secretKinds.has(field.kind)
           ? <div key={field.key} className="field-row"><span className="field-label">{field.label}</span><span className="muted small">Hidden by your organization’s policy</span></div>
           : <FieldView key={field.key} spec={field} value={readField(entry, field)} entryType={entry.type} />)}

@@ -245,3 +245,25 @@ test('policies: 2FA required and a minimum password score gate collections until
   const comp = (await h.request('GET', `/api/orgs/${orgId}/compliance`, { token: alice.token })).body['members'] as { userId: string; gap: string | null }[]
   assert.equal(comp.find((m) => m.userId === bob.userId)!.gap, null)
 })
+
+test('the access audit records writes and grants itself, and the opens and copies members report', async () => {
+  const h = harness()
+  const { alice, orgId, orgKey, collId, collKey } = await orgWithCollection(h)
+  const bob = await person(h, 'bob@example.test')
+  await h.request('POST', `/api/orgs/${orgId}/invites`, { token: alice.token, body: { email: bob.email } })
+  await h.request('POST', `/api/orgs/${orgId}/accept`, { token: bob.token })
+  await h.request('POST', `/api/orgs/${orgId}/members/${bob.userId}/confirm`, { token: alice.token, body: { orgKeyBlob: await sealOrgKey(bob.keys.publicKey, orgKey, orgId) } })
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/access/${bob.userId}`, { token: alice.token, body: { permission: 'view', keyBlob: await sealCollectionKey(bob.keys.publicKey, collKey, collId, 1) } })
+  const itemId = uuid()
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${itemId}`, { token: alice.token, body: { blob: await sealSharedItem(collId, itemId, 1, entry, collKey), keyVersion: 1 } })
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/events`, { token: bob.token, body: { action: 'copy', collectionId: collId, itemId } })).status, 201)
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/events`, { token: bob.token, body: { action: 'delete', collectionId: collId, itemId } })).status, 400, 'only view, reveal, copy are reported')
+  assert.equal((await h.request('GET', `/api/orgs/${orgId}/events`, { token: bob.token })).status, 403, 'members cannot read the audit')
+
+  const log = (await h.request('GET', `/api/orgs/${orgId}/events`, { token: alice.token })).body['events'] as { action: string; actor: string; reported: boolean }[]
+  const actions = log.map((e) => e.action)
+  for (const a of ['collection.create', 'member.invite', 'member.confirm', 'access.grant', 'item.create', 'item.copy']) assert.ok(actions.includes(a), a)
+  const copy = log.find((e) => e.action === 'item.copy')!
+  assert.equal(copy.actor, bob.userId)
+  assert.equal(copy.reported, true)
+})

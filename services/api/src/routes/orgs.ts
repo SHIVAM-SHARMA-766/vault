@@ -15,12 +15,14 @@
 // answers the same whether or not the address has an account (threat A7), and
 // the invitation appears when that person signs in.
 
+import { randomUUID } from 'node:crypto'
+
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, conflict, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { emailDigest } from '../identity.js'
 import {
   COLLECTION_PREFIX, ITEM_PREFIX, ORG_INVITE_PREFIX, ORG_MEMBER_PREFIX, ORG_META_SK, ORG_PENDING_PREFIX, PROFILE_SK, USER_ORG_PREFIX,
-  GROUP_ACCESS_PREFIX, GROUP_PREFIX, accessPrefix, accessSk, collectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
+  GROUP_ACCESS_PREFIX, GROUP_PREFIX, ORG_EVENT_PREFIX, orgEventSk, accessPrefix, accessSk, collectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
   orgPk, userOrgSk, userPk,
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
@@ -153,6 +155,45 @@ async function publicKeyOf(app: App, userId: string): Promise<string> {
   return pk
 }
 
+// ── Access audit ──────────────────────────────────────────────────────────
+// Events on ciphertext the server cannot read: who did what to which item
+// id, in which collection. Writes, grants and membership changes are recorded
+// here as they happen; opening, revealing and copying happen only in a
+// member's app, which reports them (and a modified app could stay silent —
+// the log says so). Kept for a year.
+
+const EVENT_RETENTION_SECONDS = 365 * 24 * 60 * 60
+export const CLIENT_EVENTS = ['view', 'reveal', 'copy'] as const
+
+export async function orgEvent(app: App, orgId: string, actor: string, action: string, extra: { collectionId?: string; itemId?: string; target?: string; reported?: boolean } = {}): Promise<void> {
+  const at = new Date(app.now()).toISOString()
+  await app.store.put({
+    pk: orgPk(orgId), sk: orgEventSk(at, randomUUID().slice(0, 8)), at, actor, action, ...extra,
+    expiresAt: Math.floor(app.now() / 1000) + EVENT_RETENTION_SECONDS,
+  })
+}
+
+/** A member's app reports opening, revealing or copying a shared item. */
+export async function reportEvent(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
+  const b = body(event)
+  const action = b['action']
+  if (!(CLIENT_EVENTS as readonly unknown[]).includes(action)) throw badRequest('action must be view, reveal or copy.')
+  const collectionId = String(b['collectionId'] ?? '')
+  const itemId = id(b['itemId'], 'itemId')
+  await requireAccess(app, orgId, collectionId, userId, 'view')
+  await orgEvent(app, orgId, userId, `item.${action as string}`, { collectionId, itemId, reported: true })
+  return json(201, { ok: true })
+}
+
+export async function events(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const rows = await app.store.query(orgPk(orgId), ORG_EVENT_PREFIX)
+  rows.sort((a, b) => String(b['at']).localeCompare(String(a['at'])))
+  return json(200, { events: rows.slice(0, 500).map((r) => ({
+    at: r['at'], actor: r['actor'], action: r['action'], collectionId: r['collectionId'] ?? null, itemId: r['itemId'] ?? null, target: r['target'] ?? null, reported: !!r['reported'],
+  })) })
+}
+
 // ── Organizations ─────────────────────────────────────────────────────────
 
 export async function createOrg(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
@@ -216,6 +257,7 @@ export async function setPolicies(app: App, userId: string, event: LambdaEvent, 
   const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
   if (!meta) throw notFound()
   await app.store.put({ ...meta, policies })
+  await orgEvent(app, orgId, userId, 'policies.change')
   return json(200, { policies })
 }
 
@@ -245,6 +287,7 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
   // response is the same, and the invitation waits for them to sign in.
   await app.store.put({ pk: orgPk(orgId), sk: orgPendingSk(digest), digest, role, label: memberLabel, invitedBy: userId, invitedAt: at })
   await app.store.put({ pk: emailPk(digest), sk: orgInviteSk(orgId), orgId, role, label: memberLabel, hint: meta?.['hint'] ?? '', invitedAt: at })
+  await orgEvent(app, orgId, userId, 'member.invite', { target: memberLabel })
   return json(201, { ok: true })
 }
 
@@ -318,6 +361,7 @@ export async function confirmMember(app: App, userId: string, event: LambdaEvent
   // fingerprint that is no longer current. Refuse rather than seal to it.
   if ((await publicKeyOf(app, target)) !== m.publicKey) throw conflict('This member\'s identity key changed after they accepted. Remove them and invite again.')
   await app.store.put({ ...m, status: 'confirmed', orgKeyBlob, confirmedAt: now(app) })
+  await orgEvent(app, orgId, userId, 'member.confirm', { target })
   return json(200, { ok: true })
 }
 
@@ -355,6 +399,7 @@ export async function removeMember(app: App, userId: string, orgId: string, targ
   }
   await app.store.delete(orgPk(orgId), orgMemberSk(target))
   await app.store.delete(userPk(target), userOrgSk(orgId))
+  await orgEvent(app, orgId, userId, self ? 'member.leave' : 'member.remove', { target })
   return json(200, { ok: true, rotationNeeded: rotate })
 }
 
@@ -392,6 +437,7 @@ export async function createCollection(app: App, userId: string, event: LambdaEv
   }
   const a: Access = { pk: orgPk(orgId), sk: accessSk(collectionId, userId), collectionId, userId, keyBlob, keyVersion: 1, permission: 'manage', hidePasswords: false }
   await app.store.put(a)
+  await orgEvent(app, orgId, userId, 'collection.create', { collectionId })
   return json(201, { id: collectionId })
 }
 
@@ -407,6 +453,7 @@ export async function deleteCollection(app: App, userId: string, orgId: string, 
   for (const i of await app.store.query(collectionItemsPk(collectionId))) await app.store.delete(i.pk, i.sk)
   for (const a of await app.store.query(orgPk(orgId), accessPrefix(collectionId))) await app.store.delete(a.pk, a.sk)
   await app.store.delete(orgPk(orgId), collectionSk(collectionId))
+  await orgEvent(app, orgId, userId, 'collection.delete', { collectionId })
   return json(200, { ok: true })
 }
 
@@ -434,6 +481,7 @@ export async function grantAccess(app: App, userId: string, event: LambdaEvent, 
     ...(typeof b['viaGroup'] === 'string' && isValidId(b['viaGroup']) ? { viaGroup: b['viaGroup'] } : existing?.viaGroup ? { viaGroup: existing.viaGroup } : {}),
   }
   await app.store.put(a)
+  await orgEvent(app, orgId, userId, existing ? 'access.change' : 'access.grant', { collectionId, target })
   return json(200, { ok: true })
 }
 
@@ -443,6 +491,7 @@ export async function revokeAccess(app: App, userId: string, orgId: string, coll
   if (!a) throw notFound()
   await app.store.delete(a.pk, a.sk)
   await app.store.put({ ...c, rotationNeeded: true })
+  await orgEvent(app, orgId, userId, 'access.revoke', { collectionId, target })
   return json(200, { ok: true, rotationNeeded: true })
 }
 
@@ -477,6 +526,7 @@ export async function rotateCollection(app: App, userId: string, event: LambdaEv
   }
   const { rotationNeeded: _r, ...rest } = c
   await app.store.put({ ...rest, keyVersion: version, rotatedAt: at } as Collection)
+  await orgEvent(app, orgId, userId, 'collection.rotate', { collectionId })
   return json(200, { keyVersion: version })
 }
 
@@ -575,6 +625,7 @@ export async function grantGroup(app: App, userId: string, event: LambdaEvent, o
   for (const m of need) {
     await app.store.put({ pk: orgPk(orgId), sk: accessSk(collectionId, m), collectionId, userId: m, keyBlob: given.get(m)!, keyVersion: c.keyVersion, permission, hidePasswords, viaGroup: groupId } as Access)
   }
+  await orgEvent(app, orgId, userId, 'access.grant-group', { collectionId, target: groupId })
   return json(200, { ok: true, granted: need.length })
 }
 
@@ -603,6 +654,7 @@ export async function putItem(app: App, userId: string, event: LambdaEvent, orgI
   const existing = await app.store.get(collectionItemsPk(collectionId), itemSk(itemId))
   const at = now(app)
   await app.store.put({ pk: collectionItemsPk(collectionId), sk: itemSk(itemId), id: itemId, blob, keyVersion: c.keyVersion, createdAt: existing?.['createdAt'] ?? at, updatedAt: at, updatedBy: userId })
+  await orgEvent(app, orgId, userId, existing ? 'item.edit' : 'item.create', { collectionId, itemId })
   return json(200, { id: itemId })
 }
 
@@ -610,5 +662,6 @@ export async function deleteItem(app: App, userId: string, orgId: string, collec
   await requireAccess(app, orgId, collectionId, userId, 'edit')
   if (!isValidId(itemId)) throw notFound()
   await app.store.delete(collectionItemsPk(collectionId), itemSk(itemId))
+  await orgEvent(app, orgId, userId, 'item.delete', { collectionId, itemId })
   return json(200, { ok: true })
 }

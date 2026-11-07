@@ -174,6 +174,8 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
         </form>
       ) : null}
 
+      {admin ? <Activity org={org} teams={teams} members={members} /> : null}
+
       <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
 
       <h3 className="small-head">Collections</h3>
@@ -377,5 +379,39 @@ function PoliciesForm({ org, teams }: { org: OrgView; teams: Teams }) {
       <p className="alert alert-warn"><IconAlert size={16} />Policies apply to everyone here, you included. Members who do not meet them cannot open the organization's collections until they do.</p>
       <div className="settings-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary btn-sm">Save policies</button></div>
     </form>
+  )
+}
+
+const ACTION_LABEL: Record<string, string> = {
+  'item.view': 'opened', 'item.reveal': 'revealed a secret in', 'item.copy': 'copied from', 'item.create': 'added', 'item.edit': 'edited', 'item.delete': 'deleted',
+  'access.grant': 'gave access to', 'access.change': 'changed access to', 'access.revoke': 'removed access to', 'access.grant-group': 'gave a group access to',
+  'collection.create': 'created', 'collection.delete': 'deleted', 'collection.rotate': 'rotated the key of',
+  'member.invite': 'invited', 'member.confirm': 'confirmed', 'member.remove': 'removed', 'member.leave': 'left', 'policies.change': 'changed the policies',
+}
+
+function Activity({ org, teams, members }: { org: OrgView; teams: Teams; members: OrgMember[] }) {
+  const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState<Awaited<ReturnType<typeof api.orgs.events>>['events']>([])
+  const who = (u: string | null) => members.find((m) => m.userId === u)?.label ?? (u ? 'A former member' : '—')
+  const item = (id: string | null) => teams.shared.find((e) => e.id === id)?.name ?? (id ? 'an item' : '')
+  const coll = (id: string | null) => teams.collections.find((c) => c.id === id)?.name ?? ''
+  return (
+    <div className="policy-line">
+      <button className="link small" onClick={async () => { if (!open) setEvents((await api.orgs.events(await session.token(), org.id)).events); setOpen(!open) }}>{open ? 'Hide activity' : 'Activity…'}</button>
+      {open ? (
+        <div className="audit">
+          <p className="muted small">Who did what, for a year. Opening, revealing and copying are reported by each member's app.</p>
+          <ul className="activity-list">
+            {events.length === 0 ? <li className="muted small">Nothing yet.</li> : events.map((e, i) => {
+              const target = e.action.startsWith('item.') ? `${item(e.itemId)} in ${coll(e.collectionId)}`
+                : e.action.startsWith('access.') || e.action.startsWith('collection.') ? coll(e.collectionId) + (e.target && e.action !== 'access.grant-group' ? ` (${who(e.target)})` : '')
+                : e.action.startsWith('member.') ? (members.find((m) => m.userId === e.target)?.label ?? e.target ?? '') : ''
+              return <li key={i}><span><strong>{who(e.actor)}</strong> {ACTION_LABEL[e.action] ?? e.action} {target}</span>
+                <span className="muted small">{new Date(e.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}{e.reported ? ' · reported by app' : ''}</span></li>
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   )
 }

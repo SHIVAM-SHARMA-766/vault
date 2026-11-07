@@ -72,8 +72,10 @@ test('share a collection between two people, confirmed by fingerprint, then remo
     await bob.waitForSelector('.detail .badge:has-text("View only")')
     assert.equal(await bob.getByRole('button', { name: 'Edit' }).isDisabled(), true)
 
-    // Alice removes Bob; he loses the collection.
+    // Alice removes Bob; he loses the collection. First, the audit shows he opened it.
     await orgsPage(s, alice)
+    await alice.getByRole('button', { name: 'Activity…' }).click()
+    await alice.waitForSelector('.audit li:has-text("Bob opened AWS root in Finance")')
     alice.once('dialog', (d) => d.accept())
     await alice.getByRole('button', { name: 'Remove Bob' }).click()
     // Removal re-keys the collection automatically: Bob's old key is retired.

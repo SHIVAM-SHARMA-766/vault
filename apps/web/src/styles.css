@@ -821,3 +821,4 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .list-alert { margin: 0 12px 8px; }
 .policy-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
 .policy-line p { margin: 0; }
+.audit { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; max-height: 360px; overflow-y: auto; }

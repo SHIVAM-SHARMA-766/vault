@@ -86,6 +86,8 @@ export function buildRouter(app: App): Router {
   router.delete('/api/orgs/:org/members/:user', authedP((u, _e, [o, t]) => orgs.removeMember(app, u, o!, t!)), 'Remove a member, or leave')
   router.put('/api/orgs/:org/policies', authedP((u, e, [o]) => orgs.setPolicies(app, u, e, o!)), 'Set the organization\'s policies')
   router.get('/api/orgs/:org/compliance', authedP((u, _e, [o]) => orgs.compliance(app, u, o!)), 'Which members do not meet the policies')
+  router.post('/api/orgs/:org/events', authedP((u, e, [o]) => orgs.reportEvent(app, u, e, o!)), 'Report opening, revealing or copying a shared item')
+  router.get('/api/orgs/:org/events', authedP((u, _e, [o]) => orgs.events(app, u, o!)), 'The organization\'s access audit (admins)')
   router.get('/api/orgs/:org/groups', authedP((u, _e, [o]) => orgs.groups(app, u, o!)), 'Groups, their members and the collections granted to them')
   router.post('/api/orgs/:org/groups', authedP((u, e, [o]) => orgs.createGroup(app, u, e, o!)), 'Create a group')
   router.delete('/api/orgs/:org/groups/:group', authedP((u, _e, [o, g]) => orgs.deleteGroup(app, u, o!, g!)), 'Delete a group and the access it granted')

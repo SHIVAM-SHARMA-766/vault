@@ -86,3 +86,5 @@ export const groupSk = (groupId: string) => `GROUP#${groupId}`
 export const GROUP_PREFIX = 'GROUP#'
 export const groupAccessSk = (collectionId: string, groupId: string) => `GACCESS#${collectionId}#${groupId}`
 export const GROUP_ACCESS_PREFIX = 'GACCESS#'
+export const orgEventSk = (at: string, nonce: string) => `EVENT#${at}#${nonce}`
+export const ORG_EVENT_PREFIX = 'EVENT#'
