@@ -19,8 +19,9 @@ Last revised: 2026-11-07 (phase 2 built)
 flowchart LR
   p0["Phase 0<br/>Foundation<br/>✅ done"]:::done --> p1["Phase 1<br/>Complete personal vault<br/>✅ closed · domain deferred"]:::done
   p1 --> p2["Phase 2<br/>Self-hosted product<br/>✅ built · 3 decisions open"]:::done
-  p2 --> p3["Phase 3<br/>Teams<br/>⬜ next"]:::next
-  p3 --> p4["Phase 4<br/>Browser extension"]:::later
+  p2 --> p3["Phase 3<br/>Service desk ✅, then teams<br/>🟡 teams next"]:::now
+  p3 --> p35["Phase 3.5<br/>Improvement pass"]:::next
+  p35 --> p4["Phase 4<br/>Browser extension"]:::later
   p4 --> p5["Phase 5<br/>Android"]:::later
   p5 --> p6["Phase 6<br/>Enterprise"]:::later
   classDef done fill:#dcfce7,stroke:#16a34a,color:#14532d
@@ -34,7 +35,8 @@ flowchart LR
 | 0 — Foundation | Keys for sharing, local stack, browser tests, release pipeline | ✅ Done 2026-11-06 |
 | 1 — Complete personal vault | Everything one person needs, hardened and monitored | ✅ Closed 2026-11-07; domain deferred, operator steps carried |
 | 2 — Self-hosted product | Anyone installs and upgrades it with one command | ✅ All 8 steps built 2026-11-07; licence, pricing and update channel still to decide |
-| 3 — Teams | Organizations, shared collections, policies | ⬜ Next |
+| 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | 🟡 Service desk built; teams next |
+| 3.5 — Improvement pass | Harden, polish and speed up everything built so far, before a second client | ⬜ Planned |
 | 4 — Browser extension | Autofill, the main way a password manager is used | ⬜ Planned |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
 | 6 — Enterprise | SSO, SCIM, HA | ⬜ Planned |
@@ -243,7 +245,27 @@ which runs the image workflow.
 | Restore from backup tested in CI | ✅ in the image job, into a fresh container |
 | A tampered image is refused | ◐ images are signed and `cosign verify` refuses a tampered one; verifying is the customer's step |
 
-### Phase 3 — Teams
+### Phase 3 — Service desk, then teams
+
+**Part A — Service desk (ITSM) ✅ built 2026-11-07** ([0014](../decisions/0014-service-desk.md)). Requested by the operator on 2026-11-07: the
+product needs its own help and support, so access requests, sign-in problems and questions
+do not depend on email threads or chat outside it. Built before teams because teams will
+generate exactly these requests, and because a company evaluating Vault expects it.
+
+- [x] Public requests from the sign-in screen, no account needed: **request access** (when
+  registration is not open) and **can't sign in / lost my authenticator**. Rate-limited, and
+  the answer never reveals whether an address has an account (threat A7).
+- [x] **Help & support** for signed-in users: tickets with a category, a conversation, status
+  (open → in progress → waiting → resolved → closed), and optional email updates.
+- [x] **Service desk** in the admin panel: a queue with filters, assignment, priority, replies
+  and staff-only notes; one-click actions — approve an access request (creates and emails an
+  invitation), reset two-factor sign-in for a locked-out account after verifying the person.
+- [x] A **support** role: works the queue and issues invitations, nothing else.
+- [x] Privacy: ticket text is readable by staff (it is not vault data, and the UI says never
+  to put a password in it); a requester's email address is kept only while the ticket is
+  open and erased when it closes; resolved tickets close themselves after seven days.
+
+**Part B — Teams.**
 
 The business core. Built on the model in [0009](../decisions/0009-identity-keys-and-sharing.md).
 
@@ -262,6 +284,23 @@ The business core. Built on the model in [0009](../decisions/0009-identity-keys-
 **Exit criteria:** two people in an organization share a collection, one is removed and cannot
 read anything added after; every step has browser tests with two browsers; threat A11 is
 mitigated by the confirmation step.
+
+### Phase 3.5 — Improvement pass
+
+Requested by the operator on 2026-11-07: once teams are done and before the extension, a
+phase that adds no new surface and makes everything existing better. A second client
+multiplies the cost of every rough edge, so they are paid down first.
+
+- [ ] Security review of everything since phase 1; revisit [KNOWN-ISSUES.md](KNOWN-ISSUES.md)
+  and close what can be closed (the three phase 1 crypto decisions among them).
+- [ ] Performance: unlock and search on a vault of 5,000 items, backup streaming, bundle size.
+- [ ] Accessibility (keyboard, screen readers, contrast) and mobile polish across every screen.
+- [ ] Error messages, empty states and onboarding reviewed end to end.
+- [ ] Test gaps: real export files for import, a live SMTP test, an ARM board, a timed install.
+- [ ] Documentation and screenshots refreshed.
+
+**Exit criteria:** no open 🔴 item in KNOWN-ISSUES without a recorded decision; every screen
+passes an accessibility check; the 5,000-item vault unlocks in under two seconds on a phone.
 
 ### Phase 4 — Browser extension
 

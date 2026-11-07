@@ -58,8 +58,9 @@ import real export files from three managers; three crypto decisions.
 CI. Left for the operator: decide the update channel, licence and pricing
 ([docs/ROADMAP.md](docs/ROADMAP.md#open-decisions)), then tag the first release.
 
-**Next: phase 3, teams** — organizations, shared collections, permissions, groups, policies
-([docs/ROADMAP.md](docs/ROADMAP.md#phase-3--teams)).
+**Phase 3A — service desk: built** (2026-11-07). **Next: phase 3B, teams** — organizations,
+shared collections, permissions, groups, policies. Then **phase 3.5, an improvement pass**,
+before the browser extension ([docs/ROADMAP.md](docs/ROADMAP.md#phase-3--service-desk-then-teams)).
 
 Carried over: remove the AWS resources (needs new personal AWS keys).
 
@@ -77,6 +78,18 @@ Carried over: remove the AWS resources (needs new personal AWS keys).
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Phase 3A: the service desk.** From the sign-in screen, anyone can **request
+access** or ask for **help signing in** (lost authenticator) without an account; signed-in
+users have **Help & support** with tickets and a conversation; staff work a **Service desk**
+queue in the admin panel — replies, internal notes, status, priority, assignment — with two
+actions: approve access (issues and emails an invitation) and reset two-factor sign-in
+(admin only, audited, after verifying the person). New **support** role. Requester addresses
+are kept only while a ticket is open; resolved tickets close themselves after a week. Public
+requests are rate-limited and never reveal whether an account exists. Found while testing:
+messages written in the same millisecond could come back out of order — they are now
+numbered per ticket. The roadmap gains **phase 3.5, an improvement pass** before the
+extension. [0014](decisions/0014-service-desk.md), threat model A13.
 
 **2026-11-07 — Phase 2, steps 2–8: Vault is installable.**
 - *One process*: with `SERVE_STATIC=true` the server serves the client, site and media with

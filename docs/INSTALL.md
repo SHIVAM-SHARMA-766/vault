@@ -112,6 +112,14 @@ with. With [mail](#mail) set up, enter their address and they get the code and a
 otherwise copy the code to them yourself. Registration stays closed to everyone else
 (Overview → Registration: Closed / Invite only / Open).
 
+### Requests from people outside
+
+The sign-in screen lets anyone ask for access, or for help when locked out of their
+authenticator. Both land in the admin panel's **Service desk**. Approving an access request
+issues an invitation in one click; resetting two-factor sign-in is for admins only, after you
+have confirmed who is asking through another channel. Give someone the **Support** role to
+work the queue without access to accounts.
+
 ## Backups and restore
 
 **Turn backups on by setting `BACKUP_PASSPHRASE`** (16+ characters). Vault then writes one

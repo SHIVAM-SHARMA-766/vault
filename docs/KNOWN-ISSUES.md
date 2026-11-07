@@ -147,6 +147,15 @@ itself is nodemailer's, configured to refuse plain text. The admin panel's "Send
 the check against a real server.
 </details>
 
+<details>
+<summary>🟠 <b>Service desk tickets are readable by staff</b></summary>
+
+Ticket text is support conversation, not vault data, and is stored as plain text so staff can
+read it; every text box says never to include a password, recovery key or code. Staff are not
+emailed about new tickets (Vault has no staff addresses) — the admin Overview counts open
+ones. ([0014](../decisions/0014-service-desk.md))
+</details>
+
 ## The reference instance
 
 <details>
