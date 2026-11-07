@@ -7,7 +7,7 @@ Everything is encrypted in your browser; the server stores ciphertext it holds n
 
 [![CI](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml/badge.svg)](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml)
 ![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM%20in%20the%20browser-4f46e5)
-![Tests](https://img.shields.io/badge/tests-290%20unit%20%C2%B7%2015%20browser-16a34a)
+![Tests](https://img.shields.io/badge/tests-305%20unit%20%C2%B7%2015%20browser-16a34a)
 ![Running cost](https://img.shields.io/badge/running%20cost-%240%20a%20month-0ea5e9)
 
 [**Live instance**](https://vault-shivam.duckdns.org) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
@@ -177,7 +177,7 @@ npm run dev:stack      # the whole product on http://localhost:8080, in memory �
 <summary>Tests, screenshots and the API description</summary>
 
 ```sh
-npm test               # crypto, core and API — 290 tests
+npm test               # crypto, core and API — 305 tests
 npm run test:e2e       # 15 browser tests against the real stack (needs Chrome)
 npm run screenshots    # regenerate docs/images from the running product
 npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
