@@ -39,6 +39,26 @@ address.
 
 Placeholder-looking secrets (`changeme…`, `test…`, `secret…`, `placeholder…`) are refused.
 
+### Backups
+
+Backups are off until `BACKUP_PASSPHRASE` and a destination are set. Each is one encrypted
+file holding every row and the server secrets — a complete restore with the passphrase, onto
+any driver. `node index.mjs backup` takes one now; `node index.mjs restore <file>` restores
+into an empty database ([INSTALL.md](INSTALL.md#backups-and-restore)).
+
+| Variable | Default | Secret | What it does |
+|---|---|---|---|
+| `BACKUP_PASSPHRASE` | — | yes | 16+ characters. Turns scheduled backups on. Keep a copy off the server |
+| `BACKUP_DIR` | `/data/backups` in the image | | Local directory for backup files |
+| `BACKUP_KEEP` | `14` | | Files kept in `BACKUP_DIR` |
+| `BACKUP_INTERVAL_HOURS` | `24` | | Hours between backups; `0` turns the schedule off |
+| `BACKUP_S3_ENDPOINT` | — | | S3-compatible endpoint for off-site copies (AWS, R2, B2, OCI, MinIO…) |
+| `BACKUP_S3_BUCKET` | — | | Bucket |
+| `BACKUP_S3_REGION` | `us-east-1` | | Signing region (`auto` for R2) |
+| `BACKUP_S3_ACCESS_KEY` | — | | Access key with write access to that bucket only |
+| `BACKUP_S3_SECRET_KEY` | — | yes | Its secret |
+| `BACKUP_S3_PREFIX` | `vault/` | | Key prefix |
+
 ## Where they live on the reference instance
 
 | File | Holds | Written by |

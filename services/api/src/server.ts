@@ -17,6 +17,7 @@ import type { App } from './context.js'
 import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
 import { ensureSetup } from './system.js'
+import { backupsEnabled, runBackup } from './backup.js'
 import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
 import type { ManagedStore } from './store.js'
@@ -54,6 +55,17 @@ export async function start(): Promise<void> {
   // schema that may not be there.
   const version = await store.migrate()
   console.log(`storage: ${app.config.db.driver}, schema version ${version}`)
+
+  // Scheduled backups (backup.ts), when a passphrase and a destination are set.
+  if (backupsEnabled(app.config) && app.config.backup.intervalHours > 0) {
+    const backup = () => runBackup(store, app.config)
+      .then((r) => console.log(`backup written: ${r.name} (${r.rows} rows, ${r.bytes} bytes)`))
+      .catch((err: unknown) => console.error('backup FAILED:', (err as Error).message))
+    setTimeout(() => { void backup(); setInterval(backup, app.config.backup.intervalHours * 3_600_000).unref() }, 5 * 60_000).unref()
+    console.log(`backups: every ${app.config.backup.intervalHours} h${app.config.backup.dir ? `, to ${app.config.backup.dir}` : ''}${app.config.backup.s3 ? `, to s3://${app.config.backup.s3.bucket}` : ''}; first in 5 minutes`)
+  } else if (!backupsEnabled(app.config)) {
+    console.log('backups: off (set BACKUP_PASSPHRASE and BACKUP_DIR or BACKUP_S3_*; see docs/INSTALL.md)')
+  }
 
   // A brand-new server: say how to create the owner account.
   const setupCode = await ensureSetup(app)

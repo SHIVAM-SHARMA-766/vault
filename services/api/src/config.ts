@@ -52,6 +52,13 @@ export interface Config {
    *  the addresses are not kept. */
   adminEmails: string[]
   site: { sourceDir: string; outputDir: string }
+  backup: {
+    passphrase: string
+    dir: string
+    keep: number
+    intervalHours: number
+    s3?: { endpoint: string; region: string; bucket: string; accessKey: string; secretKey: string; prefix: string }
+  }
 }
 
 export interface Variable {
@@ -85,6 +92,16 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'ADMIN_EMAILS', required: false, default: '', description: 'Comma-separated addresses that are owners. The first account is usually the only one.' },
   { name: 'SITE_SOURCE', required: false, description: 'Website templates and content. Defaults to the site/ directory shipped beside the server.' },
   { name: 'SITE_ROOT', required: false, default: '/srv/vault/site', description: 'Where the rendered website is written; the reverse proxy serves its current/ directory.' },
+  { name: 'BACKUP_PASSPHRASE', required: false, secret: true, description: 'Turns scheduled backups on (with BACKUP_DIR or BACKUP_S3_*). At least 16 characters. Keep a copy away from the server: a backup and this passphrase are a complete restore, and without it a backup cannot be opened.' },
+  { name: 'BACKUP_DIR', required: false, description: 'Directory for backup files. The container image uses /data/backups.' },
+  { name: 'BACKUP_KEEP', required: false, default: '14', description: 'How many backup files to keep in BACKUP_DIR. Use the bucket\'s lifecycle rules for S3.' },
+  { name: 'BACKUP_INTERVAL_HOURS', required: false, default: '24', description: 'Hours between scheduled backups; 0 turns the schedule off (the backup command still works).' },
+  { name: 'BACKUP_S3_ENDPOINT', required: false, description: 'An S3-compatible endpoint for off-site copies, e.g. https://s3.eu-central-1.amazonaws.com or https://<account>.r2.cloudflarestorage.com.' },
+  { name: 'BACKUP_S3_BUCKET', required: false, description: 'The bucket. Required with BACKUP_S3_ENDPOINT.' },
+  { name: 'BACKUP_S3_REGION', required: false, default: 'us-east-1', description: 'Signing region; "auto" for R2.' },
+  { name: 'BACKUP_S3_ACCESS_KEY', required: false, description: 'Access key id. Give it permission to write objects in that bucket and nothing else.' },
+  { name: 'BACKUP_S3_SECRET_KEY', required: false, secret: true, description: 'Secret access key.' },
+  { name: 'BACKUP_S3_PREFIX', required: false, default: 'vault/', description: 'Key prefix for backup objects.' },
 ]
 
 let cached: Config | null = null
@@ -145,7 +162,25 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     allowRegistration: get('ALLOW_REGISTRATION') === 'true',
     adminEmails: get('ADMIN_EMAILS').split(',').map((e) => e.trim()).filter(Boolean),
     site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },
+    backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
   }
+  const passphrase = get('BACKUP_PASSPHRASE')
+  if (passphrase && passphrase.length < 16) problems.push('BACKUP_PASSPHRASE must be at least 16 characters')
+  const s3Fields = ['BACKUP_S3_ENDPOINT', 'BACKUP_S3_BUCKET', 'BACKUP_S3_ACCESS_KEY', 'BACKUP_S3_SECRET_KEY']
+  const s3Set = s3Fields.filter((n) => get(n))
+  if (s3Set.length && s3Set.length < s3Fields.length) problems.push(`S3 backups need all of ${s3Fields.join(', ')}; missing ${s3Fields.filter((n) => !get(n)).join(', ')}`)
+  const keep = Number(get('BACKUP_KEEP'))
+  const intervalHours = Number(get('BACKUP_INTERVAL_HOURS'))
+  if (!Number.isInteger(keep) || keep < 1) problems.push('BACKUP_KEEP must be a whole number, 1 or more')
+  if (!Number.isFinite(intervalHours) || intervalHours < 0) problems.push('BACKUP_INTERVAL_HOURS must be 0 or more')
+  config.backup = {
+    passphrase, dir: get('BACKUP_DIR'), keep, intervalHours,
+    ...(s3Set.length === s3Fields.length ? { s3: {
+      endpoint: get('BACKUP_S3_ENDPOINT'), bucket: get('BACKUP_S3_BUCKET'), region: get('BACKUP_S3_REGION'),
+      accessKey: get('BACKUP_S3_ACCESS_KEY'), secretKey: get('BACKUP_S3_SECRET_KEY'), prefix: get('BACKUP_S3_PREFIX'),
+    } } : {}),
+  }
+
   if (problems.length) throw new Error(`configuration:\n  - ${problems.join('\n  - ')}`)
   return config
 }

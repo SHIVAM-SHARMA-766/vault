@@ -15,6 +15,8 @@ services:
     image: ${VAULT_IMAGE:-vault:local}
     build: ../..
     restart: unless-stopped
+    # Every setting in .env reaches Vault (backups, mail — docs/configuration.md).
+    env_file: [.env]
     environment:
       VAULT_HOSTNAME: ${VAULT_HOSTNAME:?set VAULT_HOSTNAME in .env}
       # Only when HTTPS is not on 443, e.g. https://vault.example.com:8443

@@ -79,6 +79,10 @@ export class SqliteStore implements Store {
     return Number(row.count)
   }
 
+  async scan(): Promise<Item[]> {
+    return (this.db.prepare('SELECT pk, sk, data FROM vault ORDER BY pk, sk').all() as { pk: string; sk: string; data: string }[]).map(fromRow)
+  }
+
   async sweepExpired(now = Math.floor(Date.now() / 1000)): Promise<number> {
     return this.db.prepare('DELETE FROM vault WHERE expires_at IS NOT NULL AND expires_at < ?').run(now).changes
   }

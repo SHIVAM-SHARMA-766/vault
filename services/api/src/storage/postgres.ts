@@ -111,6 +111,10 @@ export class PostgresStore implements Store {
     return Number(rows[0]?.count ?? 1)
   }
 
+  async scan(): Promise<Item[]> {
+    return (await this.pool.query('SELECT pk, sk, data FROM vault ORDER BY pk, sk')).rows.map(fromRow)
+  }
+
   async sweepExpired(now = Math.floor(Date.now() / 1000)): Promise<number> {
     const res = await this.pool.query('DELETE FROM vault WHERE expires_at IS NOT NULL AND expires_at < $1', [now])
     return res.rowCount ?? 0

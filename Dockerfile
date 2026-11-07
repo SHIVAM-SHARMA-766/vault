@@ -9,7 +9,8 @@
 #   docker run -p 8080:8080 -v vault-data:/data -e VAULT_HOSTNAME=vault.example.com vault
 #
 # Defaults: SQLite at /data/vault.db, secrets generated into /data/secrets.env
-# on first start, the website rendered under /data/site. Everything that must
+# on first start, the website rendered under /data/site, backups (once
+# BACKUP_PASSPHRASE is set) in /data/backups. Everything that must
 # survive an upgrade is in /data. See docs/INSTALL.md.
 
 ARG NODE_IMAGE=node:20.18.1-bookworm-slim
@@ -58,7 +59,8 @@ ENV NODE_ENV=production \
     DB_DRIVER=sqlite \
     DB_PATH=/data/vault.db \
     SITE_ROOT=/data/site \
-    SECRETS_FILE=/data/secrets.env
+    SECRETS_FILE=/data/secrets.env \
+    BACKUP_DIR=/data/backups
 
 RUN groupadd --system --gid 10001 vault \
  && useradd --system --uid 10001 --gid vault --home-dir /data --shell /usr/sbin/nologin vault \

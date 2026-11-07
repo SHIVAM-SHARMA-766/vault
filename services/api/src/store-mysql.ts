@@ -160,6 +160,11 @@ export class MysqlStore implements ManagedStore {
     return version
   }
 
+  async scan(): Promise<Item[]> {
+    const [rows] = await this.pool.query<Row[]>('SELECT pk, sk, data FROM vault ORDER BY pk, sk')
+    return rows.map(fromRow)
+  }
+
   async sweepExpired(now = Math.floor(Date.now() / 1000)): Promise<number> {
     const [res] = await this.pool.query('DELETE FROM vault WHERE expires_at IS NOT NULL AND expires_at < ?', [now])
     return (res as { affectedRows?: number }).affectedRows ?? 0

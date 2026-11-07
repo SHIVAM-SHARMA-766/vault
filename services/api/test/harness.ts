@@ -53,6 +53,7 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
       allowRegistration: false,
       adminEmails: [],
       site: { sourceDir: '', outputDir: '' },
+      backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
       db: {
         driver: 'mysql',
         ssl: false,

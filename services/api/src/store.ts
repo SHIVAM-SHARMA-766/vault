@@ -32,6 +32,9 @@ export interface ManagedStore extends Store {
   /** Removes rows whose expiry has passed; returns how many. */
   sweepExpired(now?: number): Promise<number>
   close(): Promise<void>
+  /** Every row in the table, for backups only — no route can reach this,
+   *  because routes are given the five-method Store. */
+  scan(): Promise<Item[]>
 }
 
 /** Raised by `put` when `mustNotExist` was requested and the item was there. */
