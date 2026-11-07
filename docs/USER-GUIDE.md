@@ -166,14 +166,33 @@ your passwords in plain text.
 
 ## Account settings
 
-<img src="images/settings.png" alt="Account settings: account details, master password, two-factor sign-in" width="820">
+Account menu → **Account settings**. It has four sections, each with its own address, so a
+link such as `/app/settings/security` opens the right one after you unlock.
 
-| Section | What it does |
+<img src="images/settings.png" alt="Account settings, Security section: two-factor sign-in and signed-in devices" width="820">
+
+| Section | What is in it |
 |---|---|
-| Master password | Change it. Other devices are signed out. Your items are not re-encrypted, so it is instant |
-| Two-factor sign-in | Turn on TOTP with any authenticator app; you get ten single-use recovery codes |
-| Recovery key | Issue a new one; the old one stops working at once |
-| Identity key | A fingerprint to compare with someone before sharing with them |
+| **Account** | Your details; change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; your identity-key fingerprint |
+| **Security** | Two-factor sign-in (TOTP with any authenticator app, plus ten single-use recovery codes); signed-in devices; security activity |
+| **Preferences** | Theme, auto-lock, clipboard clearing and the password generator's defaults — see below |
+| **Emergency access** | People you trust to reach your vault if something happens to you |
+
+### Preferences
+
+<img src="images/preferences.png" alt="Preferences: theme, auto-lock, clipboard and generator defaults" width="820">
+
+| Setting | Choices | Default |
+|---|---|---|
+| Appearance | Match system · Light · Dark | Match system |
+| Auto-lock | 1, 5, 15, 30 minutes, 1 or 4 hours idle | 15 minutes |
+| Lock when I switch tab or window | on / off | off |
+| Clear copied secrets after | 10, 30 seconds, 1 or 2 minutes, never | 30 seconds |
+| Password generator | default length (8–64) and character sets | 20, all sets |
+
+Preferences are **encrypted with your vault key** and saved on the server, so they follow you to
+every device, and the server cannot read them. An organization can set a shorter auto-lock than
+yours; when it does, the section says so.
 
 ## Devices and activity
 
@@ -182,8 +201,8 @@ your passwords in plain text.
 - **Signed-in devices** lists every browser signed in to your account, with the address it
   signed in from and when it was last active. Rename one (✎) to recognise it, or **Sign out
   device**. **Sign out everywhere** signs out all of them, this one included.
-- **Locking** — the Lock button, 15 minutes idle, or closing the tab — signs this browser out
-  on the server too.
+- **Locking** — the Lock button, the auto-lock (15 minutes idle unless you change it in
+  Preferences), or closing the tab — signs this browser out on the server too.
 - **Security activity** shows sign-ins and account changes from the last 90 days.
 
 If you see a device you do not recognise: sign it out, then change your master password.
@@ -228,7 +247,8 @@ not meet them is told why and cannot open its collections until they do.
 ### Emergency access
 
 Settings → **Emergency access**: choose someone you trust and a waiting period. After they
-accept, confirm their fingerprint. If they ever request access, you will see it in Settings —
+accept, confirm their fingerprint (they see their own fingerprint on the same page, ready to read
+out to you). If they ever request access, you will see it in this section —
 **Reject** it, or **Approve now**; if you do nothing, they get a read-only view of your vault
 when the waiting period ends. Use this for the person who should be able to get in if something
 happens to you.
@@ -249,6 +269,9 @@ happens to you.
 
 Your email address is kept only until the request is closed, then erased.
 
+If the people running the server have set a support address, it is shown under the sign-in
+form and on the Help & support page, and replies to any email Vault sends reach them.
+
 **Signed in?** Account menu → **Help & support** → **New request**. Choose what it is about,
 describe it, and optionally have replies emailed to you. The conversation stays on the page:
 reply there, or close the request when you are done. Staff can read what you write but never
@@ -256,7 +279,8 @@ your vault — **never put a password, recovery key or code in a request.**
 
 ## On a phone, and in dark mode
 
-The same app adapts to a phone and follows your system's light or dark setting.
+The same app adapts to a phone. It follows your system's light or dark setting unless you pick
+one in Settings → Preferences; on a phone, the settings sections are the chips along the top.
 
 <p>
 <img src="images/mobile-list.png" alt="The vault on a phone" width="260">

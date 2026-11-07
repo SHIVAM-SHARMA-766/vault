@@ -105,6 +105,11 @@ Open it and create your account; it becomes the **owner**, with the admin panel.
 recovery key it shows** — nobody, including you as the server's operator, can reset a
 forgotten master password.
 
+Then, in the admin panel's **Overview → Name and support**, give the server a name and a support
+address. Both are shown on the sign-in screen and the help page, and the support address becomes
+the Reply-To of every email Vault sends — so people who reply to an invitation or a sign-in
+notice reach you, not the no-reply sender.
+
 ## Inviting people
 
 Admin panel → **Invitations** → who it is for, how long it lasts, and the role they start
