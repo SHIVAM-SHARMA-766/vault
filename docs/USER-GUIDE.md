@@ -59,6 +59,10 @@ master password.
 
 ## The vault
 
+**Get started.** A new vault shows a short checklist beside the list: add or import your first
+items, turn on two-factor sign-in, set up backups, and keep your recovery key safe. Steps tick
+themselves off as you do them; **Hide this** puts it away.
+
 <img src="images/vault.png" alt="The vault with GitHub open: username, password, website, a live one-time code and a hidden custom field" width="820">
 
 | Area | What it does |
