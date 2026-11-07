@@ -51,7 +51,12 @@ test('every screen passes axe-core WCAG 2.1 AA, light and dark', async () => {
       await audit(page, `${scheme} vault with an item`, found)
       await page.getByRole('button', { name: /Password health/ }).click()
       await audit(page, `${scheme} health`, found)
-      for (const item of ['Account settings', 'Import & export', 'Organizations', 'Help & support']) {
+      for (const section of ['Account', 'Security', 'Preferences', 'Emergency access']) {
+        await s.settings(page, section)
+        await page.waitForTimeout(300)
+        await audit(page, `${scheme} settings ${section}`, found)
+      }
+      for (const item of ['Import & export', 'Organizations', 'Help & support']) {
         await s.menu(page, item)
         await page.waitForTimeout(300)
         await audit(page, `${scheme} ${item}`, found)

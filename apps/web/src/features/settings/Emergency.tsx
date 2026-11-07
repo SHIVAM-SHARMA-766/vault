@@ -10,7 +10,7 @@ import { type EntryContent, fromBase64Url, identityFingerprint, openEmergencyKey
 import { type EmergencyGrant, type EmergencyTrust, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconShield, IconX } from '../../ui/icons.js'
-import { useToast } from '../../ui/kit.js'
+import { CopyButton, useToast } from '../../ui/kit.js'
 import { myIdentity } from '../orgs/model.js'
 import { SecretRow, TextRow } from '../vault/fields.js'
 
@@ -127,6 +127,7 @@ export function Emergency({ state }: { state: session.Unlocked }) {
           </li>
         ))}
       </ul>
+      {trust.grants.some((g) => g.status === 'accepted') ? <MyFingerprint vaultKey={state.vaultKey} /> : null}
 
       {viewing ? (
         <div className="emergency-view" role="dialog" aria-label={`${viewing.from}'s vault`}>
@@ -145,5 +146,19 @@ export function Emergency({ state }: { state: session.Unlocked }) {
         </div>
       ) : null}
     </section>
+  )
+}
+
+/** Shown while someone still has to confirm you: the fingerprint they will
+ *  ask you to read out, right where you need it. */
+function MyFingerprint({ vaultKey }: { vaultKey: Uint8Array }) {
+  const [fp, setFp] = useState('')
+  useEffect(() => { void myIdentity(vaultKey).then((i) => setFp(i.fingerprint)).catch(() => {}) }, [vaultKey])
+  if (!fp) return null
+  return (
+    <div className="my-fingerprint">
+      <p className="muted small">They will check this fingerprint with you before confirming. Read it to them in person or on a call:</p>
+      <div className="fingerprint"><code>{fp}</code><CopyButton value={fp} label="Fingerprint" /></div>
+    </div>
   )
 }

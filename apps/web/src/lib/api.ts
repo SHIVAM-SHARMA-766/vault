@@ -90,6 +90,9 @@ async function request<T>(
   return payload as T
 }
 
+export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean }
+
 export const api = {
   health: () => request<{ status: string }>('GET', '/api/health'),
 
@@ -278,6 +281,10 @@ export const api = {
     request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
   revokeSession: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`, { token }),
+  /** What anyone may know about this server before signing in. */
+  instance: () => request<Instance>('GET', '/api/instance'),
+  prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),
+  putPrefs: (token: string, blob: string) => request<{ updatedAt: string }>('PUT', '/api/prefs', { token, body: { blob } }),
   activity: (token: string) =>
     request<{ events: { kind: string; at: string; ip: string; device: string }[] }>('GET', '/api/activity', { token }),
 
@@ -309,7 +316,9 @@ export const api = {
     deleteUser: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/delete`, { token, body: { confirm: id } }),
     settings: (token: string) =>
-      request<{ registration: RegistrationMode; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+      request<{ registration: RegistrationMode; profile: InstanceProfile; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+    setProfile: (token: string, profile: InstanceProfile) =>
+      request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { profile } }),
     setRegistration: (token: string, registration: RegistrationMode) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
     invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),

@@ -1,7 +1,8 @@
-// Account settings: the master password, the recovery key, the identity key
-// fingerprint, and signing out everywhere. Every change that weakens the
-// account's hold on itself asks for the current master password again, and
-// the server checks that proof (services/api/src/routes/auth.ts).
+// Account settings, in sections with their own addresses (/app/settings,
+// /app/settings/security, …): the account and its keys, sign-in security,
+// preferences, and emergency access. Every change that weakens the account's
+// hold on itself asks for the current master password again, and the server
+// checks that proof (services/api/src/routes/auth.ts).
 
 import { useEffect, useState } from 'react'
 
@@ -10,19 +11,32 @@ import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey }
 
 import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
-import { IconAlert, IconCheck, IconKey, IconLock, IconShield, IconUser } from '../../ui/icons.js'
+import { href, navigate } from '../../lib/router.js'
+import { IconAlert, IconCheck, IconKey, IconLock, IconShield, IconSliders, IconUser, IconUsers } from '../../ui/icons.js'
 import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
 import { Activity, Devices } from './Devices.js'
 import { Emergency } from './Emergency.js'
+import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 
 const MIN_LENGTH = 12
 
-export function Settings({ state }: { state: session.Unlocked }) {
+const TABS = [
+  { id: 'account', label: 'Account', Icon: IconUser, intro: 'Your sign-in details, master password and keys.' },
+  { id: 'security', label: 'Security', Icon: IconShield, intro: 'Two-factor sign-in, the devices signed in to your account, and recent activity.' },
+  { id: 'preferences', label: 'Preferences', Icon: IconSliders, intro: 'How Vault looks and behaves. Saved encrypted, so they follow you to every device.' },
+  { id: 'emergency', label: 'Emergency access', Icon: IconUsers, intro: 'People you trust to reach your vault if something happens to you.' },
+] as const
+type Tab = (typeof TABS)[number]['id']
+
+export function Settings({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
   const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus } | null>(null)
   const [version, setVersion] = useState(0)
+  const tab: Tab = TABS.find((t) => t.id === requested)?.id ?? 'account'
+  const info = TABS.find((t) => t.id === tab)!
+  const go = (t: Tab) => navigate(href({ name: 'settings', tab: t === 'account' ? null : t }))
 
   useEffect(() => {
     void (async () => {
@@ -36,41 +50,64 @@ export function Settings({ state }: { state: session.Unlocked }) {
 
   return (
     <Shell state={state}>
-      <main className="settings">
-        <div className="settings-head">
-          <h1>Account settings</h1>
-          <p className="muted">Changes here are made in this browser and proved to the server. Your master password and keys never leave it.</p>
+      <div className="admin-layout">
+        <nav className="sidebar" aria-label="Settings sections">
+          {TABS.map(({ id, label, Icon }) => (
+            <button key={id} className={`side-item ${tab === id ? 'side-active' : ''}`} onClick={() => go(id)} aria-current={tab === id ? 'page' : undefined}>
+              <Icon size={16} /><span>{label}</span>
+            </button>
+          ))}
+          <div className="sidebar-foot">
+            <IconLock size={14} /> Changes are made in this browser and proved to the server. Your master password and keys never leave it.
+          </div>
+        </nav>
+
+        <div className="filter-chips admin-chips">
+          {TABS.map(({ id, label }) => (
+            <button key={id} className={`chip ${tab === id ? 'chip-active' : ''}`} onClick={() => go(id)}>{label}</button>
+          ))}
         </div>
 
-        <section className="settings-card" aria-labelledby="s-account">
-          <div className="settings-card-head"><IconUser size={18} /><h2 id="s-account">Account</h2></div>
-          <dl className="facts">
-            <div><dt>Email</dt><dd>{state.email}</dd></div>
-            <div><dt>Role</dt><dd>{state.role && state.role !== 'user' ? state.role[0]!.toUpperCase() + state.role.slice(1) : 'Member'}</dd></div>
-            <div><dt>Created</dt><dd>{me ? new Date(me.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'}</dd></div>
-          </dl>
-        </section>
-
-        <ChangePassword state={state} />
-        <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
-        <RotateRecovery state={state} />
-
-        <section className="settings-card" aria-labelledby="s-identity">
-          <div className="settings-card-head"><IconShield size={18} /><h2 id="s-identity">Identity key</h2></div>
-          <p className="muted small">
-            When someone shares with you, they encrypt to this key. If they ever want to check it really is
-            yours, compare this fingerprint with them over a channel you trust — in person or on a call.
-          </p>
-          <div className="fingerprint">
-            {me?.fingerprint ? <code>{me.fingerprint}</code> : <span className="muted">{me ? 'Being created — unlock again to see it.' : 'Loading…'}</span>}
-            {me?.fingerprint ? <CopyButton value={me.fingerprint} label="Fingerprint" /> : null}
+        <main className="settings">
+          <div className="settings-head">
+            <h1>{info.label}</h1>
+            <p className="muted">{info.intro}</p>
           </div>
-        </section>
 
-        <Emergency state={state} />
-        <Devices />
-        <Activity />
-      </main>
+          {tab === 'account' ? <>
+            <section className="settings-card" aria-labelledby="s-account">
+              <div className="settings-card-head"><IconUser size={18} /><h2 id="s-account">Account</h2></div>
+              <dl className="facts">
+                <div><dt>Email</dt><dd>{state.email}</dd></div>
+                <div><dt>Role</dt><dd>{state.role && state.role !== 'user' ? state.role[0]!.toUpperCase() + state.role.slice(1) : 'Member'}</dd></div>
+                <div><dt>Created</dt><dd>{me ? new Date(me.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'}</dd></div>
+              </dl>
+            </section>
+            <ChangePassword state={state} />
+            <RotateRecovery state={state} />
+            <section className="settings-card" aria-labelledby="s-identity">
+              <div className="settings-card-head"><IconShield size={18} /><h2 id="s-identity">Identity key</h2></div>
+              <p className="muted small">
+                When someone shares with you, they encrypt to this key. If they ever want to check it really is
+                yours, compare this fingerprint with them over a channel you trust — in person or on a call.
+              </p>
+              <div className="fingerprint">
+                {me?.fingerprint ? <code>{me.fingerprint}</code> : <span className="muted">{me ? 'Being created — unlock again to see it.' : 'Loading…'}</span>}
+                {me?.fingerprint ? <CopyButton value={me.fingerprint} label="Fingerprint" /> : null}
+              </div>
+            </section>
+          </> : null}
+
+          {tab === 'security' ? <>
+            <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
+            <Devices />
+            <Activity />
+          </> : null}
+
+          {tab === 'preferences' ? <Preferences state={state} /> : null}
+          {tab === 'emergency' ? <Emergency state={state} /> : null}
+        </main>
+      </div>
     </Shell>
   )
 }

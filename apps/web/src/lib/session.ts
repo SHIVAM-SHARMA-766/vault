@@ -8,6 +8,7 @@
 //
 // See docs/threat-model.md, A5.
 
+import { effectiveLockMinutes } from '@vault/core'
 import { wipe } from '@vault/crypto'
 
 import { api, type KdfParams, type Permission, type Role, type Session } from './api.js'
@@ -42,15 +43,26 @@ export function patch(fields: Partial<Pick<Unlocked,
 let current: Unlocked | null = null
 let idleTimer: ReturnType<typeof setTimeout> | null = null
 
-/** Long enough not to interrupt ordinary use, short enough that a vault left
- *  open on an unattended screen does not stay open. */
-const IDLE_MS = 15 * 60 * 1000
-/** An organization may ask for a shorter idle lock (its policy). */
-let idleMs = IDLE_MS
-export function setIdleLimit(minutes: number | null): void {
-  const next = minutes ? Math.min(IDLE_MS, minutes * 60_000) : IDLE_MS
+/** The idle lock is the person's choice (Settings → Preferences, fifteen
+ *  minutes unless they change it), shortened by the strictest organization
+ *  policy they are under. Neither can lengthen what the other set. */
+let userIdleMinutes = 15
+let policyIdleMinutes: number | null = null
+let idleMs = 15 * 60_000
+function updateIdle(): void {
+  const next = effectiveLockMinutes({ lockMinutes: userIdleMinutes }, policyIdleMinutes) * 60_000
   if (next !== idleMs) { idleMs = next; if (current) resetIdleTimer() }
 }
+/** An organization's policy (null: none sets one). */
+export function setIdleLimit(minutes: number | null): void { policyIdleMinutes = minutes; updateIdle() }
+/** The person's own preference. */
+export function setUserIdle(minutes: number): void { userIdleMinutes = minutes; updateIdle() }
+/** Minutes until an idle vault locks, as things stand. */
+export function idleMinutes(): number { return idleMs / 60_000 }
+
+/** Lock the moment the tab is hidden (a preference, off by default). */
+let lockOnHide = false
+export function setLockOnHide(on: boolean): void { lockOnHide = on }
 
 type Listener = (state: Unlocked | null) => void
 const listeners = new Set<Listener>()
@@ -141,6 +153,9 @@ export function expiresAtFrom(session: Session): number {
 // ends the server session.
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', lock)
+  document.addEventListener('visibilitychange', () => {
+    if (lockOnHide && current && document.visibilityState === 'hidden') lock()
+  })
   for (const event of ['click', 'keydown', 'pointermove'] as const) {
     window.addEventListener(event, () => {
       if (current) resetIdleTimer()

@@ -113,12 +113,14 @@ try {
   await page.locator('.row-item', { hasText: 'Prod database' }).click()
   await shot(page, 'folders')
 
-  // Settings: two-factor and devices.
-  await s.menu(page, 'Account settings')
+  // Settings: security (two-factor and devices), then preferences.
+  await s.settings(page, 'Security')
   await page.waitForSelector('.device-row')
   await shot(page, 'settings')
   await page.locator('#s-sessions').scrollIntoViewIfNeeded()
   await shot(page, 'devices')
+  await s.settings(page, 'Preferences')
+  await shot(page, 'preferences')
 
   // Organizations: create one with a collection, and share an item into it.
   await s.menu(page, 'Organizations')
@@ -149,7 +151,7 @@ try {
   await shot(page, 'shared-item')
 
   // Emergency access.
-  await s.menu(page, 'Account settings')
+  await s.settings(page, 'Emergency access')
   await page.fill('#em-email', 'ravi@example.com')
   await page.fill('#em-label', 'Ravi (brother)')
   await page.getByRole('button', { name: 'Add trusted contact' }).click()

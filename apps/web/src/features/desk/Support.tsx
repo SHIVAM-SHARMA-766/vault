@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { type Ticket, type TicketMessage, api } from '../../lib/api.js'
+import { SupportContact } from '../../lib/instance.js'
 import { Link } from '../../lib/router.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconHelp, IconPlus } from '../../ui/icons.js'
@@ -37,6 +38,7 @@ export function Support({ state }: { state: session.Unlocked }) {
           </ol>
           <h1>Help &amp; support</h1>
           <p className="muted">Ask the people who run this server. They can see what you write here, but never your vault — so never put a password in a request.</p>
+          <SupportContact />
         </div>
 
         {composing ? <NewTicket email={state.email} onCancel={() => setComposing(false)} onCreated={async (id) => { setComposing(false); await load(); setOpen(id) }} /> : (

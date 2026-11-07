@@ -3,7 +3,9 @@
 
 import { useState } from 'react'
 
-import { MAX_FOLDER_DEPTH, type FolderNode, type Issue, folderTree } from '@vault/core'
+import { MAX_FOLDER_DEPTH, type FolderNode, type Issue, describeMinutes, folderTree } from '@vault/core'
+import { usePrefs } from '../../lib/prefs.js'
+import { idleMinutes } from '../../lib/session.js'
 
 import { IconEdit, IconFolder, IconGrid, IconLock, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
 import { TYPES } from '../../ui/kit.js'
@@ -24,6 +26,7 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
   onRenameFolder: (folder: Folder) => void
   onDeleteFolder: (folder: Folder) => void
 }) {
+  usePrefs() // redraws when the idle lock changes
   const tree = folderTree(folders)
   return (
     <nav className="sidebar" aria-label="Filter">
@@ -58,7 +61,7 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
                   icon={<Icon size={16} />} label={plural} count={counts[type]} />
       ))}
       <div className="sidebar-foot">
-        <IconLock size={14} /> End-to-end encrypted. Locks after 15 minutes idle.
+        <IconLock size={14} /> End-to-end encrypted. Locks after {describeMinutes(idleMinutes())} idle.
       </div>
     </nav>
   )
