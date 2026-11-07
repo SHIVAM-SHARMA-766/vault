@@ -27,6 +27,7 @@ address.
 | `DB_NAME` | | `vault` | | Database name; the schema is created and migrated on start |
 | `DB_PASSWORD` | mysql, postgres | — | yes | Database password |
 | `DB_SSL` | | `false` | | PostgreSQL: `true` requires a verified TLS connection |
+| `SECRETS_FILE` | | — | yes | A file holding `SERVER_PEPPER` and `TOKEN_SIGNING_KEY`. Created with fresh secrets (mode 0600) on first start if missing; values in the environment win. The container image uses `/data/secrets.env`. **Back it up with the database** |
 | `SERVER_PEPPER` | yes | — | yes | ≥ 32 characters (`openssl rand -base64 32`). Keys address digests; **changing it locks every account out** |
 | `TOKEN_SIGNING_KEY` | yes | — | yes | ≥ 32 characters. Signs session tokens; changing it signs everyone out |
 | `ALLOW_REGISTRATION` | | `false` | | `true` forces registration open over the admin panel's setting. For the first account only |

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { VARIABLES, parseConfig } from '../src/config.js'
+import { VARIABLES, parseConfig, withSecretsFile } from '../src/config.js'
 
 const good = {
   VAULT_HOSTNAME: 'vault.example.com',
@@ -55,5 +55,25 @@ test('only server.ts knows which database is behind the Store interface', async 
   for (const f of files) {
     const text = readFileSync(join(src, f), 'utf8')
     assert.ok(!/store-mysql|mysql2|\b(SELECT|INSERT|UPDATE|DELETE)\s+(\*|INTO|FROM|\w+\s+SET)/.test(text), `${f} reaches past the Store interface`)
+  }
+})
+
+test('SECRETS_FILE is created with strong secrets once, then reused; the environment wins', async () => {
+  const { mkdtempSync, rmSync, statSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const dir = mkdtempSync(join(tmpdir(), 'vault-secrets-'))
+  try {
+    const file = join(dir, 'secrets.env')
+    const first = withSecretsFile({ SECRETS_FILE: file })
+    assert.ok((first['SERVER_PEPPER'] ?? '').length >= 40)
+    assert.ok((first['TOKEN_SIGNING_KEY'] ?? '').length >= 60)
+    assert.equal(statSync(file).mode & 0o777, 0o600)
+    const again = withSecretsFile({ SECRETS_FILE: file })
+    assert.equal(again['SERVER_PEPPER'], first['SERVER_PEPPER'], 'not regenerated')
+    assert.equal(withSecretsFile({ SECRETS_FILE: file, SERVER_PEPPER: 'from-env'.padEnd(40, 'x') })['SERVER_PEPPER'], 'from-env'.padEnd(40, 'x'))
+    const c = parseConfig({ ...again, VAULT_HOSTNAME: 'v.example', DB_DRIVER: 'sqlite' })
+    assert.equal(c.pepper, first['SERVER_PEPPER'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })

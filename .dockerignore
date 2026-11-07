@@ -1,0 +1,19 @@
+# Only what the image build needs. Secrets, state and local output never enter
+# the build context.
+**/node_modules
+**/dist
+**/dist-bundle
+.git
+.github
+infra
+docs
+decisions
+tests
+*.md
+!apps/**/*.md
+.env
+.env.*
+*.pem
+*.key
+*.tfvars
+*.tfstate*
