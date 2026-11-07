@@ -82,7 +82,10 @@ createServer((req, res) => {
       const r = await handleRequest(router, {
         rawPath: p, rawQueryString: url.search.slice(1), headers: req.headers,
         ...(chunks.length ? { body: Buffer.concat(chunks).toString('utf8') } : {}),
-        requestContext: { http: { method: req.method ?? 'GET', sourceIp: '127.0.0.1', userAgent: String(req.headers['user-agent'] ?? '') } },
+        // Each test browser sends its own address (tests/e2e/helpers.mjs), as
+        // different people behind a proxy would; otherwise they all share one
+        // per-address rate limit.
+        requestContext: { http: { method: req.method ?? 'GET', sourceIp: String(req.headers['x-forwarded-for'] ?? '127.0.0.1').split(',')[0].trim(), userAgent: String(req.headers['user-agent'] ?? '') } },
       })
       res.writeHead(r.statusCode, r.headers)
       return res.end(r.body)

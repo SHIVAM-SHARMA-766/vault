@@ -204,6 +204,42 @@ export const api = {
       request<{ ticket: Ticket }>('POST', `/api/desk/tickets/${encodeURIComponent(id)}/close`, { token }),
   },
 
+  orgs: {
+    list: (token: string) => request<{ orgs: OrgRow[] }>('GET', '/api/orgs', { token }),
+    create: (token: string, body: { id: string; hint: string; label: string; nameBlob: string; orgKeyBlob: string }) =>
+      request<{ id: string }>('POST', '/api/orgs', { token, body }),
+    remove: (token: string, org: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}`, { token }),
+    invitations: (token: string) => request<{ invitations: OrgInvitation[] }>('GET', '/api/orgs/invitations', { token }),
+    accept: (token: string, org: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/accept`, { token }),
+    decline: (token: string, org: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/decline`, { token }),
+    members: (token: string, org: string) => request<{ members: OrgMember[]; pending: OrgPending[] }>('GET', `/api/orgs/${org}/members`, { token }),
+    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin') =>
+      request<{ ok: true }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role } }),
+    withdraw: (token: string, org: string, id: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/invites/${encodeURIComponent(id)}`, { token }),
+    confirm: (token: string, org: string, user: string, orgKeyBlob: string) =>
+      request<{ ok: true }>('POST', `/api/orgs/${org}/members/${user}/confirm`, { token, body: { orgKeyBlob } }),
+    setRole: (token: string, org: string, user: string, role: 'admin' | 'member') =>
+      request<{ ok: true }>('PUT', `/api/orgs/${org}/members/${user}`, { token, body: { role } }),
+    removeMember: (token: string, org: string, user: string) =>
+      request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/members/${user}`, { token }),
+    collections: (token: string, org: string) => request<{ collections: CollectionRow[] }>('GET', `/api/orgs/${org}/collections`, { token }),
+    createCollection: (token: string, org: string, body: { id: string; nameBlob: string; keyBlob: string }) =>
+      request<{ id: string }>('POST', `/api/orgs/${org}/collections`, { token, body }),
+    deleteCollection: (token: string, org: string, coll: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}`, { token }),
+    access: (token: string, org: string, coll: string) =>
+      request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),
+    grant: (token: string, org: string, coll: string, user: string, body: { permission: SharePermission; hidePasswords: boolean; keyBlob?: string }) =>
+      request<{ ok: true }>('PUT', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token, body }),
+    revoke: (token: string, org: string, coll: string, user: string) =>
+      request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token }),
+    items: (token: string, org: string, coll: string) =>
+      request<{ items: { id: string; blob: string; keyVersion: number; updatedAt: string }[] }>('GET', `/api/orgs/${org}/collections/${coll}/items`, { token }),
+    putItem: (token: string, org: string, coll: string, item: string, blob: string, keyVersion: number) =>
+      request<{ id: string }>('PUT', `/api/orgs/${org}/collections/${coll}/items/${item}`, { token, body: { blob, keyVersion } }),
+    deleteItem: (token: string, org: string, coll: string, item: string) =>
+      request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/items/${item}`, { token }),
+  },
+
   sessions: (token: string) => request<{ sessions: DeviceSession[] }>('GET', '/api/sessions', { token }),
   renameSession: (token: string, id: string, name: string) =>
     request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
@@ -280,6 +316,16 @@ export const api = {
   },
 }
 
+export type OrgRole = 'owner' | 'admin' | 'member'
+export type SharePermission = 'view' | 'edit' | 'manage'
+export interface OrgRow { id: string; nameBlob: string; hint: string; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string }
+export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
+export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null }
+export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string }
+export interface CollectionRow {
+  id: string; nameBlob: string; keyVersion: number; rotationNeeded: boolean
+  access: { keyBlob: string; keyVersion: number; permission: SharePermission; hidePasswords: boolean } | null
+}
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
 export interface Ticket {
   id: string; number: number; kind: 'access' | 'signin' | 'support'; subject: string; category: string

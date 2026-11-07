@@ -802,3 +802,15 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .link-strong { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer; text-align: left; margin-right: 6px; }
 .link-strong:hover { color: var(--accent); }
 @media (max-width: 900px) { .desk-grid { grid-template-columns: 1fr; } }
+
+/* ── Organizations and shared items ────────────────────────────────── */
+.badge-shared { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.shared-note { margin: 0 0 12px; }
+.org-card .small-head { margin-top: 14px; }
+.org-invite { margin: 10px 0 4px; flex-wrap: wrap; }
+.org-invite input { flex: 1; min-width: 160px; }
+.collection-row { align-items: flex-start; }
+.access-panel { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.access-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.access-list li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; }
+.access-panel .inline-form { flex-wrap: wrap; gap: 6px; }

@@ -45,6 +45,9 @@ const DEMO = JSON.stringify({
 const s = await start({ owner: OWNER })
 const shot = async (page, name, opts = {}) => {
   await page.waitForTimeout(350)
+  // Confirmation toasts pile up during a scripted run; keep them out of the
+  // docs. (Through the DOM: the app's CSP rightly refuses injected styles.)
+  await page.evaluate(() => document.querySelectorAll('.toasts').forEach((el) => { el.style.display = 'none' }))
   await page.screenshot({ path: join(OUT, `${name}.png`), ...opts })
   console.log(`  ${name}.png`)
 }
@@ -116,6 +119,28 @@ try {
   await shot(page, 'settings')
   await page.locator('#s-sessions').scrollIntoViewIfNeeded()
   await shot(page, 'devices')
+
+  // Organizations: create one with a collection, and share an item into it.
+  await s.menu(page, 'Organizations')
+  await page.fill('#o-name', 'Rao Family')
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await page.waitForSelector('.org-card')
+  await page.fill('input[aria-label="New collection name"]', 'Home & streaming')
+  await page.getByRole('button', { name: 'Add collection' }).click()
+  await page.waitForSelector('.collection-row')
+  await page.fill('input[aria-label="Email to invite"]', 'ravi@example.com')
+  await page.fill('input[aria-label="Name for this member"]', 'Ravi')
+  await page.getByRole('button', { name: 'Invite', exact: true }).click()
+  await page.waitForSelector('text=has not joined yet')
+  await shot(page, 'organizations')
+  await s.menu(page, 'Vault')
+  await page.locator('.row-item', { hasText: 'Netflix' }).click()
+  await page.getByRole('button', { name: 'Share' }).click()
+  await page.selectOption('select[aria-label="Collection"]', { label: 'Rao Family / Home & streaming' })
+  await shot(page, 'share')
+  await page.getByRole('button', { name: 'Move to collection' }).click()
+  await page.waitForSelector('.badge-shared')
+  await shot(page, 'shared-item')
 
   // Help & support.
   await s.menu(page, 'Help & support')

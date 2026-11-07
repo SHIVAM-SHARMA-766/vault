@@ -5,15 +5,16 @@ import { useState } from 'react'
 
 import { MAX_FOLDER_DEPTH, type FolderNode, type Issue, folderTree } from '@vault/core'
 
-import { IconEdit, IconFolder, IconGrid, IconLock, IconPlus, IconPulse, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconEdit, IconFolder, IconGrid, IconLock, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
 import { TYPES } from '../../ui/kit.js'
 import type { Folder } from './model.js'
 
-export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' }
+export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; id: string } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' }
 
 export const sameFilter = (a: Filter, b: Filter) => JSON.stringify(a) === JSON.stringify(b)
 
-export function Sidebar({ filter, setFilter, counts, folders, folderCounts, onNewFolder, onRenameFolder, onDeleteFolder }: {
+export function Sidebar({ filter, setFilter, counts, folders, folderCounts, collections, onNewFolder, onRenameFolder, onDeleteFolder }: {
+  collections: { id: string; label: string; group: string }[]
   filter: Filter
   setFilter: (f: Filter) => void
   counts: Record<string, number>
@@ -42,6 +43,14 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, onNe
       {folders.length ? (
         <SideItem active={filter.kind === 'unfiled'} onClick={() => setFilter({ kind: 'unfiled' })} icon={<IconFolder size={16} />} label="No folder" count={counts['unfiled']} muted />
       ) : null}
+
+      {collections.length ? <>
+        <div className="sidebar-heading">Shared</div>
+        {collections.map((c) => (
+          <SideItem key={c.id} active={filter.kind === 'collection' && filter.id === c.id} onClick={() => setFilter({ kind: 'collection', id: c.id })}
+                    icon={<IconUsers size={16} />} label={c.label} title={`${c.group} / ${c.label}`} count={counts[`coll:${c.id}`]} />
+        ))}
+      </> : null}
 
       <div className="sidebar-heading">Types</div>
       {TYPES.map(({ type, plural, Icon }) => (
@@ -89,11 +98,11 @@ function FolderItem({ node, filter, setFilter, counts, onNew, onRename, onDelete
   )
 }
 
-function SideItem({ active, onClick, icon, label, count, muted, warn }: {
-  active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count: number | undefined; muted?: boolean; warn?: boolean
+function SideItem({ active, onClick, icon, label, count, muted, warn, title }: {
+  active: boolean; onClick: () => void; icon: React.ReactNode; label: string; count: number | undefined; muted?: boolean; warn?: boolean; title?: string
 }) {
   return (
-    <button className={`side-item ${active ? 'side-active' : ''} ${muted ? 'side-muted' : ''}`} onClick={onClick} aria-current={active}>
+    <button className={`side-item ${active ? 'side-active' : ''} ${muted ? 'side-muted' : ''}`} onClick={onClick} aria-current={active} title={title}>
       {icon}<span>{label}</span>{count ? <span className={`side-count ${warn ? 'side-count-warn' : ''}`}>{count}</span> : null}
     </button>
   )

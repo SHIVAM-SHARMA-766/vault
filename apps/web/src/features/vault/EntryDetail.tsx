@@ -6,15 +6,21 @@ import { useEffect, useState } from 'react'
 import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconAlert, IconArrowLeft, IconClock, IconEdit, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconUsers, IconEdit, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import type { Decrypted, Folder, Version } from './model.js'
 
-export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
+export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
+
+export function EntryDetail({ entry, folders, issues, shared = null, shareTargets = [], onShare, onUnshare, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
+  shared?: SharedInfo | null
+  shareTargets?: { id: string; label: string }[]
+  onShare?: (collectionId: string) => void
+  onUnshare?: () => void
   onBack: () => void
   onEdit: () => void
   onToggleFavorite: () => void
@@ -24,6 +30,11 @@ export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFa
 }) {
   const [confirming, setConfirming] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const [target, setTarget] = useState('')
+  const readOnly = shared?.permission === 'view'
+  const hidden = shared?.hidePasswords === true
+  const secretKinds = new Set(['secret', 'secretBlock', 'totp'])
   const info = typeInfo(entry.type)
   const spec = typeSpec(entry.type)
   const path = folderPath(folders, entry.folderId)
@@ -37,10 +48,15 @@ export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFa
                   title={entry.favorite ? 'Remove from favorites' : 'Add to favorites'} aria-label="Toggle favorite">
             <IconStar size={16} filled={entry.favorite} />
           </button>
-          <button className={`btn btn-secondary btn-sm ${showHistory ? 'btn-pressed' : ''}`} onClick={() => setShowHistory(!showHistory)}
-                  disabled={entry.unreadable} aria-pressed={showHistory} aria-label="History"><IconClock size={15} /><span className="btn-label">History</span></button>
-          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable} aria-label="Edit"><IconEdit size={15} /><span className="btn-label">Edit</span></button>
-          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} aria-label="Delete"><IconTrash size={15} /><span className="btn-label">Delete</span></button>
+          {shared ? null : (
+            <button className={`btn btn-secondary btn-sm ${showHistory ? 'btn-pressed' : ''}`} onClick={() => setShowHistory(!showHistory)}
+                    disabled={entry.unreadable} aria-pressed={showHistory} aria-label="History"><IconClock size={15} /><span className="btn-label">History</span></button>
+          )}
+          {!shared && shareTargets.length ? (
+            <button className={`btn btn-secondary btn-sm ${sharing ? 'btn-pressed' : ''}`} onClick={() => setSharing(!sharing)} aria-label="Share"><IconUsers size={15} /><span className="btn-label">Share</span></button>
+          ) : null}
+          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable || readOnly} aria-label="Edit"><IconEdit size={15} /><span className="btn-label">Edit</span></button>
+          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} disabled={readOnly} aria-label="Delete"><IconTrash size={15} /><span className="btn-label">Delete</span></button>
         </div>
       </div>
 
@@ -50,7 +66,9 @@ export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFa
           <h2>{entry.name || 'Untitled'}</h2>
           <div className="detail-meta">
             <span className="badge"><info.Icon size={13} />{info.label}</span>
-            {path ? <span className="badge badge-folder">{path}</span> : null}
+            {path && !shared ? <span className="badge badge-folder">{path}</span> : null}
+            {shared ? <span className="badge badge-shared"><IconUsers size={13} />{shared.where}</span> : null}
+            {readOnly ? <span className="badge">View only</span> : null}
           </div>
         </div>
       </header>
@@ -72,12 +90,33 @@ export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFa
         </div>
       ) : null}
 
+      {sharing ? (
+        <div className="confirm">
+          <p><strong>Share “{entry.name}”</strong> by moving it into a collection. It is re-encrypted with the collection’s key and leaves your personal vault; everyone who can open the collection can read it.</p>
+          <div className="confirm-actions">
+            <select aria-label="Collection" value={target} onChange={(e) => setTarget(e.target.value)}>
+              <option value="">Choose a collection…</option>
+              {shareTargets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+            <button className="btn btn-secondary btn-sm" onClick={() => setSharing(false)}>Cancel</button>
+            <button className="btn btn-primary btn-sm" disabled={!target} onClick={() => { onShare?.(target); setSharing(false) }}>Move to collection</button>
+          </div>
+        </div>
+      ) : null}
+
+      {shared && !readOnly ? (
+        <p className="muted small shared-note">Shared in {shared.where}. <button className="link" onClick={onUnshare}>Move to my vault</button></p>
+      ) : null}
+
       {showHistory ? <History entry={entry} load={loadHistory} onRestore={onRestore} /> : null}
 
       <div className="fields">
-        {spec.fields.map((field) => <FieldView key={field.key} spec={field} value={readField(entry, field)} entryType={entry.type} />)}
+        {spec.fields.map((field) => hidden && secretKinds.has(field.kind)
+          ? <div key={field.key} className="field-row"><span className="field-label">{field.label}</span><span className="muted small">Hidden by your organization’s policy</span></div>
+          : <FieldView key={field.key} spec={field} value={readField(entry, field)} entryType={entry.type} />)}
         {entry.customFields.map((c, i) =>
-          c.hidden ? <SecretRow key={`c${i}`} label={c.label || 'Hidden field'} value={c.value} />
+          c.hidden ? (hidden ? <div key={`c${i}`} className="field-row"><span className="field-label">{c.label || 'Hidden field'}</span><span className="muted small">Hidden by your organization’s policy</span></div>
+                             : <SecretRow key={`c${i}`} label={c.label || 'Hidden field'} value={c.value} />)
                    : <TextRow key={`c${i}`} label={c.label || 'Field'} value={c.value} />)}
       </div>
 
