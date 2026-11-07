@@ -91,3 +91,25 @@ test('the configuration picks the driver, and asks only for what it needs', asyn
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('a database left at every earlier schema version upgrades to the latest with its data intact', async () => {
+  for (let from = 1; from < LATEST_VERSION; from++) {
+    const dir = tmp()
+    try {
+      const file = join(dir, 'old.db')
+      const old = await SqliteStore.open(file)
+      assert.equal(await old.migrate(from), from)
+      await old.put({ pk: 'USER#a', sk: 'ENTRY#1', blob: 'v1.old.data' })
+      await old.put({ pk: 'SYSTEM', sk: 'SETTINGS', registration: 'invite' })
+      await old.close()
+
+      const upgraded = await SqliteStore.open(file)
+      assert.equal(await upgraded.migrate(), LATEST_VERSION, `from ${from}`)
+      assert.equal((await upgraded.get('USER#a', 'ENTRY#1'))?.['blob'], 'v1.old.data')
+      assert.equal((await upgraded.get('SYSTEM', 'SETTINGS'))?.['registration'], 'invite')
+      await upgraded.close()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+})

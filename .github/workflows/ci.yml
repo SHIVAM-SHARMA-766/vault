@@ -345,3 +345,41 @@ jobs:
           curl -skI https://localhost/app/ | grep -qi "content-security-policy" || { echo "::error::no CSP through Caddy"; exit 1; }
           docker compose logs vault | grep -q 'storage: postgres' || { echo "::error::not on postgres"; exit 1; }
           docker compose logs vault | grep -q '/app/?setup=' || { echo "::error::no setup link"; exit 1; }
+
+  upgrade:
+    name: upgrade — previous image, then this one, on the same data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The release before this change, as the base branch has it. Its server
+      # creates and fills the data volume; this commit's server must then
+      # start on it, migrate it, and serve it. Skipped until the base branch
+      # has a Dockerfile.
+      - name: Build the previous image
+        id: prev
+        run: |
+          base="origin/${GITHUB_BASE_REF:-main}"
+          if ! git cat-file -e "$base:Dockerfile" 2>/dev/null; then echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git worktree add ../previous "$base"
+          docker build -t vault:previous ../previous
+
+      - name: Build this image
+        if: steps.prev.outputs.skip != 'true'
+        run: docker build -t vault:next .
+
+      - name: Upgrade
+        if: steps.prev.outputs.skip != 'true'
+        run: |
+          docker run -d --name old -v data:/data -e VAULT_HOSTNAME=localhost -p 8080:8080 vault:previous
+          for _ in $(seq 1 60); do curl -sf localhost:8080/api/health >/dev/null && break; sleep 1; done
+          curl -sf localhost:8080/api/health || { docker logs old; exit 1; }
+          pepper=$(docker exec old grep '^SERVER_PEPPER=' /data/secrets.env)
+          docker rm -f old
+          docker run -d --name new -v data:/data -e VAULT_HOSTNAME=localhost -p 8080:8080 vault:next
+          for _ in $(seq 1 60); do curl -sf localhost:8080/api/health >/dev/null && break; sleep 1; done
+          curl -sf localhost:8080/api/health || { docker logs new; exit 1; }
+          [ "$(docker exec new grep '^SERVER_PEPPER=' /data/secrets.env)" = "$pepper" ] || { echo "::error::secrets changed across upgrade"; exit 1; }
+          docker logs new 2>&1 | grep 'schema version'

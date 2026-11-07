@@ -25,11 +25,12 @@ export class SqliteStore implements Store {
     return new SqliteStore(db)
   }
 
-  async migrate(): Promise<number> {
+  /** `target` stops at an earlier version; tests use it to build old databases. */
+  async migrate(target?: number): Promise<number> {
     this.db.exec(META_TABLE.sqlite)
     const row = this.db.prepare("SELECT v FROM vault_meta WHERE k = 'schema_version'").get() as { v: string } | undefined
     let version = Number(row?.v ?? 0)
-    for (const m of pending(version)) {
+    for (const m of pending(version, target)) {
       // IMMEDIATE takes the write lock up front, so two processes cannot both
       // decide to run the same migration.
       this.db.transaction(() => {

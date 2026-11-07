@@ -74,9 +74,9 @@ export const META_TABLE: Record<Driver, string> = {
 
 /** Refuses to run against a database a newer release has already upgraded:
  *  an old server writing to a newer schema is how data gets damaged quietly. */
-export function pending(current: number): Migration[] {
+export function pending(current: number, target = LATEST_VERSION): Migration[] {
   if (current > LATEST_VERSION) {
     throw new Error(`the database is at schema version ${current}, newer than this server understands (${LATEST_VERSION}); install the newer release`)
   }
-  return MIGRATIONS.filter((m) => m.version > current)
+  return MIGRATIONS.filter((m) => m.version > current && m.version <= target)
 }

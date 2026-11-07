@@ -90,7 +90,8 @@ export class MysqlStore implements ManagedStore {
    *  schema, and every connection in the pool names one. Without this the
    *  service fails at boot with "Unknown database", which reads like a
    *  configuration error rather than an empty server. */
-  async migrate(): Promise<number> {
+  /** `target` stops at an earlier version; tests use it to build old databases. */
+  async migrate(target?: number): Promise<number> {
     const bootstrap = await createConnection({
       host: this.config.host,
       port: this.config.port ?? 3306,
@@ -122,7 +123,7 @@ export class MysqlStore implements ManagedStore {
       await conn.query(META_TABLE.mysql)
       const [meta] = await conn.query<RowDataPacket[]>("SELECT v FROM vault_meta WHERE k = 'schema_version'")
       version = Number(meta[0]?.['v'] ?? 0)
-      for (const m of pending(version)) {
+      for (const m of pending(version, target)) {
         // MySQL commits DDL implicitly, so each step must be idempotent on its
         // own; the version is recorded after all of its statements succeed.
         for (const sql of m.sql.mysql) await conn.query(sql)
