@@ -349,7 +349,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Installer tests (dry run)
-        run: node --test tests/install/
+        run: node --test tests/install/*.test.mjs
 
       # The business profile exactly as a customer starts it — through the
       # one-line installer, on localhost (Caddy's local CA): healthy over TLS,
