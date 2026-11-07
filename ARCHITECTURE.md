@@ -216,6 +216,14 @@ the `current` symlink, which is what Caddy serves at `/`. Uploaded images are st
 table and written to `/srv/vault/site/media/`. The renderer escapes every value and accepts
 no markup, because the site shares an origin with the vault client.
 
+## Service desk
+
+Help and support inside the product ([0014](decisions/0014-service-desk.md)): public
+requests from the sign-in screen (access, sign-in help), support tickets from signed-in users,
+and a queue in the admin panel with replies, internal notes, status, priority, assignment, and
+two actions — approve access (issues and emails an invitation) and reset two-factor sign-in.
+Requester addresses are kept only while a ticket is open.
+
 ## Administration
 
 The operator manages the service from an admin panel inside the client, at `/app/admin`
@@ -249,6 +257,9 @@ a `vault_meta` table beside it records the schema version.
 | `SYSTEM` | `BACKUP` | The last verified export, written by the backup script |
 | `SYSTEM` | `SITE#DRAFT` / `SITE#LIVE` / `SITE#V#<version>` | Website draft, pointer to the live version, and the last 30 published versions |
 | `SYSTEM` | `MEDIA#<id>` / `MEDIAMETA#<id>` | An uploaded image (bytes, base64) and its metadata |
+| `DESK` | `TICKET#<id>` / `SEQ` | A service desk ticket (kind, status, requester — email only while open) / the ticket number counter |
+| `DESKT#<id>` | `MSG#<seq>` | One message on a ticket, numbered; staff notes flagged internal |
+| `USER#<id>` | `TICKET#<id>` | Pointer to a ticket the user opened |
 
 Unlocking is one query. Everything after that — search, filter, sort, folder resolution —
 happens in the client, because the server cannot read what it is storing.

@@ -6,7 +6,7 @@
 // Every action is checked again by the server. Hiding this panel from
 // non-admins is a courtesy, not the control.
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useState } from 'react'
 
 import {
   type AdminAudit,
@@ -18,20 +18,23 @@ import {
   type Role,
   api,
 } from '../../lib/api.js'
+import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
+import { Desk } from './Desk.js'
 import { Website } from './Website.js'
 import * as session from '../../lib/session.js'
 import {
-  IconAlert, IconCheck, IconEdit, IconGlobe, IconGrid, IconKey, IconNote,
+  IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
   IconPlus, IconRefresh, IconShield, IconTrash, IconUser, IconX,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
-import { Link, href, navigate } from '../../lib/router.js'
+import { href, navigate } from '../../lib/router.js'
 
-type Tab = 'overview' | 'website' | 'users' | 'invites' | 'audit'
+type Tab = 'overview' | 'desk' | 'website' | 'users' | 'invites' | 'audit'
 
 const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => JSX.Element }[] = [
   { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
+  { id: 'desk', label: 'Service desk', needs: 'desk.read', Icon: IconInbox },
   { id: 'website', label: 'Website', needs: 'site.read', Icon: IconGlobe },
   { id: 'users', label: 'Users', needs: 'users.read', Icon: IconUser },
   { id: 'invites', label: 'Invitations', needs: 'invites.read', Icon: IconKey },
@@ -39,11 +42,12 @@ const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: numb
 ]
 
 export const ROLE_LABELS: Record<Role, string> = {
-  owner: 'Owner', admin: 'Admin', marketing: 'Marketing', viewer: 'Viewer', user: 'User',
+  owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer', user: 'User',
 }
 const ROLE_HELP: Record<Role, string> = {
   owner: 'Everything, including roles. Set in the host configuration.',
   admin: 'Users, invitations, registration and the website. Cannot change roles.',
+  support: 'The service desk and invitations. Escalates account changes to an admin.',
   marketing: 'The website only: text, search details, images and the banner.',
   viewer: 'Can see everything in this panel and change nothing.',
   user: 'No admin access.',
@@ -80,6 +84,7 @@ export function Admin({ state, tab: requested }: { state: session.Unlocked; tab:
 
         <main className="admin-main">
           {tab === 'overview' && perms.has('overview.read') ? <Overview onGo={setTab} canWrite={perms.has('settings.write')} /> : null}
+          {tab === 'desk' && perms.has('desk.read') ? <Desk selfId={state.userId} canWrite={perms.has('desk.write')} canApprove={perms.has('invites.write')} canReset={perms.has('users.write')} /> : null}
           {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
           {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
           {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
@@ -91,71 +96,6 @@ export function Admin({ state, tab: requested }: { state: session.Unlocked; tab:
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────
-
-function useAdminData<T>(load: (token: string) => Promise<T>) {
-  const [data, setData] = useState<T | null>(null)
-  const [error, setError] = useState('')
-  const reload = useCallback(async () => {
-    setError('')
-    try {
-      setData(await load(await session.token()))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load.')
-    }
-  }, [load])
-  useEffect(() => { void reload() }, [reload])
-  return { data, error, reload }
-}
-
-function Section({ title, sub, actions, children }: { title: string; sub?: string; actions?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="admin-section">
-      <div className="admin-head">
-        <div>
-          <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
-            <li><Link to="/app/">Vault</Link></li>
-            <li>Admin</li>
-            <li aria-current="page">{title}</li>
-          </ol>
-          <h1>{title}</h1>
-          {sub ? <p className="muted">{sub}</p> : null}
-        </div>
-        {actions ? <div className="admin-actions">{actions}</div> : null}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function ErrorBox({ error }: { error: string }) {
-  return error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null
-}
-
-function when(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function ago(iso: string | null | undefined): string {
-  if (!iso) return 'never'
-  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
-  if (s < 90) return 'just now'
-  if (s < 5400) return `${Math.round(s / 60)} min ago`
-  if (s < 129600) return `${Math.round(s / 3600)} h ago`
-  return `${Math.round(s / 86400)} days ago`
-}
-
-async function run(toast: ReturnType<typeof useToast>, action: (token: string) => Promise<unknown>, done: string) {
-  try {
-    await action(await session.token())
-    toast(done)
-    return true
-  } catch (err) {
-    toast(err instanceof Error ? err.message : 'That did not work.', 'error')
-    return false
-  }
-}
 
 // ── Overview ──────────────────────────────────────────────────────────────
 
@@ -183,6 +123,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
             <Stat label="Encrypted items" value={data.entries} note="across every vault" />
             <Stat label="Active sessions" value={data.activeSessions} note="signed-in devices" />
             <Stat label="Open invitations" value={data.activeInvites} note="unused and unexpired" onClick={() => onGo('invites')} />
+            <Stat label="Open tickets" value={data.openTickets} note="in the service desk" onClick={() => onGo('desk')} />
           </div>
 
           <div className="admin-cards">
@@ -320,7 +261,7 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                       {canRoles && u.role !== 'owner' && !self ? (
                         <select className="role-select" value={u.role} aria-label="Role" title={ROLE_HELP[u.role]}
                                 onChange={async (e) => { if (await run(toast, (t) => api.admin.setRole(t, u.userId, e.target.value as Role), `Role set to ${ROLE_LABELS[e.target.value as Role]}`)) await reload() }}>
-                          {(['admin', 'marketing', 'viewer', 'user'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                          {(['admin', 'support', 'marketing', 'viewer', 'user'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
                         </select>
                       ) : <span className={`pill ${u.role === 'user' ? '' : 'pill-accent'}`} title={ROLE_HELP[u.role]}>{ROLE_LABELS[u.role]}</span>}
                     </td>
@@ -452,7 +393,7 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
           <div className="field">
             <label htmlFor="inv-role">Starts as</label>
             <select id="inv-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-              {(['user', 'viewer', 'marketing', 'admin'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+              {(['user', 'viewer', 'support', 'marketing', 'admin'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
             </select>
           </div>
         ) : null}

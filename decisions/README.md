@@ -33,6 +33,7 @@ someone who would otherwise assume it was an oversight.
 | [0011](0011-two-factor-sign-in.md) | Two-factor sign-in |
 | [0012](0012-storage-drivers-and-migrations.md) | SQLite, PostgreSQL and MySQL, and versioned schema migrations |
 | [0013](0013-distribution-and-releases.md) | One image, two install profiles, generated secrets, setup link, signed releases |
+| [0014](0014-service-desk.md) | The built-in service desk: access requests, sign-in help, support |
 
 ## A note on the numbering
 

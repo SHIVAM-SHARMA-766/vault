@@ -11,6 +11,7 @@
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { inviteMessage, notify } from '../mail.js'
+import { openTicketCount } from './desk.js'
 import { requireEmail } from '../validate.js'
 import {
   BACKUP_SK,
@@ -119,6 +120,7 @@ export async function overview(app: App): Promise<LambdaResponse> {
       ? { at: backup['at'] ?? null, object: backup['object'] ?? null, bytes: backup['bytes'] ?? null }
       : null,
     mail: !!app.mailer,
+    openTickets: await openTicketCount(app),
     serverTime: new Date(now).toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
   })

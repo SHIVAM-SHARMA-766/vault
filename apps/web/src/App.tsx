@@ -16,9 +16,11 @@ import { Unlock } from './features/auth/Unlock.js'
 import { Admin } from './features/admin/Admin.js'
 import { Settings } from './features/settings/Settings.js'
 import { Transfer } from './features/transfer/Transfer.js'
+import { PublicRequest } from './features/desk/PublicRequest.js'
+import { Support } from './features/desk/Support.js'
 import { Vault } from './features/vault/Vault.js'
 
-type AuthView = 'unlock' | 'register' | 'recover'
+type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-help'
 
 export function App() {
   const [unlocked, setUnlocked] = useState(session.get())
@@ -55,6 +57,7 @@ function Signed({ state }: { state: session.Unlocked }) {
   const route = useRoute()
   if (route.name === 'settings') return <Settings state={state} />
   if (route.name === 'transfer') return <Transfer state={state} />
+  if (route.name === 'support') return <Support state={state} />
   if (route.name === 'admin') {
     // The role arrives a moment after unlock; until it does, say so rather
     // than flash the vault or a refusal.
@@ -75,7 +78,7 @@ function AuthScreen() {
   // sign-in, but the page should say where it leads.
   const forAdmin = location.pathname.startsWith('/app/admin')
   const place = forAdmin ? 'Admin panel' : 'Vault'
-  const step = view === 'unlock' ? 'Sign in' : view === 'register' ? 'Create account' : 'Recover'
+  const step = view === 'unlock' ? 'Sign in' : view === 'register' ? 'Create account' : view === 'request-access' ? 'Request access' : view === 'signin-help' ? 'Help signing in' : 'Recover'
 
   return (
     <div className="auth">
@@ -105,10 +108,13 @@ function AuthScreen() {
             </ol>
           </nav>
           {view === 'unlock' ? (
-            <Unlock forAdmin={forAdmin} onRegister={() => setView('register')} onRecover={() => setView('recover')} />
+            <Unlock forAdmin={forAdmin} onRegister={() => setView('register')} onRecover={() => setView('recover')}
+                    onRequestAccess={() => setView('request-access')} onSigninHelp={() => setView('signin-help')} />
           ) : view === 'register' ? (
             <Register setupCode={setupCode} inviteCode={inviteCode} onCancel={() => setView('unlock')}
                       onDone={() => { if (setupCode || inviteCode) history.replaceState(null, '', '/app/'); setView('unlock') }} />
+          ) : view === 'request-access' || view === 'signin-help' ? (
+            <PublicRequest kind={view === 'request-access' ? 'access' : 'signin'} onCancel={() => setView('unlock')} />
           ) : (
             <Recover onCancel={() => setView('unlock')} />
           )}

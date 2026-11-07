@@ -14,8 +14,10 @@ data, taken by `npm run screenshots` (see [Keeping these screenshots current](#k
 - [Import and export](#import-and-export)
 - [Account settings](#account-settings)
 - [Devices and activity](#devices-and-activity)
+- [Help and support](#help-and-support)
 - [On a phone, and in dark mode](#on-a-phone-and-in-dark-mode)
 - [For owners: the admin panel](#for-owners-the-admin-panel)
+- [For staff: the service desk](#for-staff-the-service-desk)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
 </details>
@@ -185,6 +187,25 @@ your passwords in plain text.
 
 If you see a device you do not recognise: sign it out, then change your master password.
 
+## Help and support
+
+**No account yet, or locked out?** The sign-in screen has two links:
+
+- **Request access** — tell the people who run the server who you are. If they approve, you
+  get an invitation by email.
+- **Lost your authenticator, or can't sign in? Ask for help** — they confirm it is really you
+  (by phone or in person) and turn off two-factor sign-in so you can set it up again. Nobody
+  can reset a forgotten master password; that is what the recovery key is for.
+
+<img src="images/request-access.png" alt="The Request access form on the sign-in screen" width="820">
+
+Your email address is kept only until the request is closed, then erased.
+
+**Signed in?** Account menu → **Help & support** → **New request**. Choose what it is about,
+describe it, and optionally have replies emailed to you. The conversation stays on the page:
+reply there, or close the request when you are done. Staff can read what you write but never
+your vault — **never put a password, recovery key or code in a request.**
+
 ## On a phone, and in dark mode
 
 The same app adapts to a phone and follows your system's light or dark setting.
@@ -201,16 +222,19 @@ The same app adapts to a phone and follows your system's light or dark setting.
 
 Staff with a role see **Admin panel** in the account menu. What each role can do:
 
-| | Owner | Admin | Marketing | Viewer |
-|---|:-:|:-:|:-:|:-:|
-| Overview | ✓ | ✓ | | ✓ |
-| Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | read |
-| Change roles | ✓ | | | |
-| Invitations (copy the code, or email it) | ✓ | ✓ | | read |
-| Registration mode (closed / invite / open) | ✓ | ✓ | | read |
-| Website: edit text, SEO, images | ✓ | ✓ | ✓ | read |
-| Website: publish, roll back | ✓ | ✓ | ✓ | |
-| Audit log | ✓ | ✓ | | ✓ |
+| | Owner | Admin | Support | Marketing | Viewer |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Overview | ✓ | ✓ | | | ✓ |
+| Service desk: read tickets | ✓ | ✓ | ✓ | | ✓ |
+| Service desk: reply, assign, approve access | ✓ | ✓ | ✓ | | |
+| Service desk: reset two-factor for a locked-out user | ✓ | ✓ | | | |
+| Invitations (copy the code, or email it) | ✓ | ✓ | ✓ | | read |
+| Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | | read |
+| Change roles | ✓ | | | | |
+| Registration mode (closed / invite / open) | ✓ | ✓ | | | read |
+| Website: edit text, SEO, images | ✓ | ✓ | | ✓ | read |
+| Website: publish, roll back | ✓ | ✓ | | ✓ | |
+| Audit log | ✓ | ✓ | | | ✓ |
 
 <details>
 <summary>Overview</summary>
@@ -232,7 +256,29 @@ draft**, then **Publish**. Every published version is kept and can be restored. 
 escaped, never run, because the website shares its address with the vault.
 </details>
 
+A **Support** role works the service desk and issues invitations, and can change nothing
+else.
+
 Nobody in the admin panel — the owner included — can read anyone's vault.
+
+## For staff: the service desk
+
+<img src="images/desk.png" alt="The service desk queue: an access request and a support ticket, with filters" width="820">
+
+Admin panel → **Service desk**. Filters show what needs attention, what is waiting on the
+requester, and what is resolved or closed.
+
+<img src="images/desk-ticket.png" alt="A ticket: the conversation on the left; requester, status, priority and assignment on the right" width="820">
+
+| To | Do |
+|---|---|
+| Answer | Write a reply. The requester sees it, and is emailed if they asked for updates |
+| Note something for colleagues | Tick **Internal note** — the requester never sees it |
+| Approve an access request | **Approve and invite**: an invitation is issued (and emailed, with mail set up) and the ticket resolves |
+| Help someone locked out | **Confirm it is really them first** — call them or see them. Then **Reset for this account** turns off two-factor sign-in. Admins only; recorded in the audit log |
+| Track work | Status, priority, **Assign to me** |
+
+Resolved tickets close by themselves after a week; closing erases the requester's address.
 
 ## Keyboard shortcuts
 

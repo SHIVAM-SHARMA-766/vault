@@ -12,6 +12,7 @@ import { openapi } from './openapi.js'
 import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
+import * as desk from './routes/desk.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -27,6 +28,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/login', ({ event }) => auth.login(app, event), 'Sign in with the auth key (and second factor)')
   router.post('/api/auth/recovery-login', ({ event }) => auth.recoveryLogin(app, event), 'Sign in with the recovery key\'s proof')
   router.post('/api/auth/refresh', ({ event }) => auth.refresh(app, event), 'Rotate a refresh token for a new session pair')
+  router.post('/api/desk/requests', ({ event }) => desk.publicRequest(app, event), 'Ask for access, or for help signing in (no account needed)')
   router.post('/api/auth/signout', ({ event }) => auth.signOut(app, event), 'End the session a refresh token belongs to')
 
   // Everything below needs a valid access token.
@@ -51,6 +53,12 @@ export function buildRouter(app: App): Router {
   router.get('/api/sessions', authed((_u, e) => sessions.list(app, e)), 'Signed-in devices')
   router.put('/api/sessions/:id/name', authed((u, e, id) => sessions.rename(app, u, e, id)), 'Name a device')
   router.delete('/api/sessions/:id', authed((u, e, id) => sessions.revoke(app, u, e, id)), 'Sign a device out')
+
+  router.get('/api/desk/tickets', authed((u) => desk.myTickets(app, u)), 'My support tickets')
+  router.post('/api/desk/tickets', authed((u, e) => desk.createTicket(app, u, e)), 'Open a support ticket')
+  router.get('/api/desk/tickets/:id', authed((u, _e, id) => desk.getMyTicket(app, u, id)), 'One of my tickets and its conversation')
+  router.post('/api/desk/tickets/:id/messages', authed((u, e, id) => desk.replyAsRequester(app, u, e, id)), 'Reply to my ticket')
+  router.post('/api/desk/tickets/:id/close', authed((u, _e, id) => desk.closeAsRequester(app, u, id)), 'Close my ticket')
 
   router.get('/api/vault', authed((u) => vault.getVault(app, u)), 'Every sealed entry and folder')
   router.put('/api/vault/entries/:id', authed((u, e, id) => vault.putEntry(app, u, e, id)), 'Create or replace a sealed entry')
@@ -88,6 +96,13 @@ export function buildRouter(app: App): Router {
   router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)), 'Withdraw an invitation')
   router.post('/api/admin/mail/test', admined('settings.write', (u, e) => admin.testMail(app, u, e)), 'Send a test email')
   router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)), 'Staff audit log')
+
+  router.get('/api/admin/desk', admined('desk.read', () => desk.queue(app)), 'The service desk queue')
+  router.get('/api/admin/desk/:id', admined('desk.read', (_u, _e, id) => desk.getForStaff(app, id)), 'A ticket with every message, internal notes included')
+  router.post('/api/admin/desk/:id/messages', admined('desk.write', (u, e, id) => desk.replyAsStaff(app, u, e, id)), 'Reply to a ticket, or add an internal note')
+  router.put('/api/admin/desk/:id', admined('desk.write', (u, e, id) => desk.updateTicket(app, u, e, id)), 'Change a ticket\'s status, priority or assignee')
+  router.post('/api/admin/desk/:id/approve', admined('invites.write', (u, e, id, r) => desk.approveAccess(app, u, r, e, id)), 'Approve an access request: issue and email an invitation')
+  router.post('/api/admin/desk/:id/reset-2fa', admined('users.write', (u, _e, id) => desk.resetTwoFactorFor(app, u, id)), 'Reset two-factor sign-in for a verified sign-in request')
 
   router.get('/api/admin/site', admined('site.read', () => site.getSite(app)), 'Website content, draft and versions')
   router.put('/api/admin/site/draft', admined('site.write', (u, e) => site.saveDraft(app, u, e)), 'Save a website draft')

@@ -7,7 +7,7 @@ Everything is encrypted in your browser; the server stores ciphertext it holds n
 
 [![CI](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml/badge.svg)](https://github.com/SHIVAM-SHARMA-766/vault/actions/workflows/ci.yml)
 ![Encryption](https://img.shields.io/badge/encryption-AES--256--GCM%20in%20the%20browser-4f46e5)
-![Tests](https://img.shields.io/badge/tests-327%20unit%20%C2%B7%2016%20browser-16a34a)
+![Tests](https://img.shields.io/badge/tests-334%20unit%20%C2%B7%2017%20browser-16a34a)
 ![Running cost](https://img.shields.io/badge/running%20cost-%240%20a%20month-0ea5e9)
 
 [**Live instance**](https://vault-shivam.duckdns.org) · [Install your own](docs/INSTALL.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
@@ -71,9 +71,9 @@ signed-in devices you can name and sign out, and ninety days of security activit
 <tr>
 <td valign="top">
 
-### 🧑‍💼 Admin panel with roles
-Owner, admin, marketing and viewer roles; invitations; account management; an audit log;
-and an editor for the public website — none of which can read a vault.
+### 🧑‍💼 Admin panel and service desk
+Roles, invitations, an audit log and a website editor — plus a built-in help desk for access
+requests, lost authenticators and support tickets. None of it can read a vault.
 
 </td>
 <td valign="top">
@@ -127,6 +127,12 @@ secrets generate themselves, and encrypted backups go to disk or any S3-compatib
 &nbsp;
 <img src="docs/images/mobile-detail.png" alt="Phone: an item" width="260">
 </p>
+</details>
+
+<details>
+<summary><b>Service desk</b> — help and support, built in</summary>
+<br>
+<img src="docs/images/desk-ticket.png" alt="A service desk ticket with the conversation and its status" width="860">
 </details>
 
 <details>
@@ -195,8 +201,8 @@ npm run dev:stack      # the whole product on http://localhost:8080, in memory �
 <summary>Tests, screenshots and the API description</summary>
 
 ```sh
-npm test               # crypto, core and API — 327 tests
-npm run test:e2e       # 16 browser tests against the real stack (needs Chrome)
+npm test               # crypto, core and API — 334 tests
+npm run test:e2e       # 17 browser tests against the real stack (needs Chrome)
 npm run screenshots    # regenerate docs/images from the running product
 npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 ```

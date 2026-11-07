@@ -124,3 +124,9 @@ export const IconDownload = (p: P) => (
 export const IconPulse = (p: P) => (
   <Svg {...p}><path d="M3 12h4l3-7 4 14 3-7h4" /></Svg>
 )
+export const IconHelp = (p: P) => (
+  <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.7-2.5 2-2.5 4" /><path d="M12 17h.01" /></Svg>
+)
+export const IconInbox = (p: P) => (
+  <Svg {...p}><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5 5h14l2 8v6H3v-6Z" /></Svg>
+)

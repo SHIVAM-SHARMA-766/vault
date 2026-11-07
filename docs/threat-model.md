@@ -188,6 +188,20 @@ on every change, and a crypto package with no dependencies at all. Planned for p
 required before the first customer install: signed releases verified by the installer and the
 update path, an SBOM per release, reproducible builds, and a published disclosure policy.
 
+### A13 — Social engineering through the service desk
+
+Someone who knows a member's master password but not their second factor files a "lost my
+authenticator" request, hoping staff will turn two-factor sign-in off.
+
+Only staff with `users.write` (owner or admin, never the support role) can reset it, never for
+an owner, and every reset is audited with the ticket number. The reset screen says, before the
+button, that anyone can type an address into the public form and that the person must be
+confirmed through another channel — a call, or in person. The requester is told by email when
+it happens, so a legitimate owner of the address learns of a reset they did not ask for. Public
+requests are rate-limited and reveal nothing about whether an address has an account (A7). A
+reset never touches the master password or the vault key: the attacker still needs the master
+password.
+
 ### A11 — Public-key substitution (applies once sharing exists)
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).
