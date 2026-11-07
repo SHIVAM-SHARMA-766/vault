@@ -1,19 +1,25 @@
-// Runtime configuration.
+// Runtime configuration: every setting the server reads, in one place.
 //
-// The database password and the two server secrets are read from the
-// environment, which systemd populates from a root-owned file on the host.
-// They are deliberately not passed through instance metadata, which anything
-// running on the host can read. A value passed
-// through Terraform ends up in the state file in plaintext, and the state file
-// gets copied to laptops and CI runners; a value committed to the repository
-// needs no explanation at all.
+// Each variable is declared once in VARIABLES — name, whether it is required,
+// its default, whether it is secret, and what it does — and docs/configuration.md
+// lists the same set (a test keeps them in step). Nothing else in the service
+// reads process.env, and nothing has a default that names a particular
+// installation: a self-hosted server must say what its address is.
 //
-// See docs/runbook.md for generating and installing them.
+// The database password and the two server secrets come from the environment,
+// which systemd fills from a root-owned file on the host. They are
+// deliberately not passed through instance metadata, which anything running on
+// the host can read, nor through Terraform, whose state file ends up in
+// plaintext on laptops and CI runners. See docs/runbook.md.
+
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export interface Config {
-  region: string
-  bucket: string
-  namespace: string
+  port: number
+  /** The public origin, e.g. https://vault.example.com. Used for absolute URLs
+   *  on the rendered website. */
+  origin: string
   db: {
     host: string
     user: string
@@ -25,46 +31,89 @@ export interface Config {
   pepper: string
   /** HMAC key for access and refresh tokens. */
   tokenKey: string
+  /** Closed unless explicitly opened. */
+  allowRegistration: boolean
+  /** Addresses that hold the owner role. Turned into digests by the server;
+   *  the addresses are not kept. */
+  adminEmails: string[]
+  site: { sourceDir: string; outputDir: string }
 }
+
+export interface Variable {
+  name: string
+  required: boolean
+  default?: string
+  secret?: boolean
+  description: string
+}
+
+export const VARIABLES: readonly Variable[] = [
+  { name: 'VAULT_HOSTNAME', required: false, description: 'The public hostname, e.g. vault.example.com. Either this or SITE_ORIGIN is required.' },
+  { name: 'SITE_ORIGIN', required: false, description: 'The public origin with scheme, e.g. https://vault.example.com. Overrides https://VAULT_HOSTNAME.' },
+  { name: 'PORT', required: false, default: '3000', description: 'Port the API listens on, on 127.0.0.1 only. The reverse proxy forwards /api/* to it.' },
+  { name: 'DB_HOST', required: true, description: 'MySQL host.' },
+  { name: 'DB_PORT', required: false, default: '3306', description: 'MySQL port.' },
+  { name: 'DB_USER', required: false, default: 'vault', description: 'MySQL user.' },
+  { name: 'DB_NAME', required: false, default: 'vault', description: 'MySQL database. Its table is created on first start.' },
+  { name: 'DB_PASSWORD', required: true, secret: true, description: 'MySQL password.' },
+  { name: 'SERVER_PEPPER', required: true, secret: true, description: 'At least 32 characters (openssl rand -base64 32). Keys the address digests. Changing it locks every account out.' },
+  { name: 'TOKEN_SIGNING_KEY', required: true, secret: true, description: 'At least 32 characters. Signs session tokens. Changing it signs everyone out.' },
+  { name: 'ALLOW_REGISTRATION', required: false, default: 'false', description: '"true" forces registration open, overriding the admin panel. For creating the first account only.' },
+  { name: 'ADMIN_EMAILS', required: false, default: '', description: 'Comma-separated addresses that are owners. The first account is usually the only one.' },
+  { name: 'SITE_SOURCE', required: false, description: 'Website templates and content. Defaults to the site/ directory shipped beside the server.' },
+  { name: 'SITE_ROOT', required: false, default: '/srv/vault/site', description: 'Where the rendered website is written; the reverse proxy serves its current/ directory.' },
+]
 
 let cached: Config | null = null
 
-function required(name: string): string {
-  const value = process.env[name]
-  if (!value) throw new Error(`missing environment variable: ${name}`)
-  return value
-}
+/** Reads and checks the whole configuration, reporting every problem at once
+ *  rather than one per restart. Refuses weak or placeholder secrets: a server
+ *  that starts with a guessable pepper is worse than one that does not start,
+ *  because nothing about it looks wrong. */
+export function parseConfig(env: Record<string, string | undefined>, here = dirname(fileURLToPath(import.meta.url))): Config {
+  const problems: string[] = []
+  const get = (name: string): string => {
+    const v = VARIABLES.find((x) => x.name === name)!
+    const value = env[name] ?? v.default ?? ''
+    if (v.required && !value) problems.push(`${name} is required: ${v.description}`)
+    return value
+  }
+  const secret = (name: string): string => {
+    const value = get(name)
+    if (!value) return value
+    if (value.length < 32) problems.push(`${name} is too short; generate one with: openssl rand -base64 32`)
+    else if (/^(placeholder|changeme|test|secret)/i.test(value)) problems.push(`${name} still holds a placeholder value`)
+    return value
+  }
+  const number = (name: string): number => {
+    const n = Number(get(name))
+    if (!Number.isInteger(n) || n <= 0 || n > 65535) problems.push(`${name} must be a port number`)
+    return n
+  }
 
-/** Refuses to start rather than running with a weak or placeholder secret. A
- *  service that comes up with a guessable pepper is worse than one that does
- *  not come up at all, because nothing about it looks wrong. */
-function requiredSecret(name: string): string {
-  const value = required(name)
-  if (value.length < 32) {
-    throw new Error(`${name} is too short; generate one with: openssl rand -base64 32`)
+  const hostname = get('VAULT_HOSTNAME')
+  let origin = get('SITE_ORIGIN') || (hostname ? `https://${hostname}` : '')
+  if (!origin) problems.push('VAULT_HOSTNAME (or SITE_ORIGIN) is required: the address people use to reach this server.')
+  else {
+    try { origin = new URL(origin).origin } catch { problems.push(`SITE_ORIGIN is not a URL: ${origin}`) }
   }
-  if (/^(placeholder|changeme|test|secret)/i.test(value)) {
-    throw new Error(`${name} still holds a placeholder value`)
+
+  const config: Config = {
+    port: number('PORT'),
+    origin,
+    db: { host: get('DB_HOST'), user: get('DB_USER'), password: get('DB_PASSWORD'), database: get('DB_NAME'), port: number('DB_PORT') },
+    pepper: secret('SERVER_PEPPER'),
+    tokenKey: secret('TOKEN_SIGNING_KEY'),
+    allowRegistration: get('ALLOW_REGISTRATION') === 'true',
+    adminEmails: get('ADMIN_EMAILS').split(',').map((e) => e.trim()).filter(Boolean),
+    site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },
   }
-  return value
+  if (problems.length) throw new Error(`configuration:\n  - ${problems.join('\n  - ')}`)
+  return config
 }
 
 export function loadConfig(): Config {
-  if (cached) return cached
-  cached = {
-    region: process.env['OCI_REGION'] ?? 'ap-mumbai-1',
-    bucket: process.env['BACKUP_BUCKET'] ?? '',
-    namespace: process.env['OBJECTSTORAGE_NAMESPACE'] ?? '',
-    db: {
-      host: required('DB_HOST'),
-      user: process.env['DB_USER'] ?? 'vault',
-      password: required('DB_PASSWORD'),
-      database: process.env['DB_NAME'] ?? 'vault',
-      port: Number(process.env['DB_PORT'] ?? 3306),
-    },
-    pepper: requiredSecret('SERVER_PEPPER'),
-    tokenKey: requiredSecret('TOKEN_SIGNING_KEY'),
-  }
+  cached ??= parseConfig(process.env)
   return cached
 }
 

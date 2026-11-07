@@ -72,4 +72,9 @@ MYSQL_PWD="$DB_PASSWORD" mysql --host="$DB_HOST" --user="$DB_USER" "$DB_NAME" -e
   ON DUPLICATE KEY UPDATE data = VALUES(data)" \
   || log "could not record the backup in the database; the admin panel will show the previous one"
 
+# The health probe (services/monitor) reads this to tell how old the last
+# verified backup is. Written only here, after the read-back succeeded.
+install -d -m 0755 /var/lib/vault
+date +%s > /var/lib/vault/last-backup
+
 log "done: ${OBJECT}, ${size} bytes, verified"

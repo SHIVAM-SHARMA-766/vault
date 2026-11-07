@@ -98,7 +98,10 @@ test('an unknown address and a wrong key are indistinguishable', async () => {
   })
 
   assert.equal(wrongKey.status, unknown.status)
-  assert.deepEqual(wrongKey.body, unknown.body)
+  // Everything but the per-request id, which differs for every response.
+  const { requestId: _a, ...a } = wrongKey.body
+  const { requestId: _b, ...b } = unknown.body
+  assert.deepEqual(a, b)
 })
 
 test('prelogin returns a decoy salt for an unknown address', async () => {

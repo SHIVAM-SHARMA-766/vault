@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Set up the host: the systemd units, the backup timer, and the pull timer that
-# installs releases. Run it when one of those changes, or after rebuilding the
+# Set up the host: the systemd units, the backup timer, the health probe, and
+# the pull timer that installs releases. Run it when one of those changes, or after rebuilding the
 # host. It does not ship application code.
 #
 #   ./scripts/deploy.sh <host>
@@ -41,9 +41,13 @@ scp -q -i "$KEY" -o BatchMode=yes \
   "$REPO/services/backup/vault-backup.sh" \
   "$REPO/services/backup/vault-backup.service" \
   "$REPO/services/backup/vault-backup.timer" \
+  "$REPO/services/backup/vault-restore-drill.sh" \
   "$REPO/services/release/vault-pull.sh" \
   "$REPO/services/release/vault-pull.service" \
   "$REPO/services/release/vault-pull.timer" \
+  "$REPO/services/monitor/vault-probe.sh" \
+  "$REPO/services/monitor/vault-probe.service" \
+  "$REPO/services/monitor/vault-probe.timer" \
   "ubuntu@$HOST:/tmp/vault-setup/"
 ok "units and scripts uploaded"
 
@@ -53,9 +57,13 @@ ssh_ "sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-api.service /e
       sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-backup.sh /usr/local/bin/vault-backup.sh
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-backup.service /etc/systemd/system/vault-backup.service
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-backup.timer /etc/systemd/system/vault-backup.timer
+      sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-restore-drill.sh /usr/local/bin/vault-restore-drill.sh
       sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-pull.sh /usr/local/bin/vault-pull.sh
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-pull.service /etc/systemd/system/vault-pull.service
       sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-pull.timer /etc/systemd/system/vault-pull.timer
+      sudo install -o root -g root -m 0755 /tmp/vault-setup/vault-probe.sh /usr/local/bin/vault-probe.sh
+      sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-probe.service /etc/systemd/system/vault-probe.service
+      sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-probe.timer /etc/systemd/system/vault-probe.timer
       sudo install -d -o root -g root -m 0755 /etc/vault
       sudo install -d -o vault -g vault -m 0755 /srv/vault/site
       printf 'RELEASE_BUCKET=%s\nOBJECTSTORAGE_NAMESPACE=%s\nVAULT_HOSTNAME=%s\nACME_EMAIL=%s\n' \
@@ -68,8 +76,9 @@ ssh_ "sudo install -o root -g root -m 0644 /tmp/vault-setup/vault-api.service /e
       sudo systemctl enable vault-api >/dev/null
       sudo systemctl enable --now vault-backup.timer >/dev/null
       sudo systemctl enable --now vault-pull.timer >/dev/null
+      sudo systemctl enable --now vault-probe.timer >/dev/null
       rm -rf /tmp/vault-setup"
-ok "vault-api unit, backup timer, and pull timer installed"
+ok "vault-api unit, backup timer, pull timer, and health probe installed"
 
 log "Restart"
 # The unit may have changed; the code on disk has not.
@@ -82,6 +91,13 @@ log "Pull"
 ssh_ 'sudo systemctl start vault-pull.service' \
   || die "the pull failed; check: journalctl -u vault-pull -n 50"
 ok "the published release is installed: $(curl -sf --max-time 10 "https://$VAULT_HOSTNAME/release.txt" || echo 'none published yet')"
+
+log "Probe"
+# One report now, so a missing permission shows here rather than as a
+# heartbeat alarm ten minutes later.
+ssh_ 'sudo systemctl start vault-probe.service && journalctl -u vault-probe -n 1 -o cat' \
+  || die "the health probe failed; check: journalctl -u vault-probe -n 50 (is the IAM policy applied?)"
+ok "health reported to OCI Monitoring"
 
 log "Verify"
 for path in / /security /app/; do

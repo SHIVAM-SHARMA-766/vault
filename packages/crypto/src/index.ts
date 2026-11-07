@@ -97,6 +97,15 @@ export {
 } from './entry.js'
 
 export {
+  EXPORT_FORMAT,
+  EXPORT_VERSION,
+  type ExportFile,
+  isExportFile,
+  openExport,
+  sealExport,
+} from './export.js'
+
+export {
   IDENTITY_VERSION,
   PUBLIC_KEY_BYTES,
   type IdentityKeyPair,

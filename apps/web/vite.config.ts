@@ -22,13 +22,12 @@ export default defineConfig({
     target: 'es2022',
   },
   server: {
-    // Talks to the real API in development, so the development build exercises
-    // the same paths the deployed one does.
+    // Forwards /api to a running API: the local stack by default
+    // (npm run dev:stack), or any server named in VAULT_API.
     proxy: {
       '/api': {
-        target: process.env['VAULT_API'] ?? 'https://vault-shivam.duckdns.org',
+        target: process.env['VAULT_API'] ?? 'http://localhost:8080',
         changeOrigin: true,
-        secure: true,
       },
     },
   },

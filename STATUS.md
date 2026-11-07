@@ -2,7 +2,7 @@
 
 What is in flight. Updated when something starts, stalls, or finishes.
 
-Last updated: 2026-11-06
+Last updated: 2026-11-07
 
 ## Right now
 
@@ -50,14 +50,25 @@ each one produced a symptom that pointed somewhere else:
 
 ## Next
 
-Phase 1 of [ROADMAP.md](ROADMAP.md): a complete, hardened personal vault. In order:
+Phase 1 of [docs/ROADMAP.md](docs/ROADMAP.md): a complete, hardened personal vault. In order:
 
 1. ~~Client architecture~~ — done 2026-11-06.
 2. ~~Account settings~~ — done 2026-11-06.
 3. ~~Two-factor sign-in~~ — done 2026-11-06 (TOTP; WebAuthn next).
 4. ~~Folders, entry-type fields, custom fields, password history~~ — done 2026-11-06.
-5. **Import and export.**
-6. **Monitoring and alerting**, and the domain.
+5. ~~Import and export~~ — done 2026-11-06.
+6. ~~Monitoring and alerting~~ — done 2026-11-07 (needs `apply.sh` + `deploy.sh` by the operator).
+7. ~~Signed-in devices and security activity~~ — done 2026-11-07.
+8. ~~Password health~~ — done 2026-11-07.
+9. ~~API: error codes, request ids, OpenAPI~~ — done 2026-11-07.
+10. ~~One configuration module; storage boundary tested~~ — done 2026-11-07.
+11. ~~Restore drill, scripted and reminded by an alarm~~ — done 2026-11-07 (first scripted run is the operator's).
+
+**What still stands between phase 1 and done** — none of it code:
+- **The domain** (threat A3), deferred until one is bought.
+- **Import tested with real export files** from three managers (exit criterion).
+- **Alerts reaching a phone**: apply, confirm the subscription mail, deploy, trip one alarm.
+- **Three decisions**: secret key in the KDF, breach checks, Argon2id (see ROADMAP).
 
 Then phase 2, the self-hosted product: container image and Compose install, first-run setup,
 PostgreSQL, migrations, backups to any S3-compatible store, signed releases.
@@ -79,6 +90,50 @@ else gets write access to `main` or the releases bucket.
   and the public security page says so.
 
 ## Recently done
+
+**2026-11-07 — Documentation with screenshots.** README rebuilt as a showcase; a
+[user guide](docs/USER-GUIDE.md) screen by screen; the roadmap moved to
+[docs/ROADMAP.md](docs/ROADMAP.md) with progress per phase and what is left;
+[docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md) for limits and accepted risks; diagrams in
+ARCHITECTURE and the runbook; READMEs for `packages/core`, `apps/web`, `apps/site` and
+`services/`. Screenshots come from `npm run screenshots`, which drives the real product.
+Taking them found and fixed three things: the entry action bar overflowed on phones, a word
+plus a year ("summer2024") rated Fair instead of Weak, and the import folder was named with
+the UTC date.
+
+**2026-11-07 — Phase 1, steps 7–11.** *Devices*: each browser that signs in is a device
+with a stable id across token refreshes; Settings lists them (this one marked), lets you
+name one and sign it out, and shows ninety days of security activity. Locking — by hand,
+when idle, or by closing the tab — now ends the server session too (`POST
+/api/auth/signout`), where before each lock left a refresh token alive for thirty days.
+*Password health*: weak, reused, year-old and http-only passwords, scored and listed in the
+vault with per-entry advice; computed in the browser by `packages/core`; entries now record
+when their password changed. *API*: a typed registry of error codes, an `x-request-id` on
+every response and in every error, one JSON log line per request, and an OpenAPI document
+generated from the routes (`/api/openapi.json`, `docs/openapi.json`, kept in sync by a
+test). *Configuration*: one module declares every setting
+([docs/configuration.md](docs/configuration.md)), reports all problems at once, and has no
+default that names this installation. *Restore drill*: `vault-restore-drill.sh` restores the
+newest backup into a scratch database and compares it with the live one; an INFO alarm
+says when the next is due.
+
+**2026-11-07 — Phase 1, step 6: monitoring and alerting.** A probe on the host
+(`services/monitor/vault-probe.sh`, every five minutes) checks the site, client, API and
+certificate through public DNS, plus disk, memory, backup age and failed units, and posts
+them to OCI Monitoring. Eight alarms in `infra/monitoring.tf` — including a heartbeat that
+fires when reports stop, so a dead or reclaimed host is caught — mail the operator through
+OCI Notifications, with six-hourly reminders. All within the always-free allowance. The
+memory metric also answers the idle-reclamation question below once a week of data exists.
+
+**2026-11-06 — Phase 1, step 5: import and export.** A new Import & export screen
+(`/app/import-export`, also in the account menu and the empty vault). Import reads Chrome /
+Edge / Brave, Firefox, Safari, Bitwarden (JSON and CSV), 1Password, LastPass, KeePass,
+Zoho Vault, our own encrypted export, and other CSVs by column name — parsed in the browser
+by `packages/core`, previewed with counts, duplicates (same name, username, site) skipped,
+folders recreated or reused, then sealed and sent in batches to a new never-overwrite route
+(`POST /api/vault/import`, 100 entries / 50 folders a call). Export is an encrypted file
+(own password, PBKDF2 → HKDF → AES-GCM, AAD `vault.export.v1`) by default, and a plain CSV in
+Bitwarden's layout behind a local master-password check and an explicit acknowledgement.
 
 **2026-11-06 — Phase 1, step 4: the full entry model.** Nested folders (create, rename,
 delete with contents moving up, filter including subfolders); every type has its own fields
@@ -107,7 +162,7 @@ signed package (phase 2) before teams (phase 3) and the extension (phase 4).
 
 **2026-11-06 — Phase 0, the foundation.** Identity key pairs on every account, with the
 sharing model designed ([0009](decisions/0009-identity-keys-and-sharing.md)); a one-command
-local stack; browser tests in CI; `prevent_destroy` on the database; [ROADMAP.md](ROADMAP.md)
+local stack; browser tests in CI; `prevent_destroy` on the database; [docs/ROADMAP.md](docs/ROADMAP.md)
 for teams, with the browser extension as the next client.
 
 **2026-11-06 — Release pipeline.** Every merge to `main` is published by GitHub Actions as

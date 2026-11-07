@@ -77,7 +77,10 @@ async function request<T>(
     const error = new ApiError(
       response.status,
       String(payload['error'] ?? 'error'),
-      String(payload['message'] ?? 'Something went wrong.'),
+      // A server fault carries a request id that matches the server's log;
+      // quoting it is how a self-hoster finds the line.
+      String(payload['message'] ?? 'Something went wrong.')
+        + (response.status >= 500 && typeof payload['requestId'] === 'string' ? ` (reference ${String(payload['requestId']).slice(0, 8)})` : ''),
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
     if (Array.isArray(payload['details'])) error.details = payload['details'] as { path: string; message: string }[]
@@ -186,9 +189,22 @@ export const api = {
   deleteFolder: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/vault/folders/${encodeURIComponent(id)}`, { token }),
 
+  sessions: (token: string) => request<{ sessions: DeviceSession[] }>('GET', '/api/sessions', { token }),
+  renameSession: (token: string, id: string, name: string) =>
+    request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
+  revokeSession: (token: string, id: string) =>
+    request<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`, { token }),
+  activity: (token: string) =>
+    request<{ events: { kind: string; at: string; ip: string; device: string }[] }>('GET', '/api/activity', { token }),
+
   /** Previous versions of an entry, newest first, each sealed for history. */
   history: (token: string, id: string) =>
     request<{ versions: { at: string; blob: string }[] }>('GET', `/api/vault/history/${encodeURIComponent(id)}`, { token }),
+
+  /** Creates many sealed items at once; never overwrites. At most 100
+   *  entries and 50 folders per call. */
+  importBulk: (token: string, body: { folders: { id: string; blob: string }[]; entries: { id: string; blob: string }[] }) =>
+    request<{ folders: number; entries: number }>('POST', '/api/vault/import', { token, body }),
 
   addHistory: (token: string, id: string, blob: string) =>
     request<{ at: string }>('POST', `/api/vault/history/${encodeURIComponent(id)}`, { token, body: { blob } }),
@@ -237,6 +253,7 @@ export const api = {
   },
 }
 
+export interface DeviceSession { id: string; device: string; name?: string; ip: string; createdAt: string; lastUsedAt: string; current: boolean }
 export type RegistrationMode = 'closed' | 'invite' | 'open'
 /** A two-factor code: six digits from the authenticator app, or a recovery code. */
 export type SecondFactor = { totpCode: string } | { recoveryCode: string }

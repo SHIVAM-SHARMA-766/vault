@@ -164,3 +164,15 @@ variable "mysql_storage_gb" {
   type        = number
   default     = 50
 }
+
+variable "alert_emails" {
+  description = "Addresses that receive alarm mails. Each gets a confirmation mail from OCI first; nothing arrives until its link is opened."
+  type        = list(string)
+  default     = []
+}
+
+variable "alert_https_endpoints" {
+  description = "Optional HTTPS endpoints that receive alarms as a POST, e.g. an ntfy topic URL for phone push notifications."
+  type        = list(string)
+  default     = []
+}

@@ -725,3 +725,51 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
   .custom-row { grid-template-columns: 1fr 1fr auto auto; }
   .folder-actions { display: inline-flex; }
 }
+
+/* ── Import & export ───────────────────────────────────────────────── */
+.alert-ok { background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--ok); }
+.file-drop {
+  display: flex; align-items: center; gap: 14px; padding: 22px 18px; margin: 4px 0 8px;
+  border: 1.5px dashed var(--line-strong); border-radius: 12px; color: var(--accent); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.file-drop:hover, .file-drop:focus-within { border-color: var(--accent); background: var(--accent-soft); }
+.file-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.file-drop > span { display: flex; flex-direction: column; gap: 2px; color: var(--text); }
+.import-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+.progress { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.progress > div { height: 100%; background: var(--accent); transition: width .2s; }
+
+/* ── Devices and activity ──────────────────────────────────────────── */
+.device-list, .activity-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.device-row:first-child { border-top: 0; }
+.device-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.device-name { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.device-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.device-rename { display: flex; gap: 6px; align-items: center; }
+.device-rename input { max-width: 220px; }
+.activity-list li { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13.5px; }
+.activity-list li:first-child { border-top: 0; }
+@media (max-width: 640px) { .device-row { flex-direction: column; align-items: flex-start; } }
+
+/* ── Password health ───────────────────────────────────────────────── */
+.side-count-warn { background: var(--warn-soft); color: var(--warn); }
+.health-summary { display: flex; gap: 14px; align-items: center; padding: 12px 14px; margin: 0 12px 8px; border: 1px solid var(--line); border-radius: 12px; }
+.health-score { display: flex; align-items: baseline; gap: 3px; flex: none; }
+.health-score strong { font-size: 30px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.health-score span { color: var(--muted); font-size: 12.5px; }
+.health-score.is-good strong { color: var(--ok); }
+.health-score.is-fair strong { color: var(--warn); }
+.health-score.is-poor strong { color: var(--danger); }
+.health-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.health-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.health-chips .chip:disabled { opacity: .45; cursor: default; }
+.health-issues ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.health-issues { margin: 0 0 14px; }
+
+/* Narrow phones: entry actions become icons so the bar fits. */
+@media (max-width: 480px) {
+  .detail-actions .btn-label { display: none; }
+  .detail-actions .btn-sm { padding-left: 10px; padding-right: 10px; }
+}

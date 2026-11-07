@@ -15,6 +15,7 @@ import { Register } from './features/auth/Register.js'
 import { Unlock } from './features/auth/Unlock.js'
 import { Admin } from './features/admin/Admin.js'
 import { Settings } from './features/settings/Settings.js'
+import { Transfer } from './features/transfer/Transfer.js'
 import { Vault } from './features/vault/Vault.js'
 
 type AuthView = 'unlock' | 'register' | 'recover'
@@ -53,6 +54,7 @@ function Signed({ state }: { state: session.Unlocked }) {
   useAccount(state)
   const route = useRoute()
   if (route.name === 'settings') return <Settings state={state} />
+  if (route.name === 'transfer') return <Transfer state={state} />
   if (route.name === 'admin') {
     // The role arrives a moment after unlock; until it does, say so rather
     // than flash the vault or a refusal.

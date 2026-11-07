@@ -1,5 +1,5 @@
 // Public surface of @vault/core: logic every Vault client shares, with no UI
-// and no third-party dependencies. See ROADMAP.md, phase 1.
+// and no third-party dependencies. See docs/ROADMAP.md.
 
 export { type Ecc, type QrCode, encodeQr, qrPath } from './qr.js'
 export {
@@ -26,3 +26,14 @@ export {
   typeSpec,
   writeField,
 } from './items.js'
+export {
+  type ImportResult,
+  type ImportedItem,
+  ImportError,
+  duplicateKey,
+  parseCsv,
+  readImport,
+  totpKey,
+} from './import.js'
+export { type ExportEntry, toCsv } from './export.js'
+export { ISSUES, type HealthInput, type HealthReport, type Issue, type Strength, analyse, passwordStrength } from './health.js'

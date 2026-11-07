@@ -7,6 +7,31 @@ Everything this project runs on is declared in [`infra/`](../infra/) and provisi
 there. There is nothing to configure in a console, and nothing about this project lives in
 another repository.
 
+**Something is wrong right now?** Start at [Alerts](#alerts) if a mail arrived, or
+[When something looks wrong](#when-something-looks-wrong) if not.
+
+<details>
+<summary><b>Contents</b></summary>
+
+| Setting up | Day to day | When it breaks |
+|---|---|---|
+| [First deploy](#first-deploy) | [Deploying code](#deploying-code) | [When something looks wrong](#when-something-looks-wrong) |
+| [Applying infrastructure changes](#applying-infrastructure-changes) | [Editing the website](#editing-the-website) | [Alerts](#alerts) |
+| [Rebuilding the host](#rebuilding-the-host) | [Staff roles](#staff-roles) | [Backups](#backups) and the [restore drill](#the-quarterly-restore-drill) |
+| [Setting the server secrets](#setting-the-server-secrets) | [Developing locally](#developing-locally) | [Recovering the vault](#recovering-the-vault) |
+| [Opening registration for the first account](#opening-registration-for-the-first-account) | [Rotating the host key](#rotating-the-host-key) | [Idle reclamation](#idle-reclamation-which-is-the-thing-most-likely-to-bite) |
+| | [Getting on the host](#getting-on-the-host) | [Tearing it down](#tearing-it-down) |
+
+</details>
+
+```mermaid
+flowchart LR
+  code["Code change"] -- "merge to main" --> auto["Released automatically<br/>(no SSH)"]
+  infra["infra/*.tf change"] -- "./scripts/apply.sh" --> oci["OCI resources"]
+  units["systemd units, probe,<br/>backup, drill scripts"] -- "open SSH → ./scripts/deploy.sh → close SSH" --> host["Host"]
+  secrets["Secrets"] -- "by hand, on the host" --> env["/srv/vault/api/run/secrets.env"]
+```
+
 ## First deploy
 
 ```sh
@@ -161,6 +186,10 @@ free -m                 # memory used, against 1 GB — 200 MB is 20%
 uptime                  # load
 vmstat 5 5              # sustained CPU
 ```
+
+The health probe records `memory_used_percent` every five minutes (see Alerts below), so
+the answer is a chart in the console: Monitoring → Metrics Explorer, namespace
+`vault_health`, metric `memory_used_percent`, the last seven days, statistic `min`.
 
 Caddy plus a Node process on a 1 GB instance plausibly holds memory above 20% on its own.
 If several days of measurement say otherwise, a keep-warm loop is the blunt answer:
@@ -327,6 +356,52 @@ curl -s https://<hostname>/api/health
 A 502 from Caddy means the API is down; a connection refused means Caddy is. A
 certificate error usually means the DuckDNS record is pointing somewhere else.
 
+## Alerts
+
+```mermaid
+flowchart LR
+  probe["vault-probe<br/>every 5 min"] -- "8 metrics" --> mon["OCI Monitoring"]
+  mon -- "threshold or<br/>missing data" --> alarm["Alarm"]
+  alarm --> topic["Notifications topic"]
+  topic --> mail["Email"]
+  topic -. optional .-> push["HTTPS push (ntfy)"]
+```
+
+`vault-probe.timer` runs `/usr/local/bin/vault-probe.sh` every five minutes. It checks the
+public site, the client, the API and the certificate through public DNS, and disk, memory,
+the last verified backup and failed units on the host, and posts each as a metric in the
+`vault_health` namespace. Alarms in `infra/monitoring.tf` watch them and mail everyone in
+`alert_emails` (each address must confirm OCI's subscription mail once). A reminder repeats
+every six hours while an alarm stays firing, and a "resolved" mail follows when it clears.
+
+| Alarm | Fires when | First look |
+|---|---|---|
+| `heartbeat` | no report for 10 minutes | OCI console: is the instance running? Then `systemctl status vault-probe.timer` |
+| `api-down` | `/api/health` failing for 10 minutes | `journalctl -u vault-api -n 100` |
+| `site-down` | `/` or `/app/` not 200 for 10 minutes | `journalctl -u caddy -n 50`; is DuckDNS pointing at the instance? |
+| `certificate` | under 14 days left | `journalctl -u caddy \| grep -i acme` — Caddy renews at 30 |
+| `backup-stale` | no verified backup for 30 hours | `journalctl -u vault-backup -n 100`, then `sudo systemctl start vault-backup` |
+| `disk` | boot disk over 85% | `sudo journalctl --vacuum-size=200M`; `du -sh /srv/vault/*` |
+| `memory` | over 90% for 30 minutes | `ps aux --sort=-rss \| head` |
+| `units-failed` | a `vault-*` unit or Caddy failed | `systemctl --failed` |
+| `restore-drill` | last passing drill over 95 days ago | `sudo vault-restore-drill.sh` (below) |
+
+On the host:
+
+```sh
+sudo systemctl start vault-probe          # report now
+journalctl -u vault-probe -n 5 -o cat     # the last reports, values included
+sudo -u nobody VAULT_HOSTNAME=<hostname> /usr/local/bin/vault-probe.sh --dry-run   # check without posting
+```
+
+To test delivery end to end, open an alarm in the console (Monitoring → Alarm definitions)
+and lower its threshold for a few minutes, or stop the timer for ten minutes to trip the
+heartbeat. Put it back afterwards.
+
+For push notifications on the phone instead of, or as well as, mail, add an HTTPS endpoint
+that takes a POST to `alert_https_endpoints` — for example an ntfy topic with a long random
+name — and apply.
+
 ## Backups
 
 **This is the only backup.** The always-free MySQL tier refuses a managed backup policy —
@@ -341,10 +416,9 @@ systemctl start vault-backup.service          # run one now
 oci os object list --auth instance_principal --bucket-name vault-backups --query 'data[].{name:name,size:"size"}' --output table
 ```
 
-**Check this periodically.** A backup that silently stopped a month ago is worse than no
-backup, because it is mistaken for one. Making the age of the newest export visible in
-the application — rather than only in a journal nobody reads — is the fix this still
-wants.
+A backup that silently stopped is worse than no backup, because it is mistaken for one.
+The health probe reports the age of the last verified export and the `backup-stale` alarm
+mails when it passes 30 hours (see Alerts).
 
 ### Restoring
 
@@ -374,21 +448,29 @@ sudo shred -u "$work"/* && sudo rmdir "$work"
 contains `DROP TABLE IF EXISTS`, so restoring over a working vault replaces it rather
 than merging.
 
-### Proving a backup is restorable
+### The quarterly restore drill
 
-Counting rows is not enough — it does not notice corrupted content. Compare the contents
-of the live and restored tables, excluding the rate counters, which change constantly:
+A backup nobody has restored is not a backup. Once a quarter, on the host:
 
 ```sh
-q() { MYSQL_PWD="$DB_PASSWORD" mysql -h "$DB_HOST" -u "$DB_USER" -N -B -e "$1"; }
-q "SELECT MD5(GROUP_CONCAT(CONCAT(pk,sk,CAST(data AS CHAR)) ORDER BY pk,sk))
-   FROM vault.vault WHERE pk NOT LIKE 'RATE#%'"
-q "SELECT MD5(GROUP_CONCAT(CONCAT(pk,sk,CAST(data AS CHAR)) ORDER BY pk,sk))
-   FROM vault_restore_test.vault WHERE pk NOT LIKE 'RATE#%'"
+sudo vault-restore-drill.sh
 ```
 
-Done on 2026-09-24: eight rows, identical digests. A backup nobody has restored is not a
-backup.
+It takes a fresh export, downloads it into a root-only directory, loads it into a scratch
+database (`vault_restore_test`) beside the live one, and compares the two tables by digest —
+every row a person stored, leaving out rows that change by themselves (rate counters,
+session rotations, activity). It then drops the scratch database and shreds the download,
+pass or fail. A pass is appended to `/var/lib/vault/restore-drills.log` and recorded for the
+health probe; the `restore-drill` alarm (INFO) mails a reminder when the last pass is over
+95 days old. A mismatch usually means someone changed their vault mid-drill — run it again;
+if it repeats, the backup is incomplete and that is an incident.
+
+The comparison logic was checked against a throwaway database: identical restores match,
+churn in the excluded rows is ignored, and a changed entry is caught.
+
+| Date | Result |
+|---|---|
+| 2026-09-24 | Manual: eight rows, identical digests |
 
 ## Recovering the vault
 

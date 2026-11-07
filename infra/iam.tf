@@ -16,7 +16,7 @@ resource "oci_identity_dynamic_group" "vault_host" {
 resource "oci_identity_policy" "vault_host" {
   compartment_id = var.tenancy_ocid
   name           = "${local.name}-host"
-  description    = "What the vault host may reach: its backup bucket, and its releases bucket read-only."
+  description    = "What the vault host may reach: its backup bucket, its releases bucket read-only, and its health metrics namespace."
 
   # The database is reached with a username and password over the private
   # subnet, not with an instance principal, so nothing here mentions it. What
@@ -31,6 +31,10 @@ resource "oci_identity_policy" "vault_host" {
     # here; it must not be able to change it, or a compromise of the host
     # could plant code that survives a rebuild.
     "Allow dynamic-group ${oci_identity_dynamic_group.vault_host.name} to read objects in tenancy where target.bucket.name = '${oci_objectstorage_bucket.releases.name}'",
+
+    # Health metrics, into its own namespace only (monitoring.tf). It cannot
+    # read metrics, or write into any other project's namespace.
+    "Allow dynamic-group ${oci_identity_dynamic_group.vault_host.name} to use metrics in tenancy where target.metrics.namespace = '${local.health_ns}'",
   ]
 
   freeform_tags = var.default_tags

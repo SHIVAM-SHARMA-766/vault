@@ -11,28 +11,55 @@ export interface RouteContext {
 
 export type Handler = (ctx: RouteContext) => Promise<LambdaResponse>
 
+/** How a route is authenticated, as recorded by the wrappers in app.ts. */
+export interface AuthTag { auth?: 'access'; permission?: string }
+
+export interface RouteInfo {
+  method: string
+  path: string
+  summary: string
+  auth: 'none' | 'access'
+  permission?: string
+}
+
 interface Route {
   method: string
+  path: string
   segments: string[]
   handler: Handler
+  summary: string
 }
 
 export class Router {
   private readonly routes: Route[] = []
 
-  add(method: string, path: string, handler: Handler): this {
+  add(method: string, path: string, handler: Handler, summary = ''): this {
     this.routes.push({
       method,
+      path,
       segments: path.split('/').filter(Boolean),
       handler,
+      summary,
     })
     return this
   }
 
-  get = (path: string, handler: Handler) => this.add('GET', path, handler)
-  post = (path: string, handler: Handler) => this.add('POST', path, handler)
-  put = (path: string, handler: Handler) => this.add('PUT', path, handler)
-  delete = (path: string, handler: Handler) => this.add('DELETE', path, handler)
+  get = (path: string, handler: Handler, summary?: string) => this.add('GET', path, handler, summary)
+  post = (path: string, handler: Handler, summary?: string) => this.add('POST', path, handler, summary)
+  put = (path: string, handler: Handler, summary?: string) => this.add('PUT', path, handler, summary)
+  delete = (path: string, handler: Handler, summary?: string) => this.add('DELETE', path, handler, summary)
+
+  /** Every route, for the OpenAPI document. */
+  list(): RouteInfo[] {
+    return this.routes.map((r) => {
+      const tag = r.handler as Handler & AuthTag
+      return {
+        method: r.method, path: r.path, summary: r.summary,
+        auth: tag.auth ?? 'none',
+        ...(tag.permission ? { permission: tag.permission } : {}),
+      }
+    })
+  }
 
   async handle(event: LambdaEvent): Promise<LambdaResponse> {
     const method = event.requestContext.http.method.toUpperCase()

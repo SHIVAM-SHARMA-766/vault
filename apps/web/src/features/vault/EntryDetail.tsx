@@ -4,16 +4,17 @@
 import { useEffect, useState } from 'react'
 
 import type { EntryContent } from '@vault/crypto'
-import { folderPath, readField, typeSpec } from '@vault/core'
+import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconArrowLeft, IconClock, IconEdit, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconEdit, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import type { Decrypted, Folder, Version } from './model.js'
 
-export function EntryDetail({ entry, folders, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, issues, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
+  issues: Issue[]
   onBack: () => void
   onEdit: () => void
   onToggleFavorite: () => void
@@ -37,9 +38,9 @@ export function EntryDetail({ entry, folders, onBack, onEdit, onToggleFavorite, 
             <IconStar size={16} filled={entry.favorite} />
           </button>
           <button className={`btn btn-secondary btn-sm ${showHistory ? 'btn-pressed' : ''}`} onClick={() => setShowHistory(!showHistory)}
-                  disabled={entry.unreadable} aria-pressed={showHistory}><IconClock size={15} />History</button>
-          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable}><IconEdit size={15} />Edit</button>
-          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)}><IconTrash size={15} />Delete</button>
+                  disabled={entry.unreadable} aria-pressed={showHistory} aria-label="History"><IconClock size={15} /><span className="btn-label">History</span></button>
+          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable} aria-label="Edit"><IconEdit size={15} /><span className="btn-label">Edit</span></button>
+          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} aria-label="Delete"><IconTrash size={15} /><span className="btn-label">Delete</span></button>
         </div>
       </div>
 
@@ -61,6 +62,13 @@ export function EntryDetail({ entry, folders, onBack, onEdit, onToggleFavorite, 
             <button className="btn btn-secondary btn-sm" onClick={() => setConfirming(false)}>Cancel</button>
             <button className="btn btn-danger btn-sm" onClick={onDelete}>Delete permanently</button>
           </div>
+        </div>
+      ) : null}
+
+      {issues.length ? (
+        <div className="alert alert-warn health-issues" role="note">
+          <IconAlert size={16} />
+          <ul>{issues.map((i) => { const x = ISSUES.find((y) => y.issue === i)!; return <li key={i}><strong>{x.label}.</strong> {x.advice}</li> })}</ul>
         </div>
       ) : null}
 

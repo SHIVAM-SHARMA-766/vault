@@ -44,9 +44,11 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
   const app: App = {
     store,
     config: {
-      region: 'ap-mumbai-1',
-      bucket: 'vault-test-backups',
-      namespace: 'test-namespace',
+      port: 3000,
+      origin: 'https://vault.test',
+      allowRegistration: false,
+      adminEmails: [],
+      site: { sourceDir: '', outputDir: '' },
       db: {
         host: '127.0.0.1',
         user: 'vault',

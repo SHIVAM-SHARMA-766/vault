@@ -23,6 +23,18 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 
 ## Routes
 
+The machine-readable list is generated from the routing table: served at
+`/api/openapi.json` and committed as [docs/openapi.json](../../docs/openapi.json). After
+adding or changing a route, run `npm run openapi --workspace @vault/api`; a test fails while
+the committed copy is stale.
+
+**Errors** are `{ "error": <code>, "message": <text>, "details"?, "requestId" }`. Clients
+branch on `error`, never on `message`; the codes are listed, with meanings, in `ERROR_CODES`
+in `src/http.ts` (and the OpenAPI document). **Every response** carries `x-request-id`, and
+the server writes one JSON log line per request with it (method, path, status, duration —
+no body, query string or address), so a reference quoted from an error finds its line:
+`journalctl -u vault-api | grep <id>`.
+
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/api/health` | — | Liveness |
@@ -31,6 +43,10 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 | POST | `/api/auth/login` | — | Exchange an Auth Key for a session and the wrapped vault key |
 | POST | `/api/auth/recovery-login` | — | The same, using the recovery key's own proof |
 | POST | `/api/auth/refresh` | refresh | Rotate the session |
+| POST | `/api/auth/signout` | refresh token in body | End that session; always 200. The client calls it on every lock |
+| GET | `/api/sessions` | access | Signed-in devices, the caller's marked `current` |
+| PUT | `/api/sessions/:id/name` | access | Name a device (≤ 40 characters; empty clears) |
+| DELETE | `/api/sessions/:id` | access | Sign a device out |
 | POST | `/api/auth/logout` | access | Revoke one session, or all |
 | GET | `/api/auth/me` | access | Profile and KDF parameters |
 | POST | `/api/auth/change-password` | access | Rewrap the vault key under a new password |
@@ -39,6 +55,7 @@ branch that cannot be worked backwards, and an HMAC digest of the account's addr
 | PUT/DELETE | `/api/vault/entries/:id` | access | One entry |
 | PUT/DELETE | `/api/vault/folders/:id` | access | One folder |
 | GET/POST | `/api/vault/history/:id` | access | Previous versions, capped at twenty |
+| POST | `/api/vault/import` | access | Creates up to 100 entries and 50 folders at once; never overwrites (409 on an existing id) |
 | GET | `/api/activity` | access | Security events, expired after ninety days |
 
 ## Decisions worth knowing before changing anything

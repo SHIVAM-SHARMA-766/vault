@@ -34,7 +34,8 @@ const pages = Object.fromEntries(Object.entries(loadDir('templates')).map(([k, v
 
 const out = renderPages({
   pages, partials, content, media: [], fallbacks: imageFallbacks(schema),
-  origin: process.env.SITE_ORIGIN ?? 'https://vault-shivam.duckdns.org',
+  // A check build; the server renders the live site with its own origin.
+  origin: process.env.SITE_ORIGIN ?? 'http://localhost:8080',
 })
 
 rmSync(DIST, { recursive: true, force: true })

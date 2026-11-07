@@ -49,6 +49,9 @@ export interface EntryContent {
   folderId?: string
   icon?: string
   iconColor?: string
+  /** When the password last changed (ISO 8601), for the health check's "old"
+   *  finding. Set by the client on save; absent on older entries. */
+  passwordChangedAt?: string
 }
 
 export interface FolderContent {

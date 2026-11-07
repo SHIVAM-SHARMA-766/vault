@@ -32,6 +32,7 @@ state in.
 | `nosql.tf` | The vault table |
 | `storage.tf` | The bucket exports are written to |
 | `iam.tf` | The dynamic group and policy the instance authenticates through |
+| `monitoring.tf` | The alerts topic, its subscriptions, and the health alarms |
 | `cloud-init.yaml` | Caddy, Node, the systemd unit, the firewall |
 
 ## Things that are the way they are on purpose

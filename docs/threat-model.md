@@ -199,10 +199,18 @@ ciphertext for fifteen minutes; it cannot take the account's ways back in away f
 
 Physical access to an unlocked session.
 
-Keys live in memory only and are discarded on logout, tab close, and idle timeout. Nothing
+Keys live in memory only and are discarded on logout, tab close, and idle timeout; each of
+those also ends the server session, and Settings lists every signed-in device so one left
+signed in elsewhere can be signed out. Nothing
 sensitive is written to `localStorage`, `sessionStorage`, or IndexedDB. The consequence is
 that a page reload requires re-entering the master password, which is a deliberate trade
 against convenience.
+
+Import and export put plaintext on disk only when the user asks for it. Files picked for
+import are read in memory and never uploaded as they are. The encrypted export is the
+default; the plain CSV needs the master password (checked locally, by unwrapping the Vault
+Key) and an explicit acknowledgement, and both screens tell the user to delete the file.
+What happens to a downloaded file afterwards is outside Vault's control.
 
 ### A6 — Credential stuffing and brute force
 

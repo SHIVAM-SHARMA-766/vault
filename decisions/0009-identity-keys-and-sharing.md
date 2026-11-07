@@ -5,7 +5,7 @@ Date: 2026-11-06
 
 ## Context
 
-Vault is becoming a password manager for teams ([ROADMAP.md](../ROADMAP.md)). Everything in
+Vault is becoming a password manager for teams ([docs/ROADMAP.md](../docs/ROADMAP.md)). Everything in
 it so far is symmetric: one random vault key per account, wrapped by keys only its owner can
 derive ([0001](0001-cryptography-and-key-hierarchy.md)). That cannot express "Rahul and Priya
 can both read the Finance folder" without the server learning a key.

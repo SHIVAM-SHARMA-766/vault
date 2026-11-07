@@ -112,3 +112,15 @@ export const IconMore = (p: P) => (
 export const IconX = (p: P) => (
   <Svg {...p}><path d="M6 6l12 12M18 6 6 18" /></Svg>
 )
+export const IconSwap = (p: P) => (
+  <Svg {...p}><path d="M7 4 3 8l4 4" /><path d="M3 8h14" /><path d="m17 20 4-4-4-4" /><path d="M21 16H7" /></Svg>
+)
+export const IconUpload = (p: P) => (
+  <Svg {...p}><path d="M12 15V3" /><path d="m7 8 5-5 5 5" /><path d="M5 21h14" /></Svg>
+)
+export const IconDownload = (p: P) => (
+  <Svg {...p}><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></Svg>
+)
+export const IconPulse = (p: P) => (
+  <Svg {...p}><path d="M3 12h4l3-7 4 14 3-7h4" /></Svg>
+)

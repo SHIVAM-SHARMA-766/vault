@@ -3,6 +3,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { passwordStrength } from '@vault/core'
 import type { EntryType } from '@vault/crypto'
 
 import {
@@ -113,23 +114,8 @@ export function PasswordInput(props: {
 
 // ── Strength ──────────────────────────────────────────────────────────────
 
-/** A rough entropy estimate from length and character classes. It does not
- *  know about dictionary words, so it errs generous; it is a nudge, not a
- *  guarantee. */
-export function strength(password: string): { score: 0 | 1 | 2 | 3 | 4; label: string } {
-  if (!password) return { score: 0, label: '' }
-  let pool = 0
-  if (/[a-z]/.test(password)) pool += 26
-  if (/[A-Z]/.test(password)) pool += 26
-  if (/[0-9]/.test(password)) pool += 10
-  if (/[^a-zA-Z0-9]/.test(password)) pool += 33
-  const unique = new Set(password).size
-  const bits = Math.log2(Math.max(pool, 2)) * Math.min(password.length, unique * 2)
-  if (bits < 40) return { score: 1, label: 'Weak' }
-  if (bits < 60) return { score: 2, label: 'Fair' }
-  if (bits < 80) return { score: 3, label: 'Strong' }
-  return { score: 4, label: 'Excellent' }
-}
+/** See packages/core's passwordStrength: an estimate, not a guarantee. */
+export const strength = passwordStrength
 
 export function StrengthMeter({ password }: { password: string }) {
   const { score, label } = strength(password)
