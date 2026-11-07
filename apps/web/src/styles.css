@@ -822,3 +822,7 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .policy-line { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 4px 0; }
 .policy-line p { margin: 0; }
 .audit { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; max-height: 360px; overflow-y: auto; }
+.emergency-form { margin-top: 10px; }
+.emergency-view { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
+.emergency-entry { border-top: 1px solid var(--line); padding: 8px 0; }
+.emergency-entry summary { cursor: pointer; font-weight: 600; }

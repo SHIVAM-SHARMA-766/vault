@@ -134,6 +134,8 @@ export {
   type OrgMeta,
   openGroupMeta,
   sealGroupMeta,
+  openEmergencyKey,
+  sealEmergencyKey,
   SHARED_KEY_BYTES,
   generateCollectionKey,
   generateOrgKey,

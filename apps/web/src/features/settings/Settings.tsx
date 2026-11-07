@@ -15,6 +15,7 @@ import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../..
 import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
 import { Activity, Devices } from './Devices.js'
+import { Emergency } from './Emergency.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 
 const MIN_LENGTH = 12
@@ -66,6 +67,7 @@ export function Settings({ state }: { state: session.Unlocked }) {
           </div>
         </section>
 
+        <Emergency state={state} />
         <Devices />
         <Activity />
       </main>

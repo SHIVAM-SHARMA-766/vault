@@ -206,6 +206,19 @@ export const api = {
       request<{ ticket: Ticket }>('POST', `/api/desk/tickets/${encodeURIComponent(id)}/close`, { token }),
   },
 
+  emergency: {
+    mine: (token: string) => request<{ grants: EmergencyGrant[] }>('GET', '/api/emergency', { token }),
+    create: (token: string, body: { email: string; label: string; fromName: string; waitDays: number }) => request<{ id: string }>('POST', '/api/emergency', { token, body }),
+    trusted: (token: string) => request<{ invitations: { id: string; fromName: string; waitDays: number }[]; grants: EmergencyTrust[] }>('GET', '/api/emergency/trusted', { token }),
+    accept: (token: string, id: string) => request<{ ok: true }>('POST', `/api/emergency/${id}/accept`, { token }),
+    confirm: (token: string, id: string, keyBlob: string) => request<{ ok: true }>('POST', `/api/emergency/${id}/confirm`, { token, body: { keyBlob } }),
+    request: (token: string, id: string) => request<{ ok: true; opensAt: string }>('POST', `/api/emergency/${id}/request`, { token }),
+    approve: (token: string, id: string) => request<{ ok: true }>('POST', `/api/emergency/${id}/approve`, { token }),
+    reject: (token: string, id: string) => request<{ ok: true }>('POST', `/api/emergency/${id}/reject`, { token }),
+    revoke: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/emergency/${id}`, { token }),
+    vault: (token: string, id: string) => request<{ keyBlob: string; entries: { id: string; blob: string }[]; folders: { id: string; blob: string }[] }>('GET', `/api/emergency/${id}/vault`, { token }),
+  },
+
   orgs: {
     list: (token: string) => request<{ orgs: OrgRow[] }>('GET', '/api/orgs', { token }),
     create: (token: string, body: { id: string; hint: string; label: string; nameBlob: string; orgKeyBlob: string }) =>
@@ -336,6 +349,8 @@ export const api = {
   },
 }
 
+export interface EmergencyGrant { id: string; label: string; waitDays: number; status: string; granteePublicKey: string | null; requestedAt: string | null; opensAt: string | null }
+export interface EmergencyTrust { id: string; fromName: string; waitDays: number; status: string; requestedAt: string | null; opensAt: string | null }
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }

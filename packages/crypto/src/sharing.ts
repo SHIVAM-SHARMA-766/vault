@@ -66,3 +66,10 @@ export const sealSharedItem = (collectionId: string, itemId: string, version: nu
   sealJson(key, content, itemAad(collectionId, itemId, version))
 export const openSharedItem = (collectionId: string, itemId: string, version: number, blob: string, key: Uint8Array) =>
   unsealJson<EntryContent>(key, blob, itemAad(collectionId, itemId, version))
+
+/** Emergency access: an account's vault key, sealed to a trusted contact's
+ *  public key, bound to that emergency grant. */
+export const sealEmergencyKey = (granteePublicKey: Uint8Array, vaultKey: Uint8Array, grantId: string): Promise<string> =>
+  sealForRecipient(granteePublicKey, vaultKey, `emergency-access:${grantId}`)
+export const openEmergencyKey = (privateKey: Uint8Array, ownPublicKey: Uint8Array, blob: string, grantId: string): Promise<Uint8Array> =>
+  openFromSender(privateKey, ownPublicKey, blob, `emergency-access:${grantId}`)

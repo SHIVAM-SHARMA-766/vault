@@ -24,6 +24,8 @@ export type ActivityKind =
   | 'regenerate-2fa-recovery-codes'
   | 'used-2fa-recovery-code'
   | 'revoke-session'
+  | 'emergency-request'
+  | 'emergency-access'
 
 const RETENTION_SECONDS = 90 * 24 * 60 * 60
 

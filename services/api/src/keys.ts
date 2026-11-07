@@ -88,3 +88,13 @@ export const groupAccessSk = (collectionId: string, groupId: string) => `GACCESS
 export const GROUP_ACCESS_PREFIX = 'GACCESS#'
 export const orgEventSk = (at: string, nonce: string) => `EVENT#${at}#${nonce}`
 export const ORG_EVENT_PREFIX = 'EVENT#'
+
+/** Emergency access (routes/emergency.ts): the grant lives with the grantor;
+ *  the invitation waits under the grantee's address digest, then a pointer
+ *  sits in the grantee's partition. */
+export const emergencySk = (id: string) => `EMGRANT#${id}`
+export const EMERGENCY_PREFIX = 'EMGRANT#'
+export const emergencyInviteSk = (id: string) => `EMINVITE#${id}`
+export const EMERGENCY_INVITE_PREFIX = 'EMINVITE#'
+export const emergencyTrustSk = (id: string) => `EMTRUST#${id}`
+export const EMERGENCY_TRUST_PREFIX = 'EMTRUST#'
