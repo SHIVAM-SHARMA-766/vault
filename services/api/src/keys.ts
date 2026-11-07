@@ -75,7 +75,11 @@ export const COLLECTION_PREFIX = 'COLL#'
 export const accessSk = (collectionId: string, userId: string) => `ACCESS#${collectionId}#${userId}`
 export const accessPrefix = (collectionId: string) => `ACCESS#${collectionId}#`
 export const ACCESS_PREFIX = 'ACCESS#'
-export const collectionItemsPk = (collectionId: string) => `COLLI#${collectionId}`
+/** Scoped by organization as well as collection: collection ids are chosen by
+ *  clients, so an id alone must never reach another organization's items. */
+export const collectionItemsPk = (orgId: string, collectionId: string) => `COLLI#${orgId}#${collectionId}`
+/** The partition items had before organization scoping (data migration only). */
+export const legacyCollectionItemsPk = (collectionId: string) => `COLLI#${collectionId}`
 export const itemSk = (itemId: string) => `ITEM#${itemId}`
 export const ITEM_PREFIX = 'ITEM#'
 export const userOrgSk = (orgId: string) => `ORG#${orgId}`

@@ -283,3 +283,72 @@ test('the server operator sees organizations by counts only, and can delete one 
   const audit = (await h.request('GET', '/api/admin/audit', { token: op.token })).body['records'] as { action: string }[]
   assert.ok(audit.some((r) => r.action === 'org.delete'))
 })
+
+test('security: a collection with the same id in another organization reaches none of the victim\'s items', async () => {
+  const h = harness()
+  const { alice, orgId, collId, collKey } = await orgWithCollection(h)
+  const itemId = uuid()
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${itemId}`, { token: alice.token, body: { blob: await sealSharedItem(collId, itemId, 1, entry, collKey), keyVersion: 1 } })
+
+  // Mallory makes her own organization and a collection with Alice's collection id.
+  const mallory = await person(h, 'mallory@example.test')
+  const mOrg = uuid()
+  const mKey = generateOrgKey()
+  await h.request('POST', '/api/orgs', { token: mallory.token, body: { id: mOrg, hint: 'x', nameBlob: await sealOrgMeta(mOrg, { name: 'x' }, mKey), orgKeyBlob: await sealOrgKey(mallory.keys.publicKey, mKey, mOrg) } })
+  assert.equal((await h.request('POST', `/api/orgs/${mOrg}/collections`, { token: mallory.token, body: {
+    id: collId, nameBlob: await sealCollectionMeta(mOrg, collId, { name: 'x' }, mKey), keyBlob: await sealCollectionKey(mallory.keys.publicKey, generateCollectionKey(), collId, 1),
+  } })).status, 201)
+  const seen = (await h.request('GET', `/api/orgs/${mOrg}/collections/${collId}/items`, { token: mallory.token })).body['items'] as unknown[]
+  assert.equal(seen.length, 0, 'none of Alice\'s items')
+  await h.request('DELETE', `/api/orgs/${mOrg}/collections/${collId}/items/${itemId}`, { token: mallory.token })
+  await h.request('DELETE', `/api/orgs/${mOrg}`, { token: mallory.token })
+  const still = (await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: alice.token })).body['items'] as unknown[]
+  assert.equal(still.length, 1, 'Alice\'s item survives Mallory deleting hers')
+})
+
+test('security: an item nobody can decrypt does not block rotation; it is named and dropped', async () => {
+  const h = harness()
+  const { alice, orgId, collId, collKey } = await orgWithCollection(h)
+  const good = uuid(); const planted = uuid()
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${good}`, { token: alice.token, body: { blob: await sealSharedItem(collId, good, 1, entry, collKey), keyVersion: 1 } })
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${planted}`, { token: alice.token, body: { blob: sealedBlob('garbage'), keyVersion: 1 } })
+  const k2 = generateCollectionKey()
+  const res = await h.request('POST', `/api/orgs/${orgId}/collections/${collId}/rotate`, { token: alice.token, body: {
+    keyVersion: 2, grants: [{ userId: alice.userId, keyBlob: await sealCollectionKey(alice.keys.publicKey, k2, collId, 2) }],
+    items: [{ id: good, blob: await sealSharedItem(collId, good, 2, entry, k2) }], drop: [planted],
+  } })
+  assert.equal(res.status, 200)
+  const items = (await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: alice.token })).body['items'] as { id: string }[]
+  assert.deepEqual(items.map((i) => i.id), [good])
+})
+
+test('migration: items stored before organization scoping move to their collection\'s organization', async () => {
+  const h = harness()
+  const { alice, orgId, collId, collKey } = await orgWithCollection(h)
+  const itemId = uuid()
+  await h.store.put({ pk: `COLLI#${collId}`, sk: `ITEM#${itemId}`, id: itemId, blob: await sealSharedItem(collId, itemId, 1, entry, collKey), keyVersion: 1, updatedAt: 'x' })
+  const { migrateItemPartitions } = await import('../src/routes/orgs.js')
+  assert.equal(await migrateItemPartitions(h.app), 1)
+  assert.equal(await migrateItemPartitions(h.app), 0, 'runs once')
+  const items = (await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: alice.token })).body['items'] as { id: string }[]
+  assert.deepEqual(items.map((i) => i.id), [itemId])
+})
+
+test('security: deleting an account leaves its organizations; an owner must delete theirs first', async () => {
+  const h = harness()
+  const { alice, orgId, orgKey, collId, collKey } = await orgWithCollection(h)
+  const bob = await person(h, 'bob@example.test')
+  await h.request('POST', `/api/orgs/${orgId}/invites`, { token: alice.token, body: { email: bob.email } })
+  await h.request('POST', `/api/orgs/${orgId}/accept`, { token: bob.token })
+  await h.request('POST', `/api/orgs/${orgId}/members/${bob.userId}/confirm`, { token: alice.token, body: { orgKeyBlob: await sealOrgKey(bob.keys.publicKey, orgKey, orgId) } })
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/access/${bob.userId}`, { token: alice.token, body: { permission: 'view', keyBlob: await sealCollectionKey(bob.keys.publicKey, collKey, collId, 1) } })
+  const { emailDigest } = await import('../src/identity.js')
+  h.app.adminDigests = new Set([emailDigest('op@example.test', h.app.config.pepper)])
+  const op = await person(h, 'op@example.test')
+  assert.equal((await h.request('POST', `/api/admin/users/${alice.userId}/delete`, { token: op.token, body: { confirm: alice.userId } })).status, 409, 'owns an organization')
+  assert.equal((await h.request('POST', `/api/admin/users/${bob.userId}/delete`, { token: op.token, body: { confirm: bob.userId } })).status, 200)
+  const members = (await h.request('GET', `/api/orgs/${orgId}/members`, { token: alice.token })).body['members'] as { userId: string }[]
+  assert.equal(members.some((m) => m.userId === bob.userId), false)
+  const colls = (await h.request('GET', `/api/orgs/${orgId}/collections`, { token: alice.token })).body['collections'] as { rotationNeeded: boolean }[]
+  assert.equal(colls[0]!.rotationNeeded, true)
+})

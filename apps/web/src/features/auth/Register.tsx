@@ -80,11 +80,9 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
       session.lock()
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
-        setError(inviteCode.trim()
-          ? 'That invitation code is not valid. It may have been used or have expired.'
-          : 'New accounts need an invitation code on this server.')
-      } else if (err instanceof ApiError && err.status === 409) {
-        setError('That address is already registered.')
+        // Deliberately the same for a bad invitation and an address that
+        // already has an account: sign-up must not reveal which (A7).
+        setError(inviteCode.trim() || setupCode ? err.message : 'New accounts need an invitation code on this server — or, if you already have an account, sign in.')
       } else {
         setError(err instanceof Error ? err.message : 'Something went wrong.')
       }

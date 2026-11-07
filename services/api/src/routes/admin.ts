@@ -12,7 +12,7 @@ import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { inviteMessage, notify } from '../mail.js'
 import { openTicketCount } from './desk.js'
-import { purgeOrg } from './orgs.js'
+import { leaveAllOrgs, purgeOrg } from './orgs.js'
 import { requireEmail } from '../validate.js'
 import {
   BACKUP_SK,
@@ -242,7 +242,10 @@ export async function deleteUser(app: App, actor: string, actorRole: Role, event
   const reg = await targetUser(app, actor, actorRole, id, false)
   const body = parseJsonBody<{ confirm?: unknown }>(event)
   if (body.confirm !== id) throw badRequest('Send the user id as "confirm" to delete an account.')
+  const { owned } = await leaveAllOrgs(app, id, true)
+  if (owned.length) throw new HttpError(409, 'conflict', `This account owns ${owned.length} organization(s) (${owned.join(', ')}). Delete them first under Organizations.`)
   await audit(app, actor, 'user.delete', id, reg.label)
+  await leaveAllOrgs(app, id, false)
   for (const item of await app.store.query(userPk(id))) await app.store.delete(item.pk, item.sk)
   await app.store.delete(emailPk(reg.emailDigest), EMAIL_SK)
   await app.store.delete(SYSTEM_PK, registrySk(id))

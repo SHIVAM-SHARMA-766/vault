@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { App } from '../context.js'
 import {
+  HttpError,
   type LambdaEvent,
   type LambdaResponse,
   badRequest,
@@ -166,6 +167,8 @@ export async function prelogin(app: App, event: LambdaEvent): Promise<LambdaResp
   })
 }
 
+const registrationRefused = () => new HttpError(403, 'forbidden', 'An account could not be created with these details. Check the invitation code — or, if you already have an account, sign in.')
+
 export async function register(app: App, event: LambdaEvent): Promise<LambdaResponse> {
   // Closed by default. A missing or malformed setting therefore refuses rather
   // than silently leaving the vault open to anyone who finds the URL. The
@@ -184,8 +187,8 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   // A setup code only ever creates the first account.
   if (setup && (await listRegistry(app)).length > 0) throw forbidden()
   const open = !setup && (app.allowRegistration || mode === 'open')
-  if (!open && !setup && mode !== 'invite') throw forbidden()
-  if (!open && !usable) throw forbidden()
+  if (!open && !setup && mode !== 'invite') throw registrationRefused()
+  if (!open && !usable) throw registrationRefused()
 
   const email = requireEmail(body['email'])
   await limitAuth(app, event, email)
@@ -212,7 +215,9 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
       { mustNotExist: true },
     )
   } catch (err) {
-    if (err instanceof AlreadyExists) throw conflict('That address is already registered.')
+    // The same refusal as a bad invitation, so registration does not tell a
+    // stranger whether an address has an account (threat A7).
+    if (err instanceof AlreadyExists) throw registrationRefused()
     throw err
   }
 
@@ -507,6 +512,17 @@ const DUMMY_VERIFIER =
 /** Checks the second factor on an account that has one. Called after the
  *  password (or recovery key) is proved. Consumes a recovery code if one is
  *  used, and records the step of a TOTP code so it cannot be replayed. */
+/** A marker row written with a condition: true for the first caller only. */
+async function claimOnce(app: App, userId: string, sk: string, ttlSeconds: number): Promise<boolean> {
+  try {
+    await app.store.put({ pk: userPk(userId), sk, expiresAt: Math.floor(app.now() / 1000) + ttlSeconds }, { mustNotExist: true })
+    return true
+  } catch (err) {
+    if (err instanceof AlreadyExists) return false
+    throw err
+  }
+}
+
 async function requireSecondFactor(
   app: App, profile: Profile, body: Record<string, unknown>, event: LambdaEvent,
 ): Promise<void> {
@@ -518,12 +534,16 @@ async function requireSecondFactor(
   if (code) {
     const step = await verifyTotp(openSecret(profile.totp.secret, app.config.pepper), code, app.now(), profile.totp.lastStep)
     if (step === null) throw invalidTwoFactor()
+    // Claimed atomically, so two sign-ins racing with one code cannot both
+    // pass the read-then-write of lastStep.
+    if (!(await claimOnce(app, profile.userId, `TOTPSTEP#${step}`, 10 * 60))) throw invalidTwoFactor()
     await app.store.put({ ...profile, totp: { ...profile.totp, lastStep: step } })
     return
   }
   const hash = hashRecoveryCode(recovery, app.config.pepper)
   const left = (profile.recoveryCodes ?? []).filter((h) => h !== hash)
   if (left.length === (profile.recoveryCodes ?? []).length) throw invalidTwoFactor()
+  if (!(await claimOnce(app, profile.userId, `RCUSED#${hash}`, 400 * 24 * 60 * 60))) throw invalidTwoFactor()
   await app.store.put({ ...profile, recoveryCodes: left })
   await recordActivity(app, profile.userId, 'used-2fa-recovery-code', event)
 }

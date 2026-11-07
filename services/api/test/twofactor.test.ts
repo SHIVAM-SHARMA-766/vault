@@ -141,3 +141,15 @@ test('an admin can reset a member who lost their phone and codes, and it is audi
   const audit = (await h.request('GET', '/api/admin/audit', { token: ownerToken })).body['records'] as Array<Record<string, unknown>>
   assert.ok(audit.some((r) => r['action'] === 'user.reset-2fa'))
 })
+
+test('security: one TOTP code or recovery code works once, even when two sign-ins race', async () => {
+  const { h, code, advance, recoveryCodes } = await withTwoFactor()
+  advance()
+  const totpCode = await code()
+  const login = (extra: Record<string, unknown>) => h.request('POST', '/api/auth/login', { body: { email: registration()['email'], authKey: fixtureB64('auth-key'), ...extra } })
+  const both = await Promise.all([login({ totpCode }), login({ totpCode })])
+  assert.deepEqual(both.map((r) => r.status).sort(), [200, 401])
+  const rc = recoveryCodes[0]!
+  const twice = await Promise.all([login({ recoveryCode: rc }), login({ recoveryCode: rc })])
+  assert.deepEqual(twice.map((r) => r.status).sort(), [200, 401])
+})

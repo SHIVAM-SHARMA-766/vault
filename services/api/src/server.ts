@@ -19,6 +19,7 @@ import { publishToDisk } from './site.js'
 import { ensureSetup } from './system.js'
 import { createMailer } from './mail.js'
 import { closeStaleTickets } from './routes/desk.js'
+import { migrateItemPartitions } from './routes/orgs.js'
 import { backupsEnabled, runBackup } from './backup.js'
 import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
@@ -72,6 +73,9 @@ export async function start(): Promise<void> {
   }
 
   console.log(app.mailer ? `mail: via ${app.config.mail.host}:${app.config.mail.port}` : 'mail: off (set SMTP_HOST and MAIL_FROM to send invitations and security notices)')
+
+  const movedItems = await migrateItemPartitions(app)
+  if (movedItems) console.log(`moved ${movedItems} shared item(s) into organization-scoped storage`)
 
   // A brand-new server: say how to create the owner account.
   const setupCode = await ensureSetup(app)
@@ -148,13 +152,15 @@ export async function start(): Promise<void> {
           requestContext: {
             http: {
               method: req.method ?? 'GET',
-              // Behind a proxy (TRUST_PROXY=true), the client is the first
-              // address in X-Forwarded-For; without it every request would
+              // Behind a proxy (TRUST_PROXY=true), the client is the address
+              // the proxy appended to X-Forwarded-For; without it every request would
               // seem to come from the proxy and per-address rate limits
               // would apply to everyone at once. Exposed directly, that
               // header is whatever the client says, so the socket is used.
               sourceIp: config.trustProxy
-                ? (req.headers['x-forwarded-for'] ?? '').toString().split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1'
+                // The rightmost entry is the one our proxy added; anything to
+                // its left came from the client and can be forged.
+                ? (req.headers['x-forwarded-for'] ?? '').toString().split(',').map((x) => x.trim()).filter(Boolean).pop() || req.socket.remoteAddress || '127.0.0.1'
                 : req.socket.remoteAddress || '127.0.0.1',
               ...(req.headers['user-agent'] ? { userAgent: req.headers['user-agent'] } : {}),
             },

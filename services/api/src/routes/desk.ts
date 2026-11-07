@@ -28,7 +28,7 @@ import {
 } from '../keys.js'
 import { notify } from '../mail.js'
 import { enforce } from '../ratelimit.js'
-import { type Role, can } from '../roles.js'
+import { type Role, can, outranks, roleOf } from '../roles.js'
 import type { Item } from '../store.js'
 import { audit, createInvite, getRegistry } from '../system.js'
 import { requireEmail } from '../validate.js'
@@ -311,7 +311,7 @@ export async function approveAccess(app: App, actor: string, actorRole: Role, ev
 /** Resets two-factor sign-in for the account behind a sign-in request.
  *  Staff must have verified the person through another channel first; the
  *  UI says so, and the action is audited. */
-export async function resetTwoFactorFor(app: App, actor: string, id: string): Promise<LambdaResponse> {
+export async function resetTwoFactorFor(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
   const t = await getTicket(app, id)
   if (t.kind !== 'signin') throw badRequest('Only sign-in requests can do this.')
   if (!t.requester.email) throw new HttpError(409, 'conflict', 'The requester address has been erased.')
@@ -320,7 +320,10 @@ export async function resetTwoFactorFor(app: App, actor: string, id: string): Pr
   const userId = String(pointer['userId'])
   const profile = await app.store.get(userPk(userId), PROFILE_SK)
   if (!profile) throw notFound()
-  if (app.adminDigests.has(String(profile['emailDigest']))) throw forbidden()
+  // The same rank rule as the admin panel: an admin can reset a member's or
+  // a support agent's two-factor, never an owner's or another admin's.
+  if (userId === actor) throw badRequest('That cannot be done to your own account.')
+  if (!outranks(actorRole, await roleOf(app, userId))) throw forbidden()
   await audit(app, actor, 'desk.reset-2fa', userId, `ticket #${t.number}`)
   const { totp: _t, recoveryCodes: _r, pendingTotp: _p, ...rest } = profile
   await app.store.put(rest as typeof profile)
