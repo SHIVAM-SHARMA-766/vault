@@ -14,12 +14,14 @@ export type Route =
   | { name: 'vault' }
   | { name: 'settings' }
   | { name: 'transfer' }
+  | { name: 'support' }
   | { name: 'admin'; tab: string | null }
 
 export function parse(pathname: string): Route {
   const parts = pathname.replace(/^\/app\/?/, '').split('/').filter(Boolean)
   if (parts[0] === 'settings') return { name: 'settings' }
   if (parts[0] === 'import-export') return { name: 'transfer' }
+  if (parts[0] === 'support') return { name: 'support' }
   if (parts[0] === 'admin') return { name: 'admin', tab: parts[1] ?? null }
   return { name: 'vault' }
 }
@@ -29,6 +31,7 @@ export function href(route: Route): string {
     case 'vault': return '/app/'
     case 'settings': return '/app/settings'
     case 'transfer': return '/app/import-export'
+    case 'support': return '/app/support'
     case 'admin': return route.tab ? `/app/admin/${route.tab}` : '/app/admin'
   }
 }

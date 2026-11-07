@@ -189,6 +189,21 @@ export const api = {
   deleteFolder: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/vault/folders/${encodeURIComponent(id)}`, { token }),
 
+  desk: {
+    /** No account needed: ask for access, or for help signing in. */
+    request: (body: { kind: 'access' | 'signin'; name: string; email: string; message: string }) =>
+      request<{ number: number }>('POST', '/api/desk/requests', { body }),
+    mine: (token: string) => request<{ tickets: Ticket[] }>('GET', '/api/desk/tickets', { token }),
+    create: (token: string, body: { subject: string; category: string; message: string; email?: string }) =>
+      request<{ ticket: Ticket }>('POST', '/api/desk/tickets', { token, body }),
+    get: (token: string, id: string) =>
+      request<{ ticket: Ticket; messages: TicketMessage[] }>('GET', `/api/desk/tickets/${encodeURIComponent(id)}`, { token }),
+    reply: (token: string, id: string, body: string) =>
+      request<{ ticket: Ticket }>('POST', `/api/desk/tickets/${encodeURIComponent(id)}/messages`, { token, body: { body } }),
+    close: (token: string, id: string) =>
+      request<{ ticket: Ticket }>('POST', `/api/desk/tickets/${encodeURIComponent(id)}/close`, { token }),
+  },
+
   sessions: (token: string) => request<{ sessions: DeviceSession[] }>('GET', '/api/sessions', { token }),
   renameSession: (token: string, id: string, name: string) =>
     request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
@@ -233,6 +248,17 @@ export const api = {
       request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
         'POST', '/api/admin/invites', { token, body: { label, days, role, ...(email ? { email } : {}) } },
       ),
+    desk: (token: string) => request<{ tickets: StaffTicket[]; counts: Record<TicketStatus, number> }>('GET', '/api/admin/desk', { token }),
+    ticket: (token: string, id: string) =>
+      request<{ ticket: StaffTicket; messages: TicketMessage[] }>('GET', `/api/admin/desk/${encodeURIComponent(id)}`, { token }),
+    replyTicket: (token: string, id: string, body: string, internal: boolean) =>
+      request<{ ticket: StaffTicket }>('POST', `/api/admin/desk/${encodeURIComponent(id)}/messages`, { token, body: { body, internal } }),
+    updateTicket: (token: string, id: string, patch: { status?: TicketStatus; priority?: 'normal' | 'high'; assignee?: string | null }) =>
+      request<{ ticket: StaffTicket }>('PUT', `/api/admin/desk/${encodeURIComponent(id)}`, { token, body: patch }),
+    approveAccess: (token: string, id: string, role: Role = 'user') =>
+      request<{ ticket: StaffTicket; code: string; emailed: boolean }>('POST', `/api/admin/desk/${encodeURIComponent(id)}/approve`, { token, body: { role } }),
+    resetTicket2fa: (token: string, id: string) =>
+      request<{ ticket: StaffTicket; hadTwoFactor: boolean }>('POST', `/api/admin/desk/${encodeURIComponent(id)}/reset-2fa`, { token }),
     testMail: (token: string, to: string) => request<{ sent: true }>('POST', '/api/admin/mail/test', { token, body: { to } }),
     deleteInvite: (token: string, id: string) =>
       request<{ ok: true }>('DELETE', `/api/admin/invites/${encodeURIComponent(id)}`, { token }),
@@ -254,16 +280,26 @@ export const api = {
   },
 }
 
+export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
+export interface Ticket {
+  id: string; number: number; kind: 'access' | 'signin' | 'support'; subject: string; category: string
+  status: TicketStatus; createdAt: string; updatedAt: string; lastFrom: 'requester' | 'staff'; emailUpdates: boolean
+}
+export interface StaffTicket extends Ticket {
+  priority: 'normal' | 'high'; assignee: string | null; closedAt: string | null
+  requester: { userId: string | null; name: string | null; email: string | null; emailErased: boolean }
+}
+export interface TicketMessage { at: string; from: 'requester' | 'staff'; author: string; body: string; internal: boolean }
 export interface DeviceSession { id: string; device: string; name?: string; ip: string; createdAt: string; lastUsedAt: string; current: boolean }
 export type RegistrationMode = 'closed' | 'invite' | 'open'
 /** A two-factor code: six digits from the authenticator app, or a recovery code. */
 export type SecondFactor = { totpCode: string } | { recoveryCode: string }
 /** Public key in the clear (base64url, 65 bytes); private key sealed under the vault key. */
 export interface Identity { publicKey: string; wrappedPrivateKey: string }
-export type Role = 'owner' | 'admin' | 'marketing' | 'viewer' | 'user'
+export type Role = 'owner' | 'admin' | 'support' | 'marketing' | 'viewer' | 'user'
 export type Permission =
   | 'overview.read' | 'users.read' | 'users.write' | 'roles.write' | 'invites.read' | 'invites.write'
-  | 'settings.write' | 'audit.read' | 'site.read' | 'site.write' | 'site.publish'
+  | 'settings.write' | 'audit.read' | 'site.read' | 'site.write' | 'site.publish' | 'desk.read' | 'desk.write'
 
 export type SiteContent = Record<string, Record<string, Record<string, unknown>>>
 export interface SiteMedia { id: string; type: string; name: string; bytes: number; uploadedAt: string; uploadedBy: string }
@@ -292,6 +328,7 @@ export interface AdminOverview {
   registrationForcedOpen: boolean
   lastBackup: { at: string | null; object: string | null; bytes: number | null } | null
   mail: boolean
+  openTickets: number
   serverTime: string
   uptimeSeconds: number
 }

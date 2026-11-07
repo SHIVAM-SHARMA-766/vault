@@ -456,7 +456,7 @@ input.mono { font-family: var(--mono); }
 .admin-head p { margin-top: 4px; font-size: 13.5px; max-width: 640px; }
 .admin-actions { display: flex; gap: 8px; }
 
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 18px; }
 .stat {
   display: flex; flex-direction: column; gap: 2px; padding: 18px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -774,3 +774,31 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
   .detail-actions .btn-label { display: none; }
   .detail-actions .btn-sm { padding-left: 10px; padding-right: 10px; }
 }
+
+/* ── Service desk ──────────────────────────────────────────────────── */
+.ticket-list { list-style: none; margin: 0; padding: 0; }
+.ticket-list > li { border-top: 1px solid var(--line); }
+.ticket-list > li:first-child { border-top: 0; }
+.ticket-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px 4px; background: none; border: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ticket-num { color: var(--muted); font-variant-numeric: tabular-nums; min-width: 36px; }
+.ticket-subject { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thread { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 12px; }
+.bubble { max-width: 88%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface, var(--bg)); }
+.bubble p { margin: 4px 0 0; white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
+.bubble-meta { font-size: 12px; color: var(--muted); }
+.bubble-requester { align-self: flex-start; }
+.bubble-staff { align-self: flex-end; background: var(--accent-soft); border-color: transparent; }
+.bubble-internal { align-self: stretch; max-width: none; background: var(--warn-soft); border-style: dashed; }
+.thread-reply textarea { width: 100%; }
+.thread-reply .settings-actions { align-items: center; justify-content: space-between; }
+.status-open, .status-in_progress { background: var(--accent-soft); color: var(--accent); }
+.status-waiting { background: var(--warn-soft); color: var(--warn); }
+.status-resolved { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+.desk-filters { margin-bottom: 14px; }
+.desk-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.desk-side { display: flex; flex-direction: column; gap: 12px; }
+.small-head { font-size: 13px; font-weight: 650; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+.row-link { cursor: pointer; }
+.link-strong { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer; text-align: left; margin-right: 6px; }
+.link-strong:hover { color: var(--accent); }
+@media (max-width: 900px) { .desk-grid { grid-template-columns: 1fr; } }

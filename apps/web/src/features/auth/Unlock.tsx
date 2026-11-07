@@ -8,7 +8,9 @@ import { IconAlert } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
 import { SecondFactorStep } from '../../ui/SecondFactor.js'
 
-export function Unlock({ onRegister, onRecover, forAdmin = false }: { onRegister: () => void; onRecover: () => void; forAdmin?: boolean }) {
+export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, forAdmin = false }: {
+  onRegister: () => void; onRecover: () => void; onRequestAccess: () => void; onSigninHelp: () => void; forAdmin?: boolean
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -141,10 +143,13 @@ export function Unlock({ onRegister, onRecover, forAdmin = false }: { onRegister
 
       <p className="auth-forgot">
         <button type="button" className="link" onClick={onRecover}>Forgot your master password? Use your recovery key</button>
+        <br />
+        <button type="button" className="link" onClick={onSigninHelp}>Lost your authenticator, or can't sign in? Ask for help</button>
       </p>
 
       <p className="auth-switch">
         New here? <button type="button" className="link" onClick={onRegister}>Create an account</button>
+        {' · '}<button type="button" className="link" onClick={onRequestAccess}>Request access</button>
       </p>
     </form>
   )

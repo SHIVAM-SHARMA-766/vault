@@ -55,6 +55,16 @@ try {
   await site.goto(`${s.base}/`)
   await shot(site, 'website')
 
+  // A visitor asks for access (a service desk ticket).
+  await site.goto(`${s.base}/app/`)
+  await site.getByRole('button', { name: 'Request access' }).click()
+  await site.fill('#pr-name', 'Vikram Mehta')
+  await site.fill('#pr-email', 'vikram@example.com')
+  await site.fill('#pr-message', 'Joining the platform team on Monday.')
+  await shot(site, 'request-access')
+  await site.getByRole('button', { name: 'Send request' }).click()
+  await site.waitForSelector('text=Your request number')
+
   // Sign-up's recovery key screen.
   const page = await s.person({ width: 1440, height: 900 })
   await page.goto(`${s.base}/app/`)
@@ -107,11 +117,30 @@ try {
   await page.locator('#s-sessions').scrollIntoViewIfNeeded()
   await shot(page, 'devices')
 
+  // Help & support.
+  await s.menu(page, 'Help & support')
+  await page.getByRole('button', { name: 'New request' }).click()
+  await page.fill('#t-subject', 'Importing from Zoho Vault')
+  await page.selectOption('#t-category', 'problem')
+  await page.fill('#t-message', 'The Zoho CSV imported, but the usernames are missing on a few items.')
+  await page.getByRole('button', { name: 'Send', exact: true }).click()
+  await page.waitForSelector('.bubble')
+
   // The admin panel.
   await s.menu(page, 'Admin panel')
   await page.waitForSelector('.admin-section')
   await shot(page, 'admin')
   // A reload would lock the vault (keys live in memory only), so navigate in-app.
+  await page.locator('.sidebar .side-item', { hasText: 'Service desk' }).click()
+  await page.waitForSelector('.desk-filters')
+  await page.locator('.desk-filters .chip', { hasText: 'All' }).click()
+  await shot(page, 'desk')
+  await page.locator('tr', { hasText: 'Importing from Zoho' }).locator('.link-strong').click()
+  await page.fill('textarea[aria-label="Reply"]', 'Thanks — could you check whether those items have a "User Name" line in SecretData?')
+  await page.getByRole('button', { name: 'Send reply' }).click()
+  await page.waitForSelector('.bubble-staff')
+  await shot(page, 'desk-ticket')
+  await page.getByRole('button', { name: 'Queue' }).click()
   await page.locator('.sidebar .side-item', { hasText: 'Website' }).click()
   await page.waitForSelector('.site-editor')
   await shot(page, 'admin-website')
