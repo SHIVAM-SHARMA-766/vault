@@ -16,10 +16,11 @@ import { emailDigest } from './identity.js'
 import type { App } from './context.js'
 import type { LambdaEvent } from './http.js'
 import { publishToDisk } from './site.js'
+import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
 import type { ManagedStore } from './store.js'
 
-const HOST = '127.0.0.1'
+const HOST = 'localhost'
 
 /** Bodies are small — one sealed entry, or one image of at most 2 MB sent as
  *  base64 from the admin panel. A cap stops a single request from consuming
@@ -72,7 +73,17 @@ export async function start(): Promise<void> {
 
   const router = buildRouter(app)
 
+  const { config } = app
+  const roots = { web: config.webRoot, site: config.site.outputDir, origin: config.origin }
+
   const server = createServer((req, res) => {
+    // Not the API: the client, the website and media, when this process
+    // serves them itself (src/web.ts). Otherwise a proxy in front does.
+    if (!(req.url ?? '/').startsWith('/api/')) {
+      if (config.serveStatic) serveStatic(req, res, roots)
+      else { res.writeHead(404, { 'content-type': 'application/json' }); res.end('{"error":"not_found","message":"Not found."}') }
+      return
+    }
     const chunks: Buffer[] = []
     let size = 0
     let aborted = false
@@ -101,10 +112,14 @@ export async function start(): Promise<void> {
           requestContext: {
             http: {
               method: req.method ?? 'GET',
-              // Caddy sets X-Forwarded-For; without it every request would
-              // appear to come from the loopback address and per-address rate
-              // limiting would apply to everyone at once.
-              sourceIp: (req.headers['x-forwarded-for'] ?? '').toString().split(',')[0]?.trim() || '127.0.0.1',
+              // Behind a proxy (TRUST_PROXY=true), the client is the first
+              // address in X-Forwarded-For; without it every request would
+              // seem to come from the proxy and per-address rate limits
+              // would apply to everyone at once. Exposed directly, that
+              // header is whatever the client says, so the socket is used.
+              sourceIp: config.trustProxy
+                ? (req.headers['x-forwarded-for'] ?? '').toString().split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1'
+                : req.socket.remoteAddress || '127.0.0.1',
               ...(req.headers['user-agent'] ? { userAgent: req.headers['user-agent'] } : {}),
             },
           },
@@ -117,8 +132,8 @@ export async function start(): Promise<void> {
     })
   })
 
-  server.listen(app.config.port, HOST, () => {
-    console.log(`vault api listening on ${HOST}:${app.config.port}`)
+  server.listen(app.config.port, app.config.host, () => {
+    console.log(`vault api listening on ${app.config.host}:${app.config.port}${app.config.serveStatic ? ' (serving client and site)' : ''}`)
   })
 
   // systemd restarts on failure; the job here is to exit rather than linger in

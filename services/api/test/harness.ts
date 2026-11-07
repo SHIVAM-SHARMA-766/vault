@@ -45,6 +45,10 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
     store,
     config: {
       port: 3000,
+      host: '127.0.0.1',
+      trustProxy: true,
+      serveStatic: false,
+      webRoot: '',
       origin: 'https://vault.test',
       allowRegistration: false,
       adminEmails: [],

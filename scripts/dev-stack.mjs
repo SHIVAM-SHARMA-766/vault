@@ -18,7 +18,7 @@
 // The browser tests (tests/e2e) start one of these per run.
 
 import { createServer } from 'node:http'
-import { mkdtempSync, readFileSync, statSync } from 'node:fs'
+import { mkdtempSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -32,12 +32,11 @@ const { buildRouter, handleRequest } = await import(join(API, 'app.js'))
 const { MemoryStore } = await import(join(API, 'store-memory.js'))
 const { emailDigest } = await import(join(API, 'identity.js'))
 const { publishToDisk } = await import(join(API, 'site.js'))
+const { serveStatic } = await import(join(API, 'web.js'))
 
 const PORT = Number(process.env.PORT ?? 8080)
 const OWNER = process.env.OWNER_EMAIL ?? 'owner@example.test'
 const PEPPER = 'dev-stack-pepper-not-a-secret-0000000000'
-const CSP = readFileSync(join(ROOT, 'apps/web/Caddyfile'), 'utf8').match(/Content-Security-Policy "([^"]+)"/)?.[1]
-if (!CSP) { console.error('could not read the Content-Security-Policy from apps/web/Caddyfile'); process.exit(1) }
 
 const app = {
   store: new MemoryStore(),
@@ -48,7 +47,7 @@ const app = {
   adminDigests: new Set([emailDigest(OWNER, PEPPER)]),
   site: { sourceDir: join(ROOT, 'apps/site'), outputDir: mkdtempSync(join(tmpdir(), 'vault-dev-site-')), origin: `http://localhost:${PORT}` },
   config: {
-    port: PORT, origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: [OWNER],
+    port: PORT, host: '127.0.0.1', trustProxy: true, serveStatic: true, webRoot: '', origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: [OWNER],
     site: { sourceDir: '', outputDir: '' },
     db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',
@@ -57,20 +56,7 @@ const app = {
 const router = buildRouter(app)
 await publishToDisk(app, app.site)
 
-const TYPES = { html: 'text/html; charset=utf-8', js: 'text/javascript', css: 'text/css', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp', map: 'application/json', txt: 'text/plain' }
-const isFile = (p) => { try { return statSync(p).isFile() } catch { return false } }
 const WEB = join(ROOT, 'apps/web/dist')
-const SITE = () => join(app.site.outputDir, 'current')
-
-function send(res, status, file) {
-  res.writeHead(status, {
-    'content-type': TYPES[file.split('.').pop()] ?? 'application/octet-stream',
-    'content-security-policy': CSP,
-    'x-content-type-options': 'nosniff',
-    'cache-control': 'no-store',
-  })
-  res.end(readFileSync(file))
-}
 
 createServer((req, res) => {
   const chunks = []
@@ -95,22 +81,8 @@ createServer((req, res) => {
       return res.end(r.body)
     }
 
-    if (p === '/app') { res.writeHead(308, { location: '/app/' }); return res.end() }
-    if (p.startsWith('/app/')) {
-      const file = join(WEB, p.slice('/app/'.length) || 'index.html')
-      if (isFile(file)) return send(res, 200, file)
-      if (!/\.[a-z0-9]+$/i.test(p)) return send(res, 200, join(WEB, 'index.html'))
-      return send(res, 404, join(SITE(), '404.html'))
-    }
-
-    if (/^\/media\/m_[A-Za-z0-9_-]+\.(png|jpg|webp)$/.test(p) && isFile(join(app.site.outputDir, p))) {
-      return send(res, 200, join(app.site.outputDir, p))
-    }
-
-    for (const c of [p.endsWith('/') ? `${p}index.html` : p, `${p}.html`]) {
-      if (isFile(join(SITE(), c))) return send(res, 200, join(SITE(), c))
-    }
-    send(res, 404, join(SITE(), '404.html'))
+    // Everything else exactly as the self-hosted server serves it (src/web.ts).
+    serveStatic(req, res, { web: WEB, site: app.site.outputDir, origin: `http://localhost:${PORT}` })
   })
 }).listen(PORT, '127.0.0.1', () => {
   console.log(`vault dev stack on http://localhost:${PORT}  (owner: ${OWNER}, registration ${app.allowRegistration ? 'open' : 'closed'})`)

@@ -14,7 +14,11 @@ address.
 |---|---|---|---|---|
 | `VAULT_HOSTNAME` | one of these two | — | | The public hostname, e.g. `vault.example.com` |
 | `SITE_ORIGIN` | one of these two | `https://$VAULT_HOSTNAME` | | The public origin with scheme. Only the origin is kept |
-| `PORT` | | `3000` | | Port on 127.0.0.1; the reverse proxy forwards `/api/*` to it |
+| `PORT` | | `3000` | | Port to listen on |
+| `HOST` | | `127.0.0.1` | | Address to listen on: `0.0.0.0` in a container, `127.0.0.1` behind a proxy on the same host |
+| `TRUST_PROXY` | | `true` | | Take the client address from `X-Forwarded-For`. Set `false` when clients reach the server directly, or they can forge it and dodge rate limits |
+| `SERVE_STATIC` | | `false` | | `true` serves the client, website and media from this process with the same headers and caching as the Caddyfile, so only a TLS proxy is needed in front. The container image sets it |
+| `WEB_ROOT` | | `web/` beside the server | | The built client, when `SERVE_STATIC` is on |
 | `DB_DRIVER` | | `mysql` | | `sqlite` (one file, no database server — personal installs), `postgres` (business installs, several app instances), or `mysql` (the reference instance) |
 | `DB_PATH` | sqlite | `/var/lib/vault/vault.db` | | The SQLite file. Its directory must be writable and backed up |
 | `DB_HOST` | mysql, postgres | — | | Database host |

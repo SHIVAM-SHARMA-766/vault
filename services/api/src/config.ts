@@ -17,6 +17,14 @@ import { fileURLToPath } from 'node:url'
 
 export interface Config {
   port: number
+  /** Address to listen on. 127.0.0.1 behind a local proxy; 0.0.0.0 in a container. */
+  host: string
+  /** Use X-Forwarded-For for the client address. Only behind a proxy. */
+  trustProxy: boolean
+  /** Serve the client, website and media from this process (src/web.ts). */
+  serveStatic: boolean
+  /** The built client, when serveStatic. */
+  webRoot: string
   /** The public origin, e.g. https://vault.example.com. Used for absolute URLs
    *  on the rendered website. */
   origin: string
@@ -55,7 +63,11 @@ export interface Variable {
 export const VARIABLES: readonly Variable[] = [
   { name: 'VAULT_HOSTNAME', required: false, description: 'The public hostname, e.g. vault.example.com. Either this or SITE_ORIGIN is required.' },
   { name: 'SITE_ORIGIN', required: false, description: 'The public origin with scheme, e.g. https://vault.example.com. Overrides https://VAULT_HOSTNAME.' },
-  { name: 'PORT', required: false, default: '3000', description: 'Port the API listens on, on 127.0.0.1 only. The reverse proxy forwards /api/* to it.' },
+  { name: 'PORT', required: false, default: '3000', description: 'Port to listen on.' },
+  { name: 'HOST', required: false, default: '127.0.0.1', description: 'Address to listen on. 0.0.0.0 in a container; 127.0.0.1 behind a proxy on the same host.' },
+  { name: 'TRUST_PROXY', required: false, default: 'true', description: '"true" when a reverse proxy sets X-Forwarded-For. Set "false" if clients reach the server directly, or they can forge their address and dodge rate limits.' },
+  { name: 'SERVE_STATIC', required: false, default: 'false', description: '"true" to serve the client, website and media from this process, so no web server is needed in front (TLS still is).' },
+  { name: 'WEB_ROOT', required: false, description: 'The built client. Defaults to the web/ directory shipped beside the server.' },
   { name: 'DB_DRIVER', required: false, default: 'mysql', description: 'mysql, postgres or sqlite. SQLite needs no database server; PostgreSQL suits several app instances.' },
   { name: 'DB_PATH', required: false, default: '/var/lib/vault/vault.db', description: 'SQLite only: the database file. Its directory must be writable and backed up.' },
   { name: 'DB_HOST', required: false, description: 'MySQL or PostgreSQL host. Required for those drivers.' },
@@ -115,6 +127,10 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
 
   const config: Config = {
     port: number('PORT'),
+    host: get('HOST'),
+    trustProxy: get('TRUST_PROXY') !== 'false',
+    serveStatic: get('SERVE_STATIC') === 'true',
+    webRoot: get('WEB_ROOT') || join(here, 'web'),
     origin,
     db: {
       driver: driver as Config['db']['driver'],
