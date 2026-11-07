@@ -16,7 +16,7 @@ import { Shell } from '../../ui/Shell.js'
 import { useVault } from '../vault/model.js'
 import {
   MAX_IMPORT_BYTES, type Source, checkMasterPassword, csvExport, download, encryptedExport,
-  openOwnExport, plan, readSource, runImport, today,
+  MAX_BACKUP_BYTES, backupSource, openOwnExport, openPersonalBackup, plan, readSource, runImport, today,
 } from './transfer.js'
 
 const MIN_EXPORT_PASSWORD = 12
@@ -46,7 +46,7 @@ type Vault = ReturnType<typeof useVault>
 
 type Step =
   | { kind: 'pick' }
-  | { kind: 'password'; text: string; name: string }
+  | { kind: 'password'; text: string; name: string; backup: boolean }
   | { kind: 'review'; source: Source; name: string }
   | { kind: 'running'; done: number; total: number }
   | { kind: 'done'; created: number; duplicates: number; tooLarge: string[] }
@@ -55,6 +55,7 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
   const [step, setStep] = useState<Step>({ kind: 'pick' })
   const [error, setError] = useState('')
   const [exportPassword, setExportPassword] = useState('')
+  const [useRecovery, setUseRecovery] = useState(false)
   const [skipDuplicates, setSkipDuplicates] = useState(true)
   const [intoFolder, setIntoFolder] = useState(false)
   const folderName = `Imported ${today()}`
@@ -72,11 +73,12 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
   async function pick(file: File | undefined) {
     setError('')
     if (!file) return
-    if (file.size > MAX_IMPORT_BYTES) { setError('That file is larger than 5 MB, which is more than any password export should be.'); return }
+    if (file.size > MAX_BACKUP_BYTES) { setError('That file is larger than 25 MB, which is more than any password export or backup should be.'); return }
     try {
       const text = await file.text()
       const read = readSource(text)
-      if ('needsPassword' in read) setStep({ kind: 'password', text, name: file.name })
+      if ('needsPassword' in read) setStep({ kind: 'password', text, name: file.name, backup: read.needsPassword === 'backup' })
+      else if (file.size > MAX_IMPORT_BYTES) setError('That file is larger than 5 MB, which is more than any password export should be.')
       else if (!read.candidates.length) setError('The file was read, but it holds no items.')
       else setStep({ kind: 'review', source: read, name: file.name })
     } catch (err) {
@@ -89,11 +91,18 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
     if (step.kind !== 'password') return
     setError('')
     try {
-      const source = await openOwnExport(step.text, exportPassword)
+      const source = step.backup
+        ? backupSource(await openPersonalBackup(step.text, exportPassword, useRecovery ? 'recovery' : 'password'))
+        : await openOwnExport(step.text, exportPassword)
       setExportPassword('')
       setStep({ kind: 'review', source, name: step.name })
     } catch (err) {
-      setError(err instanceof UnsealError ? 'That export password is wrong, or the file has been changed.' : err instanceof Error ? err.message : 'Could not open the export.')
+      setError(err instanceof UnsealError
+        ? step.backup
+          ? useRecovery ? 'That recovery key does not open this backup. It needs the recovery key you had when the backup was made.'
+            : 'That master password does not open this backup. It needs the master password you had when the backup was made.'
+          : 'That export password is wrong, or the file has been changed.'
+        : err instanceof Error ? err.message : 'Could not open the file.')
     }
   }
 
@@ -113,7 +122,7 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
     }
   }
 
-  const reset = () => { setStep({ kind: 'pick' }); setError(''); setExportPassword('') }
+  const reset = () => { setStep({ kind: 'pick' }); setError(''); setExportPassword(''); setUseRecovery(false) }
 
   return (
     <section className="settings-card" aria-labelledby="s-import">
@@ -123,7 +132,7 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
         <>
           <p className="muted small">
             From Chrome, Edge, Brave, Firefox, Safari, Bitwarden (JSON or CSV), 1Password, LastPass, KeePass, Zoho Vault,
-            or a Vault encrypted export. Other CSV files work when their columns have recognisable names.
+            a Vault encrypted export, or a Vault personal backup. Other CSV files work when their columns have recognisable names.
           </p>
           <label className="file-drop">
             <input type="file" accept=".csv,.json,.txt,text/csv,application/json" onChange={(e) => { void pick(e.target.files?.[0]); e.target.value = '' }} />
@@ -136,14 +145,21 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
 
       {step.kind === 'password' ? (
         <form onSubmit={unlockExport}>
-          <p className="muted small"><strong>{step.name}</strong> is a Vault encrypted export. Enter the password it was exported with.</p>
+          {step.backup ? (
+            <p className="muted small">
+              <strong>{step.name}</strong> is a Vault personal backup. It opens with the <strong>master password you had
+              when it was made</strong> — if you have changed it since, use the old one — or with the recovery key from that time.
+              It is opened here, in this browser; items are added to your vault, nothing is replaced.
+            </p>
+          ) : <p className="muted small"><strong>{step.name}</strong> is a Vault encrypted export. Enter the password it was exported with.</p>}
+          {step.backup ? <Check checked={useRecovery} onChange={(v) => { setUseRecovery(v); setExportPassword('') }}>Use the recovery key instead</Check> : null}
           <div className="field">
-            <label htmlFor="imp-pw">Export password</label>
+            <label htmlFor="imp-pw">{step.backup ? (useRecovery ? 'Recovery key' : 'Master password at the time') : 'Export password'}</label>
             <PasswordInput id="imp-pw" autoComplete="off" required autoFocus value={exportPassword} onChange={setExportPassword} />
           </div>
           <div className="settings-actions">
             <button type="button" className="btn btn-secondary" onClick={reset}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={!exportPassword}>Open export</button>
+            <button type="submit" className="btn btn-primary" disabled={!exportPassword}>{step.backup ? 'Open backup' : 'Open export'}</button>
           </div>
         </form>
       ) : null}
