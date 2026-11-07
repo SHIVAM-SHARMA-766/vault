@@ -15,7 +15,7 @@
     "@vault/crypto": "*",
     "@vault/site": "*",
     "better-sqlite3": "^11.7.0",
-    "mysql2": "^3.11.0",
+    "mysql2": "^3.24.6",
     "nodemailer": "^10.2.1",
     "pg": "^8.13.1"
   },
