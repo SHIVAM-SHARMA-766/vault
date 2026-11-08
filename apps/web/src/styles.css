@@ -1041,3 +1041,18 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .onboarding > span { flex: 1; }
 .onboarding-fp { display: block; margin-top: 6px; font-size: 13px; overflow-wrap: anywhere; }
 .radio-soon { opacity: .6; cursor: not-allowed; }
+
+/* Emergency Kit (decisions/0027): on screen, a card; on paper, the only thing printed. */
+.emergency-kit { border: 1px dashed var(--line, var(--border)); border-radius: 12px; padding: 16px; margin: 12px 0; }
+.emergency-kit .kit-title { font-weight: 700; margin: 0 0 8px; }
+.emergency-kit dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; margin: 0 0 8px; }
+.emergency-kit dt { color: var(--text-2); font-size: 13px; }
+.emergency-kit dd { margin: 0; overflow-wrap: anywhere; }
+.emergency-kit .kit-secret { font-family: var(--mono); font-size: 15px; letter-spacing: .05em; }
+.emergency-kit .kit-blank { border-bottom: 1px solid currentColor; min-height: 28px; }
+@media print {
+  body:has(.emergency-kit) * { visibility: hidden; }
+  body:has(.emergency-kit) .emergency-kit, body:has(.emergency-kit) .emergency-kit * { visibility: visible; }
+  body:has(.emergency-kit) .emergency-kit { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; color: #000; }
+  .no-print { display: none !important; }
+}

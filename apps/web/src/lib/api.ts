@@ -14,6 +14,8 @@ export interface KdfParams {
   algorithm: 'PBKDF2-HMAC-SHA256'
   iterations: number
   salt: string
+  /** 2 when the account mixes in a secret key (decisions/0027). */
+  version?: 2
 }
 
 export interface Session {

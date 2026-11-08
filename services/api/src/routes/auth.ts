@@ -22,7 +22,7 @@ import {
 } from '../http.js'
 import { describeDevice } from '../device.js'
 import { notify, signInNotice } from '../mail.js'
-import { decoySalt, emailDigest } from '../identity.js'
+import { decoyHasSecretKey, decoySalt, emailDigest } from '../identity.js'
 import {
   EMAIL_SK,
   PROFILE_SK,
@@ -174,6 +174,7 @@ export async function prelogin(app: App, event: LambdaEvent): Promise<LambdaResp
       algorithm: 'PBKDF2-HMAC-SHA256',
       iterations: 600_000,
       salt: decoySalt(email, app.config.pepper),
+      ...(decoyHasSecretKey(email, app.config.pepper) ? { version: 2 } : {}),
     },
   })
 }
@@ -495,7 +496,11 @@ export async function changePassword(
 
   // Every other session was authenticated with the old password.
   await revokeAllSessions(app, userId)
-  await recordActivity(app, userId, byRecovery ? 'reset-password-with-recovery-key' : 'change-password', event)
+  // Adding or removing a secret key is a re-derivation too (decisions/0027).
+  const before = profile.kdf?.version === 2, after = kdf.version === 2
+  const what = byRecovery ? 'reset-password-with-recovery-key'
+    : before === after ? 'change-password' : after ? 'add-secret-key' : 'remove-secret-key'
+  await recordActivity(app, userId, what, event)
 
   return json(200, await issueSession(app, userId, event))
 }

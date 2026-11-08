@@ -9,7 +9,7 @@ import { ImportError } from '@vault/core'
 import { UnsealError } from '@vault/crypto'
 
 import { Link } from '../../lib/router.js'
-import type * as session from '../../lib/session.js'
+import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconDownload, IconLock, IconUpload } from '../../ui/icons.js'
 import { Check, PasswordInput, typeInfo, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
@@ -92,7 +92,7 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
     setError('')
     try {
       const source = step.backup
-        ? backupSource(await openPersonalBackup(step.text, exportPassword, useRecovery ? 'recovery' : 'password'))
+        ? backupSource(await openPersonalBackup(step.text, exportPassword, useRecovery ? 'recovery' : 'password', session.get()?.email))
         : await openOwnExport(step.text, exportPassword)
       setExportPassword('')
       setStep({ kind: 'review', source, name: step.name })

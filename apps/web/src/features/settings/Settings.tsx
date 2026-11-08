@@ -16,6 +16,8 @@ import { IconAlert, IconCheck, IconDownload, IconKey, IconLock, IconShield, Icon
 import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
+import { secretKeyFor } from '../../lib/secretkey.js'
+import { SecretKey } from './SecretKey.js'
 import { Activity, Devices } from './Devices.js'
 import { Backups } from './Backups.js'
 import { DeleteAccount } from './DeleteAccount.js'
@@ -98,6 +100,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
             </section>
             <ChangePassword state={state} minScore={me?.policy.minPasswordScore ?? 0} />
             <RotateRecovery state={state} />
+            <SecretKey state={state} />
             <section className="settings-card" aria-labelledby="s-identity">
               <div className="settings-card-head"><IconShield size={18} /><h2 id="s-identity">Identity key</h2></div>
               <p className="muted small">
@@ -149,7 +152,10 @@ function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore
     try {
       const currentAuthKey = await proveCurrent(state, current)
       // Only the vault key is rewrapped. No entry is re-encrypted (decisions/0001).
-      const changed = await changePassword(next, state.vaultKey)
+      // The secret key, if the account has one, stays (decisions/0027).
+      const sk = await secretKeyFor(state.email, state.kdf)
+      const changed = await changePassword(next, state.vaultKey, undefined, sk)
+      sk?.fill(0)
       const res = await api.changePassword(await session.token(), {
         currentAuthKey, newAuthKey: changed.authKey, kdf: changed.kdf, wrappedVaultKey: changed.wrappedVaultKey,
       })

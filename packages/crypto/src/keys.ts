@@ -23,6 +23,7 @@ import { fromRecoveryString, toBase64Url, toRecoveryString, utf8Encode } from '.
 import { hkdfSha256, pbkdf2Sha256 } from './primitives.js'
 import { randomBytes } from './random.js'
 import { seal, unseal } from './aead.js'
+import { mixSecretKey } from './secretkey.js'
 
 /** OWASP's 2023 floor for PBKDF2-HMAC-SHA256. Stored per user rather than
  *  assumed, so it can be raised for new accounts without breaking existing
@@ -58,6 +59,12 @@ export interface KdfParams {
    *  that a password reused on another service cannot be attacked with
    *  precomputed tables. */
   salt: string
+  /** 2 when a secret key is mixed in (decisions/0027); absent otherwise. */
+  version?: 2
+}
+
+function kdfParams(salt: Uint8Array, iterations: number, secretKey?: Uint8Array): KdfParams {
+  return { algorithm: 'PBKDF2-HMAC-SHA256', iterations, salt: toBase64Url(salt), ...(secretKey ? { version: 2 as const } : {}) }
 }
 
 /** Case and surrounding whitespace must not produce different accounts. Applied
@@ -85,8 +92,13 @@ export async function deriveMasterKey(
   password: string,
   salt: Uint8Array,
   iterations: number = PBKDF2_ITERATIONS,
+  secretKey?: Uint8Array,
 ): Promise<Uint8Array> {
-  return pbkdf2Sha256(utf8Encode(password.normalize('NFKC')), salt, iterations, KEY_BYTES)
+  const stretched = await pbkdf2Sha256(utf8Encode(password.normalize('NFKC')), salt, iterations, KEY_BYTES)
+  if (!secretKey) return stretched
+  const master = await mixSecretKey(stretched, secretKey)
+  stretched.fill(0)
+  return master
 }
 
 /** HKDF with an empty salt: the input keying material is already the output of
@@ -152,12 +164,13 @@ export interface NewAccount {
 export async function createAccount(
   password: string,
   iterations: number = PBKDF2_ITERATIONS,
+  secretKey?: Uint8Array,
 ): Promise<NewAccount> {
   const salt = generateSalt()
   const vaultKey = generateVaultKey()
   const recoveryKey = generateRecoveryKey()
 
-  const masterKey = await deriveMasterKey(password, salt, iterations)
+  const masterKey = await deriveMasterKey(password, salt, iterations, secretKey)
   const [kek, authKey, recoveryKek, recoveryAuthKey] = await Promise.all([
     deriveKek(masterKey),
     deriveAuthKey(masterKey),
@@ -170,7 +183,7 @@ export async function createAccount(
   ])
 
   return {
-    kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations, salt: toBase64Url(salt) },
+    kdf: kdfParams(salt, iterations, secretKey),
     authKey: toBase64Url(authKey),
     wrappedVaultKey,
     wrappedVaultKeyForRecovery,
@@ -211,8 +224,9 @@ export async function deriveLoginKeys(
   password: string,
   salt: Uint8Array,
   iterations: number = PBKDF2_ITERATIONS,
+  secretKey?: Uint8Array,
 ): Promise<LoginKeys> {
-  const masterKey = await deriveMasterKey(password, salt, iterations)
+  const masterKey = await deriveMasterKey(password, salt, iterations, secretKey)
   const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
   return { authKey: toBase64Url(authKey), kek }
 }
@@ -226,8 +240,10 @@ export async function unlock(
   kdf: KdfParams,
   wrappedVaultKey: string,
   salt: Uint8Array,
+  secretKey?: Uint8Array,
 ): Promise<Unlocked> {
-  const masterKey = await deriveMasterKey(password, salt, kdf.iterations)
+  if (kdf.version === 2 && !secretKey) throw new Error('This account needs its secret key.')
+  const masterKey = await deriveMasterKey(password, salt, kdf.iterations, kdf.version === 2 ? secretKey : undefined)
   const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
   const vaultKey = await unwrapVaultKey(wrappedVaultKey, kek, 'master')
   return { vaultKey, authKey: toBase64Url(authKey) }
@@ -254,12 +270,13 @@ export async function changePassword(
   newPassword: string,
   vaultKey: Uint8Array,
   iterations: number = PBKDF2_ITERATIONS,
+  secretKey?: Uint8Array,
 ): Promise<ChangedPassword> {
   const salt = generateSalt()
-  const masterKey = await deriveMasterKey(newPassword, salt, iterations)
+  const masterKey = await deriveMasterKey(newPassword, salt, iterations, secretKey)
   const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
   return {
-    kdf: { algorithm: 'PBKDF2-HMAC-SHA256', iterations, salt: toBase64Url(salt) },
+    kdf: kdfParams(salt, iterations, secretKey),
     authKey: toBase64Url(authKey),
     wrappedVaultKey: await wrapVaultKey(vaultKey, kek, 'master'),
   }

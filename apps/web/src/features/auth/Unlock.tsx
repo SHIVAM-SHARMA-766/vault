@@ -2,10 +2,11 @@ import { useState } from 'react'
 
 import { passwordStrength } from '@vault/core'
 
-import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } from '@vault/crypto'
+import { SecretKeyFormatError, UnsealError, deriveLoginKeys, fromBase64Url, parseSecretKey, unwrapVaultKey, wipe } from '@vault/crypto'
 
 import { ApiError, type SecondFactor, type SecondFactorOffer, api } from '../../lib/api.js'
 import { useInstance } from '../../lib/instance.js'
+import { forgetSecretKey, loadSecretKey, storeSecretKey } from '../../lib/secretkey.js'
 import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
@@ -23,7 +24,12 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
   const [error, setError] = useState('')
   // Set once the password is proved and the server asks for a second factor.
   // The derived keys wait here, in memory, until the code is in.
-  const [pending, setPending] = useState<{ authKey: string; kek: Uint8Array } | null>(null)
+  const [pending, setPending] = useState<{ authKey: string; kek: Uint8Array; typedKey?: Uint8Array } | null>(null)
+  // A secret key (decisions/0027): asked for when the account has one and this
+  // browser does not hold it yet; kept here once sign-in succeeds.
+  const [needKey, setNeedKey] = useState(false)
+  const [secretText, setSecretText] = useState('')
+  const [heldButRefused, setHeldButRefused] = useState(false)
   const [offer, setOffer] = useState<SecondFactorOffer | null>(null)
 
   function explain(err: unknown) {
@@ -36,7 +42,9 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     } else if (err instanceof ApiError && err.status === 403) {
       setError('This account has been disabled. Contact the person who runs this vault.')
     } else if (err instanceof ApiError && err.status === 401) {
-      setError('Wrong email or master password.')
+      setError(needKey ? 'Wrong email, master password or secret key.' : 'Wrong email or master password.')
+    } else if (err instanceof SecretKeyFormatError) {
+      setError(err.message)
     } else if (err instanceof ApiError && err.status === 429) {
       const wait = err.retryAfter ? Math.ceil(err.retryAfter / 60) : null
       setError(wait ? `Too many attempts. Try again in ${wait} minute(s).` : err.message)
@@ -48,9 +56,10 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
   /** Steps 3 and 4: prove the password (and the second factor, if asked),
    *  then unwrap the vault key here. A wrong password fails at the server; a
    *  damaged key fails in this browser. */
-  async function finish(authKey: string, kek: Uint8Array, second?: SecondFactor) {
+  async function finish(authKey: string, kek: Uint8Array, second?: SecondFactor, typedKey?: Uint8Array) {
     const result = await api.login(email, authKey, second)
     const vaultKey = await unwrapVaultKey(result.wrappedVaultKey, kek, 'master')
+    if (typedKey) { await storeSecretKey(email, typedKey).catch(() => {}); typedKey.fill(0) }
     session.unlock({
       userId: '',
       email,
@@ -74,17 +83,41 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     try {
       // 1. Fetch the salt. An address with no account gets a decoy, so this
       //    reply does not say whether one exists.
+      // A typed secret key is checked first: a typo costs no sign-in attempt.
+      const typedEarly = needKey && secretText.trim() ? await parseSecretKey(secretText) : undefined
       const { kdf } = await api.prelogin(email)
+      // A secret key this browser holds is always used. If the server says the
+      // account has none, stop: a password-only auth key is what a server
+      // that dropped the flag would want, to guess the password offline.
+      const held = await loadSecretKey(email)
+      if (held && kdf.version !== 2) {
+        held.fill(0)
+        setHeldButRefused(true)
+        setError('This browser holds a secret key for this account, but the server says the account has none. If you removed it on another device, forget it here; otherwise do not continue.')
+        return
+      }
+      let secretKey: Uint8Array | undefined = held ?? undefined
+      let typedKey: Uint8Array | undefined
+      if (kdf.version === 2 && !secretKey) {
+        if (!needKey || !secretText.trim()) {
+          setNeedKey(true)
+          setError('This account uses a secret key. Enter it from your Emergency Kit; this browser keeps it after that.')
+          return
+        }
+        secretKey = typedKey = typedEarly ?? await parseSecretKey(secretText)
+      } else typedEarly?.fill(0)
       // 2. Derive, on this device. 600,000 iterations — the pause before the
       //    vault opens is the same pause an attacker faces per guess.
-      const keys = await deriveLoginKeys(password, fromBase64Url(kdf.salt), kdf.iterations)
+      const keys = await deriveLoginKeys(password, fromBase64Url(kdf.salt), kdf.iterations, secretKey)
+      if (secretKey && secretKey !== typedKey) secretKey.fill(0)
       kek = keys.kek
       try {
-        await finish(keys.authKey, keys.kek)
+        await finish(keys.authKey, keys.kek, undefined, typedKey)
+        setSecretText('')
       } catch (err) {
         if (err instanceof ApiError && err.code === 'two_factor_required') {
           keep = true
-          setPending({ authKey: keys.authKey, kek: keys.kek })
+          setPending({ authKey: keys.authKey, kek: keys.kek, ...(typedKey ? { typedKey } : {}) })
           setOffer((err.details as SecondFactorOffer | undefined) ?? null)
           return
         }
@@ -103,8 +136,9 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     setError('')
     setBusy(true)
     try {
-      await finish(pending.authKey, pending.kek, second)
+      await finish(pending.authKey, pending.kek, second, pending.typedKey)
       wipe(pending.kek)
+      setSecretText('')
     } catch (err) {
       explain(err)
       setBusy(false)
@@ -118,7 +152,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
   }
 
   function cancelSecond() {
-    if (pending) wipe(pending.kek)
+    if (pending) { wipe(pending.kek); pending.typedKey?.fill(0) }
     setPending(null)
     setError('')
   }
@@ -143,7 +177,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
         <label htmlFor="email">{t('Email')}</label>
         <input id="email" type="email" autoComplete="username" required autoFocus
                placeholder="you@example.com"
-               value={email} onChange={(e) => setEmail(e.target.value)} />
+               value={email} onChange={(e) => { setEmail(e.target.value); setHeldButRefused(false) }} />
       </div>
 
       <div className="field">
@@ -152,7 +186,20 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
                        value={password} onChange={setPassword} />
       </div>
 
+      {needKey ? (
+        <div className="field">
+          <label htmlFor="secret-key">{t('Secret key')}</label>
+          <input id="secret-key" autoComplete="off" spellCheck={false} placeholder="SK1-XXXX-XXXX-…"
+                 value={secretText} onChange={(e) => setSecretText(e.target.value)} />
+          <p className="hint">{t('From your Emergency Kit. Asked for once on each new browser.')}</p>
+        </div>
+      ) : null}
+
       {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
+      {heldButRefused ? (
+        <p><button type="button" className="link" onClick={() => { void forgetSecretKey(email).then(() => { setHeldButRefused(false); setError('') }) }}>
+          {t('I removed it — forget the secret key on this browser')}</button></p>
+      ) : null}
 
       <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
         {busy ? <><span className="spinner" />{t('Deriving key…')}</> : t('Unlock')}

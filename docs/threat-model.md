@@ -73,7 +73,11 @@ against the digests, but vault contents remain encrypted under each user's own k
 
 Offline guessing against the wrapped Vault Key is bounded by PBKDF2 at 600,000
 iterations — tractable only against a weak master password, which is why a strength floor
-is enforced at signup.
+is enforced at signup. An account with a **secret key** ([0027](../decisions/0027-secret-key.md),
+opt-in) is out of reach of this entirely: its master key also depends on 128 random bits kept
+on the person's devices, so a dump gives nothing to guess against. Its sign-in also refuses a
+server that stops returning the flag, so a hostile server cannot downgrade a device that holds
+the key into sending a password-only auth key.
 
 ### A3 — Malicious or modified application code
 
@@ -377,7 +381,9 @@ Determining whether an address has an account, as a precursor to phishing.
 
 The salt lookup that must precede login returns a deterministic decoy salt for unknown
 addresses, derived under the server pepper so it is indistinguishable from a real one.
-Login then fails identically either way. Registration and any future password-reset
+Login then fails identically either way. Accounts with a secret key answer `kdf.version: 2`;
+about one decoy in eight does too (chosen per address under the pepper, stable), so the flag
+alone does not prove that an account exists. Registration and any future password-reset
 surface must preserve the same property.
 
 ### A8 — Supply chain

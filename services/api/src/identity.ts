@@ -31,3 +31,11 @@ export function decoySalt(email: string, pepper: string): string {
     .update(`salt-decoy|${normalizeEmail(email)}`)
     .digest('base64url')
 }
+
+/** Whether an unknown address's decoy claims a secret key (decisions/0027).
+ *  Real accounts with one answer `version: 2`; if no decoy ever did, that
+ *  answer alone would prove an account exists. About one decoy in eight says
+ *  so too, chosen per address and stable, so asking twice tells nothing. */
+export function decoyHasSecretKey(email: string, pepper: string): boolean {
+  return createHmac('sha256', pepper).update(`secret-key-decoy|${normalizeEmail(email)}`).digest()[0]! < 32
+}

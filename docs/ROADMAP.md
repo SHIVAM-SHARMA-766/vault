@@ -99,7 +99,7 @@ where it lands.
 | Breach check without revealing passwords | ◐ | ✓ | — | 1 (decision needed) |
 | Two-factor sign-in for the account | ✓ | ✓ | ✓ TOTP | 1 |
 | Device and session management | ✓ | ✓ | ✓ | 1 |
-| Secret key mixed into the KDF | — | ✓ | — | 1 (decision needed) |
+| Secret key mixed into the KDF | ✓ opt-in ([0027](../decisions/0027-secret-key.md)) | ✓ | — | 1 |
 | Organizations, teams, shared collections | ✓ | ✓ | ✓ | 3 |
 | Per-collection permissions, hide-password | ✓ | ✓ | ✓ | 3 |
 | Organization policies (password strength, 2FA required) | ✓ | ✓ | ✓ | 3 |
@@ -190,8 +190,8 @@ The core every later phase builds on must be finished and trustworthy first.
 | Alerts reach a phone | ⬜ built; needs the operator steps above |
 | The domain is live | ⏸ deferred by the operator (2026-11-07) |
 
-**Decisions this phase still owes** — see [Open decisions](#open-decisions): secret key in the
-KDF, breach checks, Argon2id.
+**Decisions this phase still owes** — see [Open decisions](#open-decisions): Argon2id (decided in
+[0028](../decisions/0028-argon2id.md), being built). Secret key: built ([0027](../decisions/0027-secret-key.md)); breach checks: [0019](../decisions/0019-breach-check.md).
 
 ### Phase 2 — The self-hosted product ✅ (built 2026-11-07)
 
@@ -293,7 +293,7 @@ multiplies the cost of every rough edge, so they are paid down first.
 - [x] Independent security review of everything since phase 1: one critical (cross-organization
   item access) and five medium/low findings fixed with regression tests; one design gap
   recorded as threat A15 (signed key grants).
-- [ ] Decide the crypto questions: signed key grants (A15), secret key in the KDF, ~~breach checks~~ (decided: [0019](../decisions/0019-breach-check.md)),
+- [ ] Decide the crypto questions: ~~signed key grants (A15)~~ (built: 0025), ~~secret key in the KDF~~ (built: 0027), ~~breach checks~~ (decided: [0019](../decisions/0019-breach-check.md)),
   Argon2id.
 - [x] Performance: 5,000-item vault unlocks in **1.1 s** at 4× CPU throttle (was 4.2 s) — imported
   keys cached (dropped on wipe), long lists drawn incrementally; first load 111 → 77 KB gzipped.
@@ -333,7 +333,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ✅ D2 File attachments (key per file inside the sealed entry; personal items; in backups; [0020](../decisions/0020-attachments-and-offline-copy.md)) · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
 - ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ✅ D7 Access requests (request with a reason, approve for good or as a 1 h–1 week check-out that ends by itself, decline)
-- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · 🟡 D9 Passkeys and security keys ([0022](../decisions/0022-passkeys.md)): ✅ as a second factor; ⬜ unlock with a passkey (PRF) next · 🟡 D10 The crypto decisions ([0023](../decisions/0023-crypto-hardening.md)): ✅ organization recovery key ([0026](../decisions/0026-organization-recovery-key.md)); ✅ signed key grants ([0025](../decisions/0025-signed-key-grants.md)); ⬜ secret key (0027), Argon2id (0028)
+- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · 🟡 D9 Passkeys and security keys ([0022](../decisions/0022-passkeys.md)): ✅ as a second factor; ⬜ unlock with a passkey (PRF) next · 🟡 D10 The crypto decisions ([0023](../decisions/0023-crypto-hardening.md)): ✅ organization recovery key ([0026](../decisions/0026-organization-recovery-key.md)); ✅ signed key grants ([0025](../decisions/0025-signed-key-grants.md)); ✅ secret key, opt-in ([0027](../decisions/0027-secret-key.md)); ⬜ Argon2id (0028)
 - ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ✅ D12 Notify on access to a sensitive item (owner and admins notified on open, reveal or copy)
 
 **E. UI/UX**
@@ -421,7 +421,7 @@ with guidance in the admin documentation.
 | Decision | Phase | Notes |
 |---|---|---|
 | Buy a domain | — | Deferred by the operator (2026-11-07). Removes the dynamic-DNS risk (A3); accepted until then |
-| Secret key in the KDF | 1 | Strongest protection against offline guessing after a breach |
+| Secret key in the KDF | 1 | ✅ Decided and built, opt-in: [0027](../decisions/0027-secret-key.md) |
 | Breach checks | 1 | Privacy trade-off; k-anonymity at best |
 | Argon2id | 1 | Needs WebAssembly in the crypto package |
 | Licence | 2 → before the first public release | Open source (AGPL, as Bitwarden), source-available, or proprietary with offline keys |
