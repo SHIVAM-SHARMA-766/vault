@@ -164,7 +164,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/desk/:id/messages', admined('desk.write', (u, e, id) => desk.replyAsStaff(app, u, e, id)), 'Reply to a ticket, or add an internal note')
   router.put('/api/admin/desk/:id', admined('desk.write', (u, e, id) => desk.updateTicket(app, u, e, id)), 'Change a ticket\'s status, priority or assignee')
   router.post('/api/admin/desk/:id/approve', admined('invites.write', (u, e, id, r) => desk.approveAccess(app, u, r, e, id)), 'Approve an access request: issue and email an invitation')
-  router.post('/api/admin/desk/:id/reset-2fa', admined('users.write', (u, _e, id) => desk.resetTwoFactorFor(app, u, id)), 'Reset two-factor sign-in for a verified sign-in request')
+  router.post('/api/admin/desk/:id/reset-2fa', admined('users.write', (u, _e, id, r) => desk.resetTwoFactorFor(app, u, r, id)), 'Reset two-factor sign-in for a verified sign-in request')
 
   router.get('/api/admin/site', admined('site.read', () => site.getSite(app)), 'Website content, draft and versions')
   router.put('/api/admin/site/draft', admined('site.write', (u, e) => site.saveDraft(app, u, e)), 'Save a website draft')

@@ -257,7 +257,7 @@ export const api = {
       request<{ ok: true; granted: number }>('PUT', `/api/orgs/${org}/collections/${coll}/groups/${group}`, { token, body }),
     revokeGroup: (token: string, org: string, coll: string, group: string) =>
       request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/collections/${coll}/groups/${group}`, { token }),
-    rotate: (token: string, org: string, coll: string, body: { keyVersion: number; grants: { userId: string; keyBlob: string }[]; items: { id: string; blob: string }[] }) =>
+    rotate: (token: string, org: string, coll: string, body: { keyVersion: number; grants: { userId: string; keyBlob: string }[]; items: { id: string; blob: string }[]; drop?: string[] }) =>
       request<{ keyVersion: number }>('POST', `/api/orgs/${org}/collections/${coll}/rotate`, { token, body }),
     access: (token: string, org: string, coll: string) =>
       request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),

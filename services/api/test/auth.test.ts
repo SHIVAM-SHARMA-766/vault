@@ -28,11 +28,16 @@ test('registration is refused when it is closed', async () => {
   assert.equal(res.status, 403)
 })
 
-test('the same address cannot be registered twice', async () => {
+test('the same address cannot be registered twice, and the refusal does not say why', async () => {
   const h = harness()
   await h.request('POST', '/api/auth/register', { body: registration() })
   const second = await h.request('POST', '/api/auth/register', { body: registration() })
-  assert.equal(second.status, 409)
+  assert.equal(second.status, 403)
+  // Identical to a refused invitation, so an address's existence is not revealed (A7).
+  h.app.allowRegistration = false
+  const badInvite = await h.request('POST', '/api/auth/register', { body: registration({ email: 'new@example.test', inviteCode: 'NOPE-NOPE-NOPE' }) })
+  assert.equal(badInvite.status, second.status)
+  assert.equal(badInvite.body['message'], second.body['message'])
 })
 
 test('the address is never stored in the clear', async () => {

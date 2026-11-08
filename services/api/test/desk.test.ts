@@ -142,3 +142,23 @@ test('the overview counts open tickets, and a support agent sees only the desk a
   assert.deepEqual(me.body['permissions'], ['desk.read', 'desk.write', 'invites.read', 'invites.write'])
   void fixtureB64
 })
+
+test('security: a desk 2FA reset follows rank — an admin cannot reset an owner (made by setup) or another admin', async () => {
+  const h = harness()
+  const owner = await staff(h)
+  const admin1 = await user(h, 'admin1@example.test')
+  const admin2 = await user(h, 'admin2@example.test')
+  await h.request('PUT', `/api/admin/users/${admin1.userId}/role`, { token: owner, body: { role: 'admin' } })
+  await h.request('PUT', `/api/admin/users/${admin2.userId}/role`, { token: owner, body: { role: 'admin' } })
+  // A setup-created owner: stored role "owner", not in ADMIN_EMAILS.
+  const setupOwner = await user(h, 'founder@example.test')
+  const reg = await h.store.get('SYSTEM', `USER#${setupOwner.userId}`)
+  await h.store.put({ ...reg!, role: 'owner' })
+  for (const email of ['founder@example.test', 'admin2@example.test']) {
+    await h.request('POST', '/api/desk/requests', { body: { kind: 'signin', name: 'x', email } })
+  }
+  const tickets = (await h.request('GET', '/api/admin/desk', { token: owner })).body['tickets'] as { id: string; requester: { email: string } }[]
+  for (const t of tickets) {
+    assert.equal((await h.request('POST', `/api/admin/desk/${t.id}/reset-2fa`, { token: admin1.token })).status, 403, t.requester.email)
+  }
+})

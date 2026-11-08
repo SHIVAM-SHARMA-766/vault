@@ -22,7 +22,7 @@ import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, conflict,
 import { emailDigest } from '../identity.js'
 import {
   COLLECTION_PREFIX, ITEM_PREFIX, ORG_INVITE_PREFIX, ORG_MEMBER_PREFIX, ORG_META_SK, ORG_PENDING_PREFIX, PROFILE_SK, USER_ORG_PREFIX,
-  GROUP_ACCESS_PREFIX, GROUP_PREFIX, ORG_EVENT_PREFIX, SYSTEM_ORG_PREFIX, SYSTEM_PK, orgEventSk, systemOrgSk, accessPrefix, accessSk, collectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
+  GROUP_ACCESS_PREFIX, GROUP_PREFIX, ORG_EVENT_PREFIX, SYSTEM_ORG_PREFIX, SYSTEM_PK, orgEventSk, systemOrgSk, accessPrefix, accessSk, collectionItemsPk, legacyCollectionItemsPk, groupAccessSk, groupSk, collectionSk, emailPk, isValidId, itemSk, orgInviteSk, orgMemberSk, orgPendingSk,
   orgPk, userOrgSk, userPk,
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
@@ -155,6 +155,63 @@ async function publicKeyOf(app: App, userId: string): Promise<string> {
   return pk
 }
 
+/** Before an account is deleted: leave every organization it belongs to
+ *  (re-key flags as for a removal), or report the ones it owns, which must be
+ *  deleted or handed over first. */
+export async function leaveAllOrgs(app: App, userId: string, dryRun: boolean): Promise<{ owned: string[] }> {
+  const owned: string[] = []
+  for (const p of await app.store.query(userPk(userId), USER_ORG_PREFIX)) {
+    const orgId = String(p['orgId'])
+    const m = await member(app, orgId, userId)
+    if (!m) { if (!dryRun) await app.store.delete(p.pk, p.sk); continue }
+    if (m.role === 'owner') { owned.push(String((await app.store.get(orgPk(orgId), ORG_META_SK))?.['hint'] ?? orgId)); continue }
+    if (dryRun) continue
+    for (const c of await app.store.query(orgPk(orgId), COLLECTION_PREFIX) as Collection[]) {
+      const a = await access(app, orgId, c.id, userId)
+      if (!a) continue
+      await app.store.delete(a.pk, a.sk)
+      await app.store.put({ ...c, rotationNeeded: true })
+    }
+    for (const g of (await app.store.query(orgPk(orgId), GROUP_PREFIX)) as Group[]) {
+      if (g.members.includes(userId)) await app.store.put({ ...g, members: g.members.filter((x) => x !== userId) })
+    }
+    await app.store.delete(orgPk(orgId), orgMemberSk(userId))
+    await app.store.delete(p.pk, p.sk)
+    await orgEvent(app, orgId, 'system', 'member.remove', { target: userId })
+  }
+  return { owned }
+}
+
+// ── Data migration: organization-scoped item partitions ──────────────────
+
+const ITEMS_MIGRATION = 'DATAMIG#collection-items-by-org'
+
+/** Moves items from the old COLLI#<collection> partitions to
+ *  COLLI#<org>#<collection>, once. If two organizations used the same
+ *  collection id, the items belong to the collection created first — a later
+ *  one with the same id could only have been made to reach them. */
+export async function migrateItemPartitions(app: App): Promise<number> {
+  if (await app.store.get(SYSTEM_PK, ITEMS_MIGRATION)) return 0
+  const owners = new Map<string, { orgId: string; createdAt: string }>()
+  for (const ix of await app.store.query(SYSTEM_PK, SYSTEM_ORG_PREFIX)) {
+    const orgId = String(ix['orgId'])
+    for (const c of await app.store.query(orgPk(orgId), COLLECTION_PREFIX) as Collection[]) {
+      const prev = owners.get(c.id)
+      if (!prev || c.createdAt < prev.createdAt) owners.set(c.id, { orgId, createdAt: c.createdAt })
+    }
+  }
+  let moved = 0
+  for (const [collectionId, { orgId }] of owners) {
+    for (const row of await app.store.query(legacyCollectionItemsPk(collectionId), ITEM_PREFIX)) {
+      await app.store.put({ ...row, pk: collectionItemsPk(orgId, collectionId) })
+      await app.store.delete(row.pk, row.sk)
+      moved++
+    }
+  }
+  await app.store.put({ pk: SYSTEM_PK, sk: ITEMS_MIGRATION, at: new Date(app.now()).toISOString(), moved })
+  return moved
+}
+
 // ── Access audit ──────────────────────────────────────────────────────────
 // Events on ciphertext the server cannot read: who did what to which item
 // id, in which collection. Writes, grants and membership changes are recorded
@@ -243,7 +300,7 @@ export async function deleteOrg(app: App, userId: string, orgId: string): Promis
 /** Removes an organization and everything in it. */
 export async function purgeOrg(app: App, orgId: string): Promise<void> {
   for (const c of await app.store.query(orgPk(orgId), COLLECTION_PREFIX)) {
-    for (const i of await app.store.query(collectionItemsPk(String(c['id'])))) await app.store.delete(i.pk, i.sk)
+    for (const i of await app.store.query(collectionItemsPk(orgId, String(c['id'])))) await app.store.delete(i.pk, i.sk)
   }
   for (const row of await app.store.query(orgPk(orgId))) {
     if (row.sk.startsWith(ORG_MEMBER_PREFIX)) await app.store.delete(userPk(String(row['userId'])), userOrgSk(orgId))
@@ -266,7 +323,7 @@ export async function adminList(app: App): Promise<LambdaResponse> {
     const members = rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[]
     const colls = rows.filter((r) => r.sk.startsWith(COLLECTION_PREFIX)) as Collection[]
     let items = 0
-    for (const c of colls) items += (await app.store.query(collectionItemsPk(c.id), ITEM_PREFIX)).length
+    for (const c of colls) items += (await app.store.query(collectionItemsPk(orgId, c.id), ITEM_PREFIX)).length
     out.push({
       id: orgId, hint: meta['hint'] ?? '', createdAt: meta['createdAt'], ownerId: members.find((m) => m.role === 'owner')?.userId ?? null,
       members: members.filter((m) => m.status === 'confirmed').length, awaiting: members.filter((m) => m.status !== 'confirmed').length,
@@ -483,7 +540,7 @@ export async function renameCollection(app: App, userId: string, event: LambdaEv
 export async function deleteCollection(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {
   const { m } = await requireAccess(app, orgId, collectionId, userId, 'manage')
   if (m.role === 'member') throw forbidden()
-  for (const i of await app.store.query(collectionItemsPk(collectionId))) await app.store.delete(i.pk, i.sk)
+  for (const i of await app.store.query(collectionItemsPk(orgId, collectionId))) await app.store.delete(i.pk, i.sk)
   for (const a of await app.store.query(orgPk(orgId), accessPrefix(collectionId))) await app.store.delete(a.pk, a.sk)
   await app.store.delete(orgPk(orgId), collectionSk(collectionId))
   await orgEvent(app, orgId, userId, 'collection.delete', { collectionId })
@@ -539,12 +596,15 @@ export async function rotateCollection(app: App, userId: string, event: LambdaEv
   if (b['keyVersion'] !== c.keyVersion + 1) throw new HttpError(409, 'conflict', 'The collection key changed; reload and rotate again.')
   const grants = Array.isArray(b['grants']) ? b['grants'] as Record<string, unknown>[] : null
   const itemsIn = Array.isArray(b['items']) ? b['items'] as Record<string, unknown>[] : null
+  // Items the rotating member could not decrypt (planted, or damaged) are
+  // named here and removed, so one bad item can never block a rotation.
+  const drop = (Array.isArray(b['drop']) ? b['drop'] : []).map(String)
   if (!grants || !itemsIn) throw badRequest('grants and items are required.')
   const current = (await app.store.query(orgPk(orgId), accessPrefix(collectionId))) as Access[]
-  const stored = await app.store.query(collectionItemsPk(collectionId), ITEM_PREFIX)
+  const stored = await app.store.query(collectionItemsPk(orgId, collectionId), ITEM_PREFIX)
   const same = (a: string[], b2: string[]) => a.length === b2.length && [...a].sort().join() === [...b2].sort().join()
   if (!same(current.map((a) => a.userId), grants.map((g) => String(g['userId'])))) throw new HttpError(409, 'conflict', 'Who can open this collection changed; reload and rotate again.')
-  if (!same(stored.map((i) => String(i['id'])), itemsIn.map((i) => String(i['id'])))) throw new HttpError(409, 'conflict', 'The items changed; reload and rotate again.')
+  if (!same(stored.map((i) => String(i['id'])), [...itemsIn.map((i) => String(i['id'])), ...drop])) throw new HttpError(409, 'conflict', 'The items changed; reload and rotate again.')
   const version = c.keyVersion + 1
   const sealedGrants = grants.map((g) => ({ userId: String(g['userId']), keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob') }))
   const sealedItems = itemsIn.map((i) => ({ id: String(i['id']), blob: requireSealed(i['blob'], 'blob') }))
@@ -553,13 +613,14 @@ export async function rotateCollection(app: App, userId: string, event: LambdaEv
     const a = current.find((x) => x.userId === g.userId)!
     await app.store.put({ ...a, keyBlob: g.keyBlob, keyVersion: version })
   }
+  for (const d of drop) await app.store.delete(collectionItemsPk(orgId, collectionId), itemSk(d))
   for (const i of sealedItems) {
     const old = stored.find((x) => x['id'] === i.id)!
     await app.store.put({ ...old, blob: i.blob, keyVersion: version, updatedAt: at, updatedBy: userId })
   }
   const { rotationNeeded: _r, ...rest } = c
   await app.store.put({ ...rest, keyVersion: version, rotatedAt: at } as Collection)
-  await orgEvent(app, orgId, userId, 'collection.rotate', { collectionId })
+  await orgEvent(app, orgId, userId, 'collection.rotate', { collectionId, ...(drop.length ? { target: `${drop.length} unreadable item(s) removed` } : {}) })
   return json(200, { keyVersion: version })
 }
 
@@ -672,7 +733,7 @@ export async function revokeGroup(app: App, userId: string, orgId: string, colle
 
 export async function items(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {
   await requireAccess(app, orgId, collectionId, userId, 'view')
-  const rows = await app.store.query(collectionItemsPk(collectionId), ITEM_PREFIX)
+  const rows = await app.store.query(collectionItemsPk(orgId, collectionId), ITEM_PREFIX)
   return json(200, { items: rows.map((r) => ({ id: r['id'], blob: r['blob'], keyVersion: r['keyVersion'], updatedAt: r['updatedAt'] })) })
 }
 
@@ -684,9 +745,9 @@ export async function putItem(app: App, userId: string, event: LambdaEvent, orgI
   // Items are written under the current key version only, so a member who
   // still holds a rotated-away key cannot add anything readable to it.
   if (b['keyVersion'] !== c.keyVersion) throw new HttpError(409, 'conflict', 'The collection key changed; reload and try again.')
-  const existing = await app.store.get(collectionItemsPk(collectionId), itemSk(itemId))
+  const existing = await app.store.get(collectionItemsPk(orgId, collectionId), itemSk(itemId))
   const at = now(app)
-  await app.store.put({ pk: collectionItemsPk(collectionId), sk: itemSk(itemId), id: itemId, blob, keyVersion: c.keyVersion, createdAt: existing?.['createdAt'] ?? at, updatedAt: at, updatedBy: userId })
+  await app.store.put({ pk: collectionItemsPk(orgId, collectionId), sk: itemSk(itemId), id: itemId, blob, keyVersion: c.keyVersion, createdAt: existing?.['createdAt'] ?? at, updatedAt: at, updatedBy: userId })
   await orgEvent(app, orgId, userId, existing ? 'item.edit' : 'item.create', { collectionId, itemId })
   return json(200, { id: itemId })
 }
@@ -694,7 +755,7 @@ export async function putItem(app: App, userId: string, event: LambdaEvent, orgI
 export async function deleteItem(app: App, userId: string, orgId: string, collectionId: string, itemId: string): Promise<LambdaResponse> {
   await requireAccess(app, orgId, collectionId, userId, 'edit')
   if (!isValidId(itemId)) throw notFound()
-  await app.store.delete(collectionItemsPk(collectionId), itemSk(itemId))
+  await app.store.delete(collectionItemsPk(orgId, collectionId), itemSk(itemId))
   await orgEvent(app, orgId, userId, 'item.delete', { collectionId, itemId })
   return json(200, { ok: true })
 }

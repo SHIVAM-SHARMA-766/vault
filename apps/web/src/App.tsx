@@ -2,7 +2,7 @@
 // screens once unlocked. Routing lives in lib/router.tsx; every screen draws
 // its own content inside ui/Shell.tsx.
 
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { api } from './lib/api.js'
 import { newIdentity } from './lib/identity.js'
@@ -13,13 +13,17 @@ import { ToastProvider } from './ui/kit.js'
 import { Recover } from './features/auth/Recover.js'
 import { Register } from './features/auth/Register.js'
 import { Unlock } from './features/auth/Unlock.js'
-import { Admin } from './features/admin/Admin.js'
-import { Settings } from './features/settings/Settings.js'
-import { Transfer } from './features/transfer/Transfer.js'
 import { PublicRequest } from './features/desk/PublicRequest.js'
-import { Support } from './features/desk/Support.js'
-import { Orgs } from './features/orgs/Orgs.js'
 import { Vault } from './features/vault/Vault.js'
+
+// Screens most visits never open load on demand, so unlocking the vault does
+// not wait for the admin panel, the website editor or import parsers.
+const Admin = lazy(() => import('./features/admin/Admin.js').then((m) => ({ default: m.Admin })))
+const Settings = lazy(() => import('./features/settings/Settings.js').then((m) => ({ default: m.Settings })))
+const Transfer = lazy(() => import('./features/transfer/Transfer.js').then((m) => ({ default: m.Transfer })))
+const Support = lazy(() => import('./features/desk/Support.js').then((m) => ({ default: m.Support })))
+const Orgs = lazy(() => import('./features/orgs/Orgs.js').then((m) => ({ default: m.Orgs })))
+const Loading = () => <div className="boot">Loading…</div>
 
 type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-help'
 
@@ -56,15 +60,15 @@ function useAccount(state: session.Unlocked) {
 function Signed({ state }: { state: session.Unlocked }) {
   useAccount(state)
   const route = useRoute()
-  if (route.name === 'settings') return <Settings state={state} />
-  if (route.name === 'transfer') return <Transfer state={state} />
-  if (route.name === 'support') return <Support state={state} />
-  if (route.name === 'orgs') return <Orgs state={state} />
+  if (route.name === 'settings') return <Suspense fallback={<Loading />}><Settings state={state} /></Suspense>
+  if (route.name === 'transfer') return <Suspense fallback={<Loading />}><Transfer state={state} /></Suspense>
+  if (route.name === 'support') return <Suspense fallback={<Loading />}><Support state={state} /></Suspense>
+  if (route.name === 'orgs') return <Suspense fallback={<Loading />}><Orgs state={state} /></Suspense>
   if (route.name === 'admin') {
     // The role arrives a moment after unlock; until it does, say so rather
     // than flash the vault or a refusal.
     if (state.role === undefined) return <div className="boot">Loading…</div>
-    if (state.isAdmin) return <Admin state={state} tab={route.tab} />
+    if (state.isAdmin) return <Suspense fallback={<Loading />}><Admin state={state} tab={route.tab} /></Suspense>
   }
   return <Vault state={state} />
 }

@@ -11,6 +11,8 @@ const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 /** RFC 4648 base32 — the encoding TOTP secrets use. Distinct from Crockford. */
 const BASE32_RFC4648 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 
+import { forgetKey } from './keycache.js'
+
 export function utf8Encode(text: string): Uint8Array {
   return new TextEncoder().encode(text)
 }
@@ -149,4 +151,5 @@ export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
  *  nothing here can reach those copies. Worth doing, not worth relying on. */
 export function wipe(bytes: Uint8Array): void {
   bytes.fill(0)
+  forgetKey(bytes)
 }

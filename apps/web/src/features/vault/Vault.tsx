@@ -98,6 +98,26 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
 
+  // Large vaults: draw the first rows at once and the rest as the list is
+  // scrolled, instead of putting thousands of rows in the page on unlock.
+  const PAGE = 150
+  const [shown, setShown] = useState(PAGE)
+  const moreRef = useRef<HTMLLIElement>(null)
+  useEffect(() => { setShown(PAGE) }, [filter, query])
+  useEffect(() => {
+    const el = moreRef.current
+    if (!el) return
+    const io = new IntersectionObserver((seen) => { if (seen.some((x) => x.isIntersecting)) setShown((n) => n + PAGE * 2) }, { rootMargin: '600px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [shown, visible.length])
+  // A selected item beyond the drawn rows is still drawn.
+  useEffect(() => {
+    if (!selectedId) return
+    const i = visible.findIndex((e) => e.id === selectedId)
+    if (i >= shown) setShown(i + PAGE)
+  }, [selectedId, visible])
+
   async function save(content: EntryContent, id?: string, collectionId?: string): Promise<boolean> {
     try {
       const target = collectionId ?? sharedOf(entries.find((e) => e.id === id))?.collectionId
@@ -224,7 +244,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <EmptyState hasEntries={entries.length > 0} onNew={startNew} />
           ) : (
             <ul className="rows">
-              {visible.map((e) => (
+              {visible.slice(0, shown).map((e) => (
                 <li key={e.id}>
                   <button className={`row-item ${e.id === selectedId ? 'row-active' : ''}`}
                           onClick={() => { setSelectedId(e.id); setMode({ kind: 'view' }) }}>
@@ -238,6 +258,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                   </button>
                 </li>
               ))}
+              {visible.length > shown ? <li ref={moreRef} className="rows-more" aria-hidden="true" /> : null}
             </ul>
           )}
         </section>

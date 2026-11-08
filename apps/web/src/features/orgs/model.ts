@@ -220,11 +220,17 @@ export function useTeams(vaultKey: Uint8Array) {
       if (!m) throw new Error('A member with access has left; reload and try again.')
       return { userId: a.userId, keyBlob: await sealCollectionKey(fromBase64Url(m.publicKey), key, c.id, version) }
     }))
-    const resealed = await Promise.all(items.map(async (it) => {
-      const content = await openSharedItem(c.id, it.id, it.keyVersion, it.blob, c.key)
-      return { id: it.id, blob: await sealSharedItem(c.id, it.id, version, content, key) }
-    }))
-    await api.orgs.rotate(token, c.orgId, c.id, { keyVersion: version, grants, items: resealed })
+    // An item this member cannot decrypt (planted by someone holding an old
+    // key, or damaged) is dropped rather than allowed to block the rotation.
+    const resealed: { id: string; blob: string }[] = []
+    const drop: string[] = []
+    for (const it of items) {
+      try {
+        const content = await openSharedItem(c.id, it.id, it.keyVersion, it.blob, c.key)
+        resealed.push({ id: it.id, blob: await sealSharedItem(c.id, it.id, version, content, key) })
+      } catch { drop.push(it.id) }
+    }
+    await api.orgs.rotate(token, c.orgId, c.id, { keyVersion: version, grants, items: resealed, drop })
     await load()
   }
 
