@@ -6,7 +6,7 @@
   "description": "The vault client. Everything secret is derived, decrypted, and held here.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && npm run check:csp",
+    "build": "tsc -b && vite build && node scripts/build-offline.mjs && npm run check:csp",
     "typecheck": "tsc -b --noEmit",
     "preview": "vite preview",
     "check:csp": "node scripts/check-csp.mjs"

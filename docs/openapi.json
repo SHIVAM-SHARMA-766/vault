@@ -3330,6 +3330,148 @@
         }
       }
     },
+    "/api/attachments": {
+      "get": {
+        "summary": "How much of my attachment quota is in use",
+        "operationId": "getAttachments",
+        "tags": [
+          "attachments"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attachments/{id}": {
+      "put": {
+        "summary": "Store an encrypted attachment (its key stays in the sealed entry)",
+        "operationId": "putAttachmentsId",
+        "tags": [
+          "attachments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Fetch an encrypted attachment",
+        "operationId": "getAttachmentsId",
+        "tags": [
+          "attachments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an attachment",
+        "operationId": "deleteAttachmentsId",
+        "tags": [
+          "attachments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "summary": "My notifications, newest first",

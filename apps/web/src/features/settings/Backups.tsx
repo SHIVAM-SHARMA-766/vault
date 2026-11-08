@@ -230,7 +230,33 @@ export function Backups() {
           </ul>
         </section>
       ) : null}
+
+      <OfflineCopy />
     </>
+  )
+}
+
+/** An encrypted copy that opens without the server (C4). */
+function OfflineCopy() {
+  const toast = useToast()
+  const [busy, setBusy] = useState(false)
+  return (
+    <section className="settings-card" aria-labelledby="b-offline">
+      <div className="settings-card-head"><IconDownload size={18} /><h2 id="b-offline">Offline copy</h2></div>
+      <p className="muted small">One file you can keep on a USB stick or another computer. It opens in any browser with your master password, with no server and no network: for when this server is down or gone. Read-only; attached files are not included.</p>
+      <div className="settings-actions">
+        <button className="btn btn-secondary" disabled={busy} onClick={async () => {
+          setBusy(true)
+          try {
+            const { buildOfflineCopy } = await import('../../lib/offline.js')
+            const email = session.get()?.email ?? ''
+            download(`vault-offline-${new Date().toISOString().slice(0, 10)}.html`, await buildOfflineCopy(email), 'text/html')
+            toast('Offline copy downloaded. It opens with the master password you have now.')
+          } catch (err) { toast(err instanceof Error ? err.message : 'Could not make the offline copy.', 'error') }
+          finally { setBusy(false) }
+        }}>{busy ? <span className="spinner" /> : <IconDownload size={15} />}Download an offline copy</button>
+      </div>
+    </section>
   )
 }
 

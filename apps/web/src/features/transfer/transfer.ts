@@ -23,7 +23,7 @@ import {
 } from '@vault/crypto'
 import { MAX_FOLDER_DEPTH, type ImportedItem, duplicateKey, folderPath, readImport, toCsv } from '@vault/core'
 
-import { api } from '../../lib/api.js'
+import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import type { Decrypted, Folder } from '../vault/model.js'
 import { when } from '../../lib/format.js'
@@ -53,6 +53,8 @@ export interface Source {
   format: string
   candidates: Candidate[]
   warnings: string[]
+  /** Encrypted attachment files a personal backup carries (D2). */
+  attachments?: { id: string; blob: string }[]
 }
 
 export function fromImported(items: ImportedItem[]): Candidate[] {
@@ -106,13 +108,14 @@ export interface OpenedBackup {
   folders: Folder[]
   /** Items whose ciphertext did not open (damaged, or from another key). */
   failed: number
+  attachments: { id: string; blob: string }[]
 }
 
 /** Opens a personal backup in this browser with the master password — or the
  *  recovery key — that was current when it was made. Nothing is sent
  *  anywhere. Throws UnsealError when the secret is wrong. */
 export async function openPersonalBackup(text: string, secret: string, how: 'password' | 'recovery'): Promise<OpenedBackup> {
-  let file: { format?: string; version?: number; createdAt?: string; kdf?: { algorithm: string; iterations: number; salt: string }; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[] }
+  let file: { format?: string; version?: number; createdAt?: string; kdf?: { algorithm: string; iterations: number; salt: string }; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[]; attachments?: { id: string; blob: string }[] }
   try { file = JSON.parse(text) } catch { throw new Error('This backup file is damaged: it is not valid JSON.') }
   if (file.format !== 'vault-personal-backup' || file.version !== 1) throw new Error('This is not a Vault personal backup, or it is from a newer version.')
   let key: Uint8Array
@@ -136,7 +139,8 @@ export async function openPersonalBackup(text: string, secret: string, how: 'pas
     const entries = (await Promise.all((file.entries ?? []).map(async (e) => {
       try { return { ...(await openEntry(e.id, e.blob, key)), id: e.id } } catch { failed++; return null }
     }))).filter((e): e is EntryContent & { id: string } => e !== null)
-    return { createdAt: file.createdAt ?? '', entries, folders, failed }
+    const attachments = (file.attachments ?? []).filter((a) => typeof a?.id === 'string' && typeof a?.blob === 'string')
+    return { createdAt: file.createdAt ?? '', entries, folders, failed, attachments }
   } finally {
     wipe(key)
   }
@@ -148,6 +152,7 @@ export function backupSource(b: OpenedBackup): Source {
     format: `Vault personal backup (${when(b.createdAt)})`,
     candidates: b.entries.map(({ id: _id, folderId, ...content }) => ({ content, folder: folderPath(b.folders, folderId) })),
     warnings: b.failed ? [`${b.failed} item${b.failed === 1 ? '' : 's'} in the backup could not be opened and will be skipped.`] : [],
+    attachments: b.attachments,
   }
 }
 
@@ -155,6 +160,7 @@ export interface Plan {
   folders: { id: string; content: FolderContent; path: string }[]
   entries: EntryContent[]
   duplicates: number
+  attachments?: { id: string; blob: string }[]
 }
 
 /** Decides what will be created: which folders are new (existing ones with
@@ -199,6 +205,13 @@ export function plan(source: Candidate[], existing: { entries: Decrypted[]; fold
 /** Encrypts and uploads a plan in batches. Returns how many entries were
  *  created and the names of any too large to store. */
 export async function runImport(p: Plan, vaultKey: Uint8Array, onProgress: (done: number, total: number) => void): Promise<{ created: number; tooLarge: string[] }> {
+  // Attachment files from a backup go back first, under their own ids (the
+  // keys are in the entries). One already here — the same account — is kept.
+  const wanted = new Set(p.entries.flatMap((e) => (e.attachments ?? []).map((a) => a.id)))
+  for (const a of p.attachments ?? []) {
+    if (!wanted.has(a.id)) continue
+    await api.attachments.put(await session.token(), a.id, a.blob).catch((err: unknown) => { if (!(err instanceof ApiError && err.status === 409)) throw err })
+  }
   const folders = await Promise.all(p.folders.map(async (f) => ({ id: f.id, blob: await sealFolder(f.id, f.content, vaultKey) })))
   const tooLarge: string[] = []
   const sealed: { id: string; blob: string }[] = []
@@ -254,7 +267,9 @@ export async function encryptedExport(entries: Decrypted[], folders: Folder[], p
     kind: 'vault-items',
     exportedAt: new Date().toISOString(),
     folders,
-    entries: readable(entries).map(({ id: _i, updatedAt: _u, unreadable: _r, ...content }) => content),
+    // Attached files are not in an export (only in personal backups): the
+    // references would point at files the other end does not have.
+    entries: readable(entries).map(({ id: _i, updatedAt: _u, unreadable: _r, attachments: _a, ...content }) => content),
   }
   return sealExport(password, payload)
 }

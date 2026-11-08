@@ -66,6 +66,19 @@ export interface EntryContent {
   /** Remind me to change the password this many days after it last changed
    *  (D6); absent for never. */
   rotateDays?: number
+  /** Files attached to this entry (D2). Each was encrypted with its own key,
+   *  kept here, inside the sealed entry; the server holds only the ciphertext,
+   *  under the id. */
+  attachments?: AttachmentRef[]
+}
+
+export interface AttachmentRef {
+  id: string
+  name: string
+  type: string
+  size: number
+  /** base64url, 32 bytes. */
+  key: string
 }
 
 export interface FolderContent {
