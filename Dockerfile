@@ -13,7 +13,9 @@
 # BACKUP_PASSPHRASE is set) in /data/backups. Everything that must
 # survive an upgrade is in /data. See docs/INSTALL.md.
 
-ARG NODE_IMAGE=node:20.18.1-bookworm-slim
+# 20.19 or later: Vite 8's bundler (rolldown) declares it, and npm silently
+# skips its native binding on an older Node.
+ARG NODE_IMAGE=node:20.19.5-bookworm-slim
 
 # ── 1. Build: install everything, test-free build of every workspace ────────
 FROM ${NODE_IMAGE} AS build
