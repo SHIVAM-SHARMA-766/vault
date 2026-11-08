@@ -31,7 +31,7 @@ import {
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
-import { href, navigate } from '../../lib/router.js'
+import { Link, href, navigate } from '../../lib/router.js'
 
 type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit'
 
@@ -123,6 +123,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
       <ErrorBox error={error} />
       {!data ? <div className="skeletons">{[0, 1].map((i) => <div key={i} className="skeleton" />)}</div> : (
         <>
+          <SetupChecklist data={data} onGo={onGo} />
           <div className="stats">
             <Stat label="Accounts" value={data.users} note={data.disabledUsers ? `${data.disabledUsers} disabled` : 'all active'} onClick={() => onGo('users')} />
             <Stat label="Encrypted items" value={data.entries} note="across every vault" />
@@ -151,7 +152,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
             <div className="admin-card">
               <div className="admin-card-head">
                 <span className={`dot ${data.registration === 'open' || data.registrationForcedOpen ? 'dot-warn' : 'dot-ok'}`} />
-                <h2>Registration</h2>
+                <h2 id="reg-title">Registration</h2>
               </div>
               <div className="segmented" role="radiogroup" aria-label="Registration">
                 {(['closed', 'invite', 'open'] as RegistrationMode[]).map((m) => (
@@ -185,6 +186,46 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
         </>
       )}
     </Section>
+  )
+}
+
+/** What a new server still needs, from what the server can see. Gone once
+ *  everything is done. */
+function SetupChecklist({ data, onGo }: { data: AdminOverview; onGo: (t: Tab) => void }) {
+  const [extra, setExtra] = useState<{ profile: boolean; twoFactor: boolean } | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const t = await session.token()
+        const [settings, me] = await Promise.all([api.admin.settings(t), api.me(t)])
+        setExtra({ profile: Boolean(settings.profile.supportEmail || settings.profile.supportUrl), twoFactor: me.twoFactor.enabled })
+      } catch { /* the checklist waits */ }
+    })()
+  }, [])
+  if (!extra) return null
+  const backupOk = data.lastBackup?.at ? Date.now() - Date.parse(data.lastBackup.at) < 36 * 3_600_000 : false
+  const steps = [
+    { done: extra.twoFactor, text: 'Turn on two-factor sign-in for your own account', go: <Link to={href({ name: 'settings', tab: 'security' })} className="link">Security settings</Link> },
+    { done: extra.profile, text: 'Give the server a name and a support address', go: <a className="link" href="#profile-title">Name and support ↓</a> },
+    { done: data.mail, text: 'Set up mail, so invitations and sign-in notices are emailed', go: <span className="muted">SMTP_HOST in .env — docs/configuration.md</span> },
+    { done: backupOk, text: 'Have a server backup in the last day, and keep the passphrase off the server', go: <span className="muted">BACKUP_PASSPHRASE — docs/INSTALL.md</span> },
+    { done: data.registration !== 'open' && !data.registrationForcedOpen, text: 'Keep registration closed or invite-only', go: <a className="link" href="#reg-title">Registration ↓</a> },
+    { done: data.users > 1, text: 'Invite your first people', go: <button className="link" onClick={() => onGo('invites')}>Invitations</button> },
+  ]
+  const left = steps.filter((x) => !x.done).length
+  if (left === 0) return null
+  return (
+    <section className="admin-card admin-checklist" aria-labelledby="setup-title">
+      <div className="admin-card-head"><span className="dot dot-warn" /><h2 id="setup-title">Finish setting up</h2><span className="muted small">{left} of {steps.length} left</span></div>
+      <ul>
+        {steps.map((x) => (
+          <li key={x.text} className={x.done ? 'gs-done' : ''}>
+            <span className="gs-mark" aria-hidden="true">{x.done ? <IconCheck size={13} /> : null}</span>
+            <span>{x.text}{x.done ? <span className="visually-hidden"> (done)</span> : <> — {x.go}</>}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -425,6 +466,93 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
 
 const loadInvites = (t: string) => api.admin.invites(t)
 
+/** "email, name" per line — what a spreadsheet column pastes as. */
+export function parsePeople(text: string): { people: { email: string; name?: string }[]; problems: string[] } {
+  const people: { email: string; name?: string }[] = []
+  const problems: string[] = []
+  text.split(/\r?\n/).forEach((raw, i) => {
+    const line = raw.trim()
+    if (!line || /^email\b/i.test(line)) return
+    const [email = '', ...rest] = line.split(/[,;\t]/).map((x) => x.trim())
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { problems.push(`Line ${i + 1}: "${email}" is not an email address`); return }
+    const name = rest.join(' ').trim()
+    people.push({ email, ...(name ? { name } : {}) })
+  })
+  return { people, problems }
+}
+
+function BulkInvite({ canRoles, onDone }: { canRoles: boolean; onDone: () => Promise<void> }) {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [days, setDays] = useState(7)
+  const [role, setRole] = useState<Role>('user')
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<Awaited<ReturnType<typeof api.admin.bulkInvite>> | null>(null)
+  const parsed = parsePeople(text)
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const res = await api.admin.bulkInvite(await session.token(), parsed.people, days, role)
+      setDone(res); setText('')
+      await onDone()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not send the invitations.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) return <p className="small"><button className="link" onClick={() => setOpen(true)}>Invite many people at once…</button></p>
+  return (
+    <form className="admin-card bulk-invite" onSubmit={send} aria-labelledby="bulk-title">
+      <h2 id="bulk-title">Invite many people</h2>
+      <div className="field">
+        <label htmlFor="bulk-people">One person per line: email, then a name you will recognise (optional)</label>
+        <textarea id="bulk-people" rows={6} spellCheck={false} placeholder={'asha@example.com, Asha (finance)\nravi@example.com, Ravi'} value={text} onChange={(e) => setText(e.target.value)} />
+        <p className="hint">{parsed.people.length} {parsed.people.length === 1 ? 'person' : 'people'}{parsed.problems.length ? ` · ${parsed.problems.length} line${parsed.problems.length === 1 ? '' : 's'} to fix` : ''}. Pasting a column from a spreadsheet works.</p>
+        {parsed.problems.slice(0, 5).map((p) => <p key={p} className="hint hint-error">{p}</p>)}
+      </div>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="bulk-days">Expires after</label>
+          <select id="bulk-days" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+            {[1, 3, 7, 14, 30].map((d) => <option key={d} value={d}>{d} day{d > 1 ? 's' : ''}</option>)}
+          </select>
+        </div>
+        {canRoles ? (
+          <div className="field">
+            <label htmlFor="bulk-role">Everyone starts as</label>
+            <select id="bulk-role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+              {(['user', 'viewer', 'support', 'marketing', 'admin'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+            </select>
+          </div>
+        ) : null}
+      </div>
+      {done ? (
+        <div className="issued">
+          {done.warning ? <p className="alert alert-warn"><IconAlert size={16} /><span>{done.warning}</span></p> : null}
+          <p><strong>{done.results.filter((r) => r.emailed).length} of {done.results.length} emailed.</strong> {done.results.some((r) => !r.emailed) ? 'Send the others their code yourself — each is shown once:' : ''}</p>
+          {done.results.some((r) => r.code) ? (
+            <>
+              <ul className="bulk-codes">{done.results.filter((r) => r.code).map((r) => <li key={r.email}><span>{r.email}</span> <code>{r.code}</code></li>)}</ul>
+              <CopyButton value={done.results.filter((r) => r.code).map((r) => `${r.email},${r.code}`).join('\n')} label="Codes" />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="settings-actions">
+        <button type="button" className="btn btn-secondary" onClick={() => { setOpen(false); setDone(null) }}>Close</button>
+        <button className="btn btn-primary" type="submit" disabled={busy || !parsed.people.length || parsed.problems.length > 0}>
+          {busy ? <><span className="spinner" />Sending…</> : `Invite ${parsed.people.length || ''}`.trim()}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean }) {
   const toast = useToast()
   const [role, setRole] = useState<Role>('user')
@@ -441,6 +569,7 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
     try {
       const res = await api.admin.createInvite(await session.token(), label.trim(), days, role, email.trim())
       setIssued({ code: res.code, label: res.invite.label, expiresAt: res.invite.expiresAt, ...(res.emailed ? { emailedTo: email.trim() } : {}) })
+      if (res.warning) toast(res.warning, 'error')
       if (email.trim() && !res.emailed) toast('The invitation was created, but the email could not be sent. Copy the code instead.', 'error')
       setRole('user')
       setLabel('')
@@ -482,6 +611,8 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
         ) : null}
         <button className="btn btn-primary" type="submit" disabled={busy || !label.trim()}><IconPlus size={16} />Create invitation</button>
       </form> : null}
+
+      {canWrite ? <BulkInvite canRoles={canRoles} onDone={reload} /> : null}
 
       {issued ? (
         <div className="issued">

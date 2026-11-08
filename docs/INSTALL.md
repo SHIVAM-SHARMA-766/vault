@@ -137,10 +137,19 @@ notice reach you, not the no-reply sender.
 
 ## Inviting people
 
+The admin panel's Overview starts with **Finish setting up**: two-factor for you, a name and
+support address, mail, a recent backup, registration not open, and your first invitations. Each
+item ticks itself off.
+
 Admin panel → **Invitations** → who it is for, how long it lasts, and the role they start
 with. With [mail](#mail) set up, enter their address and they get the code and a link;
 otherwise copy the code to them yourself. Registration stays closed to everyone else
 (Overview → Registration: Closed / Invite only / Open).
+
+**Many people at once:** Invitations → *Invite many people at once…*, then paste one person per
+line (`email, name` — a spreadsheet column works). Everyone gets their own code by email, or,
+without mail, the codes are listed once for you to send. Invitations only work while
+registration is *Invite only* or *Open*; Vault warns if it is closed.
 
 ### Requests from people outside
 
