@@ -13,7 +13,7 @@ import {
 } from '../personal-backup.js'
 
 /** Building and uploading a backup is real work; a few an hour is plenty. */
-const RUN_LIMIT: Limit = { max: 6, windowSeconds: 60 * 60 }
+export const RUN_LIMIT: Limit = { max: 6, windowSeconds: 60 * 60 }
 
 export async function getBackups(app: App, userId: string): Promise<LambdaResponse> {
   const cfg = await getConfig(app, userId)

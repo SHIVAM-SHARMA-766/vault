@@ -328,7 +328,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **C. Backups, per user (like Zoho)**
 - ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)
 - ⬜ C3 Google Drive / OneDrive · ⬜ C4 Encrypted offline copy that opens without the server
-- ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ⬜ C7 Server backup settings in the admin UI
+- ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ✅ C7 Server backup settings in the admin UI (shown, with Back up now; values stay on the host)
 
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ⬜ D2 File attachments · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
@@ -346,8 +346,8 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ✅ F4 Reveal and count options (fixed-length mask, auto-hide) · ✅ F5 Email alerts (sign-in email switch; the server holds no address, so other alerts live in activity) · ✅ F6 Default folder · ✅ F7 Date and time styles (language is E9) · ✅ F8 Delete my account
 
 **G. Administrator settings**
-- ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ⬜ G2 IP allow-list · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ✅ G4 Sharing policy (share links on/off and longest life)
-- ⬜ G5 Rate limits in the UI · ⬜ G6 Editable email templates · ✅ G7 Data retention (activity, audit and organization logs; shortening applies at once)
+- ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ✅ G2 IP allow-list (sign-in, recovery and refresh; owners exempt) · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ✅ G4 Sharing policy (share links on/off and longest life)
+- ✅ G5 Rate limits in the UI (read-only, in words) · ✅ G6 Editable email templates (subject and a message; security text fixed) · ✅ G7 Data retention (activity, audit and organization logs; shortening applies at once)
 
 ### Phase 4 — Browser extension
 

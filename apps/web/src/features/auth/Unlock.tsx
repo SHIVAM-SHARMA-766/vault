@@ -29,7 +29,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       // The server accepted the auth key but the blob would not open. That
       // is corruption or the wrong account, not a wrong password.
       setError('The vault did not open. The stored key may be damaged.')
-    } else if (err instanceof ApiError && err.code === 'invalid_two_factor') {
+    } else if (err instanceof ApiError && (err.code === 'invalid_two_factor' || err.code === 'network_not_allowed')) {
       setError(err.message)
     } else if (err instanceof ApiError && err.status === 403) {
       setError('This account has been disabled. Contact the person who runs this vault.')

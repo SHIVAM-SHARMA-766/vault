@@ -22,7 +22,7 @@ import { promisify } from 'node:util'
 import { gunzipSync, gzipSync } from 'node:zlib'
 
 import type { Config } from './config.js'
-import { BACKUP_SK, SYSTEM_PK } from './keys.js'
+import { BACKUP_SK, BACKUP_REQUEST_SK, SYSTEM_PK } from './keys.js'
 import { s3Put } from './s3.js'
 import { LATEST_VERSION } from './storage/migrations.js'
 import type { Item, ManagedStore } from './store.js'
@@ -129,4 +129,15 @@ export async function restoreBackup(store: ManagedStore, file: Buffer, passphras
   for (const r of existing) await store.delete(r.pk, r.sk)
   for (const row of contents.rows) await store.put(row, { mustNotExist: true })
   return { header, secrets: contents.secrets }
+}
+
+/** Runs a backup if an admin asked for one (C7); the request is removed
+ *  first, so a failing backup is not retried every minute. */
+export async function takeBackupRequest(store: ManagedStore, config: Config, now = new Date()): Promise<{ name: string } | null> {
+  const req = await store.get(SYSTEM_PK, BACKUP_REQUEST_SK)
+  if (!req) return null
+  await store.delete(SYSTEM_PK, BACKUP_REQUEST_SK)
+  const r = await runBackup(store, config, now)
+  console.log(`backup written on request: ${r.name} (${r.rows} rows, ${r.bytes} bytes)`)
+  return r
 }

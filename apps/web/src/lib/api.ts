@@ -123,6 +123,19 @@ export interface ServerPolicy {
   auditDays: number
   shareLinks: boolean
   shareLinkMaxDays: number
+  allowedNetworks: string[]
+}
+
+export type TemplateKind = 'invite' | 'signIn'
+export type Templates = Partial<Record<TemplateKind, { subject: string; message: string }>>
+export interface BackupStatus {
+  enabled: boolean
+  passphraseSet: boolean
+  intervalHours: number
+  keep: number
+  destinations: { kind: 'directory' | 's3'; where: string }[]
+  last: { at: string; object: string; bytes: number } | null
+  requestedAt: string | null
 }
 
 export type BackupFrequency = 'off' | 'daily' | 'weekly' | 'monthly'
@@ -390,7 +403,12 @@ export const api = {
     deleteUser: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/delete`, { token, body: { confirm: id } }),
     settings: (token: string) =>
-      request<{ registration: RegistrationMode; profile: InstanceProfile; policy: ServerPolicy; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+      request<{ registration: RegistrationMode; profile: InstanceProfile; policy: ServerPolicy; templates: Templates; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+    setTemplates: (token: string, templates: Templates) => request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { templates } }),
+    previewTemplate: (token: string, kind: TemplateKind, subject: string, message: string) => request<{ subject: string; text: string }>('POST', '/api/admin/templates/preview', { token, body: { kind, subject, message } }),
+    limits: (token: string) => request<{ limits: { name: string; per: string; max: number; windowSeconds: number; note: string }[] }>('GET', '/api/admin/limits', { token }),
+    backup: (token: string) => request<BackupStatus>('GET', '/api/admin/backup', { token }),
+    backupNow: (token: string) => request<{ requestedAt: string }>('POST', '/api/admin/backup/run', { token }),
     update: (token: string, refresh = false) => request<UpdateStatus>('GET', `/api/admin/update${refresh ? '?refresh=1' : ''}`, { token }),
     setProfile: (token: string, profile: InstanceProfile) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { profile } }),

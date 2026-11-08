@@ -17,7 +17,7 @@ const CACHE_MS = 60 * 60_000
 const CACHE_MAX = 5000
 const MAX_BYTES = 1024 * 1024
 /** A vault of a few thousand passwords checks in one go. */
-const LIMIT: Limit = { max: 3000, windowSeconds: 3600 }
+export const BREACH_LIMIT: Limit = { max: 3000, windowSeconds: 3600 }
 
 const cache = new Map<string, { at: number; body: string }>()
 
@@ -25,7 +25,7 @@ export async function breachRange(app: App, userId: string, prefix: string): Pro
   if (!app.config.breachCheck.enabled) throw new HttpError(503, 'unavailable', 'The breach check is turned off on this server (BREACH_CHECK).')
   const p = prefix.toUpperCase()
   if (!PREFIX.test(p)) throw badRequest('prefix must be 5 hexadecimal characters.')
-  await enforce(app.store, 'breach', userId, LIMIT, app.now())
+  await enforce(app.store, 'breach', userId, BREACH_LIMIT, app.now())
 
   const hit = cache.get(p)
   if (hit && app.now() - hit.at < CACHE_MS) return json(200, { range: hit.body })

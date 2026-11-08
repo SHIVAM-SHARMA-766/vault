@@ -59,6 +59,8 @@ export interface ServerPolicy {
   /** Whether people may share an item by link (G4), and for how long at most. */
   shareLinks: boolean
   shareLinkMaxDays: number
+  /** Where accounts may sign in from (G2): addresses or CIDR ranges; empty for anywhere. Owners are exempt. */
+  allowedNetworks: string[]
 }
 
 export const POLICY_CHOICES = {
@@ -71,7 +73,7 @@ export const POLICY_CHOICES = {
 } as const
 
 export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
-  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30,
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [],
 })
 
 /** A stored policy, with anything missing or out of range taken from the
@@ -89,6 +91,7 @@ export function readPolicy(value: unknown): ServerPolicy {
     auditDays: pick('auditDays'),
     shareLinks: v['shareLinks'] !== false,
     shareLinkMaxDays: pick('shareLinkMaxDays'),
+    allowedNetworks: Array.isArray(v['allowedNetworks']) ? (v['allowedNetworks'] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 50) : [],
   }
 }
 
@@ -96,6 +99,8 @@ export interface Settings {
   registration: RegistrationMode
   profile: InstanceProfile
   policy: ServerPolicy
+  /** An admin's subject and message per email (G6); missing means the default. */
+  templates: Partial<Record<'invite' | 'signIn', { subject: string; message: string }>>
   updatedAt?: string
 }
 
@@ -105,6 +110,16 @@ function readProfile(value: unknown): InstanceProfile {
   return { name: str('name'), supportEmail: str('supportEmail'), supportUrl: str('supportUrl') }
 }
 
+function readTemplates(value: unknown): Settings['templates'] {
+  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  const out: Settings['templates'] = {}
+  for (const k of ['invite', 'signIn'] as const) {
+    const t = v[k] as Record<string, unknown> | undefined
+    if (t && typeof t['subject'] === 'string' && typeof t['message'] === 'string') out[k] = { subject: t['subject'], message: t['message'] }
+  }
+  return out
+}
+
 export async function getSettings(app: App): Promise<Settings> {
   const item = await app.store.get(SYSTEM_PK, SETTINGS_SK)
   const mode = item?.['registration']
@@ -112,6 +127,7 @@ export async function getSettings(app: App): Promise<Settings> {
     registration: REGISTRATION_MODES.includes(mode as RegistrationMode) ? (mode as RegistrationMode) : 'closed',
     profile: readProfile(item?.['profile']),
     policy: readPolicy(item?.['policy']),
+    templates: readTemplates(item?.['templates']),
     ...(typeof item?.['updatedAt'] === 'string' ? { updatedAt: item['updatedAt'] } : {}),
   }
 }

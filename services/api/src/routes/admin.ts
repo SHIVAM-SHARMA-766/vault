@@ -10,11 +10,12 @@
 
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
-import { inviteMessage, notify } from '../mail.js'
+import { type TemplateKind, TEMPLATE_KINDS, applyTemplate, inviteMessage, notify, signInNotice } from '../mail.js'
 import { openTicketCount } from './desk.js'
 import { leaveAllOrgs, purgeOrg } from './orgs.js'
 import { requireEmail } from '../validate.js'
 import {
+  BACKUP_REQUEST_SK,
   BACKUP_SK,
   EMAIL_SK,
   ENTRY_PREFIX,
@@ -31,7 +32,13 @@ import { bkdueSk } from '../personal-backup.js'
 import { updateStatus } from '../updates.js'
 import { applyRetention } from '../retention.js'
 import { eraseShares } from './shares.js'
-import { enforce, type Limit } from '../ratelimit.js'
+import { allowedFrom, requireNetworks } from '../networks.js'
+import { backupsEnabled } from '../backup.js'
+import { BREACH_LIMIT } from '../breach.js'
+import { PUBLIC_LIMIT } from './desk.js'
+import { RUN_LIMIT } from './backups.js'
+import { CREATE_LIMIT, OPEN_LIMIT } from './shares.js'
+import { API_LIMIT, AUTH_LIMIT, enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
   type GrantableRole,
@@ -60,6 +67,7 @@ import {
   putSettings,
   POLICY_CHOICES,
   type ServerPolicy,
+  type Settings,
   readPolicy,
   serverPolicyGap,
 } from '../system.js'
@@ -281,9 +289,9 @@ export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
 }
 
 export async function putSettingsRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
-  const body = parseJsonBody<{ registration?: unknown; profile?: unknown; policy?: unknown }>(event)
-  if (body.registration === undefined && body.profile === undefined && body.policy === undefined) {
-    throw badRequest('Send registration, profile or policy.')
+  const body = parseJsonBody<{ registration?: unknown; profile?: unknown; policy?: unknown; templates?: unknown }>(event)
+  if (body.registration === undefined && body.profile === undefined && body.policy === undefined && body.templates === undefined) {
+    throw badRequest('Send registration, profile, policy or templates.')
   }
   const current = await getSettings(app)
   let registration = current.registration
@@ -302,9 +310,17 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
   let policy = current.policy
   if (body.policy !== undefined) {
     policy = requirePolicy(body.policy)
+    // A list that shuts out the person saving it would lock them out at their next refresh.
+    const ip = event.requestContext.http.sourceIp
+    if (!allowedFrom(policy.allowedNetworks, ip)) throw badRequest(`Your own address (${ip}) is not in the sign-in list. Add it first, or you would be signed out.`)
     await audit(app, actor, 'settings.policy', undefined, describePolicy(policy))
   }
-  await putSettings(app, { registration, profile, policy, updatedAt: new Date(app.now()).toISOString() })
+  let templates = current.templates
+  if (body.templates !== undefined) {
+    templates = requireTemplates(body.templates)
+    await audit(app, actor, 'settings.templates', undefined, Object.keys(templates).join(',') || 'defaults')
+  }
+  await putSettings(app, { registration, profile, policy, templates, updatedAt: new Date(app.now()).toISOString() })
   // A shortened retention period takes effect now, not at the next pass.
   if (policy.activityDays < current.policy.activityDays || policy.auditDays < current.policy.auditDays) await applyRetention(app)
   return json(200, { ok: true })
@@ -316,11 +332,12 @@ export function requirePolicy(value: unknown): ServerPolicy {
   if (!value || typeof value !== 'object') throw badRequest('policy must be an object.')
   const v = value as Record<string, unknown>
   for (const k of ['requireTwoFactor', 'shareLinks']) if (typeof v[k] !== 'boolean') throw badRequest(`policy.${k} must be true or false.`)
+  requireNetworks(v['allowedNetworks'] ?? [])
   for (const k of Object.keys(POLICY_CHOICES) as (keyof typeof POLICY_CHOICES)[]) {
     const choices = POLICY_CHOICES[k] as readonly unknown[]
     if (!choices.includes(v[k])) throw badRequest(`policy.${k} must be one of: ${choices.map((c) => c ?? 'null').join(', ')}.`)
   }
-  return readPolicy(v)
+  return { ...readPolicy(v), allowedNetworks: requireNetworks(v['allowedNetworks'] ?? []) }
 }
 
 function describePolicy(p: ServerPolicy): string {
@@ -332,6 +349,7 @@ function describePolicy(p: ServerPolicy): string {
     `activity=${p.activityDays}d`,
     `audit=${p.auditDays}d`,
     p.shareLinks ? `links<=${p.shareLinkMaxDays}d` : 'no-links',
+    p.allowedNetworks.length ? `networks=${p.allowedNetworks.join(',')}` : null,
   ].filter(Boolean).join(' ')
 }
 
@@ -488,4 +506,92 @@ export async function auditRoute(app: App): Promise<LambdaResponse> {
     targetLabel: r.target ? labels.get(r.target) ?? null : null,
   }))
   return json(200, { records })
+}
+
+// ── Server backups (C7) ─────────────────────────────────────────────────────
+// Settings come from the host (BACKUP_*): they hold a passphrase and storage
+// credentials, which do not belong in a database the backup itself contains.
+// The panel shows them and can ask for a backup now. Routes never read every
+// row (store.ts), so the request is recorded and the server's own backup loop,
+// which can, takes it within a minute.
+
+export async function backupStatus(app: App): Promise<LambdaResponse> {
+  const b = app.config.backup
+  const [last, request] = await Promise.all([app.store.get(SYSTEM_PK, BACKUP_SK), app.store.get(SYSTEM_PK, BACKUP_REQUEST_SK)])
+  return json(200, {
+    enabled: backupsEnabled(app.config),
+    passphraseSet: Boolean(b.passphrase),
+    intervalHours: b.intervalHours,
+    keep: b.keep,
+    destinations: [...(b.dir ? [{ kind: 'directory', where: b.dir }] : []), ...(b.s3 ? [{ kind: 's3', where: `${b.s3.bucket}/${b.s3.prefix}` }] : [])],
+    last: last ? { at: last['at'], object: last['object'], bytes: last['bytes'] } : null,
+    requestedAt: request?.['at'] ?? null,
+    lastError: last?.['error'] ?? null,
+  })
+}
+
+const BACKUP_NOW_LIMIT: Limit = { max: 4, windowSeconds: 3600 }
+
+export async function requestBackup(app: App, actor: string): Promise<LambdaResponse> {
+  if (!backupsEnabled(app.config)) throw new HttpError(503, 'unavailable', 'Backups are not set up on this server (BACKUP_PASSPHRASE and BACKUP_DIR or BACKUP_S3_*).')
+  await enforce(app.store, 'backup-now', actor, BACKUP_NOW_LIMIT, app.now())
+  await audit(app, actor, 'backup.request')
+  const at = new Date(app.now()).toISOString()
+  await app.store.put({ pk: SYSTEM_PK, sk: BACKUP_REQUEST_SK, at, by: actor })
+  return json(202, { requestedAt: at })
+}
+
+// ── Rate limits (G5) ────────────────────────────────────────────────────────
+// What the server allows, in words, so an admin can tell a person why they
+// were asked to wait. Read-only: the values are part of the threat model.
+
+export function limitsRoute(): LambdaResponse {
+  const row = (name: string, per: string, l: Limit, note: string) => ({ name, per, max: l.max, windowSeconds: l.windowSeconds, note })
+  return json(200, {
+    limits: [
+      row('Sign-in attempts', 'address and account', AUTH_LIMIT, 'Counted for each network address and for each account, separately.'),
+      row('Requests while signed in', 'account', API_LIMIT, 'Every vault, settings and sharing request.'),
+      row('Admin panel requests', 'staff account', ADMIN_LIMIT, ''),
+      row('Access and sign-in help requests', 'address', PUBLIC_LIMIT, 'The no-account forms on the sign-in page.'),
+      row('Share links made', 'account', CREATE_LIMIT, ''),
+      row('Share links opened', 'address', OPEN_LIMIT, 'Wrong or expired links count too.'),
+      row('Personal backups run by hand, and test restores', 'account', RUN_LIMIT, 'Scheduled backups are not counted.'),
+      row('Breach-check lookups', 'account', BREACH_LIMIT, 'One per distinct password prefix.'),
+      row('Server backups asked for in the panel', 'staff account', BACKUP_NOW_LIMIT, ''),
+    ],
+  })
+}
+
+// ── Email templates (G6) ────────────────────────────────────────────────────
+
+/** Admin-written subject and message per template; both plain text. A
+ *  template with both fields empty is removed (the default returns). */
+export function requireTemplates(value: unknown): Settings['templates'] {
+  if (!value || typeof value !== 'object') throw badRequest('templates must be an object.')
+  const v = value as Record<string, unknown>
+  const out: Settings['templates'] = {}
+  for (const [k, raw] of Object.entries(v)) {
+    if (!(TEMPLATE_KINDS as readonly string[]).includes(k)) throw badRequest(`templates.${k} is not a template. Use: ${TEMPLATE_KINDS.join(', ')}.`)
+    const t = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+    const subject = typeof t['subject'] === 'string' ? t['subject'].trim() : ''
+    const message = typeof t['message'] === 'string' ? t['message'].replace(/\r\n/g, '\n').trim() : ''
+    if (subject.length > 120 || /[\u0000-\u001f]/.test(subject)) throw badRequest(`templates.${k}.subject must be one line of at most 120 characters.`)
+    if (message.length > 1000 || /[\u0000-\u0009\u000b-\u001f]/.test(message)) throw badRequest(`templates.${k}.message must be at most 1000 characters of plain text.`)
+    if (subject || message) out[k as TemplateKind] = { subject, message }
+  }
+  return out
+}
+
+/** The message as recipients would get it, with sample details. */
+export async function previewTemplate(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const b = parseJsonBody<{ kind?: unknown; subject?: unknown; message?: unknown }>(event)
+  const kind = b.kind as TemplateKind
+  if (!(TEMPLATE_KINDS as readonly unknown[]).includes(kind)) throw badRequest(`kind must be one of: ${TEMPLATE_KINDS.join(', ')}.`)
+  const t = requireTemplates({ [kind]: { subject: b.subject ?? '', message: b.message ?? '' } })[kind]
+  const { profile } = await getSettings(app)
+  const sample = kind === 'invite'
+    ? inviteMessage(app.config.origin, 'SAMPLE-CODE', 'Asha (finance)', new Date(app.now() + 7 * 86_400_000).toUTCString())
+    : signInNotice(app.config.origin, 'Firefox on Windows', '203.0.113.7', new Date(app.now()).toUTCString(), false)
+  const { template: _t, ...msg } = applyTemplate(sample, t, profile.name || 'Vault')
+  return json(200, msg)
 }

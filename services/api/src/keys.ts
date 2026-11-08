@@ -13,6 +13,8 @@ export const ratePk = (bucket: string) => `RATE#${bucket}`
 export const SYSTEM_PK = 'SYSTEM'
 export const SETTINGS_SK = 'SETTINGS'
 export const BACKUP_SK = 'BACKUP'
+/** An admin's request for a backup now; the server's backup loop takes it. */
+export const BACKUP_REQUEST_SK = 'BACKUPREQ'
 export const registrySk = (userId: string) => `USER#${userId}`
 export const inviteSk = (codeHash: string) => `INVITE#${codeHash}`
 export const inviteUsedSk = (codeHash: string) => `INVITEUSED#${codeHash}`

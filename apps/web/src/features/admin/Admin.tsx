@@ -25,17 +25,18 @@ import { STRENGTH_LABELS, describeMinutes } from '@vault/core'
 import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Website } from './Website.js'
+import { System } from './System.js'
 import { refresh as refreshInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
-  IconPlus, IconRefresh, IconShield, IconTrash, IconUser, IconX,
+  IconPlus, IconRefresh, IconShield, IconSliders, IconTrash, IconUser, IconX,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { Link, href, navigate } from '../../lib/router.js'
 
-type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit'
+type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit' | 'system'
 
 const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => JSX.Element }[] = [
   { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
@@ -45,6 +46,7 @@ const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: numb
   { id: 'orgs', label: 'Organizations', needs: 'users.read', Icon: IconGrid },
   { id: 'invites', label: 'Invitations', needs: 'invites.read', Icon: IconKey },
   { id: 'audit', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
+  { id: 'system', label: 'System', needs: 'overview.read', Icon: IconSliders },
 ]
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -96,6 +98,7 @@ export function Admin({ state, tab: requested }: { state: session.Unlocked; tab:
           {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} /> : null}
           {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
           {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
+          {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
         </main>
       </div>
     </Shell>
@@ -318,6 +321,8 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
   const toast = useToast()
   const [form, setForm] = useState<ServerPolicy | null>(null)
   const [saved, setSaved] = useState<ServerPolicy | null>(null)
+  // The list as typed, so a new empty line survives until something is on it.
+  const [networksText, setNetworksText] = useState<string | null>(null)
   useEffect(() => {
     void (async () => {
       try { const s = await api.admin.settings(await session.token()); setForm(s.policy); setSaved(s.policy) } catch { /* says loading */ }
@@ -382,6 +387,13 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
             <option value="off">Turned off</option>
           </select>
         </div>
+      </div>
+      <div className="field">
+        <label htmlFor="pol-networks">Allow sign-in only from (one address or range per line; empty for anywhere)</label>
+        <textarea id="pol-networks" rows={3} className="mono" disabled={!canWrite} placeholder={'203.0.113.0/24\n2001:db8::/32'}
+                  value={networksText ?? form.allowedNetworks.join('\n')}
+                  onChange={(e) => { setNetworksText(e.target.value); setForm({ ...form, allowedNetworks: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) }) }} />
+        <p className="hint">Owners can always sign in, so a wrong list can be fixed. Devices outside the list are signed out within 15 minutes. Your own address must be in the list.</p>
       </div>
       {shorter ? <p className="alert alert-warn"><IconAlert size={16} /><span>Saving deletes log entries older than the new period. That cannot be undone.</span></p> : null}
       {missing > 0 ? <p className="muted small">{missing === 1 ? '1 account does' : `${missing} accounts do`} not meet these yet. <button type="button" className="link" onClick={onGo}>See Users</button></p> : null}
