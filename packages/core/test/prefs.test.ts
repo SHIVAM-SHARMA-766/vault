@@ -10,7 +10,7 @@ test('nothing, or not an object, gives the defaults', () => {
 })
 
 test('valid values are kept', () => {
-  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
+  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
   assert.deepEqual(normalizePrefs(p), p)
 })
 
@@ -59,4 +59,11 @@ test('passphrase settings are checked like the rest', () => {
   assert.equal(g.words, 12)
   assert.equal(g.separator, '-')
   assert.equal(g.capitalize, false)
+})
+
+test('list sort and density default sensibly and refuse anything else', () => {
+  assert.equal(normalizePrefs({}).listSort, 'name')
+  assert.equal(normalizePrefs({}).density, 'comfortable')
+  assert.equal(normalizePrefs({ listSort: 'updated', density: 'compact' }).listSort, 'updated')
+  assert.equal(normalizePrefs({ listSort: 'random', density: 'tiny' }).density, 'comfortable')
 })

@@ -17,6 +17,12 @@ export const GENERATOR_MAX = 64
 
 export const SEPARATORS = ['-', ' ', '.', '_'] as const
 
+/** How the item list is ordered, and how much room each row takes. */
+export type ListSort = 'name' | 'updated' | 'type'
+export const LIST_SORTS: readonly ListSort[] = ['name', 'updated', 'type']
+export type Density = 'comfortable' | 'compact'
+export const DENSITIES: readonly Density[] = ['comfortable', 'compact']
+
 export interface GeneratorPrefs {
   mode: 'password' | 'passphrase'
   length: number
@@ -37,6 +43,8 @@ export interface Prefs {
   lockOnHide: boolean
   clipboardSeconds: number
   generator: GeneratorPrefs
+  listSort: ListSort
+  density: Density
 }
 
 export const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -44,6 +52,8 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   lockMinutes: 15,
   lockOnHide: false,
   clipboardSeconds: 30,
+  listSort: 'name',
+  density: 'comfortable',
   generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
@@ -63,6 +73,8 @@ export function normalizePrefs(raw: unknown): Prefs {
     lockMinutes: pick(r['lockMinutes'], LOCK_CHOICES as readonly number[], d.lockMinutes),
     lockOnHide: bool(r['lockOnHide'], d.lockOnHide),
     clipboardSeconds: pick(r['clipboardSeconds'], CLIPBOARD_CHOICES as readonly number[], d.clipboardSeconds),
+    listSort: pick(r['listSort'], LIST_SORTS, d.listSort),
+    density: pick(r['density'], DENSITIES, d.density),
     generator: {
       mode: pick(g['mode'], ['password', 'passphrase'] as const, d.generator.mode),
       length,

@@ -52,7 +52,7 @@ export const useToast = () => useContext(ToastContext)
  *  tab is focused, and only if the clipboard still holds what was put there. */
 let clearTimer: ReturnType<typeof setTimeout> | null = null
 
-async function copySecret(value: string): Promise<void> {
+export async function copySecret(value: string): Promise<void> {
   await navigator.clipboard.writeText(value)
   if (clearTimer) clearTimeout(clearTimer)
   const seconds = prefs.get().clipboardSeconds

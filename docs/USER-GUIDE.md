@@ -455,10 +455,34 @@ Resolved tickets close by themselves after a week; closing erases the requester'
 
 ## Keyboard shortcuts
 
+**<kbd>Ctrl</kbd> <kbd>K</kbd>** (<kbd>⌘</kbd> <kbd>K</kbd> on a Mac) opens the command palette:
+type part of an item's name and press <kbd>Enter</kbd> to open it, or
+<kbd>Shift</kbd> <kbd>Enter</kbd> to copy its password (cleared from the clipboard like any
+copy). Commands are in the same box: *new item*, *password health*, *sort by…*, *settings*,
+*lock*.
+
 | Key | Action |
 |---|---|
-| <kbd>/</kbd> | Search |
+| <kbd>Ctrl</kbd> <kbd>K</kbd> / <kbd>⌘</kbd> <kbd>K</kbd> | Command palette |
+| <kbd>/</kbd> | Search the list |
+| <kbd>N</kbd> | New item |
+| <kbd>J</kbd> / <kbd>K</kbd> | Next / previous item |
+| <kbd>E</kbd> | Edit the open item |
+| <kbd>S</kbd> | Select several items |
+| <kbd>L</kbd> | Lock the vault |
+| <kbd>?</kbd> | Show these shortcuts |
 | <kbd>Esc</kbd> | Close the editor, then the open item |
+
+Single-key shortcuts do nothing while you are typing in a field.
+
+### Working with many items
+
+- **Select** above the list puts a checkbox on each row (or press <kbd>S</kbd>). Pick items, or
+  tick the box at the top for everything shown, then **Favorite**, **Move to…** a folder,
+  **Archive** (or **Restore** in the Archive), or **Delete**. Items shared from an organization
+  are changed in their collection, so they cannot be picked here.
+- **Sort** the list by name, recently changed, or type. The **≡** button switches to compact
+  rows. Both follow you to your other devices, like your other preferences.
 
 ## Keeping these screenshots current
 

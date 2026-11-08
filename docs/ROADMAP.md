@@ -338,8 +338,8 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **E. UI/UX**
 - ✅ E0 Screen-by-screen audit (first pass: phone layout bug, registration-aware sign-in, org page order) · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch
-- ✅ E3 Getting-started checklist beside a new vault · ⬜ E4 Command palette and shortcuts · ⬜ E5 Bulk actions · ⬜ E6 Richer list views
-- ⬜ E7 Phone layout pass · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ⬜ E10 Notification centre
+- ✅ E3 Getting-started checklist beside a new vault · ✅ E4 Command palette and shortcuts · ✅ E5 Bulk actions (favorite, move, archive, delete) · ✅ E6 List views (sort, compact rows, synced)
+- ✅ E7 Phone layout pass (390 px screenshots of every main screen; bulk rows, sort menu and touch targets fixed) · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ⬜ E10 Notification centre
 
 **F. Personal settings**
 - ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults
