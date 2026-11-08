@@ -10,6 +10,7 @@ import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
 import { SecondFactorStep } from '../../ui/SecondFactor.js'
+import { t } from '../../lib/i18n.js'
 
 export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, forAdmin = false }: {
   onRegister: () => void; onRecover: () => void; onRequestAccess: () => void; onSigninHelp: () => void; forAdmin?: boolean
@@ -125,20 +126,20 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
         </>
       ) : (
         <>
-          <h2 className="auth-title">Unlock your vault</h2>
-          <p className="auth-sub">Enter your email and master password. Decryption happens in this browser.</p>
+          <h2 className="auth-title">{t('Unlock your vault')}</h2>
+          <p className="auth-sub">{t('Enter your email and master password. Decryption happens in this browser.')}</p>
         </>
       )}
 
       <div className="field">
-        <label htmlFor="email">Email</label>
+        <label htmlFor="email">{t('Email')}</label>
         <input id="email" type="email" autoComplete="username" required autoFocus
                placeholder="you@example.com"
                value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
 
       <div className="field">
-        <label htmlFor="password">Master password</label>
+        <label htmlFor="password">{t('Master password')}</label>
         <PasswordInput id="password" autoComplete="current-password" required
                        value={password} onChange={setPassword} />
       </div>
@@ -146,22 +147,22 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
 
       <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
-        {busy ? <><span className="spinner" />Deriving key…</> : 'Unlock'}
+        {busy ? <><span className="spinner" />{t('Deriving key…')}</> : 'Unlock'}
       </button>
 
       <p className="auth-forgot">
-        <button type="button" className="link" onClick={onRecover}>Forgot your master password? Use your recovery key</button>
+        <button type="button" className="link" onClick={onRecover}>{t('Forgot your master password? Use your recovery key')}</button>
         <br />
-        <button type="button" className="link" onClick={onSigninHelp}>Lost your authenticator, or can't sign in? Ask for help</button>
+        <button type="button" className="link" onClick={onSigninHelp}>{t('Lost your authenticator, or can\'t sign in? Ask for help')}</button>
       </p>
 
       {/* Only the ways in this server actually offers (GET /api/instance). */}
       <p className="auth-switch">
-        {mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>Create an account</button></>
+        {mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
           : mode === 'closed' && instance?.firstRun ? <>New server? <button type="button" className="link" onClick={onRegister}>Create the owner account</button> with the setup code from its log</>
-          : mode === 'closed' ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>Request access</button></>
-          : <>{mode === 'invite' ? 'Have an invitation?' : 'New here?'} <button type="button" className="link" onClick={onRegister}>Create an account</button>
-            {' · '}<button type="button" className="link" onClick={onRequestAccess}>Request access</button></>}
+          : mode === 'closed' ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></>
+          : <>{mode === 'invite' ? 'Have an invitation?' : 'New here?'} <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button>
+            {' · '}<button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></>}
       </p>
     </form>
   )

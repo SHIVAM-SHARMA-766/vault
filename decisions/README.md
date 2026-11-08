@@ -40,6 +40,10 @@ someone who would otherwise assume it was an oversight.
 | [0018](0018-share-links.md) | Share links: one item, opened without an account; the key stays in the link |
 | [0019](0019-breach-check.md) | Breach check: k-anonymity, relayed by the server, on request |
 | [0020](0020-attachments-and-offline-copy.md) | File attachments with a key per file; an offline copy in one HTML file |
+| [0021](0021-sso.md) | **Proposed:** single sign-on (OIDC) for sign-in; the master password still unlocks |
+| [0022](0022-passkeys.md) | **Proposed:** WebAuthn second factor now; unlock with a passkey (PRF) next; storing passkeys with the extension |
+| [0023](0023-crypto-hardening.md) | **Proposed:** signed key grants, an opt-in secret key, Argon2id, an organization recovery key |
+| [0024](0024-cloud-drive-backups.md) | **Proposed:** Google Drive and OneDrive backups via operator-registered OAuth apps |
 
 ## A note on the numbering
 

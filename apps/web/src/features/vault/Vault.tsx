@@ -26,6 +26,7 @@ import { type Decrypted, type Folder, emptyEntry, stripMeta, useVault } from './
 import { type SharedEntry, canEdit, useTeams } from '../orgs/model.js'
 import { type Filter, Sidebar, sameFilter } from './Sidebar.js'
 import type { EntryContent, EntryType } from '@vault/crypto'
+import { t } from '../../lib/i18n.js'
 
 type Mode = { kind: 'view' } | { kind: 'edit'; draft: EntryContent; id?: string; collectionId?: string }
 type Dialog = { kind: 'new'; parentId?: string } | { kind: 'rename'; folder: Folder } | { kind: 'delete'; folder: Folder } | null
@@ -302,18 +303,18 @@ export function Vault({ state }: { state: session.Unlocked }) {
     setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : collectionId ? undefined : fallback), ...(collectionId ? { collectionId } : {}) })
   }
 
-  const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites' : filter.kind === 'archive' ? 'Archive'
-    : filter.kind === 'health' ? 'Password health'
+  const title = filter.kind === 'all' ? t('All items') : filter.kind === 'favorites' ? t('Favorites') : filter.kind === 'archive' ? t('Archive')
+    : filter.kind === 'health' ? t('Password health')
     : filter.kind === 'collection' ? (() => { const c = openCollections.find((x) => x.id === filter.id); return c ? (c.direct ? c.name : `${c.orgName} / ${c.name}`) : 'Collection' })()
-    : filter.kind === 'unfiled' ? 'No folder' : filter.kind === 'type' ? typeInfo(filter.type as EntryType).plural
+    : filter.kind === 'unfiled' ? t('No folder') : filter.kind === 'type' ? t(typeInfo(filter.type as EntryType).plural)
     : folderPath(folders, filter.id) || 'Folder'
   const paneOpen = mode.kind === 'edit' || selected !== null
   const chips: { f: Filter; label: string }[] = [
-    { f: { kind: 'all' }, label: 'All' }, { f: { kind: 'favorites' }, label: 'Favorites' },
+    { f: { kind: 'all' }, label: t('All') }, { f: { kind: 'favorites' }, label: t('Favorites') },
     ...folders.filter((x) => !x.parentId).map((x) => ({ f: { kind: 'folder', id: x.id } as Filter, label: x.name })),
-    ...TYPES.filter((t) => entries.some((e) => e.type === t.type) || (filter.kind === 'type' && filter.type === t.type))
-      .map((t) => ({ f: { kind: 'type', type: t.type } as Filter, label: t.plural })),
-    { f: { kind: 'archive' }, label: 'Archive' },
+    ...TYPES.filter((ty) => entries.some((e) => e.type === ty.type) || (filter.kind === 'type' && filter.type === ty.type))
+      .map((ty) => ({ f: { kind: 'type', type: ty.type } as Filter, label: t(ty.plural) })),
+    { f: { kind: 'archive' }, label: t('Archive') },
   ]
 
   return (
@@ -322,12 +323,12 @@ export function Vault({ state }: { state: session.Unlocked }) {
       center={
         <div className="search">
           <IconSearch size={16} />
-          <input ref={searchRef} type="search" placeholder="Search vault" aria-label="Search vault"
+          <input ref={searchRef} type="search" placeholder={t('Search vault')} aria-label={t('Search vault')}
                  value={query} onChange={(e) => setQuery(e.target.value)} />
           <kbd>/</kbd>
         </div>
       }
-      actions={<button className="btn btn-primary" onClick={startNew}><IconPlus size={16} /><span className="hide-sm">New item</span></button>}
+      actions={<button className="btn btn-primary" onClick={startNew}><IconPlus size={16} /><span className="hide-sm">{t('New item')}</span></button>}
     >
       <div className={`layout ${paneOpen ? 'pane-open' : ''}`}>
         <Sidebar filter={filter} setFilter={setFilter} counts={counts} folders={folders} folderCounts={folderCounts}
@@ -341,13 +342,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <h2 className="truncate">{title}</h2>
             <span className="muted">{visible.length}</span>
             <div className="list-tools">
-              <select aria-label="Sort by" className="select-sm" value={view.listSort} onChange={(e) => void prefs.save(state.vaultKey, { listSort: e.target.value as ListSort })}>
-                <option value="name">Name</option>
-                <option value="updated">Recently changed</option>
-                <option value="type">Type</option>
+              <select aria-label={t('Sort by')} className="select-sm" value={view.listSort} onChange={(e) => void prefs.save(state.vaultKey, { listSort: e.target.value as ListSort })}>
+                <option value="name">{t('Name')}</option>
+                <option value="updated">{t('Recently changed')}</option>
+                <option value="type">{t('Type')}</option>
               </select>
               <button className="icon-btn" aria-pressed={view.density === 'compact'} title={view.density === 'compact' ? 'Comfortable rows' : 'Compact rows'}
-                      aria-label="Compact rows" onClick={() => void prefs.save(state.vaultKey, { density: view.density === 'compact' ? 'comfortable' : 'compact' })}>
+                      aria-label={t('Compact rows')} onClick={() => void prefs.save(state.vaultKey, { density: view.density === 'compact' ? 'comfortable' : 'compact' })}>
                 <IconRows size={16} />
               </button>
               <button className={`btn btn-ghost btn-sm ${picked ? 'btn-pressed' : ''}`} aria-pressed={!!picked} onClick={() => { setPicked(picked ? null : new Set()); setBulkConfirm(false) }}>

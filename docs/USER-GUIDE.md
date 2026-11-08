@@ -232,6 +232,7 @@ link such as `/app/settings/security` opens the right one after you unlock.
 | Put new items in | No folder, or any folder (used when no folder is open) | No folder |
 | Dates | as the browser does · 31/12/2026 · 12/31/2026 · 2026-12-31 | as the browser does |
 | Times | as the browser does · 24-hour · 12-hour | as the browser does |
+| Language | as the browser does · English · हिन्दी (Hindi) · Español (Spanish). The main screens are translated so far; the rest shows in English | as the browser does |
 | Email alerts | email me when my account signs in (when the server sends mail) | on |
 | Password generator | default length (8–64) and character sets | 20, all sets |
 

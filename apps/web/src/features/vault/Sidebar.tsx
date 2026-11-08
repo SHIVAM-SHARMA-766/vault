@@ -10,6 +10,7 @@ import { idleMinutes } from '../../lib/session.js'
 import { IconEdit, IconFolder, IconGrid, IconInbox, IconLock, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
 import { TYPES } from '../../ui/kit.js'
 import type { Folder } from './model.js'
+import { t } from '../../lib/i18n.js'
 
 export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; id: string } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' } | { kind: 'archive' }
 
@@ -30,38 +31,38 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
   const tree = folderTree(folders)
   return (
     <nav className="sidebar" aria-label="Filter">
-      <SideItem active={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })} icon={<IconGrid size={16} />} label="All items" count={counts['all']} />
-      <SideItem active={filter.kind === 'favorites'} onClick={() => setFilter({ kind: 'favorites' })} icon={<IconStar size={16} />} label="Favorites" count={counts['favorites']} />
-      <SideItem active={filter.kind === 'health'} onClick={() => setFilter({ kind: 'health' })} icon={<IconPulse size={16} />} label="Password health" count={counts['health']} warn />
-      <SideItem active={filter.kind === 'archive'} onClick={() => setFilter({ kind: 'archive' })} icon={<IconInbox size={16} />} label="Archive" count={counts['archive']} />
+      <SideItem active={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })} icon={<IconGrid size={16} />} label={t('All items')} count={counts['all']} />
+      <SideItem active={filter.kind === 'favorites'} onClick={() => setFilter({ kind: 'favorites' })} icon={<IconStar size={16} />} label={t('Favorites')} count={counts['favorites']} />
+      <SideItem active={filter.kind === 'health'} onClick={() => setFilter({ kind: 'health' })} icon={<IconPulse size={16} />} label={t('Password health')} count={counts['health']} warn />
+      <SideItem active={filter.kind === 'archive'} onClick={() => setFilter({ kind: 'archive' })} icon={<IconInbox size={16} />} label={t('Archive')} count={counts['archive']} />
 
       <div className="sidebar-heading sidebar-heading-row">
-        <span>Folders</span>
-        <button className="icon-btn icon-sm" title="New folder" aria-label="New folder" onClick={() => onNewFolder()}><IconPlus size={14} /></button>
+        <span>{t('Folders')}</span>
+        <button className="icon-btn icon-sm" title={t('New folder')} aria-label={t('New folder')} onClick={() => onNewFolder()}><IconPlus size={14} /></button>
       </div>
-      {tree.length === 0 ? <p className="sidebar-empty">No folders yet.</p> : null}
+      {tree.length === 0 ? <p className="sidebar-empty">{t('No folders yet.')}</p> : null}
       {tree.map((node) => (
         <FolderItem key={node.folder.id} node={node} filter={filter} setFilter={setFilter} counts={folderCounts}
                     onNew={onNewFolder} onRename={onRenameFolder} onDelete={onDeleteFolder} />
       ))}
       {folders.length ? (
-        <SideItem active={filter.kind === 'unfiled'} onClick={() => setFilter({ kind: 'unfiled' })} icon={<IconFolder size={16} />} label="No folder" count={counts['unfiled']} muted />
+        <SideItem active={filter.kind === 'unfiled'} onClick={() => setFilter({ kind: 'unfiled' })} icon={<IconFolder size={16} />} label={t('No folder')} count={counts['unfiled']} muted />
       ) : null}
 
       {collections.length ? <>
-        <div className="sidebar-heading">Shared</div>
+        <div className="sidebar-heading">{t('Shared')}</div>
         {collections.map((c) => (
           <SideItem key={c.id} active={filter.kind === 'collection' && filter.id === c.id} onClick={() => setFilter({ kind: 'collection', id: c.id })}
                     icon={<IconUsers size={16} />} label={c.label} title={`${c.group} / ${c.label}`} count={counts[`coll:${c.id}`]} />
         ))}
       </> : null}
 
-      <div className="sidebar-heading">Types</div>
+      <div className="sidebar-heading">{t('Types')}</div>
       {/* Only the types this vault holds (and the one being viewed), so
           fifteen types do not push folders off the screen. */}
       {TYPES.filter(({ type }) => counts[type] || (filter.kind === 'type' && filter.type === type)).map(({ type, plural, Icon }) => (
         <SideItem key={type} active={filter.kind === 'type' && filter.type === type} onClick={() => setFilter({ kind: 'type', type })}
-                  icon={<Icon size={16} />} label={plural} count={counts[type]} />
+                  icon={<Icon size={16} />} label={t(plural)} count={counts[type]} />
       ))}
       <div className="sidebar-foot">
         <IconLock size={14} /> End-to-end encrypted. Locks after {describeMinutes(idleMinutes())} idle.

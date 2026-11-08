@@ -9,6 +9,7 @@ import { when } from '../lib/format.js'
 import { navigate } from '../lib/router.js'
 import * as session from '../lib/session.js'
 import { IconBell } from './icons.js'
+import { t } from '../lib/i18n.js'
 
 /** What a notification says, and where it leads. */
 export function describeNote(n: Note): { text: string; to: string } {
@@ -70,10 +71,10 @@ export function NotificationBell() {
         {unread ? <span className="bell-count" aria-hidden="true">{unread > 9 ? '9+' : unread}</span> : null}
       </button>
       {open ? (
-        <div className="menu-pop notes-pop" role="dialog" aria-label="Notifications">
+        <div className="menu-pop notes-pop" role="dialog" aria-label={t('Notifications')}>
           <div className="notes-head">
-            <strong>Notifications</strong>
-            {unread ? <button className="link small" onClick={() => void markAll()}>Mark all read</button> : null}
+            <strong>{t('Notifications')}</strong>
+            {unread ? <button className="link small" onClick={() => void markAll()}>{t('Mark all read')}</button> : null}
           </div>
           {notes.length === 0 ? <p className="muted small notes-empty">Nothing yet. Sign-ins and account changes are under Settings → Security.</p> : (
             <ul className="notes-list">

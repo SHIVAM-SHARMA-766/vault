@@ -13,6 +13,7 @@ import { ShareLinkDialog } from './ShareLink.js'
 import { describeSize, saveAttachment } from '../../lib/attachments.js'
 import type { Decrypted, Folder, Version } from './model.js'
 import { day, when } from '../../lib/format.js'
+import { t } from '../../lib/i18n.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean; sensitive?: boolean; onSensitive?: (v: boolean) => Promise<void> }
 
@@ -67,7 +68,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
   return (
     <article className="detail">
       <div className="detail-bar">
-        <button className="btn btn-ghost back-sm" onClick={onBack}><IconArrowLeft size={16} />Back</button>
+        <button className="btn btn-ghost back-sm" onClick={onBack}><IconArrowLeft size={16} />{t('Back')}</button>
         <div className="detail-actions">
           <button className={`icon-btn ${entry.favorite ? 'is-fav' : ''}`} onClick={onToggleFavorite} disabled={entry.unreadable}
                   title={entry.favorite ? 'Remove from favorites' : 'Add to favorites'} aria-label="Toggle favorite">
@@ -75,20 +76,20 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
           </button>
           {shared ? null : (
             <button className={`btn btn-secondary btn-sm ${showHistory ? 'btn-pressed' : ''}`} onClick={() => setShowHistory(!showHistory)}
-                    disabled={entry.unreadable} aria-pressed={showHistory} aria-label="History"><IconClock size={15} /><span className="btn-label">History</span></button>
+                    disabled={entry.unreadable} aria-pressed={showHistory} aria-label={t('History')}><IconClock size={15} /><span className="btn-label">{t('History')}</span></button>
           )}
           {!shared && (shareTargets.length || onShareWithPerson) ? (
-            <button className={`btn btn-secondary btn-sm ${sharing ? 'btn-pressed' : ''}`} onClick={() => setSharing(!sharing)} aria-label="Share"><IconUsers size={15} /><span className="btn-label">Share</span></button>
+            <button className={`btn btn-secondary btn-sm ${sharing ? 'btn-pressed' : ''}`} onClick={() => setSharing(!sharing)} aria-label={t('Share')}><IconUsers size={15} /><span className="btn-label">{t('Share')}</span></button>
           ) : null}
           {vaultKey && !shared ? (
-            <button className="btn btn-secondary btn-sm" onClick={() => setLinking(true)} disabled={entry.unreadable} aria-label="Share by link"><IconLink size={15} /><span className="btn-label">Link</span></button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setLinking(true)} disabled={entry.unreadable} aria-label="Share by link"><IconLink size={15} /><span className="btn-label">{t('Link')}</span></button>
           ) : null}
           {onToggleArchive ? (
             <button className="btn btn-secondary btn-sm" onClick={onToggleArchive} disabled={entry.unreadable}
                     aria-label={entry.archived ? 'Restore from archive' : 'Archive'}><IconInbox size={15} /><span className="btn-label">{entry.archived ? 'Restore' : 'Archive'}</span></button>
           ) : null}
-          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable || readOnly} aria-label="Edit"><IconEdit size={15} /><span className="btn-label">Edit</span></button>
-          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} disabled={readOnly} aria-label="Delete"><IconTrash size={15} /><span className="btn-label">Delete</span></button>
+          <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable || readOnly} aria-label={t('Edit')}><IconEdit size={15} /><span className="btn-label">{t('Edit')}</span></button>
+          <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} disabled={readOnly} aria-label={t('Delete')}><IconTrash size={15} /><span className="btn-label">{t('Delete')}</span></button>
         </div>
       </div>
 
@@ -97,7 +98,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
         <div>
           <h2>{entry.name || 'Untitled'}</h2>
           <div className="detail-meta">
-            <span className="badge"><info.Icon size={13} />{info.label}</span>
+            <span className="badge"><info.Icon size={13} />{t(info.label)}</span>
             {path && !shared ? <span className="badge badge-folder">{path}</span> : null}
             {shared ? <span className="badge badge-shared"><IconUsers size={13} />{shared.where}</span> : null}
             {readOnly ? <span className="badge">View only</span> : null}
@@ -130,7 +131,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
               <p><strong>Share “{entry.name}” with a person</strong> who has an account on this server. It moves to a space only the two of you share, encrypted to their key once you have checked their fingerprint.</p>
               <div className="confirm-actions">
                 <input type="email" required aria-label="Their email address" placeholder="Their email address" value={person} onChange={(e) => setPerson(e.target.value)} />
-                <button type="submit" className="btn btn-primary btn-sm" disabled={!person.trim()}>Share</button>
+                <button type="submit" className="btn btn-primary btn-sm" disabled={!person.trim()}>{t('Share')}</button>
               </div>
             </form>
           ) : null}
@@ -174,7 +175,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
 
       {entry.attachments?.length ? (
         <div className="notes">
-          <span className="field-label">Attachments</span>
+          <span className="field-label">{t('Attachments')}</span>
           <ul className="attachment-list">
             {entry.attachments.map((a) => (
               <li key={a.id}>
@@ -188,7 +189,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
 
       {entry.notes ? (
         <div className="notes">
-          <span className="field-label">Notes</span>
+          <span className="field-label">{t('Notes')}</span>
           <pre>{entry.notes}</pre>
         </div>
       ) : null}
@@ -234,7 +235,7 @@ function History({ entry, load, onRestore }: { entry: Decrypted; load: () => Pro
   }, [entry.updatedAt])
 
   return (
-    <section className="history" aria-label="History">
+    <section className="history" aria-label={t('History')}>
       <div className="history-head">
         <h3>Previous versions</h3>
         <span className="muted small">Kept automatically on every edit, up to 20, encrypted like the entry.</span>

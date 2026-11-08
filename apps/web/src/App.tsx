@@ -17,6 +17,7 @@ import { Register } from './features/auth/Register.js'
 import { Unlock } from './features/auth/Unlock.js'
 import { PublicRequest } from './features/desk/PublicRequest.js'
 import { Vault } from './features/vault/Vault.js'
+import { t, useLocale } from './lib/i18n.js'
 
 // Screens most visits never open load on demand, so unlocking the vault does
 // not wait for the admin panel, the website editor or import parsers.
@@ -34,8 +35,11 @@ export function App() {
   const [unlocked, setUnlocked] = useState(session.get())
   useEffect(() => session.subscribe((s) => { if (!s) prefs.reset(); setUnlocked(s) }), [])
 
+  // A language change re-renders everything in the new language; the vault
+  // stays unlocked (its keys live outside the component tree).
+  const locale = useLocale()
   return (
-    <ToastProvider>
+    <ToastProvider key={locale}>
       {/* A share link opens the same way signed in or not, and never touches the vault. */}
       {location.pathname.startsWith('/app/s/') ? <Suspense fallback={<Loading />}><ShareView /></Suspense>
         : unlocked ? <Signed state={unlocked} /> : <AuthScreen />}
@@ -99,7 +103,7 @@ function AuthScreen() {
       <aside className="auth-brand">
         <a className="brand" href="/" title="Go to the Vault website"><BrandMark /></a>
         <div className="auth-pitch">
-          <h1>Your passwords, readable only by you.</h1>
+          <h1>{t('Your passwords, readable only by you.')}</h1>
           <p>Every entry is encrypted on this device before it is sent. The server stores
              ciphertext and holds no key that opens it.</p>
           <ul className="auth-points">
@@ -114,7 +118,7 @@ function AuthScreen() {
         <div className="auth-card">
           <a className="brand brand-compact" href="/" title="Go to the Vault website"><BrandMark /></a>
           <nav className="auth-nav" aria-label="Breadcrumb">
-            <a className="auth-home" href="/"><IconArrowLeft size={15} />Back to website</a>
+            <a className="auth-home" href="/"><IconArrowLeft size={15} />{t('Back to website')}</a>
             <ol className="crumbs">
               <li><a href="/">Home</a></li>
               <li>{view !== 'unlock' ? <button type="button" className="crumb-link" onClick={() => setView('unlock')}>{place}</button> : place}</li>

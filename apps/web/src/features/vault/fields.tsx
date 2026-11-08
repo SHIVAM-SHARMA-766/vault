@@ -10,6 +10,7 @@ import { type FieldSpec, cardBrand, formatCardNumber, isPast } from '@vault/core
 import { IconExternal, IconEye, IconEyeOff } from '../../ui/icons.js'
 import { CopyButton, Generator, StrengthMeter } from '../../ui/kit.js'
 import { day } from '../../lib/format.js'
+import { t } from '../../lib/i18n.js'
 import * as prefs from '../../lib/prefs.js'
 
 // ── Display ─────────────────────────────────────────────────────────────────
@@ -18,23 +19,23 @@ export function FieldView({ spec, value, entryType }: { spec: FieldSpec; value: 
   if (!value) return null
   switch (spec.kind) {
     case 'secret':
-      return <SecretRow label={spec.label} value={value} strength={spec.key === 'password'}
+      return <SecretRow label={t(spec.label)} value={value} strength={spec.key === 'password'}
                         display={entryType === 'card' && spec.key === 'number' ? formatCardNumber : undefined}
                         badge={entryType === 'card' && spec.key === 'number' ? cardBrand(value) : null} />
     case 'secretBlock':
-      return <SecretBlockRow label={spec.label} value={value} />
+      return <SecretBlockRow label={t(spec.label)} value={value} />
     case 'multiline':
-      return <BlockRow label={spec.label} value={value} />
+      return <BlockRow label={t(spec.label)} value={value} />
     case 'totp':
       return <TotpRow secret={value} />
     case 'url':
-      return <UrlRow label={spec.label} value={value} />
+      return <UrlRow label={t(spec.label)} value={value} />
     case 'date':
-      return <DateRow label={spec.label} value={value} expiry={spec.key === 'expires'} />
+      return <DateRow label={t(spec.label)} value={value} expiry={spec.key === 'expires'} />
     case 'select':
-      return <TextRow label={spec.label} value={spec.options?.find(([k]) => k === value)?.[1] ?? value} copy={false} />
+      return <TextRow label={t(spec.label)} value={spec.options?.find(([k]) => k === value)?.[1] ?? value} copy={false} />
     default:
-      return <TextRow label={spec.label} value={value} />
+      return <TextRow label={t(spec.label)} value={value} />
   }
 }
 
@@ -193,7 +194,7 @@ export function FieldInput({ spec, value, onChange }: { spec: FieldSpec; value: 
   if (spec.kind === 'multiline' || spec.kind === 'secretBlock') {
     return (
       <div className="field">
-        <label htmlFor={id}>{spec.label}</label>
+        <label htmlFor={id}>{t(spec.label)}</label>
         <textarea id={id} rows={spec.kind === 'secretBlock' ? 6 : 3} spellCheck={false}
                   className={spec.kind === 'secretBlock' ? 'mono' : ''} placeholder={spec.placeholder}
                   value={value} onChange={(e) => onChange(e.target.value)} />
@@ -203,7 +204,7 @@ export function FieldInput({ spec, value, onChange }: { spec: FieldSpec; value: 
   if (spec.kind === 'date') {
     return (
       <div className="field">
-        <label htmlFor={id}>{spec.label}</label>
+        <label htmlFor={id}>{t(spec.label)}</label>
         <input id={id} type="date" value={value} onChange={(e) => onChange(e.target.value)} />
       </div>
     )
@@ -211,7 +212,7 @@ export function FieldInput({ spec, value, onChange }: { spec: FieldSpec; value: 
   if (spec.kind === 'select') {
     return (
       <div className="field">
-        <label htmlFor={id}>{spec.label}</label>
+        <label htmlFor={id}>{t(spec.label)}</label>
         <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">—</option>
           {(spec.options ?? []).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
@@ -223,13 +224,13 @@ export function FieldInput({ spec, value, onChange }: { spec: FieldSpec; value: 
     return (
       <div className="field">
         <div className="label-row">
-          <label htmlFor={id}>{spec.label}</label>
+          <label htmlFor={id}>{t(spec.label)}</label>
           {spec.generate ? <button type="button" className="link" onClick={() => setGen(!gen)}>{gen ? 'Hide generator' : 'Generate'}</button> : null}
         </div>
         <div className="input-wrap">
           <input id={id} type={shown ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} className="mono"
                  placeholder={spec.placeholder} value={value} onChange={(e) => onChange(e.target.value)} />
-          <button type="button" className="input-affix" onClick={() => setShown(!shown)} aria-label={shown ? `Hide ${spec.label}` : `Show ${spec.label}`}>
+          <button type="button" className="input-affix" onClick={() => setShown(!shown)} aria-label={shown ? `Hide ${t(spec.label)}` : `Show ${t(spec.label)}`}>
             {shown ? <IconEyeOff size={16} /> : <IconEye size={16} />}
           </button>
         </div>
@@ -240,7 +241,7 @@ export function FieldInput({ spec, value, onChange }: { spec: FieldSpec; value: 
   }
   return (
     <div className="field">
-      <label htmlFor={id}>{spec.label}</label>
+      <label htmlFor={id}>{t(spec.label)}</label>
       <input id={id} autoComplete="off" spellCheck={false}
              type={spec.kind === 'email' ? 'email' : spec.kind === 'phone' ? 'tel' : 'text'}
              inputMode={spec.kind === 'url' ? 'url' : spec.kind === 'phone' ? 'tel' : spec.kind === 'expiry' ? 'numeric' : undefined}

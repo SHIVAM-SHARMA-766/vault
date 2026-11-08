@@ -9,6 +9,7 @@ import { Link, navigate } from '../lib/router.js'
 import { IconGrid, IconKey, IconLock, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
 import { BrandMark } from '../lib/instance.js'
 import { NotificationBell } from './Notifications.js'
+import { t } from '../lib/i18n.js'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer' }
 
@@ -32,8 +33,8 @@ export function Shell({ state, tag, center, actions, children }: {
           {actions}
           <NotificationBell />
           <AccountMenu state={state} />
-          <button className="btn btn-ghost" onClick={session.lock} title="Lock vault" aria-label="Lock vault">
-            <IconLock size={16} /><span className="hide-sm">Lock</span>
+          <button className="btn btn-ghost" onClick={session.lock} title={t('Lock vault')} aria-label={t('Lock vault')}>
+            <IconLock size={16} /><span className="hide-sm">{t('Lock')}</span>
           </button>
         </div>
       </header>
@@ -65,7 +66,7 @@ function AccountMenu({ state }: { state: session.Unlocked }) {
   return (
     <div className="menu" ref={ref}>
       <button className="account account-button" aria-haspopup="menu" aria-expanded={open}
-              aria-label="Account menu" onClick={() => setOpen(!open)}>
+              aria-label={t('Account menu')} onClick={() => setOpen(!open)}>
         <span className="account-avatar">{state.email[0]?.toUpperCase()}</span>
         <span className="account-email hide-md">{state.email}</span>
       </button>
@@ -75,13 +76,13 @@ function AccountMenu({ state }: { state: session.Unlocked }) {
             <span className="menu-email">{state.email}</span>
             {role ? <span className="pill pill-accent">{role}</span> : null}
           </div>
-          <button role="menuitem" className="menu-item" onClick={() => go('/app/')}><IconKey size={15} />Vault</button>
+          <button role="menuitem" className="menu-item" onClick={() => go('/app/')}><IconKey size={15} />{t('Vault')}</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/settings')}><IconUser size={15} />Account settings</button>
-          <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />Organizations</button>
+          <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />{t('Organizations')}</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/import-export')}><IconSwap size={15} />Import &amp; export</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/support')}><IconHelp size={15} />Help &amp; support</button>
           {state.isAdmin ? (
-            <button role="menuitem" className="menu-item" onClick={() => go('/app/admin')}><IconGrid size={15} />Admin panel</button>
+            <button role="menuitem" className="menu-item" onClick={() => go('/app/admin')}><IconGrid size={15} />{t('Admin panel')}</button>
           ) : null}
           <div className="menu-sep" />
           <button role="menuitem" className="menu-item" onClick={session.lock}><IconLock size={15} />Lock now</button>
