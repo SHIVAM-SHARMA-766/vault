@@ -9,6 +9,7 @@ and keeping it healthy. Every setting is listed in [configuration.md](configurat
 
 - [Choose a profile](#choose-a-profile)
 - [Requirements](#requirements)
+- [Quick install](#quick-install)
 - [Install: personal](#install-personal)
 - [Install: business](#install-business)
 - [The first account](#the-first-account)
@@ -48,6 +49,30 @@ with a backup and a restore.
   - ports **80 and 443** reach it from the internet.
   For a server only reachable on your network, see
   [Behind your own reverse proxy](#behind-your-own-reverse-proxy).
+
+## Quick install
+
+On a Linux machine with Docker, one command asks for the address, writes the configuration
+with fresh secrets, starts Vault, and prints the link that creates your owner account:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh | sh
+```
+
+It asks three things: **personal or business**, the **address** people will use (a DNS name
+pointing at the machine, or `localhost` to try it out), and **where to install** (`/opt/vault`
+as root, `~/vault` otherwise). It prints your backup passphrase once — store a copy away from
+the machine. Read the script first if you prefer: it is short and commented.
+
+Without questions (cloud-init, automation):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh \
+  | VAULT_YES=1 VAULT_PROFILE=personal VAULT_HOSTNAME=vault.example.com sh
+```
+
+Running it again **upgrades**: it takes a backup of the running server, fetches the new
+version, keeps your `.env`, and restarts. The manual steps below do the same by hand.
 
 ## Install: personal
 
@@ -178,6 +203,8 @@ Vault does not store email addresses — only keyed digests — so it mails some
 request carries their address, and does not keep it.
 
 ## Upgrading
+
+Run the installer again (it backs up first), or by hand:
 
 ```sh
 cd vault && git pull            # or change VAULT_IMAGE to the new version

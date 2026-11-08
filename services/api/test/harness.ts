@@ -40,7 +40,7 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean } = {}): Harness {
+export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string } = {}): Harness {
   const store = new MemoryStore()
   const outbox: Message[] = []
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
@@ -59,6 +59,8 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
       site: { sourceDir: '', outputDir: '' },
       backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
       personalBackup: { remote: options.remoteBackups ?? true, allowPrivate: options.allowPrivate ?? false },
+      version: options.version ?? 'dev',
+      updateCheck: { enabled: Boolean(options.updateUrl), url: options.updateUrl ?? '' },
       mail: { host: options.mail ? 'smtp.test' : '', port: 587, user: '', password: '', from: 'Vault <vault@vault.test>', signInNotices: true },
       db: {
         driver: 'mysql',
@@ -83,8 +85,11 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
   }
 
   const request = async (method: string, path: string, opts: RequestOptions = {}): Promise<Parsed> => {
+    // Split like the real server does (server.ts): path and query apart.
+    const [pathname, query] = path.split('?') as [string, string | undefined]
     const event: LambdaEvent = {
-      rawPath: path,
+      rawPath: pathname,
+      ...(query !== undefined ? { rawQueryString: query } : {}),
       headers: {
         ...(opts.token ? { [AUTH_HEADER]: `Bearer ${opts.token}` } : {}),
         ...(opts.rawHeaders ?? {}),

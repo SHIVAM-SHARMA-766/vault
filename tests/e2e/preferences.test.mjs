@@ -127,6 +127,9 @@ test('the support contact an admin sets shows on the sign-in screen and the help
     const owner = await s.person()
     await s.register(owner, 'owner@example.test')
     await s.menu(owner, 'Admin panel')
+    // The server card names the version; a development stack never calls the release feed.
+    await owner.waitForSelector('.admin-card:has-text("Version dev")')
+    await owner.waitForSelector('.admin-card:has-text("Updates"):has-text("Not checked")')
     await owner.fill('#pf-name', 'Rao Family Vault')
     await owner.fill('#pf-email', 'help@rao.example')
     await owner.getByRole('button', { name: 'Save' }).click()

@@ -313,11 +313,11 @@ The operator asked for everything below to be built one by one, each reviewed an
 are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **A. Handing Vault to one person**
-- ⬜ A1 One-line installer (asks domain and email, writes `.env`, generates secrets, prints the setup link)
+- ✅ A1 One-line installer: asks profile and address, writes `.env` with fresh secrets (mode 600), backs up before an upgrade, prints the setup link; CI installs through it
 - ⬜ A2 First-run wizard in the browser (mail, backups, registration, support contact)
 - ✅ A3 Server name and support contact set in the admin panel; shown on sign-in and help; Reply-To of every email
 - ⬜ A4 "Get Vault" page on the site
-- ⬜ A5 Update checker in the admin panel
+- ✅ A5 Update checker in the admin panel (every 12 h from the server, `UPDATE_CHECK=false` turns it off)
 - ⬜ A6 No-domain mode (DuckDNS / Cloudflare Tunnel guide)
 
 **B. An organization on its own server**

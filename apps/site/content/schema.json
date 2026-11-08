@@ -700,6 +700,194 @@
    ]
   },
   {
+   "id": "get",
+   "label": "Run your own",
+   "groups": [
+    {
+     "key": "seo",
+     "label": "Search & sharing",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Page title",
+       "type": "text",
+       "max": 70,
+       "hint": "Shown in the browser tab and search results. 50–60 characters works best."
+      },
+      {
+       "key": "description",
+       "label": "Meta description",
+       "type": "textarea",
+       "max": 170,
+       "hint": "The summary under the title in search results. 120–160 characters."
+      },
+      {
+       "key": "image",
+       "label": "Share image",
+       "type": "image",
+       "fallback": "/img/vault.png"
+      }
+     ]
+    },
+    {
+     "key": "hero",
+     "label": "Page header",
+     "fields": [
+      {
+       "key": "kicker",
+       "label": "Small label",
+       "type": "text",
+       "max": 40
+      },
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 120
+      },
+      {
+       "key": "lede",
+       "label": "Intro",
+       "type": "textarea",
+       "max": 400
+      }
+     ]
+    },
+    {
+     "key": "install",
+     "label": "The install command",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "text",
+       "label": "Text",
+       "type": "textarea",
+       "max": 400
+      },
+      {
+       "key": "command",
+       "label": "Command",
+       "type": "text",
+       "max": 300
+      },
+      {
+       "key": "note",
+       "label": "Small print",
+       "type": "textarea",
+       "max": 300
+      }
+     ]
+    },
+    {
+     "key": "steps",
+     "label": "What happens",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "items",
+       "label": "Steps",
+       "type": "list",
+       "min": 1,
+       "max": 8,
+       "itemLabel": "Step",
+       "fields": [
+        {
+         "key": "title",
+         "label": "Title",
+         "type": "text",
+         "max": 80
+        },
+        {
+         "key": "text",
+         "label": "Text",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "profiles",
+     "label": "Personal or business",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "items",
+       "label": "Profiles",
+       "type": "list",
+       "min": 1,
+       "max": 4,
+       "itemLabel": "Profile",
+       "fields": [
+        {
+         "key": "title",
+         "label": "Name",
+         "type": "text",
+         "max": 60
+        },
+        {
+         "key": "for",
+         "label": "For",
+         "type": "text",
+         "max": 120
+        },
+        {
+         "key": "text",
+         "label": "What it runs",
+         "type": "textarea",
+         "max": 300
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "key": "needs",
+     "label": "What you need",
+     "fields": [
+      {
+       "key": "title",
+       "label": "Heading",
+       "type": "text",
+       "max": 80
+      },
+      {
+       "key": "items",
+       "label": "Requirements",
+       "type": "list",
+       "min": 1,
+       "max": 10,
+       "itemLabel": "Requirement",
+       "fields": [
+        {
+         "key": "text",
+         "label": "Requirement",
+         "type": "text",
+         "max": 200
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
    "id": "faq",
    "label": "FAQ",
    "groups": [

@@ -14,6 +14,7 @@ import {
   type AdminOverview,
   type AdminUser,
   type InstanceProfile,
+  type UpdateStatus,
   type Permission,
   type RegistrationMode,
   type Role,
@@ -176,12 +177,46 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
             <div className="admin-card">
               <div className="admin-card-head"><span className="dot dot-ok" /><h2>Server</h2></div>
               <p className="big">Running</p>
-              <p className="muted small">Up {Math.floor(data.uptimeSeconds / 3600)} h {Math.floor((data.uptimeSeconds % 3600) / 60)} min · server time {when(data.serverTime)}</p>
+              <p className="muted small">Version {data.version} · up {Math.floor(data.uptimeSeconds / 3600)} h {Math.floor((data.uptimeSeconds % 3600) / 60)} min · server time {when(data.serverTime)}</p>
             </div>
+
+            <UpdateCard />
           </div>
         </>
       )}
     </Section>
+  )
+}
+
+/** Whether a newer release is out, and how to upgrade. */
+function UpdateCard() {
+  const [u, setU] = useState<UpdateStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  const load = async (refresh = false) => {
+    setBusy(true)
+    try { setU(await api.admin.update(await session.token(), refresh)) } catch { /* the card stays quiet */ } finally { setBusy(false) }
+  }
+  useEffect(() => { void load() }, [])
+  if (!u) return null
+  return (
+    <div className={`admin-card ${u.newer ? 'card-warn' : ''}`}>
+      <div className="admin-card-head"><span className={`dot ${u.newer ? 'dot-warn' : u.enabled && !u.error ? 'dot-ok' : 'dot-muted'}`} /><h2>Updates</h2></div>
+      {!u.enabled ? (
+        <><p className="big">Not checked</p><p className="muted small">Update checks are off on this server (UPDATE_CHECK=false).</p></>
+      ) : u.newer ? (
+        <>
+          <p className="big">{u.latest} is available</p>
+          <p className="muted small">You run {u.current}. To upgrade, run the installer again on the server (<code>sh deploy/install.sh</code>) — your data and settings are kept. See docs/INSTALL.md → Upgrading.</p>
+          {u.url ? <p className="small"><a href={u.url} target="_blank" rel="noopener noreferrer">Release notes</a></p> : null}
+        </>
+      ) : (
+        <>
+          <p className="big">{u.error ? 'Unknown' : u.latest ? 'Up to date' : 'Unknown'}</p>
+          <p className="muted small">{u.error ?? (u.current === 'dev' ? `A development build. Latest release: ${u.latest ?? 'none'}.` : `You run ${u.current}, the latest release.`)}</p>
+        </>
+      )}
+      {u.enabled ? <p className="muted small">{u.checkedAt ? `Checked ${ago(u.checkedAt)}. ` : ''}<button className="link" disabled={busy} onClick={() => void load(true)}>Check now</button></p> : null}
+    </div>
   )
 }
 

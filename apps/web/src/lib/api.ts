@@ -90,6 +90,10 @@ async function request<T>(
   return payload as T
 }
 
+export interface UpdateStatus {
+  enabled: boolean; current: string; latest: string | null; newer: boolean; url: string | null
+  publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
+}
 export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
 export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean }
 
@@ -347,6 +351,7 @@ export const api = {
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/delete`, { token, body: { confirm: id } }),
     settings: (token: string) =>
       request<{ registration: RegistrationMode; profile: InstanceProfile; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+    update: (token: string, refresh = false) => request<UpdateStatus>('GET', `/api/admin/update${refresh ? '?refresh=1' : ''}`, { token }),
     setProfile: (token: string, profile: InstanceProfile) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { profile } }),
     setRegistration: (token: string, registration: RegistrationMode) =>
@@ -457,6 +462,7 @@ export interface AdminOverview {
   lastBackup: { at: string | null; object: string | null; bytes: number | null } | null
   mail: boolean
   openTickets: number
+  version: string
   serverTime: string
   uptimeSeconds: number
 }
