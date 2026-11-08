@@ -157,3 +157,22 @@ test('branding: an accent from the list and a small image logo, public on the in
     assert.equal((await h.request('PUT', '/api/admin/settings', { token: owner, body: { profile: { ...base, ...bad } } })).status, 400, JSON.stringify(bad).slice(0, 40))
   }
 })
+
+test('a direct share is between two people: a third invitation is refused; it says what kind it is', async () => {
+  const { h, owner, ana, ben } = await people()
+  const orgId = uuid()
+  const orgKey = generateOrgKey()
+  assert.equal((await h.request('POST', '/api/orgs', { token: owner.token, body: {
+    id: orgId, kind: 'direct', hint: 'Shared with ana', label: 'Me', nameBlob: await sealOrgMeta(orgId, { name: 'You & ana', peer: ana.email }, orgKey), orgKeyBlob: await sealOrgKey(owner.keys.publicKey, orgKey, orgId),
+  } })).status, 201)
+  const mine = (await h.request('GET', '/api/orgs', { token: owner.token })).body['orgs'] as { id: string; kind: string }[]
+  assert.equal(mine.find((o) => o.id === orgId)!.kind, 'direct')
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/invites`, { token: owner.token, body: { email: ana.email } })).status, 201)
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/invites`, { token: owner.token, body: { email: ana.email, label: 'Ana again' } })).status, 201, 're-inviting the same person is fine')
+  const third = await h.request('POST', `/api/orgs/${orgId}/invites`, { token: owner.token, body: { email: ben.email } })
+  assert.equal(third.status, 409)
+  assert.match(String(third.body['message']), /between two people/)
+  const team = await newOrg(h, owner, 'Team')
+  const teams = (await h.request('GET', '/api/orgs', { token: owner.token })).body['orgs'] as { id: string; kind: string }[]
+  assert.equal(teams.find((o) => o.id === team.orgId)!.kind, 'team')
+})

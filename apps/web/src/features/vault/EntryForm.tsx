@@ -77,6 +77,22 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
           </div>
         ) : null}
 
+        {spec.fields.some((f) => f.at === 'password') ? (
+          <div className="field">
+            <label htmlFor="f-rotate">Remind me to change the password</label>
+            <select id="f-rotate" value={draft.rotateDays ?? ''} onChange={(e) => {
+              const v = e.target.value
+              setDraft((d) => { const { rotateDays: _r, ...rest } = d; return v ? { ...rest, rotateDays: Number(v) } : rest })
+            }}>
+              <option value="">Never</option>
+              <option value="30">Every 30 days</option>
+              <option value="90">Every 90 days</option>
+              <option value="180">Every 6 months</option>
+              <option value="365">Every year</option>
+            </select>
+          </div>
+        ) : null}
+
         <div className="field">
           <label htmlFor="f-notes">Notes</label>
           <textarea id="f-notes" rows={spec.type === 'note' ? 10 : 3} value={draft.notes ?? ''}

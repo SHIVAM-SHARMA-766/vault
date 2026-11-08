@@ -107,7 +107,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
 
   return (
     <section className="settings-card org-card" aria-label={org.name}>
-      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill pill-accent">{org.role}</span></div>
+      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>{org.kind === 'direct' ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span> : <span className="pill pill-accent">{org.role}</span>}</div>
 
       {org.policyGap ? <p className="alert alert-warn"><IconAlert size={16} />{org.policyGap} Until then, its collections stay closed to you.</p> : null}
       {admin ? <PoliciesForm org={org} teams={teams} /> : <PolicySummary org={org} />}
@@ -161,6 +161,8 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
             <button className="btn btn-primary btn-sm" onClick={async () => {
               try {
                 await teams.confirm(org.id, confirming.m.userId, confirming.m.publicKey)
+                // A direct share (D11) exists to give them its items: do it now.
+                await teams.grantDirect(org.id, confirming.m.userId, confirming.m.publicKey)
                 // Groups chosen when they were invited (B2): joined now, with keys sealed here.
                 let joined = 0
                 for (const g of confirming.m.pendingGroups ?? []) {

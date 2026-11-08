@@ -251,10 +251,14 @@ export async function createOrg(app: App, userId: string, event: LambdaEvent): P
   const nameBlob = requireSealed(b['nameBlob'], 'nameBlob', 4096)
   const orgKeyBlob = requireSharedKey(b['orgKeyBlob'], 'orgKeyBlob')
   const hint = label(b['hint'], 'hint').slice(0, MAX_HINT)
+  // 'direct' (D11): a private space between two people, made by "Share with a
+  // person". The same keys, confirmation and audit as any organization; only
+  // the size is fixed and the app presents it as a person, not a team.
+  const kind = b['kind'] === 'direct' ? 'direct' : 'team'
   const publicKey = await publicKeyOf(app, userId)
   const at = now(app)
   try {
-    await app.store.put({ pk: orgPk(orgId), sk: ORG_META_SK, id: orgId, nameBlob, hint, createdAt: at, createdBy: userId }, { mustNotExist: true })
+    await app.store.put({ pk: orgPk(orgId), sk: ORG_META_SK, id: orgId, nameBlob, hint, kind, createdAt: at, createdBy: userId }, { mustNotExist: true })
   } catch (err) {
     if (err instanceof AlreadyExists) throw conflict('An organization with that id exists.')
     throw err
@@ -275,7 +279,7 @@ export async function myOrgs(app: App, userId: string): Promise<LambdaResponse> 
     if (!meta || !m) continue
     const policies = { ...DEFAULT_POLICIES, ...((meta['policies'] as Partial<Policies>) ?? {}) }
     orgs.push({
-      id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', role: m.role, status: m.status, policies,
+      id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', kind: meta['kind'] === 'direct' ? 'direct' : 'team', role: m.role, status: m.status, policies,
       policyGap: m.status === 'confirmed' ? await policyGap(app, orgId, userId) : null,
       ...(m.orgKeyBlob ? { orgKeyBlob: m.orgKeyBlob } : {}),
     })
@@ -363,6 +367,12 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
   if (role === 'admin' && me.role !== 'owner') throw forbidden()
   const memberLabel = label(b['label']) || email.split('@')[0]!
   const digest = emailDigest(email, app.config.pepper)
+  const meta0 = await app.store.get(orgPk(orgId), ORG_META_SK)
+  if (meta0?.['kind'] === 'direct') {
+    const rows = await app.store.query(orgPk(orgId))
+    const people = rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX) || (r.sk.startsWith(ORG_PENDING_PREFIX) && r['digest'] !== digest)).length
+    if (people >= 2) throw conflict('A direct share is between two people. Share with someone else separately.')
+  }
   // Groups to join once confirmed (B2): ids of this organization's groups.
   const raw = Array.isArray(b['groups']) ? b['groups'] : []
   if (raw.length > 20) throw badRequest('groups holds at most 20 ids.')

@@ -314,7 +314,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **A. Handing Vault to one person**
 - ✅ A1 One-line installer: asks profile and address, writes `.env` with fresh secrets (mode 600), backs up before an upgrade, prints the setup link; CI installs through it
-- ⬜ A2 First-run wizard in the browser (mail, backups, registration, support contact)
+- ✅ A2 First-run wizard in the browser (name and support, registration, sign-in rules, mail test and backup status, invitations)
 - ✅ A3 Server name and support contact set in the admin panel; shown on sign-in and help; Reply-To of every email
 - ✅ A4 "Run your own" page on the site (`/get`)
 - ✅ A5 Update checker in the admin panel (every 12 h from the server, `UPDATE_CHECK=false` turns it off)
@@ -332,9 +332,9 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ⬜ D2 File attachments · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
-- ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ⬜ D6 Expiry and rotation reminders (expiry shown in health; email reminders still open) · ⬜ D7 Access requests (check-out)
+- ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ⬜ D7 Access requests (check-out)
 - ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
-- ⬜ D11 Share one item with one person · ⬜ D12 Notify on access to a sensitive item
+- ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ⬜ D12 Notify on access to a sensitive item
 
 **E. UI/UX**
 - ✅ E0 Screen-by-screen audit (first pass: phone layout bug, registration-aware sign-in, org page order) · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch

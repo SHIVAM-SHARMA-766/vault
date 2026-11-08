@@ -44,10 +44,12 @@ test('a group with a collection gives its members access', async () => {
     await alice.locator('.group-row', { hasText: 'Engineering' }).getByRole('button', { name: 'Add', exact: true }).click()
     await alice.waitForSelector('.group-row:has-text("Engineering") .pill:has-text("Bob")')
 
+    // The pill shows as soon as the server adds him; the keys are sealed to him
+    // a moment later, so wait for the toast that says the group's access went through.
+    await alice.waitForSelector('text=Bob added to Engineering', { state: 'attached' })
     await bob.reload(); await s.unlock(bob, 'bob@example.test')
     await s.menu(bob, 'Vault')
-    await bob.waitForSelector('.sidebar')
-    assert.equal(await bob.getByRole('button', { name: /Servers/ }).count(), 1, 'Bob reaches the collection through the group')
+    await bob.getByRole('button', { name: /Servers/ }).waitFor({ timeout: 10_000 })
     assert.deepEqual(s.errors, [])
   } finally {
     await s.stop()
