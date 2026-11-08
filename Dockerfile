@@ -18,6 +18,13 @@ ARG NODE_IMAGE=node:20.18.1-bookworm-slim
 # ── 1. Build: install everything, test-free build of every workspace ────────
 FROM ${NODE_IMAGE} AS build
 WORKDIR /src
+# npm ci installs better-sqlite3 for the workspace too. It fetches a prebuilt
+# binary, and falls back to compiling when that download fails (GitHub
+# release downloads do fail intermittently in CI), which needs these. The
+# runtime stage below carries none of them.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ \
+ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 COPY packages/crypto/package.json packages/crypto/
 COPY packages/core/package.json packages/core/
