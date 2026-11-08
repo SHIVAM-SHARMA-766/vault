@@ -1451,6 +1451,45 @@
         }
       }
     },
+    "/api/orgs/{org}/stale": {
+      "get": {
+        "summary": "Items whose password someone who left could have seen",
+        "operationId": "getOrgsOrgStale",
+        "tags": [
+          "orgs"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/orgs/{org}/accept": {
       "post": {
         "summary": "Accept an invitation",
@@ -3723,6 +3762,46 @@
         }
       }
     },
+    "/api/admin/users/{id}/offboard": {
+      "post": {
+        "summary": "Offboard an account: disable, sign out, remove from organizations",
+        "operationId": "postAdminUsersIdOffboard",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/users/{id}/revoke-sessions": {
       "post": {
         "summary": "Sign an account out everywhere",
@@ -3965,6 +4044,46 @@
         "operationId": "postAdminInvitesBulk",
         "tags": [
           "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "invites.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/invites/{id}/resend": {
+      "post": {
+        "summary": "Send an unused invitation again, with a fresh code",
+        "operationId": "postAdminInvitesIdResend",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "security": [
           {

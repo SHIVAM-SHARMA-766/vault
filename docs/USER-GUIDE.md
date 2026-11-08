@@ -297,12 +297,13 @@ Account menu → **Organizations**.
 <img src="images/organizations.png" alt="Organizations: your fingerprint, an organization's members and collections" width="820">
 
 1. **Create an organization** and add **collections** — "Finance", "Home & streaming".
-2. **Invite** people by email address. They see the invitation when they next sign in, and
-   **Accept**.
+2. **Invite** people by email address, and tick the **groups** they should join. They see the
+   invitation when they next sign in, and **Accept**.
 3. **Confirm them.** Ask them to read out the fingerprint shown at the top of their
    Organizations page — on a call or in person — and press **Confirm…** next to their name.
    Confirm only if it matches what you see. This is what stops anyone, the server included,
-   from slipping in a key of their own.
+   from slipping in a key of their own. Confirming also adds them to the groups chosen at
+   invitation, with the groups' collections.
 4. Open a collection's **Access** and give confirmed members **Can view**, **Can edit** or
    **Can manage** (manage lets them share it onward). **Hide passwords** lets someone use a
    login without seeing its password in the app — a policy, not encryption.
@@ -316,6 +317,11 @@ collection, re-encrypted with the collection's key; everyone with access sees it
 **Removing someone** cuts their access at once, and your app re-keys every collection they
 could open (a new key, every item re-encrypted) so a copy they kept opens nothing new. If you
 cannot manage one of them, it shows **Rotate key** for someone who can.
+
+A new key does not change the passwords they already saw. Every item in those collections
+is listed in **Password health** as **Seen by someone who left**, for everyone who can still
+open it, until someone changes its password. Change it at the site, then in Vault, and the
+mark goes.
 
 **Groups** — "Parents", "Engineering" — let you give a whole team access to a collection at
 once: create a group, add confirmed members, then in a collection's **Access** choose **Give
@@ -384,7 +390,7 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 | Service desk: reply, assign, approve access | ✓ | ✓ | ✓ | | |
 | Service desk: reset two-factor for a locked-out user | ✓ | ✓ | | | |
 | Invitations (copy the code, or email it) | ✓ | ✓ | ✓ | | read |
-| Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | | read |
+| Users: label, disable, sign out, offboard, reset 2FA, delete | ✓ | ✓ | | | read |
 | Change roles | ✓ | | | | |
 | Registration mode (closed / invite / open) | ✓ | ✓ | | | read |
 | Policies (two-factor, password strength, auto-lock, sign-in length, log retention, share links, sign-in allow-list) | ✓ | ✓ | | | read |
@@ -420,6 +426,28 @@ Overview → **Policies** sets rules for every account on the server:
 
 No policy locks anyone out: an account that misses one keeps working and is told what to do.
 Every change is in the audit log.
+</details>
+
+<details>
+<summary>Someone leaves: Offboard</summary>
+
+Admin panel → **Users** → **Offboard** does everything at once: the account is disabled,
+signed out on every device, and taken out of every organization. Each organization re-keys
+what they could open and lists the shared passwords they could see for colleagues to change.
+It is refused while the person owns an organization: hand it over or delete it first.
+**Enable** undoes the disable; organizations invite them again.
+
+**Invitations → Send again** replaces an unused invitation with a fresh code, emailed or
+shown to copy. Codes are stored only as fingerprints, so the old one cannot be re-sent, and
+it stops working.
+</details>
+
+<details>
+<summary>Branding</summary>
+
+Overview → **Name and support** also sets an **accent colour**, from a set that is
+readable in light and dark, and a **logo** (PNG, JPEG or WebP, up to 48 KB). Both appear on the
+sign-in page, at the top of the app and on share-link pages.
 </details>
 
 <details>

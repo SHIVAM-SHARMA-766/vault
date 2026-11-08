@@ -65,6 +65,8 @@ export interface SharedEntry extends Decrypted {
   collectionId: string
   permission: SharePermission
   hidePasswords: boolean
+  /** Someone who could open this has left; its password should change (B9). */
+  exposed?: boolean
 }
 
 export const canEdit = (p?: SharePermission) => p === 'edit' || p === 'manage'
@@ -94,6 +96,7 @@ export function useTeams(vaultKey: Uint8Array) {
         const name = (await openOrgMeta(row.id, row.nameBlob, key)).name
         views.push({ ...base, name, key })
         if (row.policyGap) continue
+        const stale = new Set((await api.orgs.stale(token, row.id).catch(() => ({ items: [] }))).items.map((s) => `${s.collectionId}/${s.itemId}`))
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
           const view: CollectionView = { orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
@@ -102,8 +105,9 @@ export function useTeams(vaultKey: Uint8Array) {
             view.permission = c.access.permission
             for (const it of (await api.orgs.items(token, row.id, c.id)).items) {
               try {
-                const content = await openSharedItem(c.id, it.id, it.keyVersion, it.blob, view.key)
-                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords })
+                // `exposed` is the server's word (B9), never the blob's.
+                const { exposed: _x, ...content } = (await openSharedItem(c.id, it.id, it.keyVersion, it.blob, view.key)) as EntryContent & { exposed?: unknown }
+                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords, ...(stale.has(`${c.id}/${it.id}`) ? { exposed: true } : {}) })
               } catch { /* an item under an older key; rotation re-seals it */ }
             }
           }
@@ -237,10 +241,13 @@ export function useTeams(vaultKey: Uint8Array) {
   async function saveShared(collectionId: string, content: EntryContent, id?: string): Promise<string> {
     const c = coll(collectionId)
     const itemId = id ?? crypto.randomUUID()
-    const { folderId: _f, ...rest } = content
+    const { folderId: _f, exposed: _x, ...rest } = content as EntryContent & { exposed?: unknown }
     const blob = await sealSharedItem(c.id, itemId, c.keyVersion, rest, c.key)
     if (!isWithinSizeLimit(blob)) throw new Error('That item is too large to store.')
-    await api.orgs.putItem(await session.token(), c.orgId, c.id, itemId, blob, c.keyVersion)
+    // A new password clears the "someone who left could have seen it" mark (B9).
+    const previous = id ? shared.find((e) => e.id === id) : undefined
+    const passwordChanged = !!previous && (previous.password ?? '') !== (content.password ?? '') && !!content.password
+    await api.orgs.putItem(await session.token(), c.orgId, c.id, itemId, blob, c.keyVersion, passwordChanged)
     await load()
     return itemId
   }

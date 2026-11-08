@@ -6,11 +6,11 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { api } from './lib/api.js'
 import { newIdentity } from './lib/identity.js'
-import { SupportContact, useInstance } from './lib/instance.js'
+import { BrandMark, SupportContact, useInstance } from './lib/instance.js'
 import { useRoute } from './lib/router.js'
 import * as prefs from './lib/prefs.js'
 import * as session from './lib/session.js'
-import { IconArrowLeft, IconLock, IconShield } from './ui/icons.js'
+import { IconArrowLeft, IconLock } from './ui/icons.js'
 import { ToastProvider } from './ui/kit.js'
 import { Recover } from './features/auth/Recover.js'
 import { Register } from './features/auth/Register.js'
@@ -97,7 +97,7 @@ function AuthScreen() {
   return (
     <div className="auth">
       <aside className="auth-brand">
-        <a className="brand" href="/" title="Go to the Vault website"><span className="brand-mark"><IconShield size={20} /></span>Vault</a>
+        <a className="brand" href="/" title="Go to the Vault website"><BrandMark /></a>
         <div className="auth-pitch">
           <h1>Your passwords, readable only by you.</h1>
           <p>Every entry is encrypted on this device before it is sent. The server stores
@@ -112,7 +112,7 @@ function AuthScreen() {
       </aside>
       <main className="auth-main">
         <div className="auth-card">
-          <a className="brand brand-compact" href="/" title="Go to the Vault website"><span className="brand-mark"><IconShield size={20} /></span>Vault</a>
+          <a className="brand brand-compact" href="/" title="Go to the Vault website"><BrandMark /></a>
           <nav className="auth-nav" aria-label="Breadcrumb">
             <a className="auth-home" href="/"><IconArrowLeft size={15} />Back to website</a>
             <ol className="crumbs">

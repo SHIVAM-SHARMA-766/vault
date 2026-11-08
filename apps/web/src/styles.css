@@ -968,3 +968,31 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .limits th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
 .tpl-preview { margin: 6px 0; padding: 10px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface-2); }
 .tpl-preview pre { white-space: pre-wrap; margin: 6px 0 0; font: 13px/1.5 var(--mono); }
+
+/* Branding (B3): the accent an admin picks; each checked for contrast in both themes. */
+:root[data-accent=blue] { --accent: #1d4ed8; --accent-hover: #1e40af; --accent-soft: #e8efff; --accent-text: #ffffff; }
+:root[data-accent=teal] { --accent: #0f766e; --accent-hover: #115e59; --accent-soft: #e3f5f3; --accent-text: #ffffff; }
+:root[data-accent=green] { --accent: #15803d; --accent-hover: #166534; --accent-soft: #e6f6ea; --accent-text: #ffffff; }
+:root[data-accent=orange] { --accent: #c2410c; --accent-hover: #9a3412; --accent-soft: #fdeee6; --accent-text: #ffffff; }
+:root[data-accent=rose] { --accent: #be123c; --accent-hover: #9f1239; --accent-soft: #fde8ee; --accent-text: #ffffff; }
+:root[data-accent=slate] { --accent: #334155; --accent-hover: #1e293b; --accent-soft: #edf0f4; --accent-text: #ffffff; }
+@media (prefers-color-scheme: dark) {
+  :root[data-accent=blue]:not([data-theme=light]) { --accent: #6ea8ff; --accent-hover: #8fbcff; --accent-soft: #13213d; --accent-text: #0b0a1f; }
+  :root[data-accent=teal]:not([data-theme=light]) { --accent: #2dd4bf; --accent-hover: #5eead4; --accent-soft: #0f2a28; --accent-text: #0b0a1f; }
+  :root[data-accent=green]:not([data-theme=light]) { --accent: #4ade80; --accent-hover: #86efac; --accent-soft: #10291a; --accent-text: #0b0a1f; }
+  :root[data-accent=orange]:not([data-theme=light]) { --accent: #fb923c; --accent-hover: #fdba74; --accent-soft: #2f1a0e; --accent-text: #0b0a1f; }
+  :root[data-accent=rose]:not([data-theme=light]) { --accent: #fb7185; --accent-hover: #fda4af; --accent-soft: #33121b; --accent-text: #0b0a1f; }
+  :root[data-accent=slate]:not([data-theme=light]) { --accent: #94a3b8; --accent-hover: #cbd5e1; --accent-soft: #1c232e; --accent-text: #0b0a1f; }
+}
+:root[data-theme=dark][data-accent=blue] { --accent: #6ea8ff; --accent-hover: #8fbcff; --accent-soft: #13213d; --accent-text: #0b0a1f; }
+:root[data-theme=dark][data-accent=teal] { --accent: #2dd4bf; --accent-hover: #5eead4; --accent-soft: #0f2a28; --accent-text: #0b0a1f; }
+:root[data-theme=dark][data-accent=green] { --accent: #4ade80; --accent-hover: #86efac; --accent-soft: #10291a; --accent-text: #0b0a1f; }
+:root[data-theme=dark][data-accent=orange] { --accent: #fb923c; --accent-hover: #fdba74; --accent-soft: #2f1a0e; --accent-text: #0b0a1f; }
+:root[data-theme=dark][data-accent=rose] { --accent: #fb7185; --accent-hover: #fda4af; --accent-soft: #33121b; --accent-text: #0b0a1f; }
+:root[data-theme=dark][data-accent=slate] { --accent: #94a3b8; --accent-hover: #cbd5e1; --accent-soft: #1c232e; --accent-text: #0b0a1f; }
+.brand-logo { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
+.accent-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0; }
+.accent-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line-strong); cursor: pointer; }
+.accent-swatch[aria-checked=true] { box-shadow: 0 0 0 2px var(--text); }
+.logo-row { display: flex; align-items: center; gap: 10px; }
+.logo-preview { width: 40px; height: 40px; border-radius: 10px; object-fit: contain; background: var(--surface-2); }

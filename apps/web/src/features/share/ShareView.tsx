@@ -8,7 +8,8 @@ import { readField, typeSpec } from '@vault/core'
 
 import { ApiError, api } from '../../lib/api.js'
 import { type SharedItem, openShareBlob, parseLink } from '../../lib/share.js'
-import { IconAlert, IconLock, IconShield } from '../../ui/icons.js'
+import { BrandMark } from '../../lib/instance.js'
+import { IconAlert, IconLock } from '../../ui/icons.js'
 import { typeInfo } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from '../vault/fields.js'
 import { when } from '../../lib/format.js'
@@ -40,7 +41,7 @@ export function ShareView() {
     <div className="auth share-page">
       <main className="auth-main">
       <div className="auth-card share-card">
-        <a className="brand" href="/" title="Go to the Vault website"><span className="brand-mark"><IconShield size={20} /></span>Vault</a>
+        <a className="brand" href="/" title="Go to the Vault website"><BrandMark /></a>
         {state ? <Shared {...state} /> : (
           <>
             <h1 className="auth-title">Someone shared an item with you</h1>

@@ -321,9 +321,9 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ⬜ A6 No-domain mode (DuckDNS / Cloudflare Tunnel guide)
 
 **B. An organization on its own server**
-- ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column; group-on-invite and resend still open) · ⬜ B3 Branding (logo, colours)
+- ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column), groups chosen at invite, send again · ✅ B3 Branding (accent colour, logo)
 - ⬜ B4 Member onboarding · ⬜ B5 Helm chart and reverse-proxy guides · ⬜ B6 Metrics endpoint and dashboard
-- ⬜ B7 Audit export and SIEM stream · ⬜ B8 SSO (OIDC) · ⬜ B9 Offboarding with automatic rotation
+- ⬜ B7 Audit export and SIEM stream · ⬜ B8 SSO (OIDC) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
 
 **C. Backups, per user (like Zoho)**
 - ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)

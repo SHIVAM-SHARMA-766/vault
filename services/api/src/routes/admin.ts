@@ -65,6 +65,9 @@ import {
   listRegistry,
   putRegistry,
   putSettings,
+  ACCENTS,
+  LOGO_MAX_CHARS,
+  LOGO_PATTERN,
   POLICY_CHOICES,
   type ServerPolicy,
   type Settings,
@@ -239,6 +242,22 @@ export async function setDisabled(app: App, actor: string, actorRole: Role, even
   return json(200, { ok: true })
 }
 
+/** Someone leaves (B9): in one step, the account is disabled, signed out
+ *  everywhere, and taken out of every organization — which marks each
+ *  collection they could open for rotation and lists its passwords to
+ *  change. Refused while they own an organization. Reversible: enable the
+ *  account again; organizations re-invite. */
+export async function offboard(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
+  const reg = await targetUser(app, actor, actorRole, id, false)
+  const { owned } = await leaveAllOrgs(app, id, true)
+  if (owned.length) throw new HttpError(409, 'conflict', `They own ${owned.length === 1 ? 'an organization' : `${owned.length} organizations`} (${owned.join(', ')}). Transfer or delete ${owned.length === 1 ? 'it' : 'them'} first.`)
+  await audit(app, actor, 'user.offboard', id)
+  await putRegistry(app, { ...fieldsOf(reg), disabled: true })
+  await revokeAllSessions(app, id)
+  await leaveAllOrgs(app, id, false)
+  return json(200, { ok: true })
+}
+
 export async function revokeSessions(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
   await targetUser(app, actor, actorRole, id, true)
   await audit(app, actor, 'user.revoke-sessions', id)
@@ -374,7 +393,13 @@ export function requireProfile(value: unknown): InstanceProfile {
     try { const u = new URL(supportUrl); ok = u.protocol === 'https:' || u.protocol === 'http:' } catch { /* refused below */ }
     if (!ok) throw badRequest('profile.supportUrl must be an http(s) address.')
   }
-  return { name, supportEmail, supportUrl }
+  const accent = v['accent'] ?? ''
+  if (typeof accent !== 'string' || (accent && !(ACCENTS as readonly string[]).includes(accent))) throw badRequest(`profile.accent must be one of: ${ACCENTS.join(', ')}, or empty.`)
+  const logo = v['logo'] ?? ''
+  if (typeof logo !== 'string' || logo.length > LOGO_MAX_CHARS || (logo && !LOGO_PATTERN.test(logo))) {
+    throw badRequest(`profile.logo must be a PNG, JPEG or WebP image of at most ${Math.floor(LOGO_MAX_CHARS * 3 / 4 / 1024)} KB, or empty.`)
+  }
+  return { name, supportEmail, supportUrl, accent, logo }
 }
 
 /** Staff only: this version and whether a newer one is out. */
@@ -390,6 +415,8 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
     name: profile.name || 'Vault',
     supportEmail: profile.supportEmail,
     supportUrl: profile.supportUrl,
+    accent: profile.accent,
+    logo: profile.logo,
     registration: app.allowRegistration ? 'open' : registration,
     mail: Boolean(app.mailer),
     breachCheck: app.config.breachCheck.enabled,
@@ -487,6 +514,27 @@ export async function createInviteRoute(app: App, actor: string, actorRole: Role
   const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
   // The code is returned exactly once. Only its hash is stored.
   return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role }, ...(await closedWarning(app)) })
+}
+
+/** Sends an unused invitation again (B2). Codes are stored only as hashes,
+ *  so the old one cannot be re-sent: a fresh code replaces it, with the same
+ *  label and role and a new expiry, and the old one stops working. */
+export async function resendInviteRoute(app: App, actor: string, actorRole: Role, event: LambdaEvent, id: string): Promise<LambdaResponse> {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(id)) throw badRequest('Invalid invite id.')
+  const old = (await listInvites(app)).find((i) => i.id === id)
+  if (!old || old.usedAt) throw notFound()
+  const role = old.role ?? 'user'
+  if (role !== 'user' && !can(actorRole, 'roles.write')) throw forbidden()
+  const b = parseJsonBody<{ email?: unknown; days?: unknown }>(event)
+  const email = b.email === undefined || b.email === '' ? '' : requireEmail(b.email)
+  if (email && !app.mailer) throw new HttpError(503, 'unavailable', 'Mail is not set up on this server (SMTP_HOST). Copy the new code and send it yourself.')
+  const days = b.days === undefined ? 7 : b.days
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30) throw badRequest('days must be a whole number from 1 to 30.')
+  await audit(app, actor, 'invite.resend', id, old.label)
+  const { code, invite } = await createInvite(app, actor, old.label, days, role)
+  await deleteInvite(app, id)
+  const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, old.label, invite.expiresAt) }) : false
+  return json(201, { code, emailed, invite: { id: invite.id, label: old.label, expiresAt: invite.expiresAt, role }, ...(await closedWarning(app)) })
 }
 
 export async function deleteInviteRoute(app: App, actor: string, id: string): Promise<LambdaResponse> {
