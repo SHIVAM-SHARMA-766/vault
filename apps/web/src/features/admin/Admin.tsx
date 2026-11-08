@@ -26,12 +26,13 @@ import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Website } from './Website.js'
 import { System } from './System.js'
+import { download } from '../../lib/download.js'
 import { SetupWizard, wizardDone } from './SetupWizard.js'
 import { applyBranding, refresh as refreshInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
-  IconPlus, IconRefresh, IconShield, IconSliders, IconTrash, IconUser, IconX,
+  IconDownload, IconPlus, IconRefresh, IconShield, IconSliders, IconTrash, IconUser, IconX,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
@@ -884,10 +885,19 @@ function AdminOrgs({ canWrite }: { canWrite: boolean }) {
 }
 
 function Audit() {
+  const toast = useToast()
   const { data, error, reload } = useAdminData(loadAudit)
   return (
-    <Section title="Audit log" sub="Every admin action, kept for a year. Written before the action runs, so nothing here happens unrecorded."
-             actions={<button className="btn btn-secondary btn-sm" onClick={() => void reload()}><IconRefresh size={15} />Refresh</button>}>
+    <Section title="Audit log" sub="Every admin action, kept as long as the audit retention policy says. Written before the action runs, so nothing here happens unrecorded."
+             actions={<>
+               {(['csv', 'json'] as const).map((f) => (
+                 <button key={f} className="btn btn-secondary btn-sm" onClick={async () => {
+                   try { download(`vault-audit-${new Date().toISOString().slice(0, 10)}.${f}`, await api.admin.auditExport(await session.token(), f), f === 'csv' ? 'text/csv' : 'application/json') }
+                   catch (err) { toast(err instanceof Error ? err.message : 'Could not export.', 'error') }
+                 }}><IconDownload size={15} />{f.toUpperCase()}</button>
+               ))}
+               <button className="btn btn-secondary btn-sm" onClick={() => void reload()}><IconRefresh size={15} />Refresh</button>
+             </>}>
       <ErrorBox error={error} />
       {!data ? null : data.records.length === 0 ? <p className="muted">No admin actions yet.</p> : (
         <div className="table-wrap">

@@ -1,0 +1,71 @@
+# Vault on Kubernetes. One replica: scheduled work (backups, retention, personal
+# backups) runs inside the process, so a second replica would run it twice.
+# The vault's contents are encrypted in browsers; this chart never sees a key.
+
+image:
+  repository: ghcr.io/shivam-sharma-766/vault
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# The public address people open. Required.
+hostname: vault.example.com
+
+# Settings passed as environment variables (docs/configuration.md), e.g.
+#   SMTP_HOST: smtp.example.com
+#   MAIL_FROM: "Vault <vault@example.com>"
+#   BACKUP_DIR: /data/backups
+env: {}
+
+# Secret settings (DB_PASSWORD, BACKUP_PASSPHRASE, SMTP_PASSWORD,
+# METRICS_TOKEN, …) from a Secret you create, so they stay out of values:
+#   kubectl create secret generic vault-env --from-literal=BACKUP_PASSPHRASE=…
+existingSecret: ""
+
+# sqlite: the database lives on the volume below (simplest; one pod).
+# postgres: set database.host and DB_PASSWORD in existingSecret.
+database:
+  driver: sqlite
+  host: ""
+  port: 5432
+  name: vault
+  user: vault
+  ssl: false
+
+# /data holds the database (SQLite), the server secrets generated on first
+# start, the rendered website and local backups. Back it up.
+persistence:
+  size: 2Gi
+  storageClass: ""
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+# TLS is required: browsers refuse WebCrypto without it. Use your ingress
+# controller and cert-manager, or terminate TLS in front of the cluster.
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  #  cert-manager.io/cluster-issuer: letsencrypt
+  tls:
+    enabled: true
+    secretName: vault-tls
+
+resources:
+  requests: { cpu: 50m, memory: 128Mi }
+  limits: { memory: 512Mi }
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

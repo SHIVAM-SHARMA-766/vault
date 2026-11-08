@@ -3305,6 +3305,31 @@
         }
       }
     },
+    "/api/metrics": {
+      "get": {
+        "summary": "Prometheus metrics for a scraper holding METRICS_TOKEN (counts only)",
+        "operationId": "getMetrics",
+        "tags": [
+          "metrics"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notifications": {
       "get": {
         "summary": "My notifications, newest first",
@@ -4656,6 +4681,36 @@
       "get": {
         "summary": "Staff audit log",
         "operationId": "getAdminAudit",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "audit.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/audit/export": {
+      "get": {
+        "summary": "Download the audit log as CSV or JSON",
+        "operationId": "getAdminAuditExport",
         "tags": [
           "admin"
         ],

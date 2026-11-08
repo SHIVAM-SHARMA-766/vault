@@ -1,0 +1,10 @@
+apiVersion: v2
+name: vault
+description: Vault — a zero-knowledge, self-hosted password manager. One pod, SQLite or PostgreSQL.
+type: application
+version: 0.1.0
+appVersion: "latest"
+home: https://github.com/SHIVAM-SHARMA-766/vault
+sources:
+  - https://github.com/SHIVAM-SHARMA-766/vault
+keywords: [password-manager, zero-knowledge, self-hosted]

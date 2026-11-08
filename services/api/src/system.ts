@@ -8,6 +8,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 
 import type { App } from './context.js'
+import { streamAudit } from './audit-stream.js'
 import { forbidden } from './http.js'
 import {
   AUDIT_PREFIX,
@@ -339,6 +340,7 @@ export async function audit(
     ...(detail ? { detail } : {}),
     expiresAt: Math.floor(app.now() / 1000) + (await getSettings(app)).policy.auditDays * 86_400,
   })
+  streamAudit(app, { source: 'admin', at, actor, action, ...(target ? { target } : {}), ...(detail ? { detail } : {}) })
 }
 
 /** What stops this account meeting the server policy, if anything. */

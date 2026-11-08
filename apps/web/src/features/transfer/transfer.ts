@@ -263,17 +263,7 @@ export function csvExport(entries: Decrypted[], folders: Folder[]): string {
   return toCsv(readable(entries).map((e) => ({ ...e, folder: folderPath(folders, e.folderId) })))
 }
 
-export function download(name: string, text: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = name
-  document.body.append(a)
-  a.click()
-  a.remove()
-  // Give the browser a moment to start the download before revoking.
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
-}
+export { download } from '../../lib/download.js'
 
 /** Today's date in the user's own time zone, as YYYY-MM-DD. */
 export const today = () => {

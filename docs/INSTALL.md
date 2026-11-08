@@ -247,6 +247,12 @@ docker buildx imagetools inspect ghcr.io/shivam-sharma-766/vault:1.0.0 --format 
 If you already run nginx, Traefik or another proxy with TLS, skip Caddy: run only the
 `vault` service, forward all paths to it on port 8080, and pass `X-Forwarded-For`. Vault sets
 its own security headers. If clients can reach port 8080 directly, set `TRUST_PROXY=false`.
+Ready-made configurations for nginx, Traefik, HAProxy, Apache and cloud load balancers are in
+[reverse-proxy.md](reverse-proxy.md).
+
+**Kubernetes:** a Helm chart is in `deploy/helm/vault`; see [kubernetes.md](kubernetes.md).
+**Monitoring:** Prometheus metrics, a Grafana dashboard and alert rules, plus a signed audit
+stream for a SIEM; see [monitoring.md](monitoring.md).
 
 For a server only on your network, give the proxy a certificate your devices trust (your own
 CA, or Caddy's `tls internal` with its root installed on each device).

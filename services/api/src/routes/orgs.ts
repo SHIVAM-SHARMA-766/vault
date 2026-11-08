@@ -29,6 +29,7 @@ import { AlreadyExists, type Item } from '../store.js'
 import { requireEmail, requireSealed, requireSharedKey } from '../validate.js'
 import { getSettings } from '../system.js'
 import { addNote, addNotes } from '../inbox.js'
+import { streamAudit } from '../audit-stream.js'
 
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type Permission = 'view' | 'edit' | 'manage'
@@ -240,6 +241,7 @@ export async function orgEvent(app: App, orgId: string, actor: string, action: s
     pk: orgPk(orgId), sk: orgEventSk(at, randomUUID().slice(0, 8)), at, actor, action, ...extra,
     expiresAt: Math.floor(app.now() / 1000) + (await getSettings(app)).policy.auditDays * 86_400,
   })
+  streamAudit(app, { source: 'organization', at, actor, action, orgId, ...(extra.collectionId ? { collectionId: extra.collectionId } : {}), ...(extra.itemId ? { itemId: extra.itemId } : {}), ...(extra.target ? { target: extra.target } : {}) })
 }
 
 /** A member's app reports opening, revealing or copying a shared item. */

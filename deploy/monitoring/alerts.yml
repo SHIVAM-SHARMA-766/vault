@@ -1,0 +1,24 @@
+# Prometheus alert rules for Vault (docs/monitoring.md).
+groups:
+  - name: vault
+    rules:
+      - alert: VaultDown
+        expr: up{job="vault"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: "Vault is not answering /api/metrics" }
+      - alert: VaultBackupStale
+        expr: time() - vault_backup_last_success_timestamp_seconds > 36 * 3600
+        for: 30m
+        labels: { severity: warning }
+        annotations: { summary: "No server backup in 36 hours (or never)" }
+      - alert: VaultRegistrationOpen
+        expr: vault_registration_open == 1
+        for: 1h
+        labels: { severity: warning }
+        annotations: { summary: "Anyone who finds the address can create an account" }
+      - alert: VaultServerErrors
+        expr: sum(rate(vault_http_requests_total{status="5xx"}[10m])) / sum(rate(vault_http_requests_total[10m])) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "More than 5% of Vault requests are failing" }
