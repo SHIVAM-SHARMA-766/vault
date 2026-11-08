@@ -37,6 +37,7 @@ export const ERROR_CODES = {
   two_factor_required: 'The password was right; a TOTP or recovery code is needed too.',
   invalid_two_factor: 'The TOTP or recovery code is wrong or already used.',
   forbidden: 'Signed in, but not permitted (role, disabled account, closed registration).',
+  network_not_allowed: 'The server\'s sign-in allow-list does not include this address.',
   not_found: 'No such route or item.',
   conflict: 'The item already exists, or the change conflicts with the current state.',
   too_large: 'The body or a stored item exceeds its size limit.',

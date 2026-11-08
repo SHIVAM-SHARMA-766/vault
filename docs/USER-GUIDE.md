@@ -387,7 +387,8 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 | Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | | read |
 | Change roles | ✓ | | | | |
 | Registration mode (closed / invite / open) | ✓ | ✓ | | | read |
-| Policies (two-factor, password strength, auto-lock, sign-in length, log retention, share links) | ✓ | ✓ | | | read |
+| Policies (two-factor, password strength, auto-lock, sign-in length, log retention, share links, sign-in allow-list) | ✓ | ✓ | | | read |
+| System: back up now, email templates | ✓ | ✓ | | | read |
 | Website: edit text, SEO, images | ✓ | ✓ | | ✓ | read |
 | Website: publish, roll back | ✓ | ✓ | | ✓ | |
 | Audit log | ✓ | ✓ | | | ✓ |
@@ -414,10 +415,28 @@ Overview → **Policies** sets rules for every account on the server:
 | Longest auto-lock | Caps everyone's auto-lock choice. An organization's own limit can only shorten it further |
 | Sign in again after | Ends every device's sign-in that many days after it signed in, however often it is used. Applies to devices already signed in |
 | Share links | Allowed up to 30, 7 or 1 days, or turned off. When off, the **Link** button disappears; links already made keep working until they expire or are revoked |
+| Allow sign-in only from | Addresses or ranges such as `203.0.113.0/24`, one per line; empty means anywhere. Sign-ins, recovery sign-ins and token refreshes from elsewhere are refused, so a device that leaves the network is signed out within 15 minutes. **Owners are exempt**, so a wrong list can always be fixed, and you cannot save a list that leaves out your own address |
 | Keep account activity / audit and organization logs for | Older entries are deleted. Shortening a period deletes what is older at once (the panel warns first); lengthening keeps entries written from then on |
 
 No policy locks anyone out: an account that misses one keeps working and is told what to do.
 Every change is in the audit log.
+</details>
+
+<details>
+<summary>System: backups, emails, rate limits</summary>
+
+Admin panel → **System**:
+
+- **Server backups** shows how the host is set up (how often, how many kept, where, and when
+  the last one ran) and has **Back up now**. The settings themselves (`BACKUP_PASSPHRASE`,
+  `BACKUP_DIR`, `BACKUP_S3_*`) stay on the host, because a backup contains this database and must
+  not hold its own key. Back up now is picked up by the server within a minute.
+- **Email templates**: for the invitation and the new sign-in notice, set your own subject and
+  a message that goes above the standard text, such as a welcome or who to ask. Links, codes and
+  security advice are always included. `{server}` becomes the server's name. Use **Preview**
+  to check, and **Use the standard email** to undo.
+- **Rate limits** lists, in words, how often each thing may be done and what is counted (an
+  address or an account), so you can tell someone why they were asked to wait.
 </details>
 
 <details>

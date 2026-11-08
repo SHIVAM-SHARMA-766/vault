@@ -37,6 +37,7 @@
               "two_factor_required",
               "invalid_two_factor",
               "forbidden",
+              "network_not_allowed",
               "not_found",
               "conflict",
               "too_large",
@@ -45,7 +46,7 @@
               "policy_required",
               "internal"
             ],
-            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\npolicy_required: An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.\ninternal: An unexpected error. Quote `requestId` when reporting it."
+            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnetwork_not_allowed: The server's sign-in allow-list does not include this address.\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\npolicy_required: An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.\ninternal: An unexpected error. Quote `requestId` when reporting it."
           },
           "message": {
             "type": "string",
@@ -4011,6 +4012,126 @@
           }
         ],
         "x-permission": "invites.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/templates/preview": {
+      "post": {
+        "summary": "Preview an email template with sample details",
+        "operationId": "postAdminTemplatesPreview",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "overview.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/limits": {
+      "get": {
+        "summary": "Rate limits, in words",
+        "operationId": "getAdminLimits",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "overview.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/backup": {
+      "get": {
+        "summary": "Server backup settings and the last run",
+        "operationId": "getAdminBackup",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "overview.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/backup/run": {
+      "post": {
+        "summary": "Ask the server to take a backup now",
+        "operationId": "postAdminBackupRun",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "settings.write",
         "responses": {
           "2XX": {
             "description": "Success. JSON."

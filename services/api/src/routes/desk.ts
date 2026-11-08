@@ -66,7 +66,7 @@ interface Message extends Item, MessageFields {
 }
 
 /** Public requests: per address and per email, so one source cannot flood the queue. */
-const PUBLIC_LIMIT = { max: 5, windowSeconds: 60 * 60 }
+export const PUBLIC_LIMIT = { max: 5, windowSeconds: 60 * 60 }
 const PUBLIC_EMAIL_LIMIT = { max: 3, windowSeconds: 24 * 60 * 60 }
 const AUTO_CLOSE_DAYS = 7
 const FAR_FUTURE = 4_102_444_800 // 2100-01-01: the sequence counter never expires

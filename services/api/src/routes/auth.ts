@@ -67,6 +67,7 @@ import {
   putRegistry,
   touchLogin,
 } from '../system.js'
+import { assertNetwork } from '../networks.js'
 
 export interface Profile extends Item {
   userId: string
@@ -284,6 +285,7 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   const verifier = profile?.authVerifier ?? DUMMY_VERIFIER
   const ok = await verifyAuthKey(authKey, verifier)
   if (!ok || !profile) throw invalidCredentials()
+  await assertNetwork(app, profile.userId, event.requestContext.http.sourceIp)
   // Only after the password is proved, so a disabled account cannot be told
   // apart from a wrong password by someone who does not hold it.
   await assertEnabled(app, profile.userId)
@@ -316,6 +318,7 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
   const verifier = profile?.recoveryVerifier ?? DUMMY_VERIFIER
   const ok = await verifyAuthKey(proof, verifier)
   if (!ok || !profile) throw invalidCredentials()
+  await assertNetwork(app, profile.userId, event.requestContext.http.sourceIp)
   await assertEnabled(app, profile.userId)
   // The recovery key replaces the password, not the second factor; losing
   // the phone too is what recovery codes are for.
@@ -352,6 +355,7 @@ export async function refresh(app: App, event: LambdaEvent): Promise<LambdaRespo
 
   await app.store.delete(userPk(payload.sub), sessionSk(payload.jti))
   await assertEnabled(app, payload.sub)
+  await assertNetwork(app, payload.sub, event.requestContext.http.sourceIp)
   // A session policy set or shortened after this device signed in applies
   // now: past its deadline, the device signs in again.
   const deadline = await sessionDeadline(app, String(session['createdAt']))

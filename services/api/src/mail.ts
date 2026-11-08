@@ -17,6 +17,27 @@ export interface Message {
   text: string
   /** The operator's support mailbox, when one is set (admin → Overview → Name and support). */
   replyTo?: string
+  /** Which editable template this message is (G6); the admin's subject and
+   *  message are applied when it is sent. */
+  template?: TemplateKind
+}
+
+/** Messages an admin may adjust (G6). The security text, links and codes are
+ *  never editable: only the subject, and a message put before them. */
+export type TemplateKind = 'invite' | 'signIn'
+export const TEMPLATE_KINDS: readonly TemplateKind[] = ['invite', 'signIn']
+export interface Template { subject: string; message: string }
+
+/** Applies an admin's template to a built message. `{server}` becomes the
+ *  server's name. Empty fields leave the default alone. */
+export function applyTemplate(msg: Omit<Message, 'to'>, t: Template | undefined, serverName: string): Omit<Message, 'to'> {
+  if (!t) return msg
+  const fill = (s: string) => s.replaceAll('{server}', serverName)
+  return {
+    ...msg,
+    ...(t.subject.trim() ? { subject: fill(t.subject.trim()) } : {}),
+    ...(t.message.trim() ? { text: `${fill(t.message.trim())}\n\n${msg.text}` } : {}),
+  }
 }
 
 export interface Mailer {
@@ -49,12 +70,14 @@ export async function notify(app: App, message: Message): Promise<boolean> {
   const mailer = app.mailer
   if (!mailer) return false
   try {
-    const { profile } = await getSettings(app)
+    const { profile, templates } = await getSettings(app)
     const help = profile.supportEmail || profile.supportUrl
       ? `\n\nNeed help? ${[profile.supportEmail, profile.supportUrl].filter(Boolean).join(' · ')}` : ''
+    const { template, ...rest } = message
+    const shaped = { to: message.to, ...applyTemplate(rest, template ? templates[template] : undefined, profile.name || 'Vault') }
     await mailer.send({
-      ...message,
-      text: message.text + help,
+      ...shaped,
+      text: shaped.text + help,
       ...(profile.supportEmail ? { replyTo: profile.supportEmail } : {}),
     })
     return true
@@ -73,6 +96,7 @@ export function signInNotice(origin: string, device: string, ip: string, at: str
         text: `Someone signed in to your Vault with your recovery key at ${at}, from ${device} (${ip}).\n\nIf it was you, set a new master password now if you have not already.\nIf it was not you, your recovery key is known to someone else: sign in, issue a new recovery key in Settings, and sign out every device.${footer(origin)}`,
       }
     : {
+        template: 'signIn',
         subject: 'New sign-in to your Vault',
         text: `Your Vault account was signed in to at ${at}, from ${device} (${ip}).\n\nIf this was you, there is nothing to do.\nIf it was not, sign in, open Settings → Signed-in devices, sign that device out, and change your master password.${footer(origin)}`,
       }
@@ -80,6 +104,7 @@ export function signInNotice(origin: string, device: string, ip: string, at: str
 
 export function inviteMessage(origin: string, code: string, label: string, expiresAt: string): Omit<Message, 'to'> {
   return {
+    template: 'invite',
     subject: 'You are invited to a Vault password manager',
     text: `You have been invited to create an account on the Vault server at ${origin}${label ? ` (${label})` : ''}.\n\nOpen this link to create your account:\n${origin}/app/?invite=${encodeURIComponent(code)}\n\nOr choose "Create an account" there and enter the code: ${code}\nIt works once, until ${expiresAt}.\n\nVault encrypts everything on your device. Choose a long master password, and keep the recovery key it shows you somewhere safe: nobody, including the people running this server, can reset it.${footer(origin)}`,
   }

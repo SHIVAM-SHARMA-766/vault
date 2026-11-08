@@ -266,6 +266,18 @@ not the person's. A hostile server could fake a range, hiding a breach or invent
 cannot learn passwords from it. Results are held in memory until lock. `BREACH_CHECK=false`
 removes the relay.
 
+### A19 — Admin-set sign-in allow-list and email text
+
+The allow-list (G2) is checked against the client address the server sees, which depends on
+`TRUST_PROXY` being right for the deployment (otherwise a client can forge `X-Forwarded-For`).
+It is applied at sign-in, recovery sign-in and every refresh, so a stolen refresh token used
+from outside the list stops working. Owners are exempt, and an admin cannot save a list that
+excludes their own address, so the panel cannot lock everyone out. Admin-written email text
+(G6) is plain text only, at most 120 characters for the subject and 1,000 for the message. It
+is placed above fixed content, so the standard link, code and security advice cannot be removed.
+A malicious admin could still write misleading text, but admins are trusted with accounts
+already (A9).
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

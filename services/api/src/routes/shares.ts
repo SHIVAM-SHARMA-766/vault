@@ -23,8 +23,8 @@ export const SHARE_MAX_ACTIVE = 100
 /** Index rows outlive their link by a week, so the owner sees "expired". */
 const INDEX_GRACE_SECONDS = 7 * 86_400
 
-const CREATE_LIMIT: Limit = { max: 30, windowSeconds: 3600 }
-const OPEN_LIMIT: Limit = { max: 30, windowSeconds: 600 }
+export const CREATE_LIMIT: Limit = { max: 30, windowSeconds: 3600 }
+export const OPEN_LIMIT: Limit = { max: 30, windowSeconds: 600 }
 
 /** 16 random bytes, base64url: chosen by the client so the id can be bound
  *  into the ciphertext as associated data. */

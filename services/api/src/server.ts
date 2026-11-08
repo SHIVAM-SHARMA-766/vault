@@ -20,6 +20,7 @@ import { ensureSetup } from './system.js'
 import { createMailer } from './mail.js'
 import { tick as tickPersonalBackups } from './personal-backup.js'
 import { applyRetention } from './retention.js'
+import { takeBackupRequest } from './backup.js'
 import { closeStaleTickets } from './routes/desk.js'
 import { migrateItemPartitions } from './routes/orgs.js'
 import { backupsEnabled, runBackup } from './backup.js'
@@ -69,6 +70,8 @@ export async function start(): Promise<void> {
       .then((r) => console.log(`backup written: ${r.name} (${r.rows} rows, ${r.bytes} bytes)`))
       .catch((err: unknown) => console.error('backup FAILED:', (err as Error).message))
     setTimeout(() => { void backup(); setInterval(backup, app.config.backup.intervalHours * 3_600_000).unref() }, 5 * 60_000).unref()
+    // "Back up now" from the admin panel (C7): a request row, taken here.
+    setInterval(() => void takeBackupRequest(store, app.config).catch((err: unknown) => console.error('backup FAILED:', (err as Error).message)), 60_000).unref()
     console.log(`backups: every ${app.config.backup.intervalHours} h${app.config.backup.dir ? `, to ${app.config.backup.dir}` : ''}${app.config.backup.s3 ? `, to s3://${app.config.backup.s3.bucket}` : ''}; first in 5 minutes`)
   } else if (!backupsEnabled(app.config)) {
     console.log('backups: off (set BACKUP_PASSPHRASE and BACKUP_DIR or BACKUP_S3_*; see docs/INSTALL.md)')
