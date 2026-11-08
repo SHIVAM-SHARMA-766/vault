@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { createAccount, deriveRecoveryProof } from '@vault/crypto'
+import { belowMinimum } from '@vault/core'
 
 import { newIdentity } from '../../lib/identity.js'
 
@@ -23,7 +24,8 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
   const [recoveryKey, setRecoveryKey] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
   const [inviteCode, setInviteCode] = useState((setupCode || invited).toUpperCase())
-  const mode = useInstance()?.registration
+  const instance = useInstance()
+  const mode = instance?.registration
   const [showInvite, setShowInvite] = useState(false)
   const owner = setupCode !== ''
 
@@ -33,6 +35,11 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
 
     if (password.length < MIN_LENGTH) {
       setError(`The master password must be at least ${MIN_LENGTH} characters.`)
+      return
+    }
+    const weak = belowMinimum(password, instance?.minPasswordScore ?? 0)
+    if (weak) {
+      setError(weak)
       return
     }
     if (password !== confirm) {

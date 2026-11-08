@@ -344,7 +344,7 @@
     },
     "/api/auth/password-score": {
       "put": {
-        "summary": "Report the master password's strength score, for organization policies",
+        "summary": "Report the master password's strength score, for organization and server policies",
         "operationId": "putAuthPasswordScore",
         "tags": [
           "auth"

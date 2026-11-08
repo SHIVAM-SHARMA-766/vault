@@ -29,11 +29,13 @@ export interface Unlocked {
   isAdmin?: boolean
   role?: Role
   permissions?: Permission[]
+  /** What the server policy asks that this account has not done yet. */
+  policyGap?: string | null
 }
 
 /** Updates fields of the unlocked state without touching the keys. */
 export function patch(fields: Partial<Pick<Unlocked,
-  'userId' | 'isAdmin' | 'role' | 'permissions' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
+  'userId' | 'isAdmin' | 'role' | 'permissions' | 'policyGap' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
 >>): void {
   if (!current) return
   current = { ...current, ...fields }
@@ -45,16 +47,21 @@ let idleTimer: ReturnType<typeof setTimeout> | null = null
 
 /** The idle lock is the person's choice (Settings → Preferences, fifteen
  *  minutes unless they change it), shortened by the strictest organization
- *  policy they are under. Neither can lengthen what the other set. */
+ *  policy they are under and by the server's policy. None can lengthen what
+ *  another set. */
 let userIdleMinutes = 15
 let policyIdleMinutes: number | null = null
+let serverIdleMinutes: number | null = null
 let idleMs = 15 * 60_000
 function updateIdle(): void {
-  const next = effectiveLockMinutes({ lockMinutes: userIdleMinutes }, policyIdleMinutes) * 60_000
+  const limits = [policyIdleMinutes, serverIdleMinutes].filter((m): m is number => !!m && m > 0)
+  const next = effectiveLockMinutes({ lockMinutes: userIdleMinutes }, limits.length ? Math.min(...limits) : null) * 60_000
   if (next !== idleMs) { idleMs = next; if (current) resetIdleTimer() }
 }
 /** An organization's policy (null: none sets one). */
 export function setIdleLimit(minutes: number | null): void { policyIdleMinutes = minutes; updateIdle() }
+/** The server's policy (null: it sets none). */
+export function setServerIdleLimit(minutes: number | null): void { serverIdleMinutes = minutes; updateIdle() }
 /** The person's own preference. */
 export function setUserIdle(minutes: number): void { userIdleMinutes = minutes; updateIdle() }
 /** Minutes until an idle vault locks, as things stand. */

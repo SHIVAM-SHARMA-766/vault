@@ -35,6 +35,16 @@ export type Strength = { score: 0 | 1 | 2 | 3 | 4; label: '' | 'Weak' | 'Fair' |
 /** A rough estimate: character pool and length, discounted for repeats,
  *  keyboard and alphabet runs, and the commonest passwords. It does not know
  *  dictionary words in general, so it errs generous; a nudge, not a proof. */
+/** The word for each score, as the strength meter shows it; 0 is "any". */
+export const STRENGTH_LABELS: readonly string[] = Object.freeze(['Any', 'Weak', 'Fair', 'Strong', 'Excellent'])
+
+/** Why a master password falls short of a minimum score, or null if it
+ *  meets it. Used where a server or organization policy sets a floor. */
+export function belowMinimum(password: string, minScore: number): string | null {
+  if (!minScore || passwordStrength(password).score >= minScore) return null
+  return `This server asks for a master password rated at least ${STRENGTH_LABELS[minScore]}. Make it longer, or use a passphrase.`
+}
+
 export function passwordStrength(password: string): Strength {
   if (!password) return { score: 0, label: '' }
   const core = password.toLowerCase().replace(/[\d\W_]+$/, '').replace(/^[\d\W_]+/, '')

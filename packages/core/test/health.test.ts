@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { analyse, passwordStrength } from '../src/index.js'
+import { STRENGTH_LABELS, analyse, belowMinimum, passwordStrength } from '../src/index.js'
 
 test('common, short, repeated and sequential passwords are weak', () => {
   for (const pw of ['password', 'Password123!', 'qwerty', '12345678', 'aaaaaaaaaaaa', 'abcdef123', 'letmein2024', 'summer2024', 'Pune@123', 'Rahul1990!']) {
@@ -45,4 +45,11 @@ test('reuse, age and http are found; notes and cards are not checked', () => {
 
 test('an empty vault scores 100', () => {
   assert.equal(analyse([]).score, 100)
+})
+
+test('belowMinimum explains a password under a policy floor and passes one above it', () => {
+  assert.equal(belowMinimum('anything', 0), null, 'no floor, no complaint')
+  assert.match(String(belowMinimum('password1', 3)), /at least Strong/)
+  assert.equal(belowMinimum('correct horse battery staple orbit lantern', 3), null)
+  assert.equal(STRENGTH_LABELS.length, 5)
 })

@@ -49,7 +49,8 @@ function useAccount(state: session.Unlocked) {
     void (async () => {
       try {
         const me = await api.me(await session.token())
-        session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions })
+        session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions, policyGap: me.policyGap })
+        session.setServerIdleLimit(me.policy.maxIdleMinutes)
         if (!me.identity) {
           try {
             await api.setIdentity(await session.token(), await newIdentity(state.vaultKey))

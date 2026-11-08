@@ -39,9 +39,57 @@ export interface InstanceProfile {
   supportUrl: string
 }
 
+/** Server-wide rules an administrator sets for every account (G1, G3, G7).
+ *  Two-factor and password strength are shown to anyone who misses them and
+ *  listed for admins; nobody is locked out by a policy change. The password
+ *  score is self-reported by the account's own app, as for organizations. */
+export interface ServerPolicy {
+  requireTwoFactor: boolean
+  /** 0 (none) to 4, packages/core passwordStrength. */
+  minPasswordScore: number
+  /** The longest auto-lock any account may choose; null: their choice. */
+  maxIdleMinutes: number | null
+  /** Sign in again this many days after signing in on a device, however
+   *  often it is used; null: stay signed in while used (30 idle days). */
+  sessionDays: number | null
+  /** How long each account's activity log is kept. */
+  activityDays: number
+  /** How long the admin audit log and organization event logs are kept. */
+  auditDays: number
+}
+
+export const POLICY_CHOICES = {
+  minPasswordScore: [0, 1, 2, 3, 4],
+  maxIdleMinutes: [null, 1, 5, 15, 30, 60, 240],
+  sessionDays: [null, 1, 7, 14, 30],
+  activityDays: [30, 90, 180, 365],
+  auditDays: [90, 365, 730, 1825],
+} as const
+
+export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365,
+})
+
+/** A stored policy, with anything missing or out of range taken from the
+ *  defaults, so a damaged row never weakens or breaks anything. */
+export function readPolicy(value: unknown): ServerPolicy {
+  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  const pick = <K extends keyof typeof POLICY_CHOICES>(k: K): ServerPolicy[K] =>
+    ((POLICY_CHOICES[k] as readonly unknown[]).includes(v[k]) ? v[k] : DEFAULT_POLICY[k]) as ServerPolicy[K]
+  return {
+    requireTwoFactor: v['requireTwoFactor'] === true,
+    minPasswordScore: pick('minPasswordScore'),
+    maxIdleMinutes: pick('maxIdleMinutes'),
+    sessionDays: pick('sessionDays'),
+    activityDays: pick('activityDays'),
+    auditDays: pick('auditDays'),
+  }
+}
+
 export interface Settings {
   registration: RegistrationMode
   profile: InstanceProfile
+  policy: ServerPolicy
   updatedAt?: string
 }
 
@@ -57,6 +105,7 @@ export async function getSettings(app: App): Promise<Settings> {
   return {
     registration: REGISTRATION_MODES.includes(mode as RegistrationMode) ? (mode as RegistrationMode) : 'closed',
     profile: readProfile(item?.['profile']),
+    policy: readPolicy(item?.['policy']),
     ...(typeof item?.['updatedAt'] === 'string' ? { updatedAt: item['updatedAt'] } : {}),
   }
 }
@@ -227,7 +276,6 @@ export async function ensureSetup(app: App): Promise<string | null> {
 
 // ── Audit ─────────────────────────────────────────────────────────────────
 
-const AUDIT_RETENTION_SECONDS = 365 * 24 * 60 * 60
 
 export interface AuditRecord extends Item {
   at: string
@@ -252,8 +300,17 @@ export async function audit(
     action,
     ...(target ? { target } : {}),
     ...(detail ? { detail } : {}),
-    expiresAt: Math.floor(app.now() / 1000) + AUDIT_RETENTION_SECONDS,
+    expiresAt: Math.floor(app.now() / 1000) + (await getSettings(app)).policy.auditDays * 86_400,
   })
+}
+
+/** What stops this account meeting the server policy, if anything. */
+export function serverPolicyGap(policy: ServerPolicy, profile: Item | null): string | null {
+  if (policy.requireTwoFactor && !profile?.['totp']) return 'This server requires two-factor sign-in. Turn it on in Settings → Security.'
+  if (policy.minPasswordScore && Number(profile?.['passwordScore'] ?? 0) < policy.minPasswordScore) {
+    return 'This server requires a stronger master password. Change it in Settings → Security.'
+  }
+  return null
 }
 
 export async function listAudit(app: App, limit = 200): Promise<AuditRecord[]> {

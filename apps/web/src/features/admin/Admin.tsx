@@ -18,8 +18,10 @@ import {
   type Permission,
   type RegistrationMode,
   type Role,
+  type ServerPolicy,
   api,
 } from '../../lib/api.js'
+import { STRENGTH_LABELS, describeMinutes } from '@vault/core'
 import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Website } from './Website.js'
@@ -174,6 +176,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
 
             <MailCard on={data.mail} canWrite={canWrite} />
             <ProfileCard canWrite={canWrite} />
+            <PolicyCard canWrite={canWrite} missing={data.policyGapUsers} onGo={() => onGo('users')} />
 
             <div className="admin-card">
               <div className="admin-card-head"><span className="dot dot-ok" /><h2>Server</h2></div>
@@ -304,6 +307,79 @@ function ProfileCard({ canWrite }: { canWrite: boolean }) {
   )
 }
 
+const IDLE_CHOICES: (number | null)[] = [null, 1, 5, 15, 30, 60, 240]
+const SESSION_CHOICES: (number | null)[] = [null, 1, 7, 14, 30]
+const ACTIVITY_CHOICES = [30, 90, 180, 365]
+const AUDIT_CHOICES = [90, 365, 730, 1825]
+const days = (n: number) => (n % 365 === 0 ? (n === 365 ? '1 year' : `${n / 365} years`) : n === 1 ? '1 day' : `${n} days`)
+
+/** Server-wide rules for every account (G1, G3, G7). */
+function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: number; onGo: () => void }) {
+  const toast = useToast()
+  const [form, setForm] = useState<ServerPolicy | null>(null)
+  const [saved, setSaved] = useState<ServerPolicy | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try { const s = await api.admin.settings(await session.token()); setForm(s.policy); setSaved(s.policy) } catch { /* says loading */ }
+    })()
+  }, [])
+  if (!form) return <div className="admin-card admin-card-wide"><div className="admin-card-head"><h2>Policies</h2></div><p className="muted small">Loading…</p></div>
+  const dirty = JSON.stringify(form) !== JSON.stringify(saved)
+  const shorter = saved && (form.activityDays < saved.activityDays || form.auditDays < saved.auditDays)
+  const strict = saved?.requireTwoFactor || (saved?.minPasswordScore ?? 0) > 0
+  const pick = <K extends keyof ServerPolicy>(k: K, parse: (v: string) => ServerPolicy[K]) =>
+    (e: React.ChangeEvent<HTMLSelectElement>) => setForm({ ...form, [k]: parse(e.target.value) })
+  const orNull = (v: string) => (v === '' ? null : Number(v))
+  return (
+    <form className="admin-card admin-card-wide" aria-labelledby="policy-title" onSubmit={async (e) => {
+      e.preventDefault()
+      if (await run(toast, (t) => api.admin.setPolicy(t, form), 'Policies saved')) setSaved(form)
+    }}>
+      <div className="admin-card-head"><span className={`dot ${strict ? 'dot-ok' : 'dot-muted'}`} /><h2 id="policy-title">Policies</h2></div>
+      <p className="muted small">Apply to every account on this server. Nobody is locked out by a policy: an account that misses one is told what to do and marked in Users. The password rule is checked by each person&apos;s app — the server never sees a password.</p>
+      <label className="check">
+        <input type="checkbox" disabled={!canWrite} checked={form.requireTwoFactor} onChange={(e) => setForm({ ...form, requireTwoFactor: e.target.checked })} />
+        <span>Require two-factor sign-in</span>
+      </label>
+      <div className="grid-3">
+        <div className="field">
+          <label htmlFor="pol-score">Weakest master password</label>
+          <select id="pol-score" disabled={!canWrite} value={form.minPasswordScore} onChange={pick('minPasswordScore', Number)}>
+            {STRENGTH_LABELS.map((l, i) => <option key={l} value={i}>{i === 0 ? 'Any' : l}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="pol-idle">Longest auto-lock</label>
+          <select id="pol-idle" disabled={!canWrite} value={form.maxIdleMinutes ?? ''} onChange={pick('maxIdleMinutes', orNull)}>
+            {IDLE_CHOICES.map((m) => <option key={m ?? 0} value={m ?? ''}>{m ? describeMinutes(m) : 'Each person chooses'}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="pol-session">Sign in again after</label>
+          <select id="pol-session" disabled={!canWrite} value={form.sessionDays ?? ''} onChange={pick('sessionDays', orNull)}>
+            {SESSION_CHOICES.map((d) => <option key={d ?? 0} value={d ?? ''}>{d ? days(d) : 'Never, while used'}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="pol-activity">Keep account activity for</label>
+          <select id="pol-activity" disabled={!canWrite} value={form.activityDays} onChange={pick('activityDays', Number)}>
+            {ACTIVITY_CHOICES.map((d) => <option key={d} value={d}>{days(d)}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="pol-audit">Keep audit and organization logs for</label>
+          <select id="pol-audit" disabled={!canWrite} value={form.auditDays} onChange={pick('auditDays', Number)}>
+            {AUDIT_CHOICES.map((d) => <option key={d} value={d}>{days(d)}</option>)}
+          </select>
+        </div>
+      </div>
+      {shorter ? <p className="alert alert-warn"><IconAlert size={16} /><span>Saving deletes log entries older than the new period. That cannot be undone.</span></p> : null}
+      {missing > 0 ? <p className="muted small">{missing === 1 ? '1 account does' : `${missing} accounts do`} not meet these yet. <button type="button" className="link" onClick={onGo}>See Users</button></p> : null}
+      {canWrite ? <div className="settings-actions"><button className="btn btn-primary btn-sm" type="submit" disabled={!dirty}>Save</button></div> : null}
+    </form>
+  )
+}
+
 function MailCard({ on, canWrite }: { on: boolean; canWrite: boolean }) {
   const toast = useToast()
   const [to, setTo] = useState('')
@@ -396,6 +472,7 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                     <td>
                       {u.disabled ? <span className="pill pill-danger">Disabled</span> : <span className="pill pill-ok">Active</span>}
                       {u.twoFactor ? <span className="pill pill-accent" title="Two-factor sign-in is on"> 2FA</span> : null}
+                      {u.policyGap && !u.disabled ? <span className="pill pill-warn" title="Does not meet the server policies yet">Misses policy</span> : null}
                     </td>
                     {canWrite ? <td>
                       <div className="row-actions">

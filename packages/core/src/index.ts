@@ -36,7 +36,7 @@ export {
   totpKey,
 } from './import.js'
 export { type ExportEntry, toCsv } from './export.js'
-export { ISSUES, type HealthInput, type HealthReport, type Issue, type Strength, analyse, passwordStrength } from './health.js'
+export { ISSUES, type HealthInput, type HealthReport, type Issue, type Strength, STRENGTH_LABELS, analyse, belowMinimum, passwordStrength } from './health.js'
 export {
   CLIPBOARD_CHOICES,
   DEFAULT_PREFS,

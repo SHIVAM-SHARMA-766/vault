@@ -316,7 +316,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ✅ A1 One-line installer: asks profile and address, writes `.env` with fresh secrets (mode 600), backs up before an upgrade, prints the setup link; CI installs through it
 - ⬜ A2 First-run wizard in the browser (mail, backups, registration, support contact)
 - ✅ A3 Server name and support contact set in the admin panel; shown on sign-in and help; Reply-To of every email
-- ⬜ A4 "Get Vault" page on the site
+- ✅ A4 "Run your own" page on the site (`/get`)
 - ✅ A5 Update checker in the admin panel (every 12 h from the server, `UPDATE_CHECK=false` turns it off)
 - ⬜ A6 No-domain mode (DuckDNS / Cloudflare Tunnel guide)
 
@@ -346,8 +346,8 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ⬜ F4 Reveal and count options · ⬜ F5 Email alerts · ⬜ F6 Default folder · ⬜ F7 Date, time and language · ✅ F8 Delete my account
 
 **G. Administrator settings**
-- ⬜ G1 Session policy · ⬜ G2 IP allow-list · ⬜ G3 Password policy · ⬜ G4 Sharing policy
-- ⬜ G5 Rate limits in the UI · ⬜ G6 Editable email templates · ⬜ G7 Data retention
+- ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ⬜ G2 IP allow-list · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ⬜ G4 Sharing policy
+- ⬜ G5 Rate limits in the UI · ⬜ G6 Editable email templates · ✅ G7 Data retention (activity, audit and organization logs; shortening applies at once)
 
 ### Phase 4 — Browser extension
 

@@ -61,6 +61,7 @@ import {
   claimInvite,
   getRegistry,
   getSettings,
+  serverPolicyGap,
   hashInviteCode,
   listRegistry,
   putRegistry,
@@ -107,9 +108,16 @@ export interface SessionRecord extends Item {
   name?: string
 }
 
+/** When a device signed in at `createdAt` must sign in again under the
+ *  server's session policy (epoch seconds), or undefined when it sets none. */
+async function sessionDeadline(app: App, createdAt: string): Promise<number | undefined> {
+  const days = (await getSettings(app)).policy.sessionDays
+  return days ? Math.floor(Date.parse(createdAt) / 1000) + days * 86_400 : undefined
+}
+
 async function issueSession(app: App, userId: string, event: LambdaEvent, family?: SessionRecord) {
-  const refresh = issueRefreshToken(userId, app.config.tokenKey, app.now())
   const now = new Date(app.now()).toISOString()
+  const refresh = issueRefreshToken(userId, app.config.tokenKey, app.now(), await sessionDeadline(app, family?.createdAt ?? now))
   // Sessions from before devices had ids keep their old token id as one.
   const sid = family ? (family.sid ?? family.sk.slice(SESSION_PREFIX.length)) : randomUUID()
   const access = issueAccessToken(userId, app.config.tokenKey, app.now(), sid)
@@ -342,6 +350,10 @@ export async function refresh(app: App, event: LambdaEvent): Promise<LambdaRespo
 
   await app.store.delete(userPk(payload.sub), sessionSk(payload.jti))
   await assertEnabled(app, payload.sub)
+  // A session policy set or shortened after this device signed in applies
+  // now: past its deadline, the device signs in again.
+  const deadline = await sessionDeadline(app, String(session['createdAt']))
+  if (deadline !== undefined && deadline <= Math.floor(app.now() / 1000)) throw unauthorized()
   return json(200, await issueSession(app, payload.sub, event, session as SessionRecord))
 }
 
@@ -389,6 +401,7 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()
   const role = roleFromDigest(app, profile.emailDigest, (await getRegistry(app, userId))?.role)
+  const { policy } = await getSettings(app)
   return json(200, {
     userId: profile.userId,
     kdf: profile.kdf,
@@ -398,6 +411,9 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     isAdmin: isStaff(role),
     permissions: permissionsOf(role),
     twoFactor: { enabled: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0 },
+    // What the server asks of this account, and what it still misses.
+    policy: { requireTwoFactor: policy.requireTwoFactor, minPasswordScore: policy.minPasswordScore, maxIdleMinutes: policy.maxIdleMinutes },
+    policyGap: serverPolicyGap(policy, profile),
     identity: profile.publicKey && profile.wrappedPrivateKey
       ? { publicKey: profile.publicKey, wrappedPrivateKey: profile.wrappedPrivateKey }
       : null,

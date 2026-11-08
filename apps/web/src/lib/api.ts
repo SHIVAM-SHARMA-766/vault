@@ -102,7 +102,16 @@ export interface UpdateStatus {
   publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
 }
 export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
-export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number }
+/** Server-wide rules set by an administrator (G1, G3, G7). */
+export interface ServerPolicy {
+  requireTwoFactor: boolean
+  minPasswordScore: number
+  maxIdleMinutes: number | null
+  sessionDays: number | null
+  activityDays: number
+  auditDays: number
+}
 
 export type BackupFrequency = 'off' | 'daily' | 'weekly' | 'monthly'
 export interface BackupSchedule { frequency: BackupFrequency; hour: number; weekday: number; tzOffsetMinutes: number; keep: number }
@@ -202,7 +211,7 @@ export const api = {
   /** Self-reported strength (0–4) of the master password, for organization policies. */
   passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number } }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes'>; policyGap: string | null }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -359,10 +368,12 @@ export const api = {
     deleteUser: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/delete`, { token, body: { confirm: id } }),
     settings: (token: string) =>
-      request<{ registration: RegistrationMode; profile: InstanceProfile; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+      request<{ registration: RegistrationMode; profile: InstanceProfile; policy: ServerPolicy; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
     update: (token: string, refresh = false) => request<UpdateStatus>('GET', `/api/admin/update${refresh ? '?refresh=1' : ''}`, { token }),
     setProfile: (token: string, profile: InstanceProfile) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { profile } }),
+    setPolicy: (token: string, policy: ServerPolicy) =>
+      request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { policy } }),
     setRegistration: (token: string, registration: RegistrationMode) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
     invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),
@@ -465,6 +476,7 @@ export interface SiteState {
 export interface AdminOverview {
   users: number
   disabledUsers: number
+  policyGapUsers: number
   entries: number
   activeSessions: number
   activeInvites: number
@@ -487,6 +499,7 @@ export interface AdminUser {
   isAdmin: boolean
   role: Role
   twoFactor: boolean
+  policyGap: boolean
   entries: number
   folders: number
   sessions: number

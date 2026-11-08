@@ -29,6 +29,7 @@ import {
 } from '../keys.js'
 import { bkdueSk } from '../personal-backup.js'
 import { updateStatus } from '../updates.js'
+import { applyRetention } from '../retention.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
@@ -56,6 +57,10 @@ import {
   listRegistry,
   putRegistry,
   putSettings,
+  POLICY_CHOICES,
+  type ServerPolicy,
+  readPolicy,
+  serverPolicyGap,
 } from '../system.js'
 import { revokeAllSessions } from './auth.js'
 
@@ -78,12 +83,14 @@ interface UserSummary {
   isAdmin: boolean
   role: Role
   twoFactor: boolean
+  /** Misses the server policy (two-factor or password strength). */
+  policyGap: boolean
   entries: number
   folders: number
   sessions: number
 }
 
-async function summarize(app: App, reg: RegistryEntry): Promise<UserSummary> {
+async function summarize(app: App, reg: RegistryEntry, policy: ServerPolicy): Promise<UserSummary> {
   const items = await app.store.query(userPk(reg.userId))
   const profile = items.find((i) => i.sk === PROFILE_SK)
   const now = Math.floor(app.now() / 1000)
@@ -96,6 +103,7 @@ async function summarize(app: App, reg: RegistryEntry): Promise<UserSummary> {
     isAdmin: app.adminDigests.has(reg.emailDigest),
     role: roleFromDigest(app, reg.emailDigest, reg.role),
     twoFactor: Boolean(profile?.['totp']),
+    policyGap: serverPolicyGap(policy, profile ?? null) !== null,
     entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
     folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
     sessions: items.filter((i) => i.sk.startsWith(SESSION_PREFIX)
@@ -110,11 +118,12 @@ export async function overview(app: App): Promise<LambdaResponse> {
     listInvites(app),
     app.store.get(SYSTEM_PK, BACKUP_SK),
   ])
-  const users = await Promise.all(registry.map((r) => summarize(app, r)))
+  const users = await Promise.all(registry.map((r) => summarize(app, r, settings.policy)))
   const now = app.now()
   return json(200, {
     users: users.length,
     disabledUsers: users.filter((u) => u.disabled).length,
+    policyGapUsers: users.filter((u) => u.policyGap && !u.disabled).length,
     entries: users.reduce((n, u) => n + u.entries, 0),
     activeSessions: users.reduce((n, u) => n + u.sessions, 0),
     activeInvites: invites.filter((i) => !i.usedAt && Date.parse(i.expiresAt) > now).length,
@@ -154,8 +163,8 @@ export async function deleteOrgAsOperator(app: App, actor: string, orgId: string
 }
 
 export async function listUsers(app: App): Promise<LambdaResponse> {
-  const registry = await listRegistry(app)
-  const users = await Promise.all(registry.map((r) => summarize(app, r)))
+  const [registry, { policy }] = await Promise.all([listRegistry(app), getSettings(app)])
+  const users = await Promise.all(registry.map((r) => summarize(app, r, policy)))
   users.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   return json(200, { users })
 }
@@ -270,8 +279,10 @@ export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
 }
 
 export async function putSettingsRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
-  const body = parseJsonBody<{ registration?: unknown; profile?: unknown }>(event)
-  if (body.registration === undefined && body.profile === undefined) throw badRequest('Send registration, profile, or both.')
+  const body = parseJsonBody<{ registration?: unknown; profile?: unknown; policy?: unknown }>(event)
+  if (body.registration === undefined && body.profile === undefined && body.policy === undefined) {
+    throw badRequest('Send registration, profile or policy.')
+  }
   const current = await getSettings(app)
   let registration = current.registration
   if (body.registration !== undefined) {
@@ -286,8 +297,39 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
     profile = requireProfile(body.profile)
     await audit(app, actor, 'settings.profile', undefined, profile.supportEmail || undefined)
   }
-  await putSettings(app, { registration, profile, updatedAt: new Date(app.now()).toISOString() })
+  let policy = current.policy
+  if (body.policy !== undefined) {
+    policy = requirePolicy(body.policy)
+    await audit(app, actor, 'settings.policy', undefined, describePolicy(policy))
+  }
+  await putSettings(app, { registration, profile, policy, updatedAt: new Date(app.now()).toISOString() })
+  // A shortened retention period takes effect now, not at the next pass.
+  if (policy.activityDays < current.policy.activityDays || policy.auditDays < current.policy.auditDays) await applyRetention(app)
   return json(200, { ok: true })
+}
+
+/** The server policy, as an admin sends it: every field must be one of the
+ *  offered choices, so a typo is refused rather than silently defaulted. */
+export function requirePolicy(value: unknown): ServerPolicy {
+  if (!value || typeof value !== 'object') throw badRequest('policy must be an object.')
+  const v = value as Record<string, unknown>
+  if (typeof v['requireTwoFactor'] !== 'boolean') throw badRequest('policy.requireTwoFactor must be true or false.')
+  for (const k of Object.keys(POLICY_CHOICES) as (keyof typeof POLICY_CHOICES)[]) {
+    const choices = POLICY_CHOICES[k] as readonly unknown[]
+    if (!choices.includes(v[k])) throw badRequest(`policy.${k} must be one of: ${choices.map((c) => c ?? 'null').join(', ')}.`)
+  }
+  return readPolicy(v)
+}
+
+function describePolicy(p: ServerPolicy): string {
+  return [
+    p.requireTwoFactor ? '2fa' : null,
+    p.minPasswordScore ? `score>=${p.minPasswordScore}` : null,
+    p.maxIdleMinutes ? `lock<=${p.maxIdleMinutes}m` : null,
+    p.sessionDays ? `session=${p.sessionDays}d` : null,
+    `activity=${p.activityDays}d`,
+    `audit=${p.auditDays}d`,
+  ].filter(Boolean).join(' ')
 }
 
 /** The instance profile, as an admin sends it. Every field may be empty. */
@@ -322,13 +364,16 @@ export async function updateRoute(app: App, event: LambdaEvent): Promise<LambdaR
 
 /** What anyone may know about this server before signing in. */
 export async function instanceRoute(app: App): Promise<LambdaResponse> {
-  const { registration, profile } = await getSettings(app)
+  const { registration, profile, policy } = await getSettings(app)
   return json(200, {
     name: profile.name || 'Vault',
     supportEmail: profile.supportEmail,
     supportUrl: profile.supportUrl,
     registration: app.allowRegistration ? 'open' : registration,
     mail: Boolean(app.mailer),
+    // The weakest master password this server accepts (0–4), so the sign-up
+    // form can say so before anyone types one.
+    minPasswordScore: policy.minPasswordScore,
     // A new server waiting for its owner: the sign-in screen offers the setup code.
     firstRun: (await listRegistry(app)).length === 0,
   })

@@ -244,7 +244,7 @@ you are away. Create one that can write only to that bucket or folder.
   device**. **Sign out everywhere** signs out all of them, this one included.
 - **Locking** — the Lock button, the auto-lock (15 minutes idle unless you change it in
   Preferences), or closing the tab — signs this browser out on the server too.
-- **Security activity** shows sign-ins and account changes from the last 90 days.
+- **Security activity** shows sign-ins and account changes from the last 90 days (your server's administrator can change how long).
 
 If you see a device you do not recognise: sign it out, then change your master password.
 
@@ -345,6 +345,7 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 | Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | | read |
 | Change roles | ✓ | | | | |
 | Registration mode (closed / invite / open) | ✓ | ✓ | | | read |
+| Policies (two-factor, password strength, auto-lock, sign-in length, log retention) | ✓ | ✓ | | | read |
 | Website: edit text, SEO, images | ✓ | ✓ | | ✓ | read |
 | Website: publish, roll back | ✓ | ✓ | | ✓ | |
 | Audit log | ✓ | ✓ | | | ✓ |
@@ -357,6 +358,23 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 Counts, the last verified backup, the registration mode (closed, invite only, open), whether
 mail is set up (with **Send test**), and the server's state. (Taken on the local development stack, which has no backups and forces
 registration open — hence the two notices.)
+</details>
+
+<details>
+<summary>Policies</summary>
+
+Overview → **Policies** sets rules for every account on the server:
+
+| Policy | Effect |
+|---|---|
+| Require two-factor sign-in | Accounts without it see a notice in the vault and in Settings, and are marked **Misses policy** in Users |
+| Weakest master password | Sign-up and password change refuse anything weaker. Each person's app checks it — the server never sees a password — so an existing weaker password shows as a gap until it is changed |
+| Longest auto-lock | Caps everyone's auto-lock choice. An organization's own limit can only shorten it further |
+| Sign in again after | Ends every device's sign-in that many days after it signed in, however often it is used. Applies to devices already signed in |
+| Keep account activity / audit and organization logs for | Older entries are deleted. Shortening a period deletes what is older at once (the panel warns first); lengthening keeps entries written from then on |
+
+No policy locks anyone out: an account that misses one keeps working and is told what to do.
+Every change is in the audit log.
 </details>
 
 <details>

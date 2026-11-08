@@ -132,7 +132,7 @@ test('the support contact an admin sets shows on the sign-in screen and the help
     await owner.waitForSelector('.admin-card:has-text("Updates"):has-text("Not checked")')
     await owner.fill('#pf-name', 'Rao Family Vault')
     await owner.fill('#pf-email', 'help@rao.example')
-    await owner.getByRole('button', { name: 'Save' }).click()
+    await owner.locator('form[aria-labelledby=profile-title]').getByRole('button', { name: 'Save' }).click()
     await owner.waitForSelector('text=Name and support contact saved')
     await s.menu(owner, 'Help & support')
     await owner.waitForSelector('.support-contact a[href="mailto:help@rao.example"]')
