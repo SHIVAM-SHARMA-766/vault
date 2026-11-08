@@ -20,9 +20,9 @@ jobs:
     name: crypto & core — typecheck, test, vectors
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -116,8 +116,8 @@ jobs:
       PG_DATABASE: vault
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -224,8 +224,8 @@ jobs:
     name: web — typecheck, build, policy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -251,8 +251,8 @@ jobs:
     name: site — render, policy, links
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -269,8 +269,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -292,8 +292,8 @@ jobs:
     name: dependency audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: npm
@@ -304,7 +304,7 @@ jobs:
     name: helm — lint and render the chart
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Helm is on GitHub's Ubuntu runners.
       - run: helm lint deploy/helm/vault --set hostname=vault.example.com
       - run: helm template t deploy/helm/vault --set hostname=vault.example.com > /tmp/sqlite.yaml
@@ -320,7 +320,7 @@ jobs:
     name: image — build and run the container
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The image customers install, built from this commit and run for real:
       # it must come up healthy on SQLite, serve the client and the site with
@@ -362,7 +362,7 @@ jobs:
     name: install — one-line installer, business profile (PostgreSQL + Caddy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Installer tests (dry run)
         run: node --test tests/install/*.test.mjs
@@ -389,7 +389,7 @@ jobs:
     name: upgrade — previous image, then this one, on the same data
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 

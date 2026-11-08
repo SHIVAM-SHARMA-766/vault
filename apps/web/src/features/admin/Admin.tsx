@@ -6,7 +6,7 @@
 // Every action is checked again by the server. Hiding this panel from
 // non-admins is a courtesy, not the control.
 
-import { useEffect, useState } from 'react'
+import { type ReactElement, useEffect, useState } from 'react'
 
 import {
   type AdminAudit,
@@ -40,7 +40,7 @@ import { Link, href, navigate } from '../../lib/router.js'
 
 type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit' | 'system'
 
-const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => JSX.Element }[] = [
+const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => ReactElement }[] = [
   { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
   { id: 'desk', label: 'Service desk', needs: 'desk.read', Icon: IconInbox },
   { id: 'website', label: 'Website', needs: 'site.read', Icon: IconGlobe },
