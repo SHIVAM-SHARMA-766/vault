@@ -358,6 +358,10 @@ admins get a notification. Like the activity log, this relies on each person's a
 shorter idle lock. They apply to everyone in the organization, you included; anyone who does
 not meet them is told why and cannot open its collections until they do.
 
+**Back up this organization…** (admins) downloads an encrypted file of every item in the
+collections you can open, each collection as a folder, protected by a password you choose. It
+opens in **Import & export**, on this server or another.
+
 **Activity…** (admins) shows who opened, copied, edited, shared or removed what, for a year.
 
 ### Emergency access

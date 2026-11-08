@@ -322,13 +322,13 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **B. An organization on its own server**
 - ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column), groups chosen at invite, send again · ✅ B3 Branding (accent colour, logo)
-- ⬜ B4 Member onboarding · ⬜ B5 Helm chart and reverse-proxy guides · ⬜ B6 Metrics endpoint and dashboard
-- ⬜ B7 Audit export and SIEM stream · ⬜ B8 SSO (OIDC) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
+- ⬜ B4 Member onboarding · ✅ B5 Helm chart and reverse-proxy guides (`deploy/helm/vault`, docs/kubernetes.md, docs/reverse-proxy.md) · ✅ B6 Metrics endpoint and dashboard (`/api/metrics` behind a token, Grafana dashboard and alerts)
+- ✅ B7 Audit export and SIEM stream (CSV/JSON download, signed webhook) · ⬜ B8 SSO (OIDC) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
 
 **C. Backups, per user (like Zoho)**
 - ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)
 - ⬜ C3 Google Drive / OneDrive · ⬜ C4 Encrypted offline copy that opens without the server
-- ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ✅ C7 Server backup settings in the admin UI (shown, with Back up now; values stay on the host)
+- ✅ C5 Backup history, test restore, and restore through Import & export · ✅ C6 Organization backups (encrypted export of an organization's collections, made in the admin's browser) · ✅ C7 Server backup settings in the admin UI (shown, with Back up now; values stay on the host)
 
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ⬜ D2 File attachments · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive

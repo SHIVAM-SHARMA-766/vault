@@ -1,0 +1,7 @@
+Vault is starting at https://{{ .Values.hostname }}.
+
+The first start prints a one-time setup link for the owner account:
+  kubectl logs deploy/{{ include "vault.fullname" . }} | grep -A6 "First-run setup"
+
+Back up the {{ include "vault.fullname" . }} volume (it holds the server secrets) and,
+with PostgreSQL, the database. docs/INSTALL.md and docs/kubernetes.md explain more.

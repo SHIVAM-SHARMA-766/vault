@@ -300,6 +300,22 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=moderate
 
+  helm:
+    name: helm — lint and render the chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Helm is on GitHub's Ubuntu runners.
+      - run: helm lint deploy/helm/vault --set hostname=vault.example.com
+      - run: helm template t deploy/helm/vault --set hostname=vault.example.com > /tmp/sqlite.yaml
+      - run: helm template t deploy/helm/vault --set hostname=vault.example.com --set database.driver=postgres --set database.host=pg > /tmp/pg.yaml
+      - name: The chart runs one replica, non-root, with a read-only root
+        run: |
+          grep -q 'replicas: 1' /tmp/sqlite.yaml
+          grep -q 'runAsNonRoot: true' /tmp/sqlite.yaml
+          grep -q 'readOnlyRootFilesystem: true' /tmp/sqlite.yaml
+          grep -q 'DB_HOST' /tmp/pg.yaml
+
   image:
     name: image — build and run the container
     runs-on: ubuntu-latest

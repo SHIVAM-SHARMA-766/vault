@@ -82,6 +82,9 @@ into an empty database ([INSTALL.md](INSTALL.md#backups-and-restore)).
 | `VAULT_VERSION` | `dev` | | This build's version. The container image sets it |
 | `BREACH_CHECK` | `true` | | `false` turns off the breach check in Password health: no SHA-1 prefixes are relayed to Pwned Passwords and the button is hidden ([0019](../decisions/0019-breach-check.md)) |
 | `BREACH_CHECK_URL` | `https://api.pwnedpasswords.com/range/` | | A Pwned Passwords mirror, ending in `/` |
+| `METRICS_TOKEN` | | | Turns on Prometheus metrics at `/api/metrics` for requests with `Authorization: Bearer <token>`. Counts only ([monitoring](monitoring.md)) |
+| `AUDIT_WEBHOOK_URL` | | | Sends every admin audit record and organization event, as JSON, to a SIEM or log pipeline ([monitoring](monitoring.md)) |
+| `AUDIT_WEBHOOK_SECRET` | | | Signs each webhook body: `X-Vault-Signature: sha256=<HMAC-SHA256>` |
 | `UPDATE_CHECK` | `true` | | `false` stops the admin panel checking for a newer release. When on, the server asks the release feed at most every 12 hours, with a generic client name and nothing about this install |
 | `UPDATE_CHECK_URL` | GitHub latest-release API for this project | | Another feed, for a fork or a mirror |
 

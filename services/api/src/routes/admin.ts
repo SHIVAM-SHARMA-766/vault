@@ -643,3 +643,24 @@ export async function previewTemplate(app: App, event: LambdaEvent): Promise<Lam
   const { template: _t, ...msg } = applyTemplate(sample, t, profile.name || 'Vault')
   return json(200, msg)
 }
+
+/** The audit log as a file (B7): `?format=csv` (default) or `json`, newest
+ *  first, with the labels the panel shows. Every export is itself audited. */
+export async function auditExport(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const format = new URLSearchParams(event.rawQueryString ?? '').get('format') === 'json' ? 'json' : 'csv'
+  const labels = new Map((await listRegistry(app)).map((r) => [r.userId, r.label ?? '']))
+  const rows = (await listAudit(app, 100_000)).map((r) => ({
+    at: r.at, actor: r.actor, actorLabel: labels.get(r.actor) ?? '', action: r.action,
+    target: r.target ?? '', targetLabel: r.target ? labels.get(r.target) ?? '' : '', detail: r.detail ?? '',
+  }))
+  const stamp = new Date(app.now()).toISOString().slice(0, 10)
+  if (format === 'json') {
+    return { statusCode: 200, headers: { 'content-type': 'application/json; charset=utf-8', 'content-disposition': `attachment; filename="vault-audit-${stamp}.json"`, 'cache-control': 'no-store' }, body: JSON.stringify({ exportedAt: new Date(app.now()).toISOString(), records: rows }, null, 2) }
+  }
+  // Spreadsheet-safe: quoted, and a leading = + - @ is neutralised so a label
+  // cannot become a formula when the file is opened.
+  const cell = (v: string) => `"${(/^[=+\-@]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`
+  const head = ['at', 'actor', 'actorLabel', 'action', 'target', 'targetLabel', 'detail']
+  const csv = [head.join(','), ...rows.map((r) => head.map((k) => cell(String(r[k as keyof typeof r]))).join(','))].join('\r\n')
+  return { statusCode: 200, headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="vault-audit-${stamp}.csv"`, 'cache-control': 'no-store' }, body: csv }
+}

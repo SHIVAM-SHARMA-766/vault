@@ -199,6 +199,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
       ) : null}
 
       {admin ? <Activity org={org} teams={teams} members={members} /> : null}
+      {admin ? <OrgBackup org={org} teams={teams} /> : null}
 
       <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
 
@@ -504,5 +505,57 @@ function Requests({ org, teams, members }: { org: OrgView; teams: Teams; members
         })}
       </ul>
     </>
+  )
+}
+
+/** An encrypted copy of the organization's items (C6), made in this browser
+ *  from the collections this admin can open. The file is a Vault encrypted
+ *  export: each collection a folder under the organization's name, so it
+ *  opens in Import & export with its password — on this server or another. */
+function OrgBackup({ org, teams }: { org: OrgView; teams: Teams }) {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [busy, setBusy] = useState(false)
+  const colls = teams.collections.filter((c) => c.orgId === org.id)
+  const readable = colls.filter((c) => c.key)
+  const items = teams.shared.filter((e) => e.orgId === org.id)
+  if (!open) return <button className="link small org-backup-link" onClick={() => setOpen(true)}>Back up this organization…</button>
+  return (
+    <form className="confirm org-backup" onSubmit={async (e) => {
+      e.preventDefault()
+      if (pw.length < 12) { toast('Use a password of at least 12 characters.', 'error'); return }
+      if (pw !== pw2) { toast('The two passwords do not match.', 'error'); return }
+      setBusy(true)
+      try {
+        const { encryptedExport, today } = await import('../transfer/transfer.js')
+        const rootId = crypto.randomUUID()
+        const folderOf = new Map(readable.map((c) => [c.id, crypto.randomUUID()]))
+        const folders = [{ id: rootId, name: org.name }, ...readable.map((c) => ({ id: folderOf.get(c.id)!, name: c.name, parentId: rootId }))]
+        const entries = items.map((it) => {
+          const { orgId: _o, collectionId, permission: _p, hidePasswords: _h, exposed: _x, sensitive: _s, ...rest } = it
+          return { ...rest, folderId: folderOf.get(collectionId)! }
+        })
+        const slug = org.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'organization'
+        const { download } = await import('../../lib/download.js')
+        download(`vault-org-${slug}-${today()}.json`, await encryptedExport(entries, folders, pw), 'application/json')
+        toast(`Backed up ${items.length} item${items.length === 1 ? '' : 's'} from ${readable.length} collection${readable.length === 1 ? '' : 's'}`)
+        setOpen(false); setPw(''); setPw2('')
+      } catch (err) { toast(err instanceof Error ? err.message : 'Could not back it up.', 'error') }
+      finally { setBusy(false) }
+    }}>
+      <p><strong>Back up {org.name}</strong> as an encrypted file: {items.length} item{items.length === 1 ? '' : 's'} in {readable.length} collection{readable.length === 1 ? '' : 's'}, each collection a folder.
+        {colls.length > readable.length ? ` ${colls.length - readable.length} collection${colls.length - readable.length === 1 ? '' : 's'} you cannot open ${colls.length - readable.length === 1 ? 'is' : 'are'} left out.` : ''}</p>
+      <p className="muted small">It opens in Import &amp; export with this password, here or on another Vault server. Keep the file and the password apart.</p>
+      <div className="grid-2">
+        <input type="password" autoComplete="new-password" aria-label="Backup password" placeholder="Password (12+ characters)" value={pw} onChange={(e) => setPw(e.target.value)} />
+        <input type="password" autoComplete="new-password" aria-label="Backup password again" placeholder="Again" value={pw2} onChange={(e) => setPw2(e.target.value)} />
+      </div>
+      <div className="confirm-actions">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button>
+        <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>{busy ? <span className="spinner" /> : null}Download backup</button>
+      </div>
+    </form>
   )
 }

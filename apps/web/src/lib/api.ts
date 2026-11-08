@@ -450,6 +450,12 @@ export const api = {
     testMail: (token: string, to: string) => request<{ sent: true }>('POST', '/api/admin/mail/test', { token, body: { to } }),
     deleteInvite: (token: string, id: string) =>
       request<{ ok: true }>('DELETE', `/api/admin/invites/${encodeURIComponent(id)}`, { token }),
+    /** The audit log as a file's text (B7). */
+    auditExport: async (token: string, format: 'csv' | 'json'): Promise<string> => {
+      const res = await fetch(`/api/admin/audit/export?format=${format}`, { headers: { [AUTH_HEADER]: `Bearer ${token}` }, credentials: 'omit', cache: 'no-store' })
+      if (!res.ok) throw new ApiError(res.status, 'export_failed', 'Could not export the audit log.')
+      return res.text()
+    },
     audit: (token: string) => request<{ records: AdminAudit[] }>('GET', '/api/admin/audit', { token }),
     site: (token: string) => request<SiteState>('GET', '/api/admin/site', { token }),
     saveDraft: (token: string, content: SiteContent) =>

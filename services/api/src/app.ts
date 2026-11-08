@@ -21,6 +21,7 @@ import * as prefs from './routes/prefs.js'
 import * as shares from './routes/shares.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
+import { metricsRoute, recordRequest } from './metrics.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -144,6 +145,7 @@ export function buildRouter(app: App): Router {
   router.delete('/api/shares/:id', authed((u, _e, id) => shares.revokeShare(app, u, id)), 'Revoke one of my share links')
   router.post('/api/shares/:id/open', ({ event, param }) => shares.openShare(app, event, param), 'Open a share link (no account needed; counts one view)')
   router.get('/api/breach/range/:prefix', authed((u, _e, prefix) => breachRange(app, u, prefix)), 'Pwned Passwords range for a 5-character SHA-1 prefix, relayed for the breach check')
+  router.get('/api/metrics', ({ event }) => metricsRoute(app, event), 'Prometheus metrics for a scraper holding METRICS_TOKEN (counts only)')
   router.get('/api/notifications', authed((u) => listNotes(app, u)), 'My notifications, newest first')
   router.post('/api/notifications/read', authed((u, e) => readNotes(app, u, e)), 'Mark some or all of my notifications as read')
   router.post('/api/orgs/:org/collections/:coll/request', authedP((u, e, [o, c]) => orgs.requestAccess(app, u, e, o!, c!)), 'Ask for access to a collection')
@@ -196,6 +198,7 @@ export function buildRouter(app: App): Router {
   router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/update', admined('overview.read', (_u, e) => admin.updateRoute(app, e)), 'This version, and whether a newer release is out')
   router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)), 'Staff audit log')
+  router.get('/api/admin/audit/export', admined('audit.read', (_u, e) => admin.auditExport(app, e)), 'Download the audit log as CSV or JSON')
 
   router.get('/api/admin/desk', admined('desk.read', () => desk.queue(app)), 'The service desk queue')
   router.get('/api/admin/desk/:id', admined('desk.read', (_u, _e, id) => desk.getForStaff(app, id)), 'A ticket with every message, internal notes included')
@@ -235,6 +238,7 @@ export async function handleRequest(router: Router, event: LambdaEvent, opts: { 
     res = errorResponse(err, requestId)
   }
   res = { ...res, headers: { ...res.headers, 'x-request-id': requestId } }
+  recordRequest(event.requestContext.http.method, res.statusCode, performance.now() - started)
   if (opts.log) {
     console.log(JSON.stringify({
       level: 'info', requestId, method: event.requestContext.http.method, path: event.rawPath,
