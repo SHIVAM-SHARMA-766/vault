@@ -332,14 +332,14 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ⬜ D2 File attachments · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
-- ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ⬜ D7 Access requests (check-out)
+- ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ✅ D7 Access requests (request with a reason, approve for good or as a 1 h–1 week check-out that ends by itself, decline)
 - ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
-- ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ⬜ D12 Notify on access to a sensitive item
+- ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ✅ D12 Notify on access to a sensitive item (owner and admins notified on open, reveal or copy)
 
 **E. UI/UX**
 - ✅ E0 Screen-by-screen audit (first pass: phone layout bug, registration-aware sign-in, org page order) · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch
 - ✅ E3 Getting-started checklist beside a new vault · ✅ E4 Command palette and shortcuts · ✅ E5 Bulk actions (favorite, move, archive, delete) · ✅ E6 List views (sort, compact rows, synced)
-- ✅ E7 Phone layout pass (390 px screenshots of every main screen; bulk rows, sort menu and touch targets fixed) · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ⬜ E10 Notification centre
+- ✅ E7 Phone layout pass (390 px screenshots of every main screen; bulk rows, sort menu and touch targets fixed) · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ✅ E10 Notification centre (bell, unread count, ten kinds, ids and labels only)
 
 **F. Personal settings**
 - ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults

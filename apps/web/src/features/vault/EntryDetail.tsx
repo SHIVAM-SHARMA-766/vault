@@ -13,7 +13,7 @@ import { ShareLinkDialog } from './ShareLink.js'
 import type { Decrypted, Folder, Version } from './model.js'
 import { day, when } from '../../lib/format.js'
 
-export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
+export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean; sensitive?: boolean; onSensitive?: (v: boolean) => Promise<void> }
 
 export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
@@ -99,6 +99,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
             {path && !shared ? <span className="badge badge-folder">{path}</span> : null}
             {shared ? <span className="badge badge-shared"><IconUsers size={13} />{shared.where}</span> : null}
             {readOnly ? <span className="badge">View only</span> : null}
+            {shared?.sensitive ? <span className="badge badge-sensitive" title="The organization's admins are told when this is opened">Sensitive</span> : null}
           </div>
         </div>
       </header>
@@ -150,6 +151,10 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
       {shared && !readOnly ? (
         <p className="muted small shared-note">Shared in {shared.where}. <button className="link" onClick={onUnshare}>Move to my vault</button></p>
       ) : null}
+      {shared?.onSensitive ? (
+        <label className="check sensitive-toggle"><input type="checkbox" checked={!!shared.sensitive} onChange={(e) => void shared.onSensitive!(e.target.checked)} />
+          <span>Tell the admins whenever someone opens this</span></label>
+      ) : shared?.sensitive ? <p className="muted small">Sensitive: the organization&apos;s admins are told when it is opened, revealed or copied.</p> : null}
 
       {linking && vaultKey ? <ShareLinkDialog entry={entry} vaultKey={vaultKey} maxDays={linkMaxDays} onClose={() => setLinking(false)} /> : null}
 

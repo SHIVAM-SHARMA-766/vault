@@ -15,6 +15,7 @@ import { AlreadyExists } from '../store.js'
 import { requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
 import { getSettings } from '../system.js'
+import { addNote } from '../inbox.js'
 
 export const SHARE_EXPIRY_CHOICES = [3600, 86_400, 7 * 86_400, 30 * 86_400] as const
 export const SHARE_VIEW_CHOICES = [1, 2, 5, 10, null] as const
@@ -89,6 +90,7 @@ export async function openShare(app: App, event: LambdaEvent, id: string): Promi
     await app.store.delete(sharePk(id), SHARE_META_SK)
   }
   await recordActivity(app, String(meta['ownerId']), 'share-open', event)
+  await addNote(app, String(meta['ownerId']), 'share-opened', { shareId: id, ip: event.requestContext.http.sourceIp, viewsLeft: maxViews === null ? null : maxViews - views })
   return json(200, {
     blob: meta['blob'],
     expiresAt: new Date(Number(meta['expiresAt']) * 1000).toISOString(),

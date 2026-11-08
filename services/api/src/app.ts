@@ -20,6 +20,7 @@ import * as orgs from './routes/orgs.js'
 import * as prefs from './routes/prefs.js'
 import * as shares from './routes/shares.js'
 import { breachRange } from './breach.js'
+import { listNotes, readNotes } from './inbox.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -143,6 +144,12 @@ export function buildRouter(app: App): Router {
   router.delete('/api/shares/:id', authed((u, _e, id) => shares.revokeShare(app, u, id)), 'Revoke one of my share links')
   router.post('/api/shares/:id/open', ({ event, param }) => shares.openShare(app, event, param), 'Open a share link (no account needed; counts one view)')
   router.get('/api/breach/range/:prefix', authed((u, _e, prefix) => breachRange(app, u, prefix)), 'Pwned Passwords range for a 5-character SHA-1 prefix, relayed for the breach check')
+  router.get('/api/notifications', authed((u) => listNotes(app, u)), 'My notifications, newest first')
+  router.post('/api/notifications/read', authed((u, e) => readNotes(app, u, e)), 'Mark some or all of my notifications as read')
+  router.post('/api/orgs/:org/collections/:coll/request', authedP((u, e, [o, c]) => orgs.requestAccess(app, u, e, o!, c!)), 'Ask for access to a collection')
+  router.get('/api/orgs/:org/requests', authedP((u, _e, [o]) => orgs.listRequests(app, u, o!)), 'Access requests waiting (owner and admins)')
+  router.delete('/api/orgs/:org/collections/:coll/request/:user', authedP((u, _e, [o, c, t]) => orgs.denyRequest(app, u, o!, c!, t!)), 'Turn down an access request')
+  router.put('/api/orgs/:org/collections/:coll/items/:item/sensitive', authedP((u, e, [o, c, i]) => orgs.setSensitive(app, u, e, o!, c!, i!)), 'Mark an item sensitive: admins are told when it is opened')
   router.get('/api/prefs', authed((u) => prefs.getPrefs(app, u)), 'My sealed preferences')
   router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
   router.get('/api/backups', authed((u) => backups.getBackups(app, u)), 'My backup schedule, destination, runs and copies')

@@ -264,6 +264,15 @@ replaced. Duplicates are skipped if you leave that option on.
 For S3 or WebDAV, the server keeps the secret key or password encrypted so it can back up while
 you are away. Create one that can write only to that bucket or folder.
 
+## Notifications
+
+The **bell** at the top shows what happened while you were away: a share link opened, an
+invitation, someone accepting yours (confirm them), an access request or its answer, a
+check-out ending, a sensitive item opened, a scheduled backup that failed, an emergency access
+request. Choose one to go where it matters, or **Mark all read**. Notifications are kept as long
+as account activity (90 days unless your administrator changes it). They name people by the
+label your organization gave them, never an item's name, which the server cannot read.
+
 ## Devices and activity
 
 <img src="images/devices.png" alt="Signed-in devices with this device marked, and the security activity list" width="820">
@@ -334,6 +343,16 @@ mark goes.
 **Groups** — "Parents", "Engineering" — let you give a whole team access to a collection at
 once: create a group, add confirmed members, then in a collection's **Access** choose **Give
 access to a group**. People added to the group later get the group's collections.
+
+**Asking for a collection.** Members see every collection's name, including ones they cannot
+open, with **Request access** (and an optional reason). The owner and admins are notified and
+find the request under **Access requests** on the organization. **Approve** gives access for
+good or as a **check-out** (1 hour to 1 week), which ends by itself: the collection is then
+marked for a key rotation and the person is told. **Decline** tells them too.
+
+**Sensitive items.** Someone who manages a collection can tick **Tell the admins whenever
+someone opens this** on an item. Each time a member opens, reveals or copies it, the owner and
+admins get a notification. Like the activity log, this relies on each person's app reporting it.
 
 **Policies…** (admins) can require two-factor sign-in, a minimum master password strength and a
 shorter idle lock. They apply to everyone in the organization, you included; anyone who does

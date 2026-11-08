@@ -122,3 +122,10 @@ export const SHARE_META_SK = 'META'
 export const SHARE_VIEWS_SK = 'VIEWS'
 export const userShareSk = (shareId: string) => `SHARE#${shareId}`
 export const USER_SHARE_PREFIX = 'SHARE#'
+
+// ── Notification centre (E10) ─────────────────────────────────────────────
+export const noteSk = (at: string, nonce: string) => `NOTE#${at}#${nonce}`
+export const NOTE_PREFIX = 'NOTE#'
+/** A member asking for access to a collection (D7). */
+export const requestSk = (collectionId: string, userId: string) => `REQ#${collectionId}#${userId}`
+export const REQUEST_PREFIX = 'REQ#'

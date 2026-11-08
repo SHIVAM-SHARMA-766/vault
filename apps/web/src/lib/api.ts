@@ -331,12 +331,17 @@ export const api = {
       request<{ keyVersion: number }>('POST', `/api/orgs/${org}/collections/${coll}/rotate`, { token, body }),
     access: (token: string, org: string, coll: string) =>
       request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),
-    grant: (token: string, org: string, coll: string, user: string, body: { permission: SharePermission; hidePasswords: boolean; keyBlob?: string; viaGroup?: string }) =>
+    grant: (token: string, org: string, coll: string, user: string, body: { permission: SharePermission; hidePasswords: boolean; keyBlob?: string; viaGroup?: string; hours?: number }) =>
       request<{ ok: true }>('PUT', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token, body }),
     revoke: (token: string, org: string, coll: string, user: string) =>
       request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token }),
     items: (token: string, org: string, coll: string) =>
-      request<{ items: { id: string; blob: string; keyVersion: number; updatedAt: string }[] }>('GET', `/api/orgs/${org}/collections/${coll}/items`, { token }),
+      request<{ items: { id: string; blob: string; keyVersion: number; updatedAt: string; sensitive?: boolean }[] }>('GET', `/api/orgs/${org}/collections/${coll}/items`, { token }),
+    setSensitive: (token: string, org: string, coll: string, item: string, sensitive: boolean) =>
+      request<{ sensitive: boolean }>('PUT', `/api/orgs/${org}/collections/${coll}/items/${item}/sensitive`, { token, body: { sensitive } }),
+    requestAccess: (token: string, org: string, coll: string, reason: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/collections/${coll}/request`, { token, body: { reason } }),
+    requests: (token: string, org: string) => request<{ requests: { collectionId: string; userId: string; label: string; reason: string; at: string }[] }>('GET', `/api/orgs/${org}/requests`, { token }),
+    denyRequest: (token: string, org: string, coll: string, user: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/request/${user}`, { token }),
     putItem: (token: string, org: string, coll: string, item: string, blob: string, keyVersion: number, passwordChanged = false) =>
       request<{ id: string }>('PUT', `/api/orgs/${org}/collections/${coll}/items/${item}`, { token, body: { blob, keyVersion, ...(passwordChanged ? { passwordChanged } : {}) } }),
     deleteItem: (token: string, org: string, coll: string, item: string) =>
@@ -361,6 +366,8 @@ export const api = {
   },
   alerts: (token: string) => request<{ signIn: boolean; available: boolean }>('GET', '/api/account/alerts', { token }),
   setAlerts: (token: string, signIn: boolean) => request<{ signIn: boolean }>('PUT', '/api/account/alerts', { token, body: { signIn } }),
+  notifications: (token: string) => request<{ notes: Note[]; unread: number }>('GET', '/api/notifications', { token }),
+  readNotifications: (token: string, ids: string[] | 'all') => request<{ notes: Note[]; unread: number }>('POST', '/api/notifications/read', { token, body: ids === 'all' ? { all: true } : { ids } }),
   breachRange: (token: string, prefix: string) => request<{ range: string }>('GET', `/api/breach/range/${prefix}`, { token }),
   prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),
   putPrefs: (token: string, blob: string) => request<{ updatedAt: string }>('PUT', '/api/prefs', { token, body: { blob } }),
@@ -477,8 +484,12 @@ export interface OrgPending { id: string; label: string; role: OrgRole; invitedA
 export interface GroupRow { id: string; nameBlob: string; members: string[]; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean }[] }
 export interface CollectionRow {
   id: string; nameBlob: string; keyVersion: number; rotationNeeded: boolean
-  access: { keyBlob: string; keyVersion: number; permission: SharePermission; hidePasswords: boolean } | null
+  access: { keyBlob: string; keyVersion: number; permission: SharePermission; hidePasswords: boolean; until?: string } | null
+  requested?: boolean
 }
+
+export type NoteKind = 'share-opened' | 'access-request' | 'access-granted' | 'access-denied' | 'access-ended' | 'sensitive-opened' | 'org-invite' | 'member-accepted' | 'backup-failed' | 'emergency-request'
+export interface Note { id: string; kind: NoteKind; at: string; read: boolean; data: Record<string, string | number | boolean | null> }
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
 export interface Ticket {
   id: string; number: number; kind: 'access' | 'signin' | 'support'; subject: string; category: string

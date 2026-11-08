@@ -1014,3 +1014,17 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .wizard-status li.is-warn { border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
 .share-person { margin-bottom: 10px; }
 .share-person input { flex: 1; min-width: 0; }
+
+/* Notification centre (E10) */
+.bell { position: relative; }
+.bell-count { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center; }
+.notes-pop { width: min(380px, calc(100vw - 24px)); right: 0; padding: 0; }
+.notes-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.notes-list { list-style: none; margin: 0; padding: 4px; max-height: 60vh; overflow-y: auto; }
+.note { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 9px 10px; border: 0; background: none; border-radius: 8px; text-align: left; cursor: pointer; font-size: 13.5px; color: var(--text); }
+.note:hover { background: var(--surface-2); }
+.note.is-unread { background: var(--accent-soft); }
+.note.is-unread > span:first-child { font-weight: 600; }
+.notes-empty { padding: 12px 14px; }
+.badge-sensitive { background: var(--warn-soft); color: var(--warn); }
+.sensitive-toggle { margin: 4px 0 10px; }

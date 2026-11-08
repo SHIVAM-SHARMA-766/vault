@@ -202,6 +202,8 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
 
       <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
 
+      {admin ? <Requests org={org} teams={teams} members={members} /> : null}
+
       <h3 className="small-head">Collections</h3>
       {colls.length === 0 ? <p className="muted small">No collections yet.</p> : (
         <ul className="device-list">
@@ -239,7 +241,17 @@ function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams
         <span className="device-name"><IconFolder size={15} /> {c.name}
           {c.rotationNeeded ? <span className="pill pill-danger" title="Someone lost access; their copy of the key should be retired">Key rotation due</span> : null}
         </span>
-        <span className="muted small">{c.permission ? PERMISSION_LABEL[c.permission] : 'You have no access'}{c.hidePasswords ? ' · passwords hidden' : ''}</span>
+        <span className="muted small">{c.permission ? PERMISSION_LABEL[c.permission] : 'You have no access'}{c.hidePasswords ? ' · passwords hidden' : ''}{c.until ? ` · until ${when(c.until)}` : ''}</span>
+        {!c.permission ? (
+          c.requested ? <span className="pill">Access requested</span> : (
+            <button className="btn btn-secondary btn-sm" onClick={async () => {
+              const reason = window.prompt(`Why do you need ${c.name}? (optional, the admins see this)`) ?? null
+              if (reason === null) return
+              try { await api.orgs.requestAccess(await session.token(), c.orgId, c.id, reason); toast('Asked. The admins have been told.'); await teams.load() }
+              catch (err) { toast(err instanceof Error ? err.message : 'Could not ask.', 'error') }
+            }}>Request access</button>
+          )
+        ) : null}
         {open ? (
           <div className="access-panel">
             <ul className="access-list">
@@ -437,5 +449,60 @@ function Activity({ org, teams, members }: { org: OrgView; teams: Teams; members
         </div>
       ) : null}
     </div>
+  )
+}
+
+const DURATIONS: [number | 0, string][] = [[0, 'For good'], [1, 'For 1 hour'], [8, 'For 8 hours'], [24, 'For 1 day'], [72, 'For 3 days'], [168, 'For 1 week']]
+
+/** Access requests waiting on this organization's admins (D7). Approving
+ *  seals the collection key to them here, for good or as a check-out. */
+function Requests({ org, teams, members }: { org: OrgView; teams: Teams; members: OrgMember[] }) {
+  const toast = useToast()
+  const [list, setList] = useState<{ collectionId: string; userId: string; label: string; reason: string; at: string }[]>([])
+  const [choice, setChoice] = useState<Record<string, { perm: SharePermission; hours: number }>>({})
+  const load = async () => { try { setList((await api.orgs.requests(await session.token(), org.id)).requests) } catch { setList([]) } }
+  useEffect(() => { void load() }, [org.id, teams.collections.length])
+  if (!list.length) return null
+  return (
+    <>
+      <h3 className="small-head">Access requests</h3>
+      <ul className="device-list requests">
+        {list.map((r) => {
+          const key = `${r.collectionId}/${r.userId}`
+          const c = teams.collections.find((x) => x.id === r.collectionId)
+          const m = members.find((x) => x.userId === r.userId)
+          const pick = choice[key] ?? { perm: 'view' as SharePermission, hours: 8 }
+          const canGrant = c?.permission === 'manage' && m
+          return (
+            <li key={key} className="device-row">
+              <div className="device-text">
+                <span className="device-name">{r.label} → {c?.name ?? 'a collection'}</span>
+                <span className="muted small">{r.reason ? `“${r.reason}” · ` : ''}asked {when(r.at)}</span>
+              </div>
+              <div className="device-actions">
+                {canGrant ? (
+                  <>
+                    <select aria-label={`Permission for ${r.label}`} className="select-sm" value={pick.perm} onChange={(e) => setChoice({ ...choice, [key]: { ...pick, perm: e.target.value as SharePermission } })}>
+                      <option value="view">Can view</option><option value="edit">Can edit</option>
+                    </select>
+                    <select aria-label={`How long for ${r.label}`} className="select-sm" value={pick.hours} onChange={(e) => setChoice({ ...choice, [key]: { ...pick, hours: Number(e.target.value) } })}>
+                      {DURATIONS.map(([h, l]) => <option key={h} value={h}>{l}</option>)}
+                    </select>
+                    <button className="btn btn-primary btn-sm" onClick={async () => {
+                      try { await teams.grant(r.collectionId, m!.userId, m!.publicKey, pick.perm, false, undefined, pick.hours || undefined); toast(`${r.label} can open ${c!.name}${pick.hours ? ` for ${DURATIONS.find(([h]) => h === pick.hours)![1].replace('For ', '')}` : ''}`); await load(); await teams.load() }
+                      catch (err) { toast(err instanceof Error ? err.message : 'Could not approve.', 'error') }
+                    }}>Approve</button>
+                  </>
+                ) : <span className="muted small">Needs someone who manages it</span>}
+                <button className="btn btn-ghost btn-sm" onClick={async () => {
+                  try { await api.orgs.denyRequest(await session.token(), org.id, r.collectionId, r.userId); toast('Turned down'); await load() }
+                  catch (err) { toast(err instanceof Error ? err.message : 'Could not decline.', 'error') }
+                }}>Decline</button>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </>
   )
 }
