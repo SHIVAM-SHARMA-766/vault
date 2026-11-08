@@ -24,6 +24,7 @@ import { ShareLinks } from './ShareLinks.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 import { day } from '../../lib/format.js'
+import { t } from '../../lib/i18n.js'
 
 const MIN_LENGTH = 12
 
@@ -62,7 +63,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
         <nav className="sidebar" aria-label="Settings sections">
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} className={`side-item ${tab === id ? 'side-active' : ''}`} onClick={() => go(id)} aria-current={tab === id ? 'page' : undefined}>
-              <Icon size={16} /><span>{label}</span>
+              <Icon size={16} /><span>{t(label)}</span>
             </button>
           ))}
           <div className="sidebar-foot">
@@ -72,13 +73,13 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
 
         <div className="filter-chips admin-chips">
           {TABS.map(({ id, label }) => (
-            <button key={id} className={`chip ${tab === id ? 'chip-active' : ''}`} onClick={() => go(id)}>{label}</button>
+            <button key={id} className={`chip ${tab === id ? 'chip-active' : ''}`} onClick={() => go(id)}>{t(label)}</button>
           ))}
         </div>
 
         <main className="settings">
           <div className="settings-head">
-            <h1>{info.label}</h1>
+            <h1>{t(info.label)}</h1>
             <p className="muted">{info.intro}</p>
           </div>
 

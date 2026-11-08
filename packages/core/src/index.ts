@@ -45,6 +45,8 @@ export { EXPIRING_DAYS, ISSUES, PASSWORD_ISSUES, breachCount, expiryOf, type Hea
 export {
   CLIPBOARD_CHOICES,
   AUTO_HIDE_CHOICES,
+  LANGUAGES,
+  type Language,
   CLOCKS,
   DATE_STYLES,
   MASK_LENGTHS,

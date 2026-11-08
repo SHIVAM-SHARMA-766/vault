@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { openFolder } from '@vault/crypto'
 import {
-  AUTO_HIDE_CHOICES, CLIPBOARD_CHOICES, type Clock, type DateStyle, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
+  AUTO_HIDE_CHOICES, CLIPBOARD_CHOICES, type Language, type Clock, type DateStyle, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
   describeMinutes, describeSeconds, flattenTree, folderTree, formatWhen, passphraseBits,
 } from '@vault/core'
 
@@ -16,8 +16,9 @@ import type { Folder } from '../vault/model.js'
 
 import * as prefs from '../../lib/prefs.js'
 import * as session from '../../lib/session.js'
-import { IconClock, IconCopy, IconEye, IconFolder, IconInbox, IconKey, IconSun } from '../../ui/icons.js'
+import { IconClock, IconCopy, IconEye, IconGlobe, IconFolder, IconInbox, IconKey, IconSun } from '../../ui/icons.js'
 import { Check, useToast } from '../../ui/kit.js'
+import { LOCALE_NAMES, t } from '../../lib/i18n.js'
 
 const THEME_LABELS: Record<Theme, string> = { system: 'Match system', light: 'Light', dark: 'Dark' }
 
@@ -31,7 +32,7 @@ export function Preferences({ state }: { state: session.Unlocked }) {
     setSaving(true)
     try {
       await prefs.save(state.vaultKey, next)
-      toast('Preferences saved')
+      toast(t('Preferences saved'))
     } catch {
       toast('Applied for now, but not saved — the server could not be reached', 'error')
     } finally {
@@ -42,7 +43,7 @@ export function Preferences({ state }: { state: session.Unlocked }) {
   return (
     <>
       <section className="settings-card" aria-labelledby="p-theme">
-        <div className="settings-card-head"><IconSun size={18} /><h2 id="p-theme">Appearance</h2></div>
+        <div className="settings-card-head"><IconSun size={18} /><h2 id="p-theme">{t('Appearance')}</h2></div>
         <p className="muted small">Light, dark, or whatever your device is set to.</p>
         <div className="segmented" role="radiogroup" aria-labelledby="p-theme">
           {(Object.keys(THEME_LABELS) as Theme[]).map((t) => (
@@ -55,7 +56,7 @@ export function Preferences({ state }: { state: session.Unlocked }) {
       </section>
 
       <section className="settings-card" aria-labelledby="p-lock">
-        <div className="settings-card-head"><IconClock size={18} /><h2 id="p-lock">Auto-lock</h2></div>
+        <div className="settings-card-head"><IconClock size={18} /><h2 id="p-lock">{t('Auto-lock')}</h2></div>
         <p className="muted small">
           After this long without a click or key press, the vault locks and forgets its keys. Closing or reloading
           the tab always locks it.
@@ -76,7 +77,7 @@ export function Preferences({ state }: { state: session.Unlocked }) {
       </section>
 
       <section className="settings-card" aria-labelledby="p-clip">
-        <div className="settings-card-head"><IconCopy size={18} /><h2 id="p-clip">Clipboard</h2></div>
+        <div className="settings-card-head"><IconCopy size={18} /><h2 id="p-clip">{t('Clipboard')}</h2></div>
         <p className="muted small">
           A copied password is cleared from the clipboard after this long, if it is still there and this tab is
           in front.
@@ -87,6 +88,18 @@ export function Preferences({ state }: { state: session.Unlocked }) {
                   onChange={(e) => void change({ clipboardSeconds: Number(e.target.value) })}>
             {CLIPBOARD_CHOICES.map((s) => <option key={s} value={s}>{s === 0 ? 'Never clear' : describeSeconds(s)}</option>)}
           </select>
+        </div>
+      </section>
+
+      <section className="settings-card" aria-labelledby="p-language">
+        <div className="settings-card-head"><IconGlobe size={18} /><h2 id="p-language">{t('Language')}</h2></div>
+        <div className="field">
+          <label htmlFor="p-lang">{t('Language')}</label>
+          <select id="p-lang" value={p.language} disabled={saving} onChange={(e) => void change({ language: e.target.value as Language })}>
+            <option value="system">{t('As my browser does')}</option>
+            {(['en', 'hi', 'es'] as const).map((l) => <option key={l} value={l}>{LOCALE_NAMES[l]}</option>)}
+          </select>
+          <p className="hint">Hindi and Spanish cover the main screens so far; anything not yet translated shows in English.</p>
         </div>
       </section>
 
@@ -113,7 +126,7 @@ export function Preferences({ state }: { state: session.Unlocked }) {
       <DefaultFolder state={state} p={p} saving={saving} change={change} />
 
       <section className="settings-card" aria-labelledby="p-dates">
-        <div className="settings-card-head"><IconClock size={18} /><h2 id="p-dates">Dates and times</h2></div>
+        <div className="settings-card-head"><IconClock size={18} /><h2 id="p-dates">{t('Dates and times')}</h2></div>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="p-date">Dates</label>

@@ -13,11 +13,13 @@ import { sealJson, unsealJson, utf8Encode } from '@vault/crypto'
 
 import { api } from './api.js'
 import * as session from './session.js'
+import { setLanguage } from './i18n.js'
 
 const AAD = utf8Encode('vault.prefs.v1')
 const THEME_KEY = 'vault.theme'
 
 let current: Prefs = DEFAULT_PREFS
+let generation = 0
 const listeners = new Set<(p: Prefs) => void>()
 
 export const get = (): Prefs => current
@@ -47,6 +49,9 @@ export function applyStoredTheme(): void {
     document.documentElement.dataset['theme'] = stored
     current = { ...current, theme: stored }
   }
+  let lang: string | null = null
+  try { lang = localStorage.getItem('vault.lang') } catch { /* storage blocked */ }
+  if (lang === 'en' || lang === 'hi' || lang === 'es') current = { ...current, language: lang }
 }
 
 function apply(p: Prefs): void {
@@ -54,15 +59,19 @@ function apply(p: Prefs): void {
   applyTheme(p.theme)
   session.setUserIdle(p.lockMinutes)
   session.setLockOnHide(p.lockOnHide)
+  setLanguage(p.language)
   for (const l of listeners) l(p)
 }
 
 /** Reads the sealed preferences after an unlock. A missing or unreadable blob
  *  means the defaults, never a failed unlock. */
 export async function load(vaultKey: Uint8Array): Promise<void> {
+  // A change saved while this was loading is newer than what loads; keep it.
+  const at = generation
   try {
     const { blob } = await api.prefs(await session.token())
-    apply(blob ? normalizePrefs(await unsealJson(vaultKey, blob, AAD)) : { ...DEFAULT_PREFS, theme: current.theme })
+    if (generation !== at) return
+    apply(blob ? normalizePrefs(await unsealJson(vaultKey, blob, AAD)) : { ...DEFAULT_PREFS, theme: current.theme, language: current.language })
   } catch {
     apply(current)
   }
@@ -70,6 +79,7 @@ export async function load(vaultKey: Uint8Array): Promise<void> {
 
 /** Changes some preferences, applies them at once, and saves them sealed. */
 export async function save(vaultKey: Uint8Array, change: Partial<Prefs>): Promise<void> {
+  generation++
   const next = normalizePrefs({ ...current, ...change })
   apply(next)
   await api.putPrefs(await session.token(), await sealJson(vaultKey, next, AAD))
@@ -78,5 +88,5 @@ export async function save(vaultKey: Uint8Array, change: Partial<Prefs>): Promis
 /** On lock, the session-bound preferences return to their defaults; the theme
  *  stays, so the sign-in screen does not flash. */
 export function reset(): void {
-  apply({ ...DEFAULT_PREFS, theme: current.theme })
+  apply({ ...DEFAULT_PREFS, theme: current.theme, language: current.language })
 }

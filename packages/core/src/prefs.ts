@@ -33,6 +33,9 @@ export type DateStyle = 'system' | 'dmy' | 'mdy' | 'ymd'
 export const DATE_STYLES: readonly DateStyle[] = ['system', 'dmy', 'mdy', 'ymd']
 export type Clock = 'system' | '12h' | '24h'
 export const CLOCKS: readonly Clock[] = ['system', '12h', '24h']
+/** The app's language (E9); 'system' follows the browser. */
+export type Language = 'system' | 'en' | 'hi' | 'es'
+export const LANGUAGES: readonly Language[] = ['system', 'en', 'hi', 'es']
 
 export interface GeneratorPrefs {
   mode: 'password' | 'passphrase'
@@ -62,6 +65,7 @@ export interface Prefs {
   defaultFolderId: string
   dateStyle: DateStyle
   clock: Clock
+  language: Language
 }
 
 export const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -76,6 +80,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   defaultFolderId: '',
   dateStyle: 'system',
   clock: 'system',
+  language: 'system',
   generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
@@ -102,6 +107,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     defaultFolderId: typeof r['defaultFolderId'] === 'string' && /^[A-Za-z0-9-]{0,64}$/.test(r['defaultFolderId']) ? r['defaultFolderId'] : d.defaultFolderId,
     dateStyle: pick(r['dateStyle'], DATE_STYLES, d.dateStyle),
     clock: pick(r['clock'], CLOCKS, d.clock),
+    language: pick(r['language'], LANGUAGES, d.language),
     generator: {
       mode: pick(g['mode'], ['password', 'passphrase'] as const, d.generator.mode),
       length,

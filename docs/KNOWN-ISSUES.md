@@ -221,3 +221,11 @@ Files can be attached to items in your own vault. An item with attachments canno
 collection or shared with a person until they are removed. Exports and share links leave
 attachments out; personal backups carry them. ([0020](../decisions/0020-attachments-and-offline-copy.md))
 </details>
+
+<details>
+<summary>🟡 <b>Translations cover the main screens only</b></summary>
+
+Hindi and Spanish are available for sign-in, the vault, items, the sidebar and settings
+navigation. Other screens (the admin panel, organizations, imports, most help text) still show
+in English until their strings are translated.
+</details>

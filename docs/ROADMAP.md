@@ -323,23 +323,23 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **B. An organization on its own server**
 - ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column), groups chosen at invite, send again · ✅ B3 Branding (accent colour, logo)
 - ✅ B4 Member onboarding (fingerprint guidance while waiting, a welcome once confirmed) · ✅ B5 Helm chart and reverse-proxy guides (`deploy/helm/vault`, docs/kubernetes.md, docs/reverse-proxy.md) · ✅ B6 Metrics endpoint and dashboard (`/api/metrics` behind a token, Grafana dashboard and alerts)
-- ✅ B7 Audit export and SIEM stream (CSV/JSON download, signed webhook) · ⬜ B8 SSO (OIDC) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
+- ✅ B7 Audit export and SIEM stream (CSV/JSON download, signed webhook) · ⬜ B8 SSO (OIDC), proposed in [0021](../decisions/0021-sso.md) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
 
 **C. Backups, per user (like Zoho)**
 - ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)
-- ⬜ C3 Google Drive / OneDrive · ✅ C4 Encrypted offline copy that opens without the server (one HTML file, no network)
+- ⬜ C3 Google Drive / OneDrive, proposed in [0024](../decisions/0024-cloud-drive-backups.md) (WebDAV bridges work today) · ✅ C4 Encrypted offline copy that opens without the server (one HTML file, no network)
 - ✅ C5 Backup history, test restore, and restore through Import & export · ✅ C6 Organization backups (encrypted export of an organization's collections, made in the admin's browser) · ✅ C7 Server backup settings in the admin UI (shown, with Back up now; values stay on the host)
 
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ✅ D2 File attachments (key per file inside the sealed entry; personal items; in backups; [0020](../decisions/0020-attachments-and-offline-copy.md)) · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
 - ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ✅ D7 Access requests (request with a reason, approve for good or as a 1 h–1 week check-out that ends by itself, decline)
-- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
+- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys, proposed in [0022](../decisions/0022-passkeys.md) · ⬜ D10 The crypto decisions above, proposed in [0023](../decisions/0023-crypto-hardening.md)
 - ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ✅ D12 Notify on access to a sensitive item (owner and admins notified on open, reveal or copy)
 
 **E. UI/UX**
 - ✅ E0 Screen-by-screen audit (first pass: phone layout bug, registration-aware sign-in, org page order) · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch
 - ✅ E3 Getting-started checklist beside a new vault · ✅ E4 Command palette and shortcuts · ✅ E5 Bulk actions (favorite, move, archive, delete) · ✅ E6 List views (sort, compact rows, synced)
-- ✅ E7 Phone layout pass (390 px screenshots of every main screen; bulk rows, sort menu and touch targets fixed) · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ✅ E10 Notification centre (bell, unread count, ten kinds, ids and labels only)
+- ✅ E7 Phone layout pass (390 px screenshots of every main screen; bulk rows, sort menu and touch targets fixed) · ✅ E8 Plain-language errors with a next step · ✅ E9 Languages, started (Hindi and Spanish for the main screens, English fallback, a language preference; more coverage to come) · ✅ E10 Notification centre (bell, unread count, ten kinds, ids and labels only)
 
 **F. Personal settings**
 - ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults

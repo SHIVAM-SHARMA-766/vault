@@ -12,6 +12,7 @@ import { FieldInput } from './fields.js'
 import { ATTACHMENT_MAX_BYTES, deleteAttachments, describeSize, uploadAttachment } from '../../lib/attachments.js'
 import { IconUpload } from '../../ui/icons.js'
 import type { Folder } from './model.js'
+import { t } from '../../lib/i18n.js'
 
 export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false }: {
   initial: EntryContent
@@ -63,17 +64,17 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
       <div className="editor-body">
         <div className="grid-2">
           <div className="field">
-            <label htmlFor="f-type">Type</label>
+            <label htmlFor="f-type">{t('Type')}</label>
             <select id="f-type" value={draft.type} onChange={(e) => set('type', e.target.value as EntryType)}>
               {typesByGroup().map(({ group, types }) => (
                 <optgroup key={group} label={group}>
-                  {types.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+                  {types.map((ty) => <option key={ty.type} value={ty.type}>{t(ty.label)}</option>)}
                 </optgroup>
               ))}
             </select>
           </div>
           <div className="field">
-            <label htmlFor="f-name">Name</label>
+            <label htmlFor="f-name">{t('Name')}</label>
             <input id="f-name" required autoFocus placeholder={spec.type === 'card' ? 'e.g. HDFC Millennia' : 'e.g. GitHub'}
                    value={draft.name} onChange={(e) => set('name', e.target.value)} />
           </div>
@@ -105,7 +106,7 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
         ) : null}
 
         <div className="field">
-          <label htmlFor="f-notes">Notes</label>
+          <label htmlFor="f-notes">{t('Notes')}</label>
           <textarea id="f-notes" rows={spec.type === 'note' ? 10 : 3} value={draft.notes ?? ''}
                     onChange={(e) => set('notes', e.target.value)} />
         </div>
@@ -132,13 +133,13 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
           ))}
           <button type="button" className="btn btn-secondary btn-sm"
                   onClick={() => set('customFields', [...draft.customFields, { label: '', value: '', hidden: false }])}>
-            <IconPlus size={15} />Add field
+            <IconPlus size={15} />{t('Add field')}
           </button>
         </div>
 
         {!shared ? (
           <div className="field attachments">
-            <span className="field-label">Attachments</span>
+            <span className="field-label">{t('Attachments')}</span>
             {(draft.attachments ?? []).length ? (
               <ul className="attachment-list">
                 {(draft.attachments ?? []).map((a) => (
@@ -172,17 +173,17 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
         ) : null}
 
         <div className="grid-2">
-          {shared ? <div className="field"><label>Folder</label><p className="muted small">Shared items live in their collection.</p></div> : <div className="field">
-            <label htmlFor="f-folder">Folder</label>
+          {shared ? <div className="field"><label>{t('Folder')}</label><p className="muted small">Shared items live in their collection.</p></div> : <div className="field">
+            <label htmlFor="f-folder">{t('Folder')}</label>
             <select id="f-folder" value={draft.folderId ?? ''} onChange={(e) => set('folderId', e.target.value || undefined)}>
-              <option value="">No folder</option>
+              <option value="">{t('No folder')}</option>
               {folderOptions.map((n) => (
                 <option key={n.folder.id} value={n.folder.id}>{'  '.repeat(n.depth)}{n.folder.name}</option>
               ))}
             </select>
           </div>}
           <div className="field">
-            <label htmlFor="f-tags">Tags</label>
+            <label htmlFor="f-tags">{t('Tags')}</label>
             <input id="f-tags" placeholder="work, personal" value={tagText} onChange={(e) => setTagText(e.target.value)} />
           </div>
         </div>
@@ -190,7 +191,7 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
       </div>
 
       <div className="editor-foot">
-        <button type="button" className="btn btn-secondary" onClick={cancel}>Cancel</button>
+        <button type="button" className="btn btn-secondary" onClick={cancel}>{t('Cancel')}</button>
         <button type="submit" className="btn btn-primary" disabled={!draft.name.trim() || saving}>
           {saving ? <><span className="spinner" />Encrypting…</> : 'Save'}
         </button>

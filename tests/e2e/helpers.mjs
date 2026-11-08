@@ -41,9 +41,9 @@ export async function start({ owner = 'owner@example.test' } = {}) {
   let people = 0
 
   /** A fresh, isolated browser profile — one per person in a test. */
-  async function person({ width = 1440, height = 900, scheme = 'light', bypassCSP = false, wizard = false } = {}) {
+  async function person({ width = 1440, height = 900, scheme = 'light', bypassCSP = false, wizard = false, locale = 'en-US' } = {}) {
     // A distinct client address per person, as real people would have.
-    const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, bypassCSP, extraHTTPHeaders: { 'x-forwarded-for': `10.0.${people >> 8}.${++people & 255}` } })
+    const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, bypassCSP, locale, extraHTTPHeaders: { 'x-forwarded-for': `10.0.${people >> 8}.${++people & 255}` } })
     // The first-run setup wizard opens for a new server's owner; tests about
     // other things start with it already seen (wizard: true to test it).
     if (!wizard) await context.addInitScript(() => { try { localStorage.setItem('vault.setup-wizard.done', '1') } catch { /* no storage */ } })
