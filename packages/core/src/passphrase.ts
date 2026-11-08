@@ -16,7 +16,7 @@ export const PASSPHRASE_MAX_WORDS = 12
 export const BITS_PER_WORD = Math.log2(7776)
 
 /** A uniform integer in [0, n), rejecting the biased tail. */
-function uniform(n: number, random: (bytes: Uint8Array) => Uint8Array): number {
+function uniform(n: number, random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array): number {
   const limit = Math.floor(0x1_0000_0000 / n) * n
   const buf = new Uint8Array(4)
   for (;;) {
@@ -29,7 +29,7 @@ function uniform(n: number, random: (bytes: Uint8Array) => Uint8Array): number {
 export function generatePassphrase(
   list: readonly string[],
   opts: PassphraseOptions,
-  random: (bytes: Uint8Array) => Uint8Array = (b) => globalThis.crypto.getRandomValues(b),
+  random: (bytes: Uint8Array<ArrayBuffer>) => Uint8Array = (b) => globalThis.crypto.getRandomValues(b),
 ): string {
   const count = Math.min(PASSPHRASE_MAX_WORDS, Math.max(PASSPHRASE_MIN_WORDS, Math.floor(opts.words)))
   const words = Array.from({ length: count }, () => list[uniform(list.length, random)]!)

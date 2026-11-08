@@ -1,7 +1,7 @@
 // Small shared pieces: toasts, copy-to-clipboard, password fields, the
 // generator, and the strength meter. Nothing here touches the network.
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 
 import { PASSPHRASE_MAX_WORDS, PASSPHRASE_MIN_WORDS, describeSeconds, generatePassphrase, passphraseBits, passwordStrength } from '@vault/core'
 import type { EntryType } from '@vault/crypto'
@@ -228,7 +228,7 @@ export function Check({ checked, onChange, children }: { checked: boolean; onCha
 
 // ── Entry types ───────────────────────────────────────────────────────────
 
-export const TYPES: { type: EntryType; label: string; plural: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
+export const TYPES: { type: EntryType; label: string; plural: string; Icon: (p: { size?: number }) => ReactElement }[] = [
   { type: 'login', label: 'Login', plural: 'Logins', Icon: IconKey },
   { type: 'note', label: 'Secure note', plural: 'Secure notes', Icon: IconNote },
   { type: 'card', label: 'Card', plural: 'Cards', Icon: IconCard },

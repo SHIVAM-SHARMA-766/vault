@@ -160,6 +160,14 @@ export function Backups() {
             <span><strong>My S3-compatible bucket</strong><span className="muted small">AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO…</span></span></label>
           <label className="radio"><input type="radio" name="dest" disabled={!data.remoteAllowed} checked={dest.type === 'webdav'} onChange={() => setDest(dest.type === 'webdav' ? dest : emptyDav())} />
             <span><strong>My WebDAV folder</strong><span className="muted small">Nextcloud, ownCloud, a NAS</span></span></label>
+          {/* Google Drive and OneDrive need the operator's OAuth apps (decisions/0024). */}
+          {(['Google Drive', 'Microsoft OneDrive'] as const).map((name) => (
+            <label key={name} className="radio radio-soon" title="Coming soon">
+              <input type="radio" name="dest" disabled aria-describedby="dest-soon" />
+              <span><strong>{name}</strong><span className="muted small">Coming soon</span></span>
+            </label>
+          ))}
+          <p id="dest-soon" className="hint">Google Drive and OneDrive are coming soon. Until then, Nextcloud, Synology or Koofr can reach them through the WebDAV option.</p>
           {!data.remoteAllowed ? <p className="hint">This server keeps personal backups on the server only.</p> : null}
         </fieldset>
 

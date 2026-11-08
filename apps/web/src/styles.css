@@ -1040,3 +1040,4 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .onboarding { align-items: flex-start; }
 .onboarding > span { flex: 1; }
 .onboarding-fp { display: block; margin-top: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.radio-soon { opacity: .6; cursor: not-allowed; }
