@@ -213,3 +213,11 @@ ntfy topic to be configured. Alerts start only after the subscription mail is co
 | Idle lock | 15 minutes | Keys live in memory only |
 | Plain CSV export | Unencrypted by nature | Behind the master password and an acknowledgement; for leaving, not for backup |
 | Signed-in device list | Shows the address and browser seen at sign-in | Not geolocated; nothing is sent to a third party |
+
+<details>
+<summary>🟡 <b>Attachments stay with personal items</b></summary>
+
+Files can be attached to items in your own vault. An item with attachments cannot be moved into a
+collection or shared with a person until they are removed. Exports and share links leave
+attachments out; personal backups carry them. ([0020](../decisions/0020-attachments-and-offline-copy.md))
+</details>

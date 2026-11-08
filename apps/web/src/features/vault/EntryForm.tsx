@@ -2,13 +2,15 @@
 // (packages/core), so a card asks for a card's things and an SSH key for an
 // SSH key's. Custom fields cover everything else.
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import type { CustomField, EntryContent, EntryType } from '@vault/crypto'
 import { flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField } from '@vault/core'
 
 import { IconEye, IconEyeOff, IconPlus, IconX } from '../../ui/icons.js'
 import { FieldInput } from './fields.js'
+import { ATTACHMENT_MAX_BYTES, deleteAttachments, describeSize, uploadAttachment } from '../../lib/attachments.js'
+import { IconUpload } from '../../ui/icons.js'
 import type { Folder } from './model.js'
 
 export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false }: {
@@ -23,6 +25,13 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
   const [draft, setDraft] = useState<EntryContent>(initial)
   const [saving, setSaving] = useState(false)
   const [tagText, setTagText] = useState(initial.tags.join(', '))
+  // Attachments (D2): uploaded as soon as they are picked; on cancel, the new
+  // ones are deleted again, and on save, the ones removed from the list.
+  const original = useRef((initial.attachments ?? []).map((a) => a.id))
+  const [added, setAdded] = useState<string[]>([])
+  const [uploading, setUploading] = useState('')
+  const [attachError, setAttachError] = useState('')
+  const cancel = () => { void deleteAttachments(added); onCancel() }
   const spec = typeSpec(draft.type)
   const folderOptions = useMemo(() => flattenTree(folderTree(folders)), [folders])
 
@@ -39,14 +48,16 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
     const customFields = draft.customFields.filter((c) => c.label.trim() || c.value.trim())
     const { folderId, ...rest } = draft
     const ok = await onSave({ ...rest, ...(folderId ? { folderId } : {}), tags, fields, customFields }, id)
-    if (!ok) setSaving(false)
+    if (!ok) { setSaving(false); return }
+    const kept = new Set((draft.attachments ?? []).map((a) => a.id))
+    void deleteAttachments(original.current.filter((x) => !kept.has(x)))
   }
 
   return (
     <form className="editor" onSubmit={submit}>
       <div className="detail-bar">
         <h2>{id ? 'Edit item' : 'New item'}</h2>
-        <button type="button" className="icon-btn" onClick={onCancel} aria-label="Close"><IconX size={18} /></button>
+        <button type="button" className="icon-btn" onClick={cancel} aria-label="Close"><IconX size={18} /></button>
       </div>
 
       <div className="editor-body">
@@ -125,6 +136,41 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
           </button>
         </div>
 
+        {!shared ? (
+          <div className="field attachments">
+            <span className="field-label">Attachments</span>
+            {(draft.attachments ?? []).length ? (
+              <ul className="attachment-list">
+                {(draft.attachments ?? []).map((a) => (
+                  <li key={a.id}>
+                    <span className="truncate">{a.name}</span><span className="muted small">{describeSize(a.size)}</span>
+                    <button type="button" className="icon-btn icon-sm" aria-label={`Remove ${a.name}`} onClick={() => set('attachments', (draft.attachments ?? []).filter((x) => x.id !== a.id))}><IconX size={14} /></button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <label className="btn btn-secondary btn-sm attach-btn">
+              <IconUpload size={15} />{uploading ? `Encrypting ${uploading}…` : 'Attach a file'}
+              <input type="file" className="visually-hidden" aria-label="Attach a file" disabled={!!uploading} onChange={async (e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                setAttachError('')
+                if (file.size > ATTACHMENT_MAX_BYTES) { setAttachError(`${file.name} is larger than 2 MB.`); return }
+                setUploading(file.name)
+                try {
+                  const ref = await uploadAttachment(file)
+                  setAdded((x) => [...x, ref.id])
+                  setDraft((d) => ({ ...d, attachments: [...(d.attachments ?? []), ref] }))
+                } catch (err) { setAttachError(err instanceof Error ? err.message : 'Could not attach it.') }
+                finally { setUploading('') }
+              }} />
+            </label>
+            {attachError ? <p className="alert alert-error small">{attachError}</p> : null}
+            <p className="hint">Up to 2 MB a file. Each is encrypted here with its own key before it is uploaded.</p>
+          </div>
+        ) : null}
+
         <div className="grid-2">
           {shared ? <div className="field"><label>Folder</label><p className="muted small">Shared items live in their collection.</p></div> : <div className="field">
             <label htmlFor="f-folder">Folder</label>
@@ -144,7 +190,7 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
       </div>
 
       <div className="editor-foot">
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+        <button type="button" className="btn btn-secondary" onClick={cancel}>Cancel</button>
         <button type="submit" className="btn btn-primary" disabled={!draft.name.trim() || saving}>
           {saving ? <><span className="spinner" />Encrypting…</> : 'Save'}
         </button>

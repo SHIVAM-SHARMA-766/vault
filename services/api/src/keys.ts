@@ -129,3 +129,9 @@ export const NOTE_PREFIX = 'NOTE#'
 /** A member asking for access to a collection (D7). */
 export const requestSk = (collectionId: string, userId: string) => `REQ#${collectionId}#${userId}`
 export const REQUEST_PREFIX = 'REQ#'
+
+// ── Attachments (D2) ──────────────────────────────────────────────────────
+// One encrypted file per row, in its owner's partition. Its key lives in the
+// sealed entry it belongs to, so the server holds ciphertext it cannot open.
+export const attachmentSk = (id: string) => `ATT#${id}`
+export const ATTACHMENT_PREFIX = 'ATT#'

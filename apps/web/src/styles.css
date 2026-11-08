@@ -1028,3 +1028,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .notes-empty { padding: 12px 14px; }
 .badge-sensitive { background: var(--warn-soft); color: var(--warn); }
 .sensitive-toggle { margin: 4px 0 10px; }
+
+/* Attachments (D2) */
+.attachment-list { list-style: none; margin: 4px 0 8px; padding: 0; display: grid; gap: 4px; }
+.attachment-list li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+.attachment-list li .truncate { flex: 1; min-width: 0; }
+.attach-btn { cursor: pointer; position: relative; }
+
+/* Member onboarding (B4) */
+.alert-info { background: var(--accent-soft); color: var(--text); }
+.onboarding { align-items: flex-start; }
+.onboarding > span { flex: 1; }
+.onboarding-fp { display: block; margin-top: 6px; font-size: 13px; overflow-wrap: anywhere; }

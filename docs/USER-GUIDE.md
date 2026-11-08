@@ -71,6 +71,11 @@ themselves off as you do them; **Hide this** puts it away.
 | Middle column | The items in the current view; type to search (press <kbd>/</kbd>) |
 | Right column | The open item: copy any field, reveal a password, open the website, see a live **one-time code** |
 
+**Attach files** in the editor with **Attach a file**: scans, licence files, a recovery sheet,
+up to 2 MB each. Each file is encrypted in your browser with its own key before it is uploaded,
+and **Download** on the item decrypts it again. Files are kept with your item and in your
+personal backups. They are not shared with the item, and not included in exports or share links.
+
 **Add an item** with **New item**. Choose its type — fifteen of them, grouped as Everyday,
 Money, Documents and Technical — and the form shows that type's own fields. The left column
 lists a type once you have an item of it. Add **custom
@@ -239,6 +244,11 @@ yours; when it does, the section says so.
 
 ### Backups
 
+**Offline copy.** At the bottom of Backups, **Download an offline copy** saves one HTML file you
+can keep on a USB stick or another computer. It opens in any browser with your master password,
+with no server and no network: for when this server is down or gone. It is read-only, it is as
+strong as your master password at the time, and it leaves out attached files.
+
 <img src="images/backups.png" alt="Backups: status, schedule and destination, copies and history" width="820">
 
 Settings → **Backups** keeps your own copies of your vault, independent of the server's backups.
@@ -343,6 +353,10 @@ mark goes.
 **Groups** — "Parents", "Engineering" — let you give a whole team access to a collection at
 once: create a group, add confirmed members, then in a collection's **Access** choose **Give
 access to a group**. People added to the group later get the group's collections.
+
+**Joining one.** After you accept an invitation, the vault shows a note with your fingerprint
+until an admin confirms you: read it to them on a call or in person. Once you are confirmed, it
+tells you once where shared items appear.
 
 **Asking for a collection.** Members see every collection's name, including ones they cannot
 open, with **Request access** (and an optional reason). The owner and admins are notified and

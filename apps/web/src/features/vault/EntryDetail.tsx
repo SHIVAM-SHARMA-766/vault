@@ -6,10 +6,11 @@ import { useEffect, useState } from 'react'
 import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconAlert, IconArrowLeft, IconClock, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import { ShareLinkDialog } from './ShareLink.js'
+import { describeSize, saveAttachment } from '../../lib/attachments.js'
 import type { Decrypted, Folder, Version } from './model.js'
 import { day, when } from '../../lib/format.js'
 
@@ -40,6 +41,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
   loadHistory: () => Promise<Version[]>
   onRestore: (content: EntryContent) => Promise<void>
 }) {
+  const toast = useToast()
   const [confirming, setConfirming] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -169,6 +171,20 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
                              : <SecretRow key={`c${i}`} label={c.label || 'Hidden field'} value={c.value} />)
                    : <TextRow key={`c${i}`} label={c.label || 'Field'} value={c.value} />)}
       </div>
+
+      {entry.attachments?.length ? (
+        <div className="notes">
+          <span className="field-label">Attachments</span>
+          <ul className="attachment-list">
+            {entry.attachments.map((a) => (
+              <li key={a.id}>
+                <span className="truncate">{a.name}</span><span className="muted small">{describeSize(a.size)}</span>
+                <button className="btn btn-ghost btn-sm" aria-label={`Download ${a.name}`} onClick={() => { void saveAttachment(a).catch((err: unknown) => toast(err instanceof Error ? err.message : 'Could not open the file.', 'error')) }}><IconDownload size={14} />Download</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {entry.notes ? (
         <div className="notes">

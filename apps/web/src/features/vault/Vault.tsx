@@ -9,6 +9,7 @@ import { ISSUES, type ListSort, analyse, descendants, flattenTree, folderTree, f
 import { Link } from '../../lib/router.js'
 import { api } from '../../lib/api.js'
 import { checkBreaches } from '../../lib/breach.js'
+import { deleteAttachments } from '../../lib/attachments.js'
 import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconInbox, IconPlus, IconRows, IconSearch, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
@@ -200,7 +201,11 @@ export function Vault({ state }: { state: session.Unlocked }) {
     try {
       const sh = sharedOf(entries.find((e) => e.id === id))
       if (sh) await teams.deleteShared(sh.collectionId, id)
-      else await vault.deleteEntry(id)
+      else {
+        const files = (entries.find((e) => e.id === id)?.attachments ?? []).map((a) => a.id)
+        await vault.deleteEntry(id)
+        void deleteAttachments(files)
+      }
       setSelectedId(null)
       setMode({ kind: 'view' })
       toast('Entry deleted')
@@ -212,6 +217,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
   /** Sharing an item moves it: re-encrypted under the collection key, then
    *  removed from the personal vault — an item lives in one place (0009). */
   async function moveToCollection(entry: Decrypted, collectionId: string) {
+    if (entry.attachments?.length) { toast('Remove its attachments first: attached files stay in your own vault and cannot be shared yet.', 'error'); return }
     try {
       const { folderId: _f, ...content } = contentOf(entry)
       const id = await teams.saveShared(collectionId, content)
@@ -422,6 +428,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
           {vault.error ? <p className="alert alert-error"><IconAlert size={16} />{vault.error}</p> : null}
           {state.policyGap ? <p className="alert alert-warn list-alert" data-testid="server-policy-gap"><IconAlert size={16} /><span>{state.policyGap} <Link to="/app/settings/security">Open Security</Link></span></p> : null}
+          <MemberOnboarding teams={teams} />
           {teams.orgs.filter((o) => o.policyGap).map((o) => <p key={o.id} className="alert alert-warn list-alert"><IconAlert size={16} />{o.name}: {o.policyGap}</p>)}
 
           {vault.loading ? (
@@ -477,6 +484,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: (c.direct ? c.name : `${c.orgName} / ${c.name}`) }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}
                          onShareWithPerson={sharedOf(selected) ? undefined : async (email) => {
+                           if (selected.attachments?.length) { toast('Remove its attachments first: attached files stay in your own vault and cannot be shared yet.', 'error'); return }
                            try {
                              const r = await teams.shareWithPerson(email, contentOf(selected))
                              await vault.deleteEntry(selected.id)
@@ -595,5 +603,37 @@ function EmptyState({ hasEntries, onNew }: { hasEntries: boolean; onNew: () => v
         </>
       )}
     </div>
+  )
+}
+
+/** Joining an organization (B4): while an admin has yet to confirm you, what
+ *  to do (read them your fingerprint); once confirmed, where to find what is
+ *  shared — once per organization. */
+function MemberOnboarding({ teams }: { teams: ReturnType<typeof useTeams> }) {
+  const [seen, setSeen] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('vault.org-welcome') ?? '[]') as string[]) } catch { return new Set() }
+  })
+  const dismiss = (id: string) => {
+    const next = new Set(seen).add(id)
+    setSeen(next)
+    try { localStorage.setItem('vault.org-welcome', JSON.stringify([...next])) } catch { /* shown again next time */ }
+  }
+  const waiting = teams.orgs.filter((o) => o.status === 'accepted')
+  const fresh = teams.orgs.filter((o) => o.status === 'confirmed' && o.role !== 'owner' && !seen.has(o.id))
+  return (
+    <>
+      {waiting.map((o) => (
+        <div key={o.id} className="alert alert-info list-alert onboarding" role="status">
+          <span><strong>You have joined {o.name}.</strong> An admin must confirm you before anything is shared with you. When they ask, read them your fingerprint — on a call or in person, not by chat:
+            {teams.identity ? <code className="onboarding-fp">{teams.identity.fingerprint}</code> : null}</span>
+        </div>
+      ))}
+      {fresh.map((o) => (
+        <div key={o.id} className="alert alert-ok list-alert onboarding" role="status">
+          <span><strong>You are in {o.name}.</strong> What it shares with you appears under <strong>Shared</strong> in the left column, encrypted to your own key. {o.policies.requireTwoFactor ? 'It requires two-factor sign-in. ' : ''}Ask an admin if you need a collection you cannot see.</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => dismiss(o.id)}>Got it</button>
+        </div>
+      ))}
+    </>
   )
 }

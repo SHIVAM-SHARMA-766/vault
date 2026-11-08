@@ -278,6 +278,16 @@ is placed above fixed content, so the standard link, code and security advice ca
 A malicious admin could still write misleading text, but admins are trusted with accounts
 already (A9).
 
+### A20 — Attachments and offline copies
+
+An attachment is encrypted with its own key, which lives only inside the sealed entry
+([0020](../decisions/0020-attachments-and-offline-copy.md)). The server sees ciphertext, a size
+and a time; it cannot link a file to an entry. A hostile server could withhold or swap blobs, but
+a swapped blob fails decryption because the attachment id is bound into it. An **offline copy**
+is a file the person holds, as strong as their master password when it was made. Guessing
+against it offline costs the same as against a stolen database row (A2). Its page allows no
+network, so opening it reveals nothing to anyone.
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

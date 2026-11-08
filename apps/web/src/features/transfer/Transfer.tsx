@@ -61,7 +61,7 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
   const folderName = `Imported ${today()}`
 
   const preview = useMemo(() => step.kind === 'review'
-    ? plan(step.source.candidates, vault, { skipDuplicates, ...(intoFolder ? { intoFolder: folderName } : {}) })
+    ? { ...plan(step.source.candidates, vault, { skipDuplicates, ...(intoFolder ? { intoFolder: folderName } : {}) }), ...(step.source.attachments ? { attachments: step.source.attachments } : {}) }
     : null, [step, vault.entries, vault.folders, skipDuplicates, intoFolder])
 
   const byType = useMemo(() => {

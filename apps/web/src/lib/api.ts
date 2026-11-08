@@ -366,6 +366,12 @@ export const api = {
   },
   alerts: (token: string) => request<{ signIn: boolean; available: boolean }>('GET', '/api/account/alerts', { token }),
   setAlerts: (token: string, signIn: boolean) => request<{ signIn: boolean }>('PUT', '/api/account/alerts', { token, body: { signIn } }),
+  attachments: {
+    usage: (token: string) => request<{ used: number; count: number; quota: number }>('GET', '/api/attachments', { token }),
+    put: (token: string, id: string, blob: string) => request<{ id: string; bytes: number; used: number; quota: number }>('PUT', `/api/attachments/${id}`, { token, body: { blob } }),
+    get: (token: string, id: string) => request<{ blob: string }>('GET', `/api/attachments/${id}`, { token }),
+    remove: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/attachments/${id}`, { token }),
+  },
   notifications: (token: string) => request<{ notes: Note[]; unread: number }>('GET', '/api/notifications', { token }),
   readNotifications: (token: string, ids: string[] | 'all') => request<{ notes: Note[]; unread: number }>('POST', '/api/notifications/read', { token, body: ids === 'all' ? { all: true } : { ids } }),
   breachRange: (token: string, prefix: string) => request<{ range: string }>('GET', `/api/breach/range/${prefix}`, { token }),

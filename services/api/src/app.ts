@@ -19,6 +19,7 @@ import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
 import * as prefs from './routes/prefs.js'
 import * as shares from './routes/shares.js'
+import * as attachments from './routes/attachments.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
 import { metricsRoute, recordRequest } from './metrics.js'
@@ -146,6 +147,10 @@ export function buildRouter(app: App): Router {
   router.post('/api/shares/:id/open', ({ event, param }) => shares.openShare(app, event, param), 'Open a share link (no account needed; counts one view)')
   router.get('/api/breach/range/:prefix', authed((u, _e, prefix) => breachRange(app, u, prefix)), 'Pwned Passwords range for a 5-character SHA-1 prefix, relayed for the breach check')
   router.get('/api/metrics', ({ event }) => metricsRoute(app, event), 'Prometheus metrics for a scraper holding METRICS_TOKEN (counts only)')
+  router.get('/api/attachments', authed((u) => attachments.attachmentUsage(app, u)), 'How much of my attachment quota is in use')
+  router.put('/api/attachments/:id', authed((u, e, id) => attachments.putAttachment(app, u, e, id)), 'Store an encrypted attachment (its key stays in the sealed entry)')
+  router.get('/api/attachments/:id', authed((u, _e, id) => attachments.getAttachment(app, u, id)), 'Fetch an encrypted attachment')
+  router.delete('/api/attachments/:id', authed((u, _e, id) => attachments.deleteAttachment(app, u, id)), 'Delete an attachment')
   router.get('/api/notifications', authed((u) => listNotes(app, u)), 'My notifications, newest first')
   router.post('/api/notifications/read', authed((u, e) => readNotes(app, u, e)), 'Mark some or all of my notifications as read')
   router.post('/api/orgs/:org/collections/:coll/request', authedP((u, e, [o, c]) => orgs.requestAccess(app, u, e, o!, c!)), 'Ask for access to a collection')

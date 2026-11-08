@@ -82,6 +82,7 @@ export {
 export {
   MAX_BLOB_BYTES,
   type CustomField,
+  type AttachmentRef,
   type EntryContent,
   type EntryType,
   type FolderContent,
