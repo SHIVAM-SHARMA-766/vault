@@ -89,6 +89,20 @@ criterion asks for real files from three managers.
 </details>
 
 <details>
+<summary>🟠 <b>The browser extension is at its first stage</b></summary>
+
+[0029](../decisions/0029-browser-extension.md) is built in stages. What is missing now:
+
+- It is not yet in the Chrome or Firefox store, so it is loaded unpacked from a release zip.
+- It shows your own vault only, not shared collections.
+- It fills only when you click or press the shortcut. There is no icon inside login fields, and
+  it does not offer to save a new password after you sign in.
+- It fills the top frame only, so a login form inside a same-site frame is not filled yet.
+- A copied password is not cleared from the clipboard later, as the web app does.
+- An account whose only second factor is a security key signs in with a recovery code.
+</details>
+
+<details>
 <summary>🟡 <b>Passkeys are a second factor, not yet a way to unlock</b></summary>
 
 Security keys and passkeys work as a second factor at sign-in ([0022](../decisions/0022-passkeys.md)).

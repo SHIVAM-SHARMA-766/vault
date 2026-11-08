@@ -101,6 +101,22 @@ S3-compatible store. Tested in CI on every change.
 
 </td>
 </tr>
+<tr>
+<td width="50%" valign="top">
+
+### 🧩 Browser extension
+Chrome and Firefox, pointed at your own server. Fills on a click or Ctrl+Shift+L, only where the
+site truly matches, so a look-alike page gets nothing. No standing access to the pages you visit.
+
+</td>
+<td width="50%" valign="top">
+
+### 🗝️ Optional secret key
+Mix a 128-bit key kept on your devices into your master password, with a printable Emergency
+Kit. A full copy of the server then gives nothing to guess against.
+
+</td>
+</tr>
 </table>
 
 ## A closer look
@@ -242,6 +258,7 @@ npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 | [`services/api/`](services/api/) | The API, its storage adapters, and its OpenAPI generator |
 | [`apps/web/`](apps/web/) | The vault client and the admin panel, at `/app/` |
 | [`apps/site/`](apps/site/) | The public website: templates, editable content, renderer |
+| [`apps/extension/`](apps/extension/) | The browser extension for Chrome and Firefox |
 | [`services/`](services/) | Backup and restore drill, release pull agent, health probe |
 | [`infra/`](infra/) | Terraform for everything the reference instance runs on |
 | [`deploy/`](deploy/) | Install profiles: personal and business Compose files |

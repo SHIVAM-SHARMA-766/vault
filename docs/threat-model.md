@@ -315,6 +315,32 @@ Attempts are rate limited (5 per hour per member), refusals are audited, and a r
 every remaining owner and admin. A hostile server could seal collection keys to a recovery key
 of its own, which is A15 again: signed key grants (0025) will cover recovery copies too.
 
+### A23 — The browser extension and phishing pages
+
+The extension ([0029](../decisions/0029-browser-extension.md)) fills passwords into pages, so a
+look-alike page is the obvious way to try to get one. It fills only after the person clicks or
+presses the shortcut, and only into the tab they acted on. The background reads that tab's URL
+from the browser, not from the popup, and fills only an item whose saved URL matches it:
+
+- the same origin, or
+- an https page on the same registrable domain, under the Public Suffix List bundled in the
+  extension.
+
+So `example.com.evil.io`, `examplee.com`, a neighbour on `github.io`, another port on the same
+address, and an http copy of an https site all get nothing. The function that runs in the page
+checks `location.origin` again before it writes, and it fills only the top frame, so a
+cross-origin frame never receives a password.
+
+Its base install has no standing access to websites (`activeTab`, not all sites), no content
+scripts, no `externally_connectable` and no web-accessible resources, so a page cannot talk to
+it. Its build refuses a manifest that adds any of these. The vault key and tokens live in
+`chrome.storage.session`, which is memory only and closed to content scripts. It reaches only
+the server origin the person approved.
+
+The extension's code is also part of A3. Loaded from a release zip or a store, it is fixed
+when installed rather than served by the hostname on every visit. That narrows A3 for people who
+use it, but only once it is distributed through a store (decision 0029, stage 4).
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

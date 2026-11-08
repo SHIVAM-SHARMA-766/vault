@@ -81,3 +81,4 @@ export {
   generatePassphrase,
   passphraseBits,
 } from './passphrase.js'
+export { type SiteMatch, matchSite, rankForPage, registrableDomain } from './sitematch.js'
