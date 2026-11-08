@@ -67,7 +67,7 @@ import {
   touchLogin,
 } from '../system.js'
 
-interface Profile extends Item {
+export interface Profile extends Item {
   userId: string
   emailDigest: string
   kdf: KdfParams
@@ -523,7 +523,7 @@ async function claimOnce(app: App, userId: string, sk: string, ttlSeconds: numbe
   }
 }
 
-async function requireSecondFactor(
+export async function requireSecondFactor(
   app: App, profile: Profile, body: Record<string, unknown>, event: LambdaEvent,
 ): Promise<void> {
   if (!profile.totp) return
@@ -548,7 +548,7 @@ async function requireSecondFactor(
   await recordActivity(app, profile.userId, 'used-2fa-recovery-code', event)
 }
 
-async function profileWithPassword(app: App, userId: string, body: Record<string, unknown>): Promise<Profile> {
+export async function profileWithPassword(app: App, userId: string, body: Record<string, unknown>): Promise<Profile> {
   const currentAuthKey = requireBase64UrlBytes(body['currentAuthKey'], 32, 'currentAuthKey')
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()

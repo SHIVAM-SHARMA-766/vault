@@ -15,11 +15,19 @@ export const CLIPBOARD_CHOICES = [0, 10, 30, 60, 120] as const
 export const GENERATOR_MIN = 8
 export const GENERATOR_MAX = 64
 
+export const SEPARATORS = ['-', ' ', '.', '_'] as const
+
 export interface GeneratorPrefs {
+  mode: 'password' | 'passphrase'
   length: number
   upper: boolean
   digits: boolean
   symbols: boolean
+  /** Passphrase: words, separator, capitals, a digit. */
+  words: number
+  separator: string
+  capitalize: boolean
+  digit: boolean
 }
 
 export interface Prefs {
@@ -36,7 +44,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   lockMinutes: 15,
   lockOnHide: false,
   clipboardSeconds: 30,
-  generator: Object.freeze({ length: 20, upper: true, digits: true, symbols: true }),
+  generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
 const pick = <T>(value: unknown, allowed: readonly T[], fallback: T): T =>
@@ -56,10 +64,15 @@ export function normalizePrefs(raw: unknown): Prefs {
     lockOnHide: bool(r['lockOnHide'], d.lockOnHide),
     clipboardSeconds: pick(r['clipboardSeconds'], CLIPBOARD_CHOICES as readonly number[], d.clipboardSeconds),
     generator: {
+      mode: pick(g['mode'], ['password', 'passphrase'] as const, d.generator.mode),
       length,
       upper: bool(g['upper'], d.generator.upper),
       digits: bool(g['digits'], d.generator.digits),
       symbols: bool(g['symbols'], d.generator.symbols),
+      words: typeof g['words'] === 'number' && Number.isInteger(g['words']) ? Math.min(12, Math.max(3, g['words'])) : d.generator.words,
+      separator: pick(g['separator'], SEPARATORS as readonly string[], d.generator.separator),
+      capitalize: bool(g['capitalize'], d.generator.capitalize),
+      digit: bool(g['digit'], d.generator.digit),
     },
   }
 }

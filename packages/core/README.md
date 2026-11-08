@@ -14,6 +14,10 @@ run the same code.
 | `src/export.ts` | `toCsv`: Bitwarden-layout CSV; non-login types become notes with their fields listed |
 | `src/health.ts` | `passwordStrength` and `analyse`: weak, reused, old (> 365 days since `passwordChangedAt`), unencrypted site; a 0–100 score |
 | `src/qr.ts` | QR encoder for the 2FA enrolment code, checked against vectors from an independent encoder |
+| `src/prefs.ts` | `normalizePrefs`: an account's preferences (theme, auto-lock, clipboard, generator) made valid field by field, since they arrive decrypted but unchecked; `effectiveLockMinutes` under an organization policy |
+| `src/passphrase.ts` | `generatePassphrase`: uniform, rejection-sampled draws from a word list; `passphraseBits` |
+| `src/words.ts` | The EFF large wordlist (CC BY 3.0 US, see `NOTICE.md`), exported separately as `@vault/core/words` so clients load it only on demand |
+| `src/errors.ts` | `friendlyError`: what a person reads when a request fails — what happened and what to do |
 | `test/` | Fixtures per import format, a CSV round trip, health cases, QR vectors |
 
 ## Contracts

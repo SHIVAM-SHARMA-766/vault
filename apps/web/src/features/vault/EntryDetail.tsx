@@ -6,14 +6,14 @@ import { useEffect, useState } from 'react'
 import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconAlert, IconArrowLeft, IconClock, IconUsers, IconEdit, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import type { Decrypted, Folder, Version } from './model.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
 
-export function EntryDetail({ entry, folders, issues, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, issues, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
@@ -26,6 +26,8 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
   onBack: () => void
   onEdit: () => void
   onToggleFavorite: () => void
+  /** Absent for shared items: archiving one would hide it from everyone. */
+  onToggleArchive?: (() => void) | undefined
   onDelete: () => void
   loadHistory: () => Promise<Version[]>
   onRestore: (content: EntryContent) => Promise<void>
@@ -65,6 +67,10 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
           )}
           {!shared && shareTargets.length ? (
             <button className={`btn btn-secondary btn-sm ${sharing ? 'btn-pressed' : ''}`} onClick={() => setSharing(!sharing)} aria-label="Share"><IconUsers size={15} /><span className="btn-label">Share</span></button>
+          ) : null}
+          {onToggleArchive ? (
+            <button className="btn btn-secondary btn-sm" onClick={onToggleArchive} disabled={entry.unreadable}
+                    aria-label={entry.archived ? 'Restore from archive' : 'Archive'}><IconInbox size={15} /><span className="btn-label">{entry.archived ? 'Restore' : 'Archive'}</span></button>
           ) : null}
           <button className="btn btn-secondary btn-sm" onClick={onEdit} disabled={entry.unreadable || readOnly} aria-label="Edit"><IconEdit size={15} /><span className="btn-label">Edit</span></button>
           <button className="btn btn-danger-ghost btn-sm" onClick={() => setConfirming(true)} disabled={readOnly} aria-label="Delete"><IconTrash size={15} /><span className="btn-label">Delete</span></button>

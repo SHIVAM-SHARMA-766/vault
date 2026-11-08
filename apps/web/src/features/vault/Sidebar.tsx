@@ -7,11 +7,11 @@ import { MAX_FOLDER_DEPTH, type FolderNode, type Issue, describeMinutes, folderT
 import { usePrefs } from '../../lib/prefs.js'
 import { idleMinutes } from '../../lib/session.js'
 
-import { IconEdit, IconFolder, IconGrid, IconLock, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
+import { IconEdit, IconFolder, IconGrid, IconInbox, IconLock, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
 import { TYPES } from '../../ui/kit.js'
 import type { Folder } from './model.js'
 
-export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; id: string } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' }
+export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; id: string } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' } | { kind: 'archive' }
 
 export const sameFilter = (a: Filter, b: Filter) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -33,6 +33,7 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
       <SideItem active={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })} icon={<IconGrid size={16} />} label="All items" count={counts['all']} />
       <SideItem active={filter.kind === 'favorites'} onClick={() => setFilter({ kind: 'favorites' })} icon={<IconStar size={16} />} label="Favorites" count={counts['favorites']} />
       <SideItem active={filter.kind === 'health'} onClick={() => setFilter({ kind: 'health' })} icon={<IconPulse size={16} />} label="Password health" count={counts['health']} warn />
+      <SideItem active={filter.kind === 'archive'} onClick={() => setFilter({ kind: 'archive' })} icon={<IconInbox size={16} />} label="Archive" count={counts['archive']} />
 
       <div className="sidebar-heading sidebar-heading-row">
         <span>Folders</span>

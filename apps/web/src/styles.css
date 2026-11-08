@@ -890,3 +890,5 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .gs-done .gs-mark { border-color: var(--ok); background: var(--ok); color: var(--surface); }
 .gs-done h3 { color: var(--muted); text-decoration: line-through; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.generator-mode { grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
