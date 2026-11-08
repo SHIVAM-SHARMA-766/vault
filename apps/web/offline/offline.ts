@@ -3,7 +3,7 @@
 // network. Built from the same crypto and item packages as the app, so it
 // decrypts exactly as the app does. The page's own policy allows no requests.
 
-import { fromBase64Url, openEntry, openFolder, unlock, wipe, type EntryContent, type KdfParams } from '@vault/crypto'
+import { fromBase64Url, openEntry, openFolder, parseSecretKey, unlock, wipe, type EntryContent, type KdfParams } from '@vault/crypto'
 import { folderPath, readField, typeSpec } from '@vault/core'
 
 interface OfflineFile {
@@ -28,6 +28,9 @@ const el = (tag: string, attrs: Record<string, string> = {}, text?: string) => {
 const data = JSON.parse(($('#vault-data') as HTMLScriptElement).textContent ?? '{}') as OfflineFile
 $('#made').textContent = `${data.email} · made ${new Date(data.createdAt).toLocaleString()}`
 
+// An account with a secret key (decisions/0027) needs it here too.
+if (data.kdf.version === 2) $('#skrow').hidden = false
+
 let items: (EntryContent & { id: string; path: string })[] = []
 
 $('#unlock').addEventListener('submit', async (ev) => {
@@ -38,7 +41,8 @@ $('#unlock').addEventListener('submit', async (ev) => {
   ;($('#go') as HTMLButtonElement).disabled = true
   try {
     if (data.kdf.iterations < 600_000 || data.kdf.iterations > 10_000_000) throw new Error('bad kdf')
-    const { vaultKey } = await unlock(pw, data.kdf, data.wrappedVaultKey, fromBase64Url(data.kdf.salt))
+    const sk = data.kdf.version === 2 ? await parseSecretKey(($('#sk') as HTMLInputElement).value) : undefined
+    const { vaultKey } = await unlock(pw, data.kdf, data.wrappedVaultKey, fromBase64Url(data.kdf.salt), sk)
     try {
       const folders = (await Promise.all(data.folders.map(async (f) => { try { return { ...(await openFolder(f.id, f.blob, vaultKey)), id: f.id } } catch { return null } }))).filter((f) => f !== null)
       items = (await Promise.all(data.entries.map(async (e) => {
@@ -51,7 +55,9 @@ $('#unlock').addEventListener('submit', async (ev) => {
     $('#open').hidden = false
     render('')
   } catch {
-    err.textContent = 'That master password does not open this copy. It needs the one you had when the copy was made.'
+    err.textContent = data.kdf.version === 2
+      ? 'That master password and secret key do not open this copy. It needs the ones you had when the copy was made.'
+      : 'That master password does not open this copy. It needs the one you had when the copy was made.'
   } finally {
     ;($('#go') as HTMLButtonElement).disabled = false
   }

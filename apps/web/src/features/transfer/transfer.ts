@@ -6,7 +6,7 @@
 import {
   type EntryContent,
   type FolderContent,
-  deriveLoginKeys,
+  type KdfParams,
   fromBase64Url,
   isExportFile,
   isWithinSizeLimit,
@@ -25,6 +25,7 @@ import { MAX_FOLDER_DEPTH, type ImportedItem, duplicateKey, folderPath, readImpo
 
 import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
+import { deriveForAccount, loadSecretKey } from '../../lib/secretkey.js'
 import type { Decrypted, Folder } from '../vault/model.js'
 import { when } from '../../lib/format.js'
 
@@ -114,7 +115,7 @@ export interface OpenedBackup {
 /** Opens a personal backup in this browser with the master password — or the
  *  recovery key — that was current when it was made. Nothing is sent
  *  anywhere. Throws UnsealError when the secret is wrong. */
-export async function openPersonalBackup(text: string, secret: string, how: 'password' | 'recovery'): Promise<OpenedBackup> {
+export async function openPersonalBackup(text: string, secret: string, how: 'password' | 'recovery', email?: string): Promise<OpenedBackup> {
   let file: { format?: string; version?: number; createdAt?: string; kdf?: { algorithm: string; iterations: number; salt: string }; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[]; attachments?: { id: string; blob: string }[] }
   try { file = JSON.parse(text) } catch { throw new Error('This backup file is damaged: it is not valid JSON.') }
   if (file.format !== 'vault-personal-backup' || file.version !== 1) throw new Error('This is not a Vault personal backup, or it is from a newer version.')
@@ -129,7 +130,13 @@ export async function openPersonalBackup(text: string, secret: string, how: 'pas
     if (file.kdf.algorithm !== 'PBKDF2-HMAC-SHA256' || !Number.isInteger(file.kdf.iterations) || file.kdf.iterations < 600_000 || file.kdf.iterations > 10_000_000) {
       throw new Error('This backup file uses key settings Vault does not create, so it was not opened.')
     }
-    key = (await unlock(secret, file.kdf as never, file.wrappedVaultKey, fromBase64Url(file.kdf.salt))).vaultKey
+    // A backup made with a secret key (decisions/0027) needs it: this
+    // browser's copy, for the account signed in here.
+    const kdf = file.kdf as KdfParams
+    const sk = kdf.version === 2 && email ? await loadSecretKey(email) : undefined
+    if (kdf.version === 2 && !sk) throw new Error('This backup was made by an account with a secret key, and this browser does not hold it. Open it with the recovery key instead.')
+    try { key = (await unlock(secret, kdf, file.wrappedVaultKey, fromBase64Url(file.kdf.salt), sk ?? undefined)).vaultKey }
+    finally { sk?.fill(0) }
   }
   try {
     let failed = 0
@@ -249,7 +256,7 @@ export async function runImport(p: Plan, vaultKey: Uint8Array, onProgress: (done
  *  account's wrapped vault key. Nothing is sent. */
 export async function checkMasterPassword(state: session.Unlocked, password: string): Promise<boolean> {
   const me = await api.me(await session.token())
-  const keys = await deriveLoginKeys(password, fromBase64Url(state.kdf.salt), state.kdf.iterations)
+  const keys = await deriveForAccount(state, password)
   try {
     wipe(await unwrapVaultKey(me.wrappedVaultKey, keys.kek, 'master'))
     return true

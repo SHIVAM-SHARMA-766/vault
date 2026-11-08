@@ -26,6 +26,15 @@ export {
 export { randomBytes } from './random.js'
 
 export {
+  SECRET_KEY_BYTES,
+  SecretKeyFormatError,
+  formatSecretKey,
+  generateSecretKey,
+  mixSecretKey,
+  parseSecretKey,
+} from './secretkey.js'
+
+export {
   GCM_IV_BYTES,
   GCM_TAG_BYTES,
   type HashName,

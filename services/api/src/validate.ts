@@ -76,6 +76,9 @@ export interface KdfParams {
   algorithm: 'PBKDF2-HMAC-SHA256'
   iterations: number
   salt: string
+  /** 2 when the client mixes a secret key into the derivation (decisions/0027).
+   *  The server cannot check it; it only hands it back at sign-in. */
+  version?: 2
 }
 
 /** The iteration floor is enforced here as well as in the client, because the
@@ -96,9 +99,11 @@ export function requireKdf(value: unknown): KdfParams {
   if (kdf.iterations < MIN_ITERATIONS) {
     throw badRequest(`kdf.iterations must be at least ${MIN_ITERATIONS}.`)
   }
+  if (kdf.version !== undefined && kdf.version !== 2) throw badRequest('kdf.version must be 2 when present.')
   return {
     algorithm: 'PBKDF2-HMAC-SHA256',
     iterations: kdf.iterations,
     salt: requireBase64UrlBytes(kdf.salt, 32, 'kdf.salt'),
+    ...(kdf.version === 2 ? { version: 2 as const } : {}),
   }
 }

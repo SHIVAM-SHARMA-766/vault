@@ -89,10 +89,20 @@ criterion asks for real files from three managers.
 </details>
 
 <details>
-<summary>🟠 <b>No WebAuthn or security keys</b></summary>
+<summary>🟡 <b>Passkeys are a second factor, not yet a way to unlock</b></summary>
 
-Two-factor sign-in is TOTP with ten single-use recovery codes. Hardware keys and passkeys
-are planned alongside passkey support (phase 4).
+Security keys and passkeys work as a second factor at sign-in ([0022](../decisions/0022-passkeys.md)).
+Unlocking with a passkey alone (the WebAuthn PRF extension) is the next part of that decision.
+</details>
+
+<details>
+<summary>🟡 <b>The secret key is typed on each new browser</b></summary>
+
+[0027](../decisions/0027-secret-key.md) also describes handing the secret key to a new device by
+QR code from a signed-in one; that is not built, so it is typed from the Emergency Kit. A
+personal backup made while the key was on opens with this browser's copy of the key or with the
+recovery key, and an offline copy asks for it. An organization admin cannot see or require it;
+it is each person's choice.
 </details>
 
 <details>

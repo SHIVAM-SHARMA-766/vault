@@ -290,7 +290,7 @@ function TestRestore() {
     setBusy(true); setResult(null)
     try {
       const file = await api.backups.latest(await session.token())
-      const opened = await openPersonalBackup(file.body, secret, recovery ? 'recovery' : 'password')
+      const opened = await openPersonalBackup(file.body, secret, recovery ? 'recovery' : 'password', session.get()?.email)
       setResult({ ok: true, text: `${file.name} opens: ${opened.entries.length} item${opened.entries.length === 1 ? '' : 's'} and ${opened.folders.length} folder${opened.folders.length === 1 ? '' : 's'}${opened.failed ? `; ${opened.failed} could not be opened` : ''}. Nothing was imported.` })
       setSecret('')
     } catch (err) {

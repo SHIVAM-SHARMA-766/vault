@@ -211,11 +211,30 @@ link such as `/app/settings/security` opens the right one after you unlock.
 
 | Section | What is in it |
 |---|---|
-| **Account** | Your details; delete your account (master password, two-factor code and a typed DELETE; export first); change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; your identity-key fingerprint |
+| **Account** | Your details; delete your account (master password, two-factor code and a typed DELETE; export first); change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; add a secret key (below); your identity-key fingerprint |
 | **Security** | Two-factor sign-in (TOTP with any authenticator app, plus ten single-use recovery codes); signed-in devices; security activity |
 | **Preferences** | Theme, auto-lock, clipboard clearing and the password generator's defaults — see below |
 | **Backups** | Your own encrypted backups, on your schedule, here or in your own storage — see below |
 | **Emergency access** | People you trust to reach your vault if something happens to you |
+
+### Secret key (optional)
+
+**Account → Secret key → Add a secret key** mixes a random 128-bit key into your master
+password. Even someone with a full copy of the server then has nothing to guess your
+password against. Vault shows it once in an **Emergency Kit**: the server address, your
+email, the key (`SK1-…`), and a blank line where you write your master password by hand.
+Print it or write it down.
+
+- This browser keeps the key, sealed with a device key that cannot be copied out.
+- Each new browser asks for it once, at sign-in. A typo is caught before anything is sent.
+- Adding or removing it signs out your other devices, like a password change. Nothing is
+  re-encrypted.
+- Lost it? Your recovery key still works. A reset on a browser that does not hold the secret
+  key turns it off, and you can add a new one.
+- Backups and offline copies made while it is on need it too. A personal backup opens with
+  this browser's copy, or with the recovery key.
+- If a browser that holds the key is told by the server that the account has none, sign-in
+  stops. Choose *forget the secret key on this browser* only if you removed it yourself.
 
 ### Preferences
 

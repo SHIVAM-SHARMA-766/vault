@@ -53,6 +53,7 @@ code{overflow-wrap:anywhere;white-space:pre-wrap}#err{color:#c0262d}
 <div id="locked">
 <p>Everything below is encrypted. It opens here, in this file, with your master password; nothing is sent anywhere.</p>
 <form id="unlock"><label for="pw">Master password</label><input id="pw" type="password" autocomplete="current-password" required autofocus>
+<div id="skrow" hidden><label for="sk">Secret key (from your Emergency Kit)</label><input id="sk" autocomplete="off" spellcheck="false" placeholder="SK1-XXXX-XXXX-…"></div>
 <p id="err" role="alert"></p><button id="go" type="submit">Open</button></form>
 </div>
 <div id="open" hidden>
@@ -60,7 +61,7 @@ code{overflow-wrap:anywhere;white-space:pre-wrap}#err{color:#c0262d}
 <p class="muted" id="count"></p>
 <div class="cols"><div class="panel"><ul id="list"></ul></div><div class="panel" id="detail"><p class="muted">Choose an item.</p></div></div>
 </div>
-<p class="muted">Read-only. Made by Vault. Keep this file somewhere safe: it is as strong as your master password. Attached files are not included.</p>
+<p class="muted">Read-only. Made by Vault. Keep this file somewhere safe: it is as strong as your master password (and your secret key, if you have one). Attached files are not included.</p>
 </main>
 <script id="vault-data" type="application/json">${json}</script>
 <script>${safe}</script>

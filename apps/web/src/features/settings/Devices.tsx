@@ -99,6 +99,8 @@ const KIND: Record<string, string> = {
   'login': 'Signed in',
   'recovery-login': 'Signed in with the recovery key',
   'change-password': 'Master password changed',
+  'add-secret-key': 'Secret key added',
+  'remove-secret-key': 'Secret key removed',
   'reset-password-with-recovery-key': 'Master password reset with the recovery key',
   'rotate-recovery-key': 'Recovery key replaced',
   'enrol-identity': 'Identity key created',

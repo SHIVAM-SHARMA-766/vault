@@ -17,6 +17,8 @@ export type ActivityKind =
   | 'login'
   | 'recovery-login'
   | 'change-password'
+  | 'add-secret-key'
+  | 'remove-secret-key'
   | 'rotate-recovery-key'
   | 'enrol-identity'
   | 'reset-password-with-recovery-key'
