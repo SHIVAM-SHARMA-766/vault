@@ -293,7 +293,7 @@ multiplies the cost of every rough edge, so they are paid down first.
 - [x] Independent security review of everything since phase 1: one critical (cross-organization
   item access) and five medium/low findings fixed with regression tests; one design gap
   recorded as threat A15 (signed key grants).
-- [ ] Decide the crypto questions: signed key grants (A15), secret key in the KDF, breach checks,
+- [ ] Decide the crypto questions: signed key grants (A15), secret key in the KDF, ~~breach checks~~ (decided: [0019](../decisions/0019-breach-check.md)),
   Argon2id.
 - [x] Performance: 5,000-item vault unlocks in **1.1 s** at 4× CPU throttle (was 4.2 s) — imported
   keys cached (dropped on wipe), long lists drawn incrementally; first load 111 → 77 KB gzipped.
@@ -332,7 +332,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ⬜ D2 File attachments · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
-- ⬜ D5 Breach check and a Watchtower-style dashboard · ⬜ D6 Expiry and rotation reminders · ⬜ D7 Access requests (check-out)
+- ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ⬜ D6 Expiry and rotation reminders (expiry shown in health; email reminders still open) · ⬜ D7 Access requests (check-out)
 - ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
 - ⬜ D11 Share one item with one person · ⬜ D12 Notify on access to a sensitive item
 

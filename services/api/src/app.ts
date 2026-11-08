@@ -19,6 +19,7 @@ import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
 import * as prefs from './routes/prefs.js'
 import * as shares from './routes/shares.js'
+import { breachRange } from './breach.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -138,6 +139,7 @@ export function buildRouter(app: App): Router {
   router.get('/api/shares', authed((u) => shares.listShares(app, u)), 'My share links and their status')
   router.delete('/api/shares/:id', authed((u, _e, id) => shares.revokeShare(app, u, id)), 'Revoke one of my share links')
   router.post('/api/shares/:id/open', ({ event, param }) => shares.openShare(app, event, param), 'Open a share link (no account needed; counts one view)')
+  router.get('/api/breach/range/:prefix', authed((u, _e, prefix) => breachRange(app, u, prefix)), 'Pwned Passwords range for a 5-character SHA-1 prefix, relayed for the breach check')
   router.get('/api/prefs', authed((u) => prefs.getPrefs(app, u)), 'My sealed preferences')
   router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
   router.get('/api/backups', authed((u) => backups.getBackups(app, u)), 'My backup schedule, destination, runs and copies')

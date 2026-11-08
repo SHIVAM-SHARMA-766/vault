@@ -96,14 +96,6 @@ are planned alongside passkey support (phase 4).
 </details>
 
 <details>
-<summary>🟠 <b>No breach check</b></summary>
-
-Password health finds weak, reused, old and http-only passwords locally. Checking against a
-public breach corpus would reveal a 5-character hash prefix per password to that service;
-whether to offer it, and how, is an open decision.
-</details>
-
-<details>
 <summary>🔴 <b>Emergency access trusts the server to keep the waiting period</b></summary>
 
 A grantor's vault key is sealed to their trusted contact when the contact is confirmed; the

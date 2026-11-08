@@ -38,6 +38,7 @@ someone who would otherwise assume it was an oversight.
 | [0016](0016-teams-completion.md) | Key rotation, groups, policies, access audit, emergency access, operator view |
 | [0017](0017-personal-backups.md) | Personal backups: each person's own schedule and destination (S3, WebDAV, on the server) |
 | [0018](0018-share-links.md) | Share links: one item, opened without an account; the key stays in the link |
+| [0019](0019-breach-check.md) | Breach check: k-anonymity, relayed by the server, on request |
 
 ## A note on the numbering
 
