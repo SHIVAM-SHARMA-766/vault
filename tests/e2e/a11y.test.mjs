@@ -30,6 +30,10 @@ test('every screen passes axe-core WCAG 2.1 AA, light and dark', async () => {
     for (const scheme of ['light', 'dark']) {
       const page = await s.person({ scheme, bypassCSP: true })
       for (const path of ['/', '/features', '/security', '/faq', '/get']) { await page.goto(`${s.base}${path}`); await audit(page, `${scheme} site ${path}`, found) }
+      // A share link's landing page (no account; the link here is made up, so it stays on the landing step).
+      await page.goto(`${s.base}/app/s/AAAAAAAAAAAAAAAAAAAAAA#${'A'.repeat(43)}`)
+      await page.waitForSelector('text=Someone shared an item with you')
+      await audit(page, `${scheme} share link`, found)
       // Closed (once an account exists): sign-in offers a request for access.
       if (scheme === 'light') { const first = await s.person(); await s.register(first, 'first@example.test') }
       await s.setRegistration(false)

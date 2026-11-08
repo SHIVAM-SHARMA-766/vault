@@ -18,6 +18,7 @@ import * as desk from './routes/desk.js'
 import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
 import * as prefs from './routes/prefs.js'
+import * as shares from './routes/shares.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -133,6 +134,10 @@ export function buildRouter(app: App): Router {
   router.get('/api/vault/history/:id', authed((u, _e, id) => vault.getHistory(app, u, id)), 'Previous versions of an entry')
   router.post('/api/vault/import', authed((u, e) => vault.bulkImport(app, u, e)), 'Create many sealed items at once; never overwrites')
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)), 'Add a sealed previous version')
+  router.post('/api/shares', authed((u, e) => shares.createShare(app, u, e)), 'Create a share link for one item (sealed in the browser; the key stays in the link)')
+  router.get('/api/shares', authed((u) => shares.listShares(app, u)), 'My share links and their status')
+  router.delete('/api/shares/:id', authed((u, _e, id) => shares.revokeShare(app, u, id)), 'Revoke one of my share links')
+  router.post('/api/shares/:id/open', ({ event, param }) => shares.openShare(app, event, param), 'Open a share link (no account needed; counts one view)')
   router.get('/api/prefs', authed((u) => prefs.getPrefs(app, u)), 'My sealed preferences')
   router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
   router.get('/api/backups', authed((u) => backups.getBackups(app, u)), 'My backup schedule, destination, runs and copies')

@@ -27,6 +27,8 @@ export type ActivityKind =
   | 'revoke-session'
   | 'emergency-request'
   | 'emergency-access'
+  | 'share-create'
+  | 'share-open'
 
 
 /** Best effort. A failure to record an event must never fail the operation

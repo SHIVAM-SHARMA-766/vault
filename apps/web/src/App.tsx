@@ -25,6 +25,7 @@ const Settings = lazy(() => import('./features/settings/Settings.js').then((m) =
 const Transfer = lazy(() => import('./features/transfer/Transfer.js').then((m) => ({ default: m.Transfer })))
 const Support = lazy(() => import('./features/desk/Support.js').then((m) => ({ default: m.Support })))
 const Orgs = lazy(() => import('./features/orgs/Orgs.js').then((m) => ({ default: m.Orgs })))
+const ShareView = lazy(() => import('./features/share/ShareView.js').then((m) => ({ default: m.ShareView })))
 const Loading = () => <div className="boot">Loading…</div>
 
 type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-help'
@@ -35,7 +36,9 @@ export function App() {
 
   return (
     <ToastProvider>
-      {unlocked ? <Signed state={unlocked} /> : <AuthScreen />}
+      {/* A share link opens the same way signed in or not, and never touches the vault. */}
+      {location.pathname.startsWith('/app/s/') ? <Suspense fallback={<Loading />}><ShareView /></Suspense>
+        : unlocked ? <Signed state={unlocked} /> : <AuthScreen />}
     </ToastProvider>
   )
 }

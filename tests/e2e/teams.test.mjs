@@ -59,7 +59,7 @@ test('share a collection between two people, confirmed by fingerprint, then remo
     await alice.fill('#f-password', 'Zq8!vN3#pL6@wR1x')
     await alice.click('.editor-foot .btn-primary')
     await alice.waitForSelector('.detail h2:has-text("AWS root")')
-    await alice.getByRole('button', { name: 'Share' }).click()
+    await alice.getByRole('button', { name: 'Share', exact: true }).click()
     await alice.selectOption('select[aria-label="Collection"]', { label: 'Acme / Finance' })
     await alice.getByRole('button', { name: 'Move to collection' }).click()
     await alice.waitForSelector('.badge-shared:has-text("Acme / Finance")')

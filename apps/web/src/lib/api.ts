@@ -104,6 +104,16 @@ export interface UpdateStatus {
 export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
 export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number }
 /** Server-wide rules set by an administrator (G1, G3, G7). */
+export interface ShareRow {
+  id: string
+  labelBlob: string
+  createdAt: string
+  expiresAt: string
+  maxViews: number | null
+  views: number
+  status: 'live' | 'used' | 'expired' | 'revoked'
+}
+
 export interface ServerPolicy {
   requireTwoFactor: boolean
   minPasswordScore: number
@@ -326,6 +336,13 @@ export const api = {
     request<{ ok: true }>('POST', '/api/account/delete', { token, body }),
   /** What anyone may know about this server before signing in. */
   instance: () => request<Instance>('GET', '/api/instance'),
+  shares: {
+    create: (token: string, body: { id: string; blob: string; labelBlob: string; expiresIn: number; maxViews: number | null }) =>
+      request<{ id: string; expiresAt: string; maxViews: number | null }>('POST', '/api/shares', { token, body }),
+    list: (token: string) => request<{ shares: ShareRow[] }>('GET', '/api/shares', { token }),
+    revoke: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/shares/${encodeURIComponent(id)}`, { token }),
+    open: (id: string) => request<{ blob: string; expiresAt: string; viewsLeft: number | null }>('POST', `/api/shares/${encodeURIComponent(id)}/open`, {}),
+  },
   prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),
   putPrefs: (token: string, blob: string) => request<{ updatedAt: string }>('PUT', '/api/prefs', { token, body: { blob } }),
   backups: {

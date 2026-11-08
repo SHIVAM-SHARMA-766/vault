@@ -260,6 +260,21 @@ you are away. Create one that can write only to that bucket or folder.
 
 If you see a device you do not recognise: sign it out, then change your master password.
 
+## Sharing one item by link
+
+To give one item to someone without an account (a contractor, a relative, a new colleague),
+open it and choose **Link**. Pick how long the link lasts (1 hour to 30 days) and how many
+times it can be opened (once, 2, 5, 10, or no limit), then **Create link** and copy it.
+
+- The link holds its own key after the `#`. Vault never receives that key, so it cannot show
+  you the link again. Copy it straight away.
+- The person opens it in any browser and chooses **Open it**. A chat app's preview does not use
+  up a view.
+- They get a copy of the item as it was when you shared it. Later edits are not in the copy.
+- **Settings → Security → Share links** shows each link (live, used up, expired, revoked) and how
+  often it was opened, with **Revoke** for live ones. Every open also shows in your activity.
+- Anyone who has the whole link can open it, so send it over a channel you trust.
+
 ## Sharing with an organization
 
 Account menu → **Organizations**.

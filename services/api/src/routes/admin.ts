@@ -30,6 +30,7 @@ import {
 import { bkdueSk } from '../personal-backup.js'
 import { updateStatus } from '../updates.js'
 import { applyRetention } from '../retention.js'
+import { eraseShares } from './shares.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
@@ -268,6 +269,7 @@ export async function deleteUser(app: App, actor: string, actorRole: Role, event
  *  The caller has already refused when it owns any. */
 export async function eraseAccount(app: App, id: string, emailDigest: string): Promise<void> {
   await leaveAllOrgs(app, id, false)
+  await eraseShares(app, id)
   for (const item of await app.store.query(userPk(id))) await app.store.delete(item.pk, item.sk)
   await app.store.delete(emailPk(emailDigest), EMAIL_SK)
   await app.store.delete(SYSTEM_PK, registrySk(id))
