@@ -18,6 +18,14 @@ export type EntryType =
   | 'bankAccount'
   | 'sshKey'
   | 'wifi'
+  | 'apiCredential'
+  | 'database'
+  | 'server'
+  | 'softwareLicense'
+  | 'passport'
+  | 'driverLicense'
+  | 'membership'
+  | 'cryptoWallet'
 
 export interface CustomField {
   label: string

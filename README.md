@@ -30,9 +30,10 @@ sites you use.
 </td>
 <td width="50%" valign="top">
 
-### 🗂️ Seven item types, nested folders
-Logins, secure notes, cards, identities, bank accounts, SSH keys and Wi-Fi, each with its
-own fields; custom and hidden fields; folders four levels deep; live one-time codes.
+### 🗂️ Fifteen item types, nested folders
+Logins, notes, cards, identities, bank accounts, passports, driving licences, memberships,
+crypto wallets, API credentials, databases, servers, software licences, SSH keys and Wi-Fi,
+each with its own fields; custom and hidden fields; folders four levels deep; live one-time codes.
 
 </td>
 </tr>

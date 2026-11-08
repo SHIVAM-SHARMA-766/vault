@@ -71,8 +71,9 @@ themselves off as you do them; **Hide this** puts it away.
 | Middle column | The items in the current view; type to search (press <kbd>/</kbd>) |
 | Right column | The open item: copy any field, reveal a password, open the website, see a live **one-time code** |
 
-**Add an item** with **New item**. Choose its type — Login, Secure note, Card, Identity,
-Bank account, SSH key or Wi-Fi — and the form shows that type's own fields. Add **custom
+**Add an item** with **New item**. Choose its type — fifteen of them, grouped as Everyday,
+Money, Documents and Technical — and the form shows that type's own fields. The left column
+lists a type once you have an item of it. Add **custom
 fields** for anything else, and mark them hidden to mask them like a password.
 
 <details>
@@ -89,6 +90,17 @@ fields** for anything else, and mark them hidden to mask them like a password.
 | Bank account | Bank, holder, account number, IFSC/routing, IBAN, type, PIN |
 | SSH key | Host, public key, private key, passphrase |
 | Wi-Fi | Network name, password, security |
+| API credential | Service, key ID, secret or token (with generator), endpoint, scopes, expiry |
+| Database | Type (PostgreSQL, MySQL…), host, port, database, username, password, connection string |
+| Server | Host or IP, username, password, admin console, hosting provider |
+| Software licence | Product, version, licence key, licensed to, email, purchased, expiry |
+| Passport | Full name, number, country, nationality, date of birth, place of issue, issued, expiry |
+| Driving licence | Full name, number, country or state, vehicle classes, date of birth, issued, expiry |
+| Membership | Organization, member name, member or policy number, PIN, website, phone, expiry |
+| Crypto wallet | Wallet, receiving address, recovery phrase (masked), wallet password, PIN |
+
+Dates are written in your locale's style, and an expiry date that has passed shows
+**Expired**.
 
 </details>
 
@@ -131,7 +143,7 @@ nothing is lost either way.
 
 <img src="images/health.png" alt="Password health: score 78/100, filters for weak, reused, old and unencrypted site, and the advice shown on an affected item" width="820">
 
-**Password health** in the left column scores your logins and Wi-Fi passwords out of 100 and
+**Password health** in the left column scores the passwords of your logins, Wi-Fi, databases and servers out of 100 and
 lists the ones with a problem:
 
 | Finding | Meaning | What to do |

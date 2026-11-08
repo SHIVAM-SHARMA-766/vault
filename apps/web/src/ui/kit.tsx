@@ -9,6 +9,7 @@ import type { EntryType } from '@vault/crypto'
 import {
   IconAlert, IconBank, IconCard, IconCheck, IconCopy, IconEye, IconEyeOff, IconKey,
   IconNote, IconRefresh, IconTerminal, IconUser, IconWifi,
+  IconBadge, IconCode, IconDatabase, IconIdCard, IconPassport, IconServer, IconTicket, IconWallet,
 } from './icons.js'
 import * as prefs from '../lib/prefs.js'
 
@@ -235,6 +236,14 @@ export const TYPES: { type: EntryType; label: string; plural: string; Icon: (p: 
   { type: 'bankAccount', label: 'Bank account', plural: 'Bank accounts', Icon: IconBank },
   { type: 'sshKey', label: 'SSH key', plural: 'SSH keys', Icon: IconTerminal },
   { type: 'wifi', label: 'Wi-Fi', plural: 'Wi-Fi', Icon: IconWifi },
+  { type: 'apiCredential', label: 'API credential', plural: 'API credentials', Icon: IconCode },
+  { type: 'database', label: 'Database', plural: 'Databases', Icon: IconDatabase },
+  { type: 'server', label: 'Server', plural: 'Servers', Icon: IconServer },
+  { type: 'softwareLicense', label: 'Software licence', plural: 'Software licences', Icon: IconBadge },
+  { type: 'passport', label: 'Passport', plural: 'Passports', Icon: IconPassport },
+  { type: 'driverLicense', label: 'Driving licence', plural: 'Driving licences', Icon: IconIdCard },
+  { type: 'membership', label: 'Membership', plural: 'Memberships', Icon: IconTicket },
+  { type: 'cryptoWallet', label: 'Crypto wallet', plural: 'Crypto wallets', Icon: IconWallet },
 ]
 
 export const typeInfo = (t: EntryType) => TYPES.find((x) => x.type === t) ?? TYPES[0]!

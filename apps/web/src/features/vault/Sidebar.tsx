@@ -57,7 +57,9 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
       </> : null}
 
       <div className="sidebar-heading">Types</div>
-      {TYPES.map(({ type, plural, Icon }) => (
+      {/* Only the types this vault holds (and the one being viewed), so
+          fifteen types do not push folders off the screen. */}
+      {TYPES.filter(({ type }) => counts[type] || (filter.kind === 'type' && filter.type === type)).map(({ type, plural, Icon }) => (
         <SideItem key={type} active={filter.kind === 'type' && filter.type === type} onClick={() => setFilter({ kind: 'type', type })}
                   icon={<Icon size={16} />} label={plural} count={counts[type]} />
       ))}

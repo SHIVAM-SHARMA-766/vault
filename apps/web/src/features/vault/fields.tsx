@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react'
 
 import { generateTotp } from '@vault/crypto'
-import { type FieldSpec, cardBrand, formatCardNumber } from '@vault/core'
+import { type FieldSpec, cardBrand, formatCardNumber, formatDate, isPast } from '@vault/core'
 
 import { IconExternal, IconEye, IconEyeOff } from '../../ui/icons.js'
 import { CopyButton, Generator, StrengthMeter } from '../../ui/kit.js'
@@ -27,11 +27,23 @@ export function FieldView({ spec, value, entryType }: { spec: FieldSpec; value: 
       return <TotpRow secret={value} />
     case 'url':
       return <UrlRow label={spec.label} value={value} />
+    case 'date':
+      return <DateRow label={spec.label} value={value} expiry={spec.key === 'expires'} />
     case 'select':
       return <TextRow label={spec.label} value={spec.options?.find(([k]) => k === value)?.[1] ?? value} copy={false} />
     default:
       return <TextRow label={spec.label} value={value} />
   }
+}
+
+function DateRow({ label, value, expiry }: { label: string; value: string; expiry: boolean }) {
+  const expired = expiry && isPast(value)
+  return (
+    <div className="field-row">
+      <span className="field-label">{label}{expired ? <span className="pill pill-danger field-badge">Expired</span> : null}</span>
+      <div className="field-value"><span className="truncate">{formatDate(value)}</span></div>
+    </div>
+  )
 }
 
 export function TextRow({ label, value, copy = true }: { label: string; value: string; copy?: boolean }) {
@@ -165,6 +177,14 @@ export function FieldInput({ spec, value, onChange }: { spec: FieldSpec; value: 
         <textarea id={id} rows={spec.kind === 'secretBlock' ? 6 : 3} spellCheck={false}
                   className={spec.kind === 'secretBlock' ? 'mono' : ''} placeholder={spec.placeholder}
                   value={value} onChange={(e) => onChange(e.target.value)} />
+      </div>
+    )
+  }
+  if (spec.kind === 'date') {
+    return (
+      <div className="field">
+        <label htmlFor={id}>{spec.label}</label>
+        <input id={id} type="date" value={value} onChange={(e) => onChange(e.target.value)} />
       </div>
     )
   }

@@ -5,7 +5,7 @@
 import { useMemo, useState } from 'react'
 
 import type { CustomField, EntryContent, EntryType } from '@vault/crypto'
-import { TYPE_SPECS, flattenTree, folderTree, readField, typeSpec, writeField } from '@vault/core'
+import { flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField } from '@vault/core'
 
 import { IconEye, IconEyeOff, IconPlus, IconX } from '../../ui/icons.js'
 import { FieldInput } from './fields.js'
@@ -54,7 +54,11 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
           <div className="field">
             <label htmlFor="f-type">Type</label>
             <select id="f-type" value={draft.type} onChange={(e) => set('type', e.target.value as EntryType)}>
-              {TYPE_SPECS.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+              {typesByGroup().map(({ group, types }) => (
+                <optgroup key={group} label={group}>
+                  {types.map((t) => <option key={t.type} value={t.type}>{t.label}</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
           <div className="field">

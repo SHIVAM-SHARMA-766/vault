@@ -185,7 +185,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const chips: { f: Filter; label: string }[] = [
     { f: { kind: 'all' }, label: 'All' }, { f: { kind: 'favorites' }, label: 'Favorites' },
     ...folders.filter((x) => !x.parentId).map((x) => ({ f: { kind: 'folder', id: x.id } as Filter, label: x.name })),
-    ...TYPES.map((t) => ({ f: { kind: 'type', type: t.type } as Filter, label: t.plural })),
+    ...TYPES.filter((t) => entries.some((e) => e.type === t.type) || (filter.kind === 'type' && filter.type === t.type))
+      .map((t) => ({ f: { kind: 'type', type: t.type } as Filter, label: t.plural })),
     { f: { kind: 'archive' }, label: 'Archive' },
   ]
 

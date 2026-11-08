@@ -331,7 +331,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ⬜ C7 Server backup settings in the admin UI
 
 **D. Features others have**
-- ⬜ D1 More item types · ⬜ D2 File attachments · ⬜ D3 Secure share links · ✅ D4 Archive
+- ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ⬜ D2 File attachments · ⬜ D3 Secure share links · ✅ D4 Archive
 - ⬜ D5 Breach check and a Watchtower-style dashboard · ⬜ D6 Expiry and rotation reminders · ⬜ D7 Access requests (check-out)
 - ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
 - ⬜ D11 Share one item with one person · ⬜ D12 Notify on access to a sensitive item
