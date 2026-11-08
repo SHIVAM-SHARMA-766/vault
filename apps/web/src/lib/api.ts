@@ -101,7 +101,7 @@ export interface UpdateStatus {
   enabled: boolean; current: string; latest: string | null; newer: boolean; url: string | null
   publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
 }
-export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
+export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string; accent: string; logo: string }
 export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean }
 /** Server-wide rules set by an administrator (G1, G3, G7). */
 export interface ShareRow {
@@ -297,15 +297,16 @@ export const api = {
     accept: (token: string, org: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/accept`, { token }),
     decline: (token: string, org: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/decline`, { token }),
     members: (token: string, org: string) => request<{ members: OrgMember[]; pending: OrgPending[] }>('GET', `/api/orgs/${org}/members`, { token }),
-    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin') =>
-      request<{ ok: true }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role } }),
+    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin', groups: string[] = []) =>
+      request<{ ok: true }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role, ...(groups.length ? { groups } : {}) } }),
+    stale: (token: string, org: string) => request<{ items: { collectionId: string; itemId: string; since: string; who: string }[] }>('GET', `/api/orgs/${org}/stale`, { token }),
     withdraw: (token: string, org: string, id: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/invites/${encodeURIComponent(id)}`, { token }),
     confirm: (token: string, org: string, user: string, orgKeyBlob: string) =>
       request<{ ok: true }>('POST', `/api/orgs/${org}/members/${user}/confirm`, { token, body: { orgKeyBlob } }),
     setRole: (token: string, org: string, user: string, role: 'admin' | 'member') =>
       request<{ ok: true }>('PUT', `/api/orgs/${org}/members/${user}`, { token, body: { role } }),
     removeMember: (token: string, org: string, user: string) =>
-      request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/members/${user}`, { token }),
+      request<{ ok: true; rotationNeeded: string[]; passwordsToChange: number }>('DELETE', `/api/orgs/${org}/members/${user}`, { token }),
     collections: (token: string, org: string) => request<{ collections: CollectionRow[] }>('GET', `/api/orgs/${org}/collections`, { token }),
     createCollection: (token: string, org: string, body: { id: string; nameBlob: string; keyBlob: string }) =>
       request<{ id: string }>('POST', `/api/orgs/${org}/collections`, { token, body }),
@@ -336,8 +337,8 @@ export const api = {
       request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token }),
     items: (token: string, org: string, coll: string) =>
       request<{ items: { id: string; blob: string; keyVersion: number; updatedAt: string }[] }>('GET', `/api/orgs/${org}/collections/${coll}/items`, { token }),
-    putItem: (token: string, org: string, coll: string, item: string, blob: string, keyVersion: number) =>
-      request<{ id: string }>('PUT', `/api/orgs/${org}/collections/${coll}/items/${item}`, { token, body: { blob, keyVersion } }),
+    putItem: (token: string, org: string, coll: string, item: string, blob: string, keyVersion: number, passwordChanged = false) =>
+      request<{ id: string }>('PUT', `/api/orgs/${org}/collections/${coll}/items/${item}`, { token, body: { blob, keyVersion, ...(passwordChanged ? { passwordChanged } : {}) } }),
     deleteItem: (token: string, org: string, coll: string, item: string) =>
       request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/items/${item}`, { token }),
   },
@@ -398,6 +399,9 @@ export const api = {
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/reset-2fa`, { token }),
     setDisabled: (token: string, id: string, disabled: boolean) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/disabled`, { token, body: { disabled } }),
+    offboard: (token: string, id: string) => request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/offboard`, { token }),
+    resendInvite: (token: string, id: string, email: string, days = 7) =>
+      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role }; warning?: string }>('POST', `/api/admin/invites/${encodeURIComponent(id)}/resend`, { token, body: { email, days } }),
     revokeSessions: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/revoke-sessions`, { token }),
     deleteUser: (token: string, id: string) =>
@@ -468,8 +472,8 @@ export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
 export interface OrgRow { id: string; nameBlob: string; hint: string; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
 export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
-export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null }
-export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string }
+export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[] }
+export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[] }
 export interface GroupRow { id: string; nameBlob: string; members: string[]; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean }[] }
 export interface CollectionRow {
   id: string; nameBlob: string; keyVersion: number; rotationNeeded: boolean

@@ -39,7 +39,7 @@ test('reuse, age and http are found; notes and cards are not checked', () => {
   assert.deepEqual(r.issues.get('d'), ['old'], 'the password age wins over the last edit')
   assert.deepEqual(r.issues.get('e'), ['weak'])
   assert.equal(r.issues.has('f'), false, 'a local address over http is not flagged; a recent change is not old')
-  assert.deepEqual(r.counts, { breached: 0, weak: 1, reused: 2, old: 1, insecure: 1, expired: 0, expiring: 0 })
+  assert.deepEqual(r.counts, { breached: 0, exposed: 0, weak: 1, reused: 2, old: 1, insecure: 1, expired: 0, expiring: 0 })
   assert.equal(r.score, 17)
 })
 
@@ -94,4 +94,11 @@ test('breach counts are read from a range response, padding and case aside', () 
   assert.equal(breachCount(body, '011053fd0102e94d6ae2f8b83d76faf94f6'), 12)
   assert.equal(breachCount(body, '00D4F6E8FA6EECAD2A3AA415EEC418D38EC'), 0)
   assert.equal(breachCount(body, 'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF'), 0)
+})
+
+test('a shared password seen by someone who left is an issue, and is scored', () => {
+  const fresh = new Date().toISOString()
+  const r = analyse([{ id: 's', type: 'login', password: 'unique-and-Long-Passw0rd!x', updatedAt: fresh }], Date.now(), new Set(), new Set(['s']))
+  assert.deepEqual(r.issues.get('s'), ['exposed'])
+  assert.equal(r.score, 0)
 })

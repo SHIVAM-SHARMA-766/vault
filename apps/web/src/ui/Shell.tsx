@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import * as session from '../lib/session.js'
 import { Link, navigate } from '../lib/router.js'
-import { IconGrid, IconKey, IconLock, IconShield, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
+import { IconGrid, IconKey, IconLock, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
+import { BrandMark } from '../lib/instance.js'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer' }
 
@@ -22,7 +23,7 @@ export function Shell({ state, tag, center, actions, children }: {
     <div className="app">
       <header className="topbar">
         <Link to="/app/" className="brand" title="Your vault">
-          <span className="brand-mark"><IconShield size={18} /></span>Vault
+          <BrandMark size={18} />
           {tag ? <span className="admin-tag">{tag}</span> : null}
         </Link>
         {center}

@@ -37,7 +37,16 @@ export interface InstanceProfile {
   name: string
   supportEmail: string
   supportUrl: string
+  /** Branding (B3): one of the accent colours the app ships (each checked for
+   *  contrast in light and dark), or '' for the default. */
+  accent: string
+  /** A small logo as a data: URL (PNG, JPEG or WebP), or ''. */
+  logo: string
 }
+
+export const ACCENTS = ['indigo', 'blue', 'teal', 'green', 'orange', 'rose', 'slate'] as const
+export const LOGO_MAX_CHARS = 64 * 1024
+export const LOGO_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/
 
 /** Server-wide rules an administrator sets for every account (G1, G3, G7).
  *  Two-factor and password strength are shown to anyone who misses them and
@@ -107,7 +116,13 @@ export interface Settings {
 function readProfile(value: unknown): InstanceProfile {
   const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
   const str = (k: string) => (typeof v[k] === 'string' ? (v[k] as string) : '')
-  return { name: str('name'), supportEmail: str('supportEmail'), supportUrl: str('supportUrl') }
+  const accent = str('accent')
+  const logo = str('logo')
+  return {
+    name: str('name'), supportEmail: str('supportEmail'), supportUrl: str('supportUrl'),
+    accent: (ACCENTS as readonly string[]).includes(accent) ? accent : '',
+    logo: logo.length <= LOGO_MAX_CHARS && LOGO_PATTERN.test(logo) ? logo : '',
+  }
 }
 
 function readTemplates(value: unknown): Settings['templates'] {

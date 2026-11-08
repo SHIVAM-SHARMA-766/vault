@@ -68,17 +68,18 @@ export function passwordStrength(password: string): Strength {
   return { score: 4, label: 'Excellent' }
 }
 
-export type Issue = 'breached' | 'weak' | 'reused' | 'old' | 'insecure' | 'expired' | 'expiring'
+export type Issue = 'breached' | 'exposed' | 'weak' | 'reused' | 'old' | 'insecure' | 'expired' | 'expiring'
 
 /** Issues about a password, which the score counts. Expiry is about the
  *  item, shown beside them but not scored. */
-export const PASSWORD_ISSUES: readonly Issue[] = ['breached', 'weak', 'reused', 'old', 'insecure']
+export const PASSWORD_ISSUES: readonly Issue[] = ['breached', 'exposed', 'weak', 'reused', 'old', 'insecure']
 
 /** How far ahead "expiring soon" looks. */
 export const EXPIRING_DAYS = 30
 
 export const ISSUES: readonly { issue: Issue; label: string; advice: string }[] = [
   { issue: 'breached', label: 'Breached', advice: 'This password appears in known data breaches, so attackers try it first. Change it here and everywhere else it is used.' },
+  { issue: 'exposed', label: 'Seen by someone who left', advice: 'Someone who could open this shared item has left the organization. Change this password at the site, then here.' },
   { issue: 'weak', label: 'Weak', advice: 'Easy to guess. Replace it with a generated password.' },
   { issue: 'reused', label: 'Reused', advice: 'The same password is used elsewhere in this vault. One leak opens every site that shares it.' },
   { issue: 'old', label: 'Old', advice: 'Not changed in over a year.' },
@@ -124,8 +125,9 @@ export function expiryOf(e: Pick<HealthInput, 'type' | 'fields'>): number | null
   return null
 }
 
-/** `breached` holds the ids of entries whose password a breach check found. */
-export function analyse(entries: readonly HealthInput[], now = Date.now(), breached: ReadonlySet<string> = new Set()): HealthReport {
+/** `breached` holds the ids of entries whose password a breach check found;
+ *  `exposed`, shared items someone who has since left could open (B9). */
+export function analyse(entries: readonly HealthInput[], now = Date.now(), breached: ReadonlySet<string> = new Set(), exposed: ReadonlySet<string> = new Set()): HealthReport {
   // Types whose password a person chose and could reuse: not a card PIN or a
   // wallet password, which are checked by nobody else.
   const withPassword = entries.filter((e) => PASSWORD_TYPES.has(e.type) && e.password)
@@ -133,11 +135,12 @@ export function analyse(entries: readonly HealthInput[], now = Date.now(), breac
   for (const e of withPassword) uses.set(e.password!, (uses.get(e.password!) ?? 0) + 1)
 
   const issues = new Map<string, Issue[]>()
-  const counts: Record<Issue, number> = { breached: 0, weak: 0, reused: 0, old: 0, insecure: 0, expired: 0, expiring: 0 }
+  const counts: Record<Issue, number> = { breached: 0, exposed: 0, weak: 0, reused: 0, old: 0, insecure: 0, expired: 0, expiring: 0 }
   let failing = 0
   for (const e of withPassword) {
     const found: Issue[] = []
     if (breached.has(e.id)) found.push('breached')
+    if (exposed.has(e.id)) found.push('exposed')
     if (passwordStrength(e.password!).score <= 1) found.push('weak')
     if ((uses.get(e.password!) ?? 0) > 1) found.push('reused')
     const changed = Date.parse(e.passwordChangedAt ?? e.updatedAt)

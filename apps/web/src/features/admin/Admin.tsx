@@ -26,7 +26,7 @@ import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Website } from './Website.js'
 import { System } from './System.js'
-import { refresh as refreshInstance } from '../../lib/instance.js'
+import { applyBranding, refresh as refreshInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
@@ -287,7 +287,7 @@ function ProfileCard({ canWrite }: { canWrite: boolean }) {
   return (
     <form className="admin-card admin-card-wide" aria-labelledby="profile-title" onSubmit={async (e) => {
       e.preventDefault()
-      if (await run(toast, (t) => api.admin.setProfile(t, form), 'Name and support contact saved')) { setSaved(form); refreshInstance() }
+      if (await run(toast, (t) => api.admin.setProfile(t, form), 'Name, support contact and branding saved')) { setSaved(form); refreshInstance() }
     }}>
       <div className="admin-card-head"><span className={`dot ${saved?.supportEmail ? 'dot-ok' : 'dot-muted'}`} /><h2 id="profile-title">Name and support</h2></div>
       <p className="muted small">Shown on the sign-in screen and the help page. Replies to any email Vault sends go to the support address.</p>
@@ -305,11 +305,46 @@ function ProfileCard({ canWrite }: { canWrite: boolean }) {
           <input id="pf-url" type="url" maxLength={300} placeholder="https://…" disabled={!canWrite} value={form.supportUrl} onChange={set('supportUrl')} />
         </div>
       </div>
+      <div className="grid-2">
+        <div className="field">
+          <span className="field-label" id="pf-accent">Accent colour</span>
+          <div className="accent-swatches" role="radiogroup" aria-labelledby="pf-accent">
+            {ACCENT_CHOICES.map(([key, colour, name]) => (
+              <button key={key || 'default'} type="button" role="radio" aria-checked={form.accent === key} aria-label={name} title={name} disabled={!canWrite}
+                      className="accent-swatch" style={{ background: colour }}
+                      onClick={() => { setForm({ ...form, accent: key }); applyBranding({ accent: key }) }} />
+            ))}
+          </div>
+          <p className="hint">Buttons, links and highlights, for everyone on this server. Each choice is readable in light and dark.</p>
+        </div>
+        <div className="field">
+          <label htmlFor="pf-logo">Logo (PNG, JPEG or WebP, up to 48 KB)</label>
+          <div className="logo-row">
+            {form.logo ? <img className="logo-preview" src={form.logo} alt="Current logo" /> : null}
+            <input id="pf-logo" type="file" accept="image/png,image/jpeg,image/webp" disabled={!canWrite} onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (!file) return
+              if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) { toast('Use a PNG, JPEG or WebP image.', 'error'); return }
+              if (file.size > 48 * 1024) { toast('That image is larger than 48 KB. Use a smaller one.', 'error'); return }
+              const reader = new FileReader()
+              reader.onload = () => setForm((f) => (f ? { ...f, logo: String(reader.result) } : f))
+              reader.readAsDataURL(file)
+            }} />
+            {form.logo && canWrite ? <button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm({ ...form, logo: '' })}>Remove</button> : null}
+          </div>
+          <p className="hint">Shown beside the server name on the sign-in page and at the top of the app.</p>
+        </div>
+      </div>
       {canWrite ? <div className="settings-actions"><button className="btn btn-primary btn-sm" type="submit" disabled={!dirty}>Save</button></div> : null}
     </form>
   )
 }
 
+const ACCENT_CHOICES: [string, string, string][] = [
+  ['', '#4f46e5', 'Indigo (default)'], ['blue', '#1d4ed8', 'Blue'], ['teal', '#0f766e', 'Teal'], ['green', '#15803d', 'Green'],
+  ['orange', '#c2410c', 'Orange'], ['rose', '#be123c', 'Rose'], ['slate', '#334155', 'Slate'],
+]
 const IDLE_CHOICES: (number | null)[] = [null, 1, 5, 15, 30, 60, 240]
 const SESSION_CHOICES: (number | null)[] = [null, 1, 7, 14, 30]
 const ACTIVITY_CHOICES = [30, 90, 180, 365]
@@ -518,6 +553,12 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                                     onClick={async () => { if (await run(toast, (t) => api.admin.setDisabled(t, u.userId, !u.disabled), u.disabled ? 'Account enabled' : 'Account disabled')) await reload() }}>
                               {u.disabled ? 'Enable' : 'Disable'}
                             </button>
+                            {!u.disabled ? (
+                              <button className="btn btn-secondary btn-sm" aria-label={`Offboard ${u.label || 'this account'}`} onClick={async () => {
+                                if (!window.confirm(`Offboard ${u.label || 'this account'}? They are disabled, signed out everywhere, and removed from every organization. Shared passwords they could see are listed for their colleagues to change.`)) return
+                                if (await run(toast, (t) => api.admin.offboard(t, u.userId), 'Offboarded: disabled, signed out, removed from organizations')) await reload()
+                              }}>Offboard</button>
+                            ) : null}
                             <button className="icon-btn icon-danger" title="Delete account" aria-label="Delete account"
                                     onClick={() => { setDeleting(u); setConfirmText('') }}>
                               <IconTrash size={15} />
@@ -661,6 +702,7 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
   const [email, setEmail] = useState('')
   const [issued, setIssued] = useState<{ code: string; label: string; expiresAt: string; emailedTo?: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [resending, setResending] = useState<{ invite: AdminInvite; email: string } | null>(null)
 
   async function create(e: React.FormEvent) {
     e.preventDefault()
@@ -735,6 +777,9 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
                   <td><span className={`pill ${i.status === 'active' ? 'pill-ok' : i.status === 'used' ? 'pill-accent' : ''}`}>{i.status}</span></td>
                   <td>
                     {i.status !== 'used' && canWrite ? (
+                      <button className="btn btn-ghost btn-sm" aria-label={`Send the invitation for ${i.label} again`} onClick={() => setResending({ invite: i, email: '' })}>Send again</button>
+                    ) : null}
+                    {i.status !== 'used' && canWrite ? (
                       <button className="icon-btn icon-danger" title="Revoke" aria-label="Revoke invitation"
                               onClick={async () => { if (await run(toast, (t) => api.admin.deleteInvite(t, i.id), 'Invitation revoked')) await reload() }}>
                         <IconTrash size={15} />
@@ -747,6 +792,28 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
           </table>
         </div>
       )}
+      {resending ? (
+        <form className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rs-title" onSubmit={async (e) => {
+          e.preventDefault()
+          const r = resending
+          await run(toast, async (t) => {
+            const res = await api.admin.resendInvite(t, r.invite.id, r.email.trim())
+            setIssued({ code: res.code, label: res.invite.label, expiresAt: res.invite.expiresAt, ...(res.emailed ? { emailedTo: r.email.trim() } : {}) })
+          }, 'Sent again with a fresh code; the old one no longer works')
+          setResending(null); await reload()
+        }}>
+          <div className="modal">
+            <h2 id="rs-title">Send the invitation for {resending.invite.label} again</h2>
+            <p className="muted">Vault keeps only a fingerprint of each code, so a fresh code replaces the old one, valid for 7 days. The old code stops working.</p>
+            <label htmlFor="rs-email" className="field-label">Email it to (optional)</label>
+            <input id="rs-email" type="email" autoFocus placeholder="Leave empty to copy the code yourself" value={resending.email} onChange={(e) => setResending({ ...resending, email: e.target.value })} />
+            <div className="modal-actions">
+              <button type="button" className="btn btn-secondary" onClick={() => setResending(null)}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Send again</button>
+            </div>
+          </div>
+        </form>
+      ) : null}
     </Section>
   )
 }

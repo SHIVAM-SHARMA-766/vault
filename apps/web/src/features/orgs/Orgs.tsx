@@ -84,6 +84,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
   const [confirming, setConfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
   const [email, setEmail] = useState('')
   const [label, setLabel] = useState('')
+  const [inviteGroups, setInviteGroups] = useState<string[]>([])
   const [collName, setCollName] = useState('')
   const [groupsList, setGroupsList] = useState<GroupView[]>([])
   const colls = teams.collections.filter((c) => c.orgId === org.id)
@@ -134,7 +135,9 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
                     if (teams.collections.find((c) => c.id === cid)?.permission !== 'manage') continue
                     try { await teams.rotate(cid); rotated++ } catch { /* left marked; the Rotate button retries */ }
                   }
-                  toast(r.rotationNeeded.length ? `Removed. ${rotated} of ${r.rotationNeeded.length} collection key(s) rotated.` : 'Removed')
+                  const keys = r.rotationNeeded.length ? ` ${rotated} of ${r.rotationNeeded.length} collection key(s) rotated.` : ''
+                  const pw = r.passwordsToChange ? ` ${r.passwordsToChange} password${r.passwordsToChange === 1 ? '' : 's'} they could see ${r.passwordsToChange === 1 ? 'is' : 'are'} listed in Password health to change.` : ''
+                  toast(`Removed.${keys}${pw}`)
                 }}><IconX size={15} /></button>
               ) : null}
             </div>
@@ -142,7 +145,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
         ))}
         {pending.map((p) => (
           <li key={p.id} className="device-row">
-            <div className="device-text"><span className="device-name">{p.label}</span><span className="muted small">invited · has not joined yet</span></div>
+            <div className="device-text"><span className="device-name">{p.label}</span><span className="muted small">invited · has not joined yet{p.groups?.length ? ` · will join ${p.groups.map((g) => groupsList.find((x) => x.id === g)?.name ?? 'a group').join(', ')}` : ''}</span></div>
             {admin ? <button className="btn btn-secondary btn-sm" onClick={async () => { await api.orgs.withdraw(await session.token(), org.id, p.id); await loadMembers() }}>Withdraw</button> : null}
           </li>
         ))}
@@ -156,7 +159,16 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
           <div className="confirm-actions">
             <button className="btn btn-secondary btn-sm" onClick={() => setConfirming(null)}>Cancel</button>
             <button className="btn btn-primary btn-sm" onClick={async () => {
-              try { await teams.confirm(org.id, confirming.m.userId, confirming.m.publicKey); toast(`${confirming.m.label} confirmed`); setConfirming(null); await loadMembers() }
+              try {
+                await teams.confirm(org.id, confirming.m.userId, confirming.m.publicKey)
+                // Groups chosen when they were invited (B2): joined now, with keys sealed here.
+                let joined = 0
+                for (const g of confirming.m.pendingGroups ?? []) {
+                  try { await teams.addToGroup(org.id, g, confirming.m.userId, confirming.m.publicKey); joined++ } catch { /* stays pending; add by hand */ }
+                }
+                toast(joined ? `${confirming.m.label} confirmed and added to ${joined} group${joined === 1 ? '' : 's'}` : `${confirming.m.label} confirmed`)
+                setConfirming(null); await loadMembers(); await teams.load()
+              }
               catch (err) { toast(err instanceof Error ? err.message : 'Could not confirm.', 'error') }
             }}><IconCheck size={15} />It matches — confirm</button>
           </div>
@@ -166,12 +178,21 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
       {admin ? (
         <form className="inline-form org-invite" onSubmit={async (e) => {
           e.preventDefault()
-          await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member')
-          toast('Invited. They will see it when they sign in.'); setEmail(''); setLabel(''); await loadMembers()
+          await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups)
+          toast('Invited. They will see it when they sign in.'); setEmail(''); setLabel(''); setInviteGroups([]); await loadMembers()
         }}>
           <input type="email" required placeholder="Email to invite" aria-label="Email to invite" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Name (for you)" aria-label="Name for this member" maxLength={80} value={label} onChange={(e) => setLabel(e.target.value)} />
           <button className="btn btn-secondary btn-sm" type="submit">Invite</button>
+          {groupsList.length ? (
+            <fieldset className="invite-groups">
+              <legend className="small muted">Add to groups once confirmed</legend>
+              {groupsList.map((g) => (
+                <label key={g.id} className="check"><input type="checkbox" checked={inviteGroups.includes(g.id)}
+                  onChange={(e) => setInviteGroups(e.target.checked ? [...inviteGroups, g.id] : inviteGroups.filter((x) => x !== g.id))} /><span>{g.name}</span></label>
+              ))}
+            </fieldset>
+          ) : null}
         </form>
       ) : null}
 

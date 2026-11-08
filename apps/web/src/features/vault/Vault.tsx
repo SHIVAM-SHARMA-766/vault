@@ -105,7 +105,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const health = useMemo(() => {
     const ok = active.filter((e) => !e.unreadable)
     const hit = new Set(breaches ? ok.filter((e) => e.password && (breaches.get(e.password) ?? 0) > 0).map((e) => e.id) : [])
-    return analyse(ok, Date.now(), hit)
+    const exposed = new Set(ok.filter((e) => (e as SharedEntry).exposed).map((e) => e.id))
+    return analyse(ok, Date.now(), hit, exposed)
   }, [active, breaches])
 
   async function runBreachCheck() {
@@ -555,7 +556,8 @@ function sorter(by: ListSort): (a: Decrypted, b: Decrypted) => number {
 }
 
 function contentOf(e: Decrypted): EntryContent {
-  const { orgId: _o, collectionId: _c, permission: _p, hidePasswords: _h, ...rest } = e as SharedEntry
+  // Everything the app adds about where an item sits stays out of what is sealed.
+  const { orgId: _o, collectionId: _c, permission: _p, hidePasswords: _h, exposed: _x, ...rest } = e as SharedEntry
   return stripMeta(rest as Decrypted)
 }
 

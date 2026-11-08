@@ -34,7 +34,7 @@ test('an admin sets the profile; anyone can read it without signing in', async (
   assert.equal(res.body['supportEmail'], 'help@acme.example')
   assert.equal(res.body['supportUrl'], 'https://acme.example/help')
   const settings = await h.request('GET', '/api/admin/settings', { token: owner })
-  assert.deepEqual(settings.body['profile'], PROFILE)
+  assert.deepEqual(settings.body['profile'], { ...PROFILE, accent: '', logo: '' })
 })
 
 test('changing the profile leaves registration alone, and the other way round', async () => {

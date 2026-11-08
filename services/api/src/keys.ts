@@ -96,6 +96,10 @@ export const groupAccessSk = (collectionId: string, groupId: string) => `GACCESS
 export const GROUP_ACCESS_PREFIX = 'GACCESS#'
 export const orgEventSk = (at: string, nonce: string) => `EVENT#${at}#${nonce}`
 export const ORG_EVENT_PREFIX = 'EVENT#'
+/** An item whose secrets someone who has since left could read (B9). Cleared
+ *  when its password is changed or it is deleted. */
+export const staleSk = (collectionId: string, itemId: string) => `STALE#${collectionId}#${itemId}`
+export const STALE_PREFIX = 'STALE#'
 
 /** Emergency access (routes/emergency.ts): the grant lives with the grantor;
  *  the invitation waits under the grantee's address digest, then a pointer

@@ -4,12 +4,31 @@
 import { useEffect, useState } from 'react'
 
 import { type Instance, api } from './api.js'
+import { IconShield } from '../ui/icons.js'
 
 let cached: Promise<Instance | null> | null = null
 
 function fetchOnce(): Promise<Instance | null> {
-  cached ??= api.instance().catch(() => null)
+  cached ??= api.instance().then((i) => { applyBranding(i); return i }, () => null)
   return cached
+}
+
+/** The admin's accent colour (B3), as a data attribute the stylesheet reads. */
+export function applyBranding(i: Pick<Instance, 'accent'> | null): void {
+  if (i?.accent) document.documentElement.dataset['accent'] = i.accent
+  else delete document.documentElement.dataset['accent']
+}
+
+/** The server's logo and name where the app shows its brand (B3); the shield
+ *  and "Vault" when none is set. */
+export function BrandMark({ size = 20 }: { size?: number }) {
+  const i = useInstance()
+  return (
+    <>
+      <span className="brand-mark">{i?.logo ? <img className="brand-logo" src={i.logo} alt="" /> : <IconShield size={size} />}</span>
+      {i?.name || 'Vault'}
+    </>
+  )
 }
 
 /** Forget the cached profile, after an admin changes it. */
