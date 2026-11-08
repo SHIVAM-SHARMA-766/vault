@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import {
-  type EntryContent, fromBase64Url, generateCollectionKey, generateOrgKey, identityFingerprint, isWithinSizeLimit,
+  type EntryContent, createOrgRecovery, deriveOrgRecovery, fromRecoveryString, openCollectionKeyFromRecovery, openOrgKeyFromRecovery, openOrgRecoveryEscrow, sealCollectionKeyForRecovery, sealOrgKeyForRecovery, toBase64Url, toRecoveryString, fromBase64Url, generateCollectionKey, generateOrgKey, identityFingerprint, isWithinSizeLimit,
   openCollectionKey, openCollectionMeta, openOrgKey, openOrgMeta, openSharedItem, sealCollectionKey,
   sealCollectionMeta, sealOrgKey, sealOrgMeta, sealSharedItem, unwrapIdentityPrivateKey, wipe, openGroupMeta, sealGroupMeta,
 } from '@vault/crypto'
@@ -43,6 +43,8 @@ export interface OrgView {
   kind: 'team' | 'direct'
   /** For a direct share, the other person's address (sealed in the org's name). */
   peer?: string
+  /** The organization recovery key's public half, when one is set (0026). */
+  recovery?: { createdAt: string; publicKey: string } | null
   role: OrgRole
   status: 'accepted' | 'confirmed'
   key?: Uint8Array
@@ -60,6 +62,8 @@ export interface CollectionView {
   rotationNeeded: boolean
   /** In a direct share with one person (D11). */
   direct?: boolean
+  /** This version's key has a copy sealed to the recovery key (0026). */
+  recoveryCovered?: boolean
   /** I asked for access and am waiting (D7). */
   requested?: boolean
   /** My access is a check-out that ends then (D7). */
@@ -102,7 +106,7 @@ export function useTeams(vaultKey: Uint8Array) {
       const colls: CollectionView[] = []
       const entries: SharedEntry[] = []
       for (const row of rows) {
-        const base = { id: row.id, kind: row.kind ?? 'team', role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap }
+        const base = { id: row.id, kind: row.kind ?? 'team', recovery: row.recovery ?? null, role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap }
         if (row.status !== 'confirmed' || !row.orgKeyBlob) { views.push({ ...base, name: row.hint || 'Organization' }); continue }
         const key = await openOrgKey(me.privateKey, me.publicKey, row.orgKeyBlob, row.id)
         const meta = await openOrgMeta(row.id, row.nameBlob, key)
@@ -112,7 +116,7 @@ export function useTeams(vaultKey: Uint8Array) {
         const stale = new Set((await api.orgs.stale(token, row.id).catch(() => ({ items: [] }))).items.map((s) => `${s.collectionId}/${s.itemId}`))
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
-          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), ...(c.requested ? { requested: true } : {}), ...(c.access?.until ? { until: c.access.until } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
+          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), ...(c.requested ? { requested: true } : {}), ...(c.recoveryCovered ? { recoveryCovered: true } : {}), ...(c.access?.until ? { until: c.access.until } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
           if (c.access && c.access.keyVersion === c.keyVersion) {
             view.key = await openCollectionKey(me.privateKey, me.publicKey, c.access.keyBlob, c.id, c.keyVersion)
             view.permission = c.access.permission
@@ -126,6 +130,14 @@ export function useTeams(vaultKey: Uint8Array) {
           }
           colls.push(view)
         }
+      }
+      // Collections this account manages that lack a recovery copy get one
+      // now (0026), so a recovery key created before them still covers them.
+      for (const c of colls) {
+        const rec = views.find((o) => o.id === c.orgId)?.recovery
+        if (!rec || !c.key || c.permission !== 'manage' || c.recoveryCovered) continue
+        void sealCollectionKeyForRecovery(fromBase64Url(rec.publicKey), c.key, c.id, c.keyVersion)
+          .then((blob) => api.orgs.setCollectionRecovery(token, c.orgId, c.id, c.keyVersion, blob)).catch(() => { /* next time */ })
       }
       entries.sort((a, b) => a.name.localeCompare(b.name))
       // The strictest idle policy among confirmed organizations sets the lock.
@@ -145,13 +157,65 @@ export function useTeams(vaultKey: Uint8Array) {
     return c as CollectionView & { key: Uint8Array }
   }
 
-  async function createOrg(name: string, label: string): Promise<string> {
+  /** Creates an organization, and its recovery key (0026): returned once, as
+   *  text, for the owner to keep offline. */
+  async function createOrg(name: string, label: string): Promise<{ id: string; recoveryKey: string }> {
     const me = await myIdentity(vaultKey)
     const id = crypto.randomUUID()
     const key = generateOrgKey()
-    await api.orgs.create(await session.token(), { id, hint: name.slice(0, 80), label, nameBlob: await sealOrgMeta(id, { name }, key), orgKeyBlob: await sealOrgKey(me.publicKey, key, id) })
+    const token = await session.token()
+    await api.orgs.create(token, { id, hint: name.slice(0, 80), label, nameBlob: await sealOrgMeta(id, { name }, key), orgKeyBlob: await sealOrgKey(me.publicKey, key, id) })
+    const rec = await createOrgRecovery(id)
+    await api.orgs.setRecovery(token, id, { publicKey: rec.publicKey, escrow: rec.escrow, verifier: rec.verifier, orgKeyRecovery: await sealOrgKeyForRecovery(rec.pair.publicKey, key, id), collections: [] })
     await load()
-    return id
+    return { id, recoveryKey: toRecoveryString(rec.recoveryKey) }
+  }
+
+  /** Creates or replaces an organization's recovery key, sealing the org key
+   *  and every collection key this account can open to it. */
+  async function makeRecoveryKey(orgId: string): Promise<{ recoveryKey: string; covered: number; total: number }> {
+    const org = orgs.find((o) => o.id === orgId)
+    if (!org?.key) throw new Error('You cannot open that organization.')
+    const rec = await createOrgRecovery(orgId)
+    const colls = collections.filter((c) => c.orgId === orgId)
+    const open = colls.filter((c) => c.key)
+    await api.orgs.setRecovery(await session.token(), orgId, {
+      publicKey: rec.publicKey, escrow: rec.escrow, verifier: rec.verifier,
+      orgKeyRecovery: await sealOrgKeyForRecovery(rec.pair.publicKey, org.key, orgId),
+      collections: await Promise.all(open.map(async (c) => ({ id: c.id, recoveryBlob: await sealCollectionKeyForRecovery(rec.pair.publicKey, c.key!, c.id, c.keyVersion) }))),
+    })
+    await load()
+    return { recoveryKey: toRecoveryString(rec.recoveryKey), covered: open.length, total: colls.length }
+  }
+
+  /** Recovers an organization with its recovery key: opens the escrow here,
+   *  re-seals the org key and every recoverable collection key to this
+   *  account, and asks the server to make it the owner. */
+  async function recoverWithKey(orgId: string, recoveryText: string): Promise<{ restored: number; total: number }> {
+    const me = await myIdentity(vaultKey)
+    const token = await session.token()
+    const r = await api.orgs.getRecovery(token, orgId)
+    let raw: Uint8Array
+    try { raw = fromRecoveryString(recoveryText) } catch { throw new Error('That is not this organization\'s recovery key.') }
+    if (raw.length !== 32) throw new Error('That is not this organization\'s recovery key.')
+    const { kek, auth } = await deriveOrgRecovery(raw, orgId)
+    let priv: Uint8Array
+    try { priv = await openOrgRecoveryEscrow(kek, r.escrow, orgId) } catch { throw new Error('That is not this organization\'s recovery key.') }
+    const pub = fromBase64Url(r.publicKey)
+    try {
+      const orgKey = await openOrgKeyFromRecovery(priv, pub, r.orgKeyRecovery, orgId)
+      const grants = []
+      for (const c of r.collections) {
+        if (!c.recoveryBlob) continue
+        try {
+          const key = await openCollectionKeyFromRecovery(priv, pub, c.recoveryBlob, c.id, c.keyVersion)
+          grants.push({ collectionId: c.id, keyVersion: c.keyVersion, keyBlob: await sealCollectionKey(me.publicKey, key, c.id, c.keyVersion) })
+        } catch { /* a copy from an older key: skipped */ }
+      }
+      const res = await api.orgs.recover(token, orgId, { auth: toBase64Url(auth), orgKeyBlob: await sealOrgKey(me.publicKey, orgKey, orgId), grants })
+      await load()
+      return { restored: res.restored, total: r.collections.length }
+    } finally { wipe(priv) }
   }
 
   async function createCollection(orgId: string, name: string): Promise<string> {
@@ -160,8 +224,10 @@ export function useTeams(vaultKey: Uint8Array) {
     if (!org?.key) throw new Error('You cannot open that organization.')
     const id = crypto.randomUUID()
     const key = generateCollectionKey()
+    const recoveryPub = org.recovery?.publicKey ? fromBase64Url(org.recovery.publicKey) : null
     await api.orgs.createCollection(await session.token(), orgId, {
       id, nameBlob: await sealCollectionMeta(orgId, id, { name }, org.key), keyBlob: await sealCollectionKey(me.publicKey, key, id, 1),
+      ...(recoveryPub ? { recoveryBlob: await sealCollectionKeyForRecovery(recoveryPub, key, id, 1) } : {}),
     })
     await load()
     return id
@@ -294,7 +360,8 @@ export function useTeams(vaultKey: Uint8Array) {
         resealed.push({ id: it.id, blob: await sealSharedItem(c.id, it.id, version, content, key) })
       } catch { drop.push(it.id) }
     }
-    await api.orgs.rotate(token, c.orgId, c.id, { keyVersion: version, grants, items: resealed, drop })
+    const recoveryPub = orgs.find((o) => o.id === c.orgId)?.recovery?.publicKey
+    await api.orgs.rotate(token, c.orgId, c.id, { keyVersion: version, grants, items: resealed, drop, ...(recoveryPub ? { recoveryBlob: await sealCollectionKeyForRecovery(fromBase64Url(recoveryPub), key, c.id, version) } : {}) })
     await load()
   }
 
@@ -318,7 +385,7 @@ export function useTeams(vaultKey: Uint8Array) {
     await load()
   }
 
-  return { orgs, collections, shared, invitations, identity, error, load, shareWithPerson, grantDirect, createOrg, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
+  return { orgs, collections, shared, invitations, identity, error, load, shareWithPerson, grantDirect, createOrg, makeRecoveryKey, recoverWithKey, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
 }
 
 export type Teams = ReturnType<typeof useTeams>

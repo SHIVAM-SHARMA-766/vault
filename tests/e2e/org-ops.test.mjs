@@ -14,6 +14,10 @@ test('an organization backup opens in Import & export, each collection a folder'
     await s.menu(alice, 'Organizations')
     await alice.fill('#o-name', 'Acme')
     await alice.getByRole('button', { name: 'Create', exact: true }).click()
+    // The organization's recovery key is shown once (decisions/0026).
+    await alice.waitForSelector('#ork-title')
+    await alice.getByLabel('I have stored it somewhere safe').check()
+    await alice.getByRole('button', { name: 'Done' }).click()
     await alice.waitForSelector('.org-card h2:has-text("Acme")')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()

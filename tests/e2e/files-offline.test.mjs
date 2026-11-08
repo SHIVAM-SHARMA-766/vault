@@ -90,6 +90,10 @@ test('joining an organization: told what to do while waiting, welcomed once conf
     await s.menu(alice, 'Organizations')
     await alice.fill('#o-name', 'Acme')
     await alice.getByRole('button', { name: 'Create', exact: true }).click()
+    // The organization's recovery key is shown once (decisions/0026).
+    await alice.waitForSelector('#ork-title')
+    await alice.getByLabel('I have stored it somewhere safe').check()
+    await alice.getByRole('button', { name: 'Done' }).click()
     await alice.waitForSelector('.org-card h2:has-text("Acme")')
     await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
     await alice.getByRole('button', { name: 'Invite', exact: true }).click()

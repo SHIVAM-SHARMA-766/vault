@@ -315,7 +315,7 @@ export const api = {
     removeMember: (token: string, org: string, user: string) =>
       request<{ ok: true; rotationNeeded: string[]; passwordsToChange: number }>('DELETE', `/api/orgs/${org}/members/${user}`, { token }),
     collections: (token: string, org: string) => request<{ collections: CollectionRow[] }>('GET', `/api/orgs/${org}/collections`, { token }),
-    createCollection: (token: string, org: string, body: { id: string; nameBlob: string; keyBlob: string }) =>
+    createCollection: (token: string, org: string, body: { id: string; nameBlob: string; keyBlob: string; recoveryBlob?: string }) =>
       request<{ id: string }>('POST', `/api/orgs/${org}/collections`, { token, body }),
     deleteCollection: (token: string, org: string, coll: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}`, { token }),
     setPolicies: (token: string, org: string, policies: OrgPolicies) => request<{ policies: OrgPolicies }>('PUT', `/api/orgs/${org}/policies`, { token, body: policies }),
@@ -334,7 +334,7 @@ export const api = {
       request<{ ok: true; granted: number }>('PUT', `/api/orgs/${org}/collections/${coll}/groups/${group}`, { token, body }),
     revokeGroup: (token: string, org: string, coll: string, group: string) =>
       request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/collections/${coll}/groups/${group}`, { token }),
-    rotate: (token: string, org: string, coll: string, body: { keyVersion: number; grants: { userId: string; keyBlob: string }[]; items: { id: string; blob: string }[]; drop?: string[] }) =>
+    rotate: (token: string, org: string, coll: string, body: { keyVersion: number; grants: { userId: string; keyBlob: string }[]; items: { id: string; blob: string }[]; drop?: string[]; recoveryBlob?: string }) =>
       request<{ keyVersion: number }>('POST', `/api/orgs/${org}/collections/${coll}/rotate`, { token, body }),
     access: (token: string, org: string, coll: string) =>
       request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),
@@ -346,6 +346,14 @@ export const api = {
       request<{ items: { id: string; blob: string; keyVersion: number; updatedAt: string; sensitive?: boolean }[] }>('GET', `/api/orgs/${org}/collections/${coll}/items`, { token }),
     setSensitive: (token: string, org: string, coll: string, item: string, sensitive: boolean) =>
       request<{ sensitive: boolean }>('PUT', `/api/orgs/${org}/collections/${coll}/items/${item}/sensitive`, { token, body: { sensitive } }),
+    setRecovery: (token: string, org: string, body: { publicKey: string; escrow: string; verifier: string; orgKeyRecovery: string; collections: { id: string; recoveryBlob: string }[] }) =>
+      request<{ ok: true }>('PUT', `/api/orgs/${org}/recovery`, { token, body }),
+    getRecovery: (token: string, org: string) =>
+      request<{ publicKey: string; escrow: string; orgKeyRecovery: string; createdAt: string; collections: { id: string; keyVersion: number; recoveryBlob: string | null }[] }>('GET', `/api/orgs/${org}/recovery`, { token }),
+    recover: (token: string, org: string, body: { auth: string; orgKeyBlob: string; grants: { collectionId: string; keyVersion: number; keyBlob: string }[] }) =>
+      request<{ ok: true; restored: number }>('POST', `/api/orgs/${org}/recover`, { token, body }),
+    setCollectionRecovery: (token: string, org: string, coll: string, keyVersion: number, recoveryBlob: string) =>
+      request<{ ok: true }>('PUT', `/api/orgs/${org}/collections/${coll}/recovery-blob`, { token, body: { keyVersion, recoveryBlob } }),
     requestAccess: (token: string, org: string, coll: string, reason: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/collections/${coll}/request`, { token, body: { reason } }),
     requests: (token: string, org: string) => request<{ requests: { collectionId: string; userId: string; label: string; reason: string; at: string }[] }>('GET', `/api/orgs/${org}/requests`, { token }),
     denyRequest: (token: string, org: string, coll: string, user: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/request/${user}`, { token }),
@@ -496,13 +504,13 @@ export interface AdminOrg {
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
-export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
+export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; recovery?: { createdAt: string; publicKey: string } | null; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
 export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
 export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[] }
 export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[] }
 export interface GroupRow { id: string; nameBlob: string; members: string[]; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean }[] }
 export interface CollectionRow {
-  id: string; nameBlob: string; keyVersion: number; rotationNeeded: boolean
+  id: string; nameBlob: string; keyVersion: number; rotationNeeded: boolean; recoveryCovered?: boolean
   access: { keyBlob: string; keyVersion: number; permission: SharePermission; hidePasswords: boolean; until?: string } | null
   requested?: boolean
 }

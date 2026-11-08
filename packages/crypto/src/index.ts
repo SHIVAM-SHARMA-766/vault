@@ -151,3 +151,17 @@ export {
   sealOrgMeta,
   sealSharedItem,
 } from './sharing.js'
+
+export {
+  ORG_RECOVERY_KEY_BYTES,
+  type NewOrgRecovery,
+  type OrgRecoveryDerived,
+  createOrgRecovery,
+  deriveOrgRecovery,
+  openCollectionKeyFromRecovery,
+  openOrgKeyFromRecovery,
+  openOrgRecoveryEscrow,
+  recoveryVerifier,
+  sealCollectionKeyForRecovery,
+  sealOrgKeyForRecovery,
+} from './orgrecovery.js'

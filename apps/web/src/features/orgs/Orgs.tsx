@@ -21,6 +21,7 @@ export function Orgs({ state }: { state: session.Unlocked }) {
   const toast = useToast()
   const teams = useTeams(state.vaultKey)
   const [name, setName] = useState('')
+  const [showKey, setShowKey] = useState<{ org: string; key: string } | null>(null)
 
   return (
     <Shell state={state}>
@@ -57,7 +58,7 @@ export function Orgs({ state }: { state: session.Unlocked }) {
 
         <form className="settings-card" aria-labelledby="o-new" onSubmit={async (e) => {
           e.preventDefault()
-          try { await teams.createOrg(name.trim(), state.email.split('@')[0]!); setName(''); toast('Organization created') }
+          try { const made = await teams.createOrg(name.trim(), state.email.split('@')[0]!); setShowKey({ org: name.trim(), key: made.recoveryKey }); setName(''); toast('Organization created') }
           catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
         }}>
           <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">New organization</h2></div>
@@ -72,6 +73,7 @@ export function Orgs({ state }: { state: session.Unlocked }) {
           <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
         </section>
       </main>
+      {showKey ? <RecoveryKeyShown org={showKey.org} recoveryKey={showKey.key} onDone={() => setShowKey(null)} /> : null}
     </Shell>
   )
 }
@@ -101,6 +103,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
       <section className="settings-card">
         <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill">Waiting</span></div>
         <p className="muted small">You have joined. An admin must confirm you — by checking your fingerprint (below) — before anything is shared with you.</p>
+        <OrgRecovery org={org} teams={teams} />
       </section>
     )
   }
@@ -200,6 +203,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
 
       {admin ? <Activity org={org} teams={teams} members={members} /> : null}
       {admin ? <OrgBackup org={org} teams={teams} /> : null}
+      <OrgRecovery org={org} teams={teams} />
 
       <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
 
@@ -557,5 +561,66 @@ function OrgBackup({ org, teams }: { org: OrgView; teams: Teams }) {
         <button type="submit" className="btn btn-primary btn-sm" disabled={busy}>{busy ? <span className="spinner" /> : null}Download backup</button>
       </div>
     </form>
+  )
+}
+
+/** Shown once: the recovery key of an organization just created or replaced. */
+function RecoveryKeyShown({ org, recoveryKey, onDone }: { org: string; recoveryKey: string; onDone: () => void }) {
+  const [ack, setAck] = useState(false)
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ork-title">
+      <div className="modal">
+        <h2 id="ork-title">Recovery key for {org}</h2>
+        <p className="muted">If every owner and admin ever loses access, this key gives the organization back to a member, with every collection it covers. Keep it offline: printed, or in a safe. Vault cannot show it again and cannot recover it.</p>
+        <p className="recovery-key"><code>{recoveryKey}</code></p>
+        <div className="settings-actions"><CopyButton value={recoveryKey} label="Recovery key" /></div>
+        <label className="check"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} /><span>I have stored it somewhere safe</span></label>
+        <div className="modal-actions"><button className="btn btn-primary" disabled={!ack} onClick={onDone}>Done</button></div>
+      </div>
+    </div>
+  )
+}
+
+/** The organization recovery key (decisions/0026): the owner creates or
+ *  replaces it; any member can use it to take the organization back. */
+function OrgRecovery({ org, teams }: { org: OrgView; teams: Teams }) {
+  const toast = useToast()
+  const [shown, setShown] = useState<string | null>(null)
+  const [recovering, setRecovering] = useState(false)
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  if (org.kind === 'direct') return null
+  const colls = teams.collections.filter((c) => c.orgId === org.id)
+  const covered = colls.filter((c) => c.recoveryCovered).length
+  return (
+    <div className="org-recovery">
+      {org.role === 'owner' && org.status === 'confirmed' ? (
+        <p className="muted small">
+          {org.recovery ? `Recovery key created ${when(org.recovery.createdAt)} · covers ${covered} of ${colls.length} collection${colls.length === 1 ? '' : 's'}. ` : 'No recovery key yet: if every owner and admin loses access, nobody can get this organization back. '}
+          <button className="link small" disabled={busy} onClick={async () => {
+            if (org.recovery && !window.confirm('Replace the recovery key? The old one stops working.')) return
+            setBusy(true)
+            try { const r = await teams.makeRecoveryKey(org.id); setShown(r.recoveryKey); if (r.covered < r.total) toast(`${r.total - r.covered} collection(s) you cannot open are covered once someone who manages them opens the organization.`) }
+            catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
+            finally { setBusy(false) }
+          }}>{org.recovery ? 'Replace the recovery key' : 'Create a recovery key'}</button>
+        </p>
+      ) : org.recovery ? (
+        recovering ? (
+          <form className="inline-form" onSubmit={async (e) => {
+            e.preventDefault()
+            setBusy(true)
+            try { const r = await teams.recoverWithKey(org.id, text); toast(`You now own ${org.name}: ${r.restored} of ${r.total} collection(s) restored.`); setRecovering(false); setText('') }
+            catch (err) { toast(err instanceof Error ? err.message : 'Recovery failed.', 'error') }
+            finally { setBusy(false) }
+          }}>
+            <input aria-label="Organization recovery key" className="mono" placeholder="Recovery key" value={text} onChange={(e) => setText(e.target.value)} />
+            <button type="submit" className="btn btn-danger btn-sm" disabled={busy || text.replace(/[^0-9a-z]/gi, '').length < 20}>Recover</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setRecovering(false)}>Cancel</button>
+          </form>
+        ) : <button className="link small" onClick={() => setRecovering(true)}>Owners locked out? Recover with the recovery key…</button>
+      ) : null}
+      {shown ? <RecoveryKeyShown org={org.name} recoveryKey={shown} onDone={() => setShown(null)} /> : null}
+    </div>
   )
 }
