@@ -30,6 +30,7 @@ import { requireEmail, requireSealed, requireSharedKey } from '../validate.js'
 import { getSettings } from '../system.js'
 import { addNote, addNotes } from '../inbox.js'
 import { streamAudit } from '../audit-stream.js'
+import { hasSecondFactor } from '../twofactor.js'
 
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type Permission = 'view' | 'edit' | 'manage'
@@ -151,7 +152,7 @@ async function policyGap(app: App, orgId: string, userId: string): Promise<strin
   const p = await policiesOf(app, orgId)
   if (!p.requireTwoFactor && !p.minPasswordScore) return null
   const profile = await app.store.get(userPk(userId), PROFILE_SK)
-  if (p.requireTwoFactor && !profile?.['totp']) return 'This organization requires two-factor sign-in. Turn it on in Settings.'
+  if (p.requireTwoFactor && !hasSecondFactor(profile)) return 'This organization requires two-factor sign-in. Turn it on in Settings.'
   if (p.minPasswordScore && Number(profile?.['passwordScore'] ?? 0) < p.minPasswordScore) return 'This organization requires a stronger master password. Change it in Settings.'
   return null
 }

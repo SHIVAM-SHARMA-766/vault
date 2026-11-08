@@ -288,6 +288,16 @@ is a file the person holds, as strong as their master password when it was made.
 against it offline costs the same as against a stolen database row (A2). Its page allows no
 network, so opening it reveals nothing to anyone.
 
+### A21 — Passkeys and security keys at sign-in
+
+WebAuthn keys ([0022](../decisions/0022-passkeys.md)) are a second factor bound to this server's
+origin and relying-party id. A phishing page on another address receives no usable assertion.
+Challenges are random, single-use, and expire after five minutes. Signature counters are
+recorded. Verification uses @simplewebauthn (attestation "none": the server does not trust a
+particular device maker, and needs no metadata service). Admin and help-desk two-factor resets
+clear keys as well as the authenticator app, after the verification those flows already require
+(A13).
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

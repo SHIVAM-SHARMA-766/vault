@@ -97,3 +97,9 @@ export const twoFactorRequired = () =>
   new HttpError(401, 'two_factor_required', 'Enter the code from your authenticator app.')
 export const invalidTwoFactor = () =>
   new HttpError(401, 'invalid_two_factor', 'That code is not valid. Codes change every 30 seconds and each works once.')
+
+/** Whether an account has any second factor: an authenticator app (TOTP) or
+ *  at least one passkey or security key (WebAuthn, decisions/0022). */
+export function hasSecondFactor(profile: Record<string, unknown> | null | undefined): boolean {
+  return Boolean(profile?.['totp']) || (Array.isArray(profile?.['webauthn']) && (profile!['webauthn'] as unknown[]).length > 0)
+}

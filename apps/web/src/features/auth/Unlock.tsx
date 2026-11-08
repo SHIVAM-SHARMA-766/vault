@@ -4,7 +4,7 @@ import { passwordStrength } from '@vault/core'
 
 import { UnsealError, deriveLoginKeys, fromBase64Url, unwrapVaultKey, wipe } from '@vault/crypto'
 
-import { ApiError, type SecondFactor, api } from '../../lib/api.js'
+import { ApiError, type SecondFactor, type SecondFactorOffer, api } from '../../lib/api.js'
 import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
@@ -24,6 +24,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
   // Set once the password is proved and the server asks for a second factor.
   // The derived keys wait here, in memory, until the code is in.
   const [pending, setPending] = useState<{ authKey: string; kek: Uint8Array } | null>(null)
+  const [offer, setOffer] = useState<SecondFactorOffer | null>(null)
 
   function explain(err: unknown) {
     if (err instanceof UnsealError) {
@@ -84,6 +85,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
         if (err instanceof ApiError && err.code === 'two_factor_required') {
           keep = true
           setPending({ authKey: keys.authKey, kek: keys.kek })
+          setOffer((err.details as SecondFactorOffer | undefined) ?? null)
           return
         }
         throw err
@@ -106,6 +108,12 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     } catch (err) {
       explain(err)
       setBusy(false)
+      // A key's challenge works once: ask for a fresh one for the next try.
+      if ('webauthn' in second) {
+        try { await api.login(email, pending.authKey) } catch (again) {
+          if (again instanceof ApiError && again.code === 'two_factor_required') setOffer((again.details as SecondFactorOffer | undefined) ?? null)
+        }
+      }
     }
   }
 
@@ -115,7 +123,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     setError('')
   }
 
-  if (pending) return <SecondFactorStep onSubmit={submitSecond} onCancel={cancelSecond} busy={busy} error={error} />
+  if (pending) return <SecondFactorStep onSubmit={submitSecond} onCancel={cancelSecond} busy={busy} error={error} offer={offer} />
 
   return (
     <form onSubmit={submit} noValidate={false}>
@@ -147,7 +155,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
 
       <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
-        {busy ? <><span className="spinner" />{t('Deriving key…')}</> : 'Unlock'}
+        {busy ? <><span className="spinner" />{t('Deriving key…')}</> : t('Unlock')}
       </button>
 
       <p className="auth-forgot">

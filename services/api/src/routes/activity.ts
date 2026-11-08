@@ -21,6 +21,8 @@ export type ActivityKind =
   | 'enrol-identity'
   | 'reset-password-with-recovery-key'
   | 'enable-2fa'
+  | 'add-security-key'
+  | 'remove-security-key'
   | 'disable-2fa'
   | 'regenerate-2fa-recovery-codes'
   | 'used-2fa-recovery-code'

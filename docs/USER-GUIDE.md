@@ -284,6 +284,15 @@ request. Choose one to go where it matters, or **Mark all read**. Notifications 
 as account activity (90 days unless your administrator changes it). They name people by the
 label your organization gave them, never an item's name, which the server cannot read.
 
+### Passkeys and security keys
+
+**Settings → Security → Passkeys and security keys → Add a passkey or security key.** Use a
+hardware key (YubiKey, Titan) or a passkey on your device (Windows Hello, Touch ID, Android) as
+your second factor at sign-in, instead of or alongside an authenticator app. A key only answers
+this server's real address, so a look-alike phishing page gets nothing. Your first second factor
+comes with ten recovery codes; save them. Removing a key asks for your master password and a
+second factor. Your master password still unlocks the vault: a key protects signing in.
+
 ## Devices and activity
 
 <img src="images/devices.png" alt="Signed-in devices with this device marked, and the security activity list" width="820">
