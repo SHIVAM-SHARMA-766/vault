@@ -8,6 +8,7 @@
 // file only reads the parts it needs, structurally.
 
 export type EntryType = 'login' | 'note' | 'card' | 'identity' | 'bankAccount' | 'sshKey' | 'wifi'
+  | 'apiCredential' | 'database' | 'server' | 'softwareLicense' | 'passport' | 'driverLicense' | 'membership' | 'cryptoWallet'
 
 /** How a field is shown and edited. */
 export type FieldKind =
@@ -20,6 +21,7 @@ export type FieldKind =
   | 'phone'
   | 'totp'       // a base32 TOTP key, shown as a live code
   | 'expiry'     // MM/YY
+  | 'date'       // YYYY-MM-DD, a calendar date such as a passport's expiry
   | 'select'
 
 export interface FieldSpec {
@@ -36,10 +38,15 @@ export interface FieldSpec {
   generate?: boolean
 }
 
+/** How the new-item picker groups types. */
+export type TypeGroup = 'Everyday' | 'Money' | 'Documents' | 'Technical'
+export const TYPE_GROUPS: readonly TypeGroup[] = ['Everyday', 'Money', 'Documents', 'Technical']
+
 export interface TypeSpec {
   type: EntryType
   label: string
   plural: string
+  group: TypeGroup
   fields: readonly FieldSpec[]
   /** The field whose value best identifies an entry in a list. */
   subtitle?: string
@@ -50,7 +57,7 @@ const f = (key: string, label: string, kind: FieldKind, extra: Partial<FieldSpec
 
 export const TYPE_SPECS: readonly TypeSpec[] = [
   {
-    type: 'login', label: 'Login', plural: 'Logins', subtitle: 'username',
+    type: 'login', label: 'Login', plural: 'Logins', group: 'Everyday', subtitle: 'username',
     fields: [
       { key: 'username', label: 'Username or email', kind: 'text', at: 'username' },
       { key: 'password', label: 'Password', kind: 'secret', at: 'password', generate: true },
@@ -58,9 +65,9 @@ export const TYPE_SPECS: readonly TypeSpec[] = [
       { key: 'totpSecret', label: 'One-time code (TOTP key)', kind: 'totp', at: 'totpSecret', placeholder: 'Base32 key from the site' },
     ],
   },
-  { type: 'note', label: 'Secure note', plural: 'Secure notes', fields: [] },
+  { type: 'note', label: 'Secure note', plural: 'Secure notes', group: 'Everyday', fields: [] },
   {
-    type: 'card', label: 'Card', plural: 'Cards', subtitle: 'cardholder',
+    type: 'card', label: 'Card', plural: 'Cards', group: 'Money', subtitle: 'cardholder',
     fields: [
       f('cardholder', 'Name on card', 'text'),
       f('number', 'Card number', 'secret', { placeholder: '1234 5678 9012 3456' }),
@@ -70,7 +77,7 @@ export const TYPE_SPECS: readonly TypeSpec[] = [
     ],
   },
   {
-    type: 'identity', label: 'Identity', plural: 'Identities', subtitle: 'fullName',
+    type: 'identity', label: 'Identity', plural: 'Identities', group: 'Documents', subtitle: 'fullName',
     fields: [
       f('fullName', 'Full name', 'text'),
       f('email', 'Email', 'email'),
@@ -82,7 +89,7 @@ export const TYPE_SPECS: readonly TypeSpec[] = [
     ],
   },
   {
-    type: 'bankAccount', label: 'Bank account', plural: 'Bank accounts', subtitle: 'bankName',
+    type: 'bankAccount', label: 'Bank account', plural: 'Bank accounts', group: 'Money', subtitle: 'bankName',
     fields: [
       f('bankName', 'Bank', 'text'),
       f('accountHolder', 'Account holder', 'text'),
@@ -94,7 +101,7 @@ export const TYPE_SPECS: readonly TypeSpec[] = [
     ],
   },
   {
-    type: 'sshKey', label: 'SSH key', plural: 'SSH keys', subtitle: 'host',
+    type: 'sshKey', label: 'SSH key', plural: 'SSH keys', group: 'Technical', subtitle: 'host',
     fields: [
       f('host', 'Host', 'text', { placeholder: 'user@server.example.com' }),
       f('publicKey', 'Public key', 'multiline', { placeholder: 'ssh-ed25519 AAAA…' }),
@@ -103,14 +110,126 @@ export const TYPE_SPECS: readonly TypeSpec[] = [
     ],
   },
   {
-    type: 'wifi', label: 'Wi-Fi', plural: 'Wi-Fi', subtitle: 'username',
+    type: 'wifi', label: 'Wi-Fi', plural: 'Wi-Fi', group: 'Everyday', subtitle: 'username',
     fields: [
       { key: 'username', label: 'Network name (SSID)', kind: 'text', at: 'username' },
       { key: 'password', label: 'Password', kind: 'secret', at: 'password', generate: true },
       f('security', 'Security', 'select', { options: [['wpa2', 'WPA2'], ['wpa3', 'WPA3'], ['wpa', 'WPA'], ['wep', 'WEP'], ['open', 'Open']] }),
     ],
   },
+  {
+    type: 'apiCredential', label: 'API credential', plural: 'API credentials', group: 'Technical', subtitle: 'service',
+    fields: [
+      f('service', 'Service', 'text', { placeholder: 'e.g. Stripe, AWS, OpenAI' }),
+      f('keyId', 'Key ID or client ID', 'text'),
+      f('secret', 'Secret or token', 'secret', { generate: true }),
+      { key: 'url', label: 'Endpoint or console', kind: 'url', at: 'url', placeholder: 'https://' },
+      f('scopes', 'Scopes or permissions', 'text'),
+      f('expires', 'Expires', 'date'),
+    ],
+  },
+  {
+    type: 'database', label: 'Database', plural: 'Databases', group: 'Technical', subtitle: 'host',
+    fields: [
+      f('engine', 'Type', 'select', { options: [['postgresql', 'PostgreSQL'], ['mysql', 'MySQL / MariaDB'], ['sqlserver', 'SQL Server'], ['oracle', 'Oracle'], ['mongodb', 'MongoDB'], ['redis', 'Redis'], ['sqlite', 'SQLite'], ['other', 'Other']] }),
+      f('host', 'Host', 'text', { placeholder: 'db.example.com' }),
+      f('port', 'Port', 'text', { placeholder: '5432' }),
+      f('database', 'Database', 'text'),
+      { key: 'username', label: 'Username', kind: 'text', at: 'username' },
+      { key: 'password', label: 'Password', kind: 'secret', at: 'password', generate: true },
+      f('connection', 'Connection string', 'secret', { placeholder: 'postgres://…' }),
+    ],
+  },
+  {
+    type: 'server', label: 'Server', plural: 'Servers', group: 'Technical', subtitle: 'host',
+    fields: [
+      f('host', 'Host or IP', 'text', { placeholder: 'server.example.com' }),
+      { key: 'username', label: 'Username', kind: 'text', at: 'username' },
+      { key: 'password', label: 'Password', kind: 'secret', at: 'password', generate: true },
+      { key: 'url', label: 'Admin console', kind: 'url', at: 'url', placeholder: 'https://' },
+      f('provider', 'Hosting provider', 'text'),
+    ],
+  },
+  {
+    type: 'softwareLicense', label: 'Software licence', plural: 'Software licences', group: 'Technical', subtitle: 'product',
+    fields: [
+      f('product', 'Product', 'text'),
+      f('version', 'Version', 'text'),
+      f('licenseKey', 'Licence key', 'secretBlock'),
+      f('licensedTo', 'Licensed to', 'text'),
+      f('email', 'Registered email', 'email'),
+      f('purchased', 'Purchased', 'date'),
+      f('expires', 'Expires', 'date'),
+    ],
+  },
+  {
+    type: 'passport', label: 'Passport', plural: 'Passports', group: 'Documents', subtitle: 'fullName',
+    fields: [
+      f('fullName', 'Full name', 'text'),
+      f('number', 'Passport number', 'secret'),
+      f('country', 'Issuing country', 'text'),
+      f('nationality', 'Nationality', 'text'),
+      f('dateOfBirth', 'Date of birth', 'date'),
+      f('placeOfIssue', 'Place of issue', 'text'),
+      f('issued', 'Issued', 'date'),
+      f('expires', 'Expires', 'date'),
+    ],
+  },
+  {
+    type: 'driverLicense', label: 'Driving licence', plural: 'Driving licences', group: 'Documents', subtitle: 'fullName',
+    fields: [
+      f('fullName', 'Full name', 'text'),
+      f('number', 'Licence number', 'secret'),
+      f('country', 'Issuing country or state', 'text'),
+      f('classes', 'Vehicle classes', 'text', { placeholder: 'e.g. LMV, MCWG' }),
+      f('dateOfBirth', 'Date of birth', 'date'),
+      f('issued', 'Issued', 'date'),
+      f('expires', 'Expires', 'date'),
+    ],
+  },
+  {
+    type: 'membership', label: 'Membership', plural: 'Memberships', group: 'Everyday', subtitle: 'organization',
+    fields: [
+      f('organization', 'Organization', 'text', { placeholder: 'e.g. airline, gym, insurer' }),
+      f('memberName', 'Member name', 'text'),
+      f('memberId', 'Member or policy number', 'text'),
+      f('pin', 'PIN', 'secret'),
+      { key: 'url', label: 'Website', kind: 'url', at: 'url', placeholder: 'https://' },
+      f('phone', 'Phone', 'phone'),
+      f('expires', 'Expires', 'date'),
+    ],
+  },
+  {
+    type: 'cryptoWallet', label: 'Crypto wallet', plural: 'Crypto wallets', group: 'Money', subtitle: 'walletName',
+    fields: [
+      f('walletName', 'Wallet', 'text', { placeholder: 'e.g. Ledger, MetaMask' }),
+      f('address', 'Receiving address', 'text'),
+      f('recoveryPhrase', 'Recovery phrase', 'secretBlock'),
+      { key: 'password', label: 'Wallet password', kind: 'secret', at: 'password' },
+      f('pin', 'PIN', 'secret'),
+    ],
+  },
 ]
+
+/** Types by picker group, in display order. */
+export function typesByGroup(): { group: TypeGroup; types: TypeSpec[] }[] {
+  return TYPE_GROUPS.map((group) => ({ group, types: TYPE_SPECS.filter((t) => t.group === group) }))
+}
+
+/** A field's date (YYYY-MM-DD) as the person's locale writes it, or the raw
+ *  text if it is not one (an entry imported with a free-form date). */
+export function formatDate(value: string, locale?: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!m) return value
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])))
+  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' })
+}
+
+/** Whether a YYYY-MM-DD date is before `now`'s day. False for anything else. */
+export function isPast(value: string, now = Date.now()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  return value < new Date(now).toISOString().slice(0, 10)
+}
 
 export const typeSpec = (type: string): TypeSpec => TYPE_SPECS.find((t) => t.type === type) ?? TYPE_SPECS[0]!
 

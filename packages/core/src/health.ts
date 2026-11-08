@@ -97,9 +97,12 @@ export interface HealthReport {
 }
 
 const OLD_DAYS = 365
+const PASSWORD_TYPES = new Set(['login', 'wifi', 'database', 'server'])
 
 export function analyse(entries: readonly HealthInput[], now = Date.now()): HealthReport {
-  const withPassword = entries.filter((e) => (e.type === 'login' || e.type === 'wifi') && e.password)
+  // Types whose password a person chose and could reuse: not a card PIN or a
+  // wallet password, which are checked by nobody else.
+  const withPassword = entries.filter((e) => PASSWORD_TYPES.has(e.type) && e.password)
   const uses = new Map<string, number>()
   for (const e of withPassword) uses.set(e.password!, (uses.get(e.password!) ?? 0) + 1)
 

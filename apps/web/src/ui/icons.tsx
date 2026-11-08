@@ -139,3 +139,27 @@ export const IconSliders = (p: P) => (
 export const IconSun = (p: P) => (
   <Svg {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></Svg>
 )
+export const IconCode = (p: P) => (
+  <Svg {...p}><path d="m8 7-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14" /></Svg>
+)
+export const IconDatabase = (p: P) => (
+  <Svg {...p}><ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" /><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8" /></Svg>
+)
+export const IconServer = (p: P) => (
+  <Svg {...p}><rect x="3.5" y="4" width="17" height="7" rx="1.5" /><rect x="3.5" y="13" width="17" height="7" rx="1.5" /><path d="M7.5 7.5h.01M7.5 16.5h.01" /></Svg>
+)
+export const IconBadge = (p: P) => (
+  <Svg {...p}><circle cx="12" cy="9" r="5.5" /><path d="m8.5 13.3-1.5 7.2 5-2.5 5 2.5-1.5-7.2" /></Svg>
+)
+export const IconPassport = (p: P) => (
+  <Svg {...p}><rect x="5" y="3" width="14" height="18" rx="1.5" /><circle cx="12" cy="10" r="3" /><path d="M9 16.5h6" /></Svg>
+)
+export const IconIdCard = (p: P) => (
+  <Svg {...p}><rect x="2.5" y="5" width="19" height="14" rx="2" /><circle cx="8.5" cy="11" r="2" /><path d="M5.5 16c.6-1.4 1.7-2 3-2s2.4.6 3 2M14 10h4.5M14 13.5h3" /></Svg>
+)
+export const IconTicket = (p: P) => (
+  <Svg {...p}><path d="M3 8a2 2 0 0 0 0 4v0a2 2 0 0 1 0 4v2h18v-2a2 2 0 0 1 0-4 2 2 0 0 0 0-4V6H3v2Z" /><path d="M14 6v12" strokeDasharray="2 2" /></Svg>
+)
+export const IconWallet = (p: P) => (
+  <Svg {...p}><path d="M4 7.5V18a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2 2 2 0 0 1 2-2h12v4" /><path d="M16.5 14.5h.01" /></Svg>
+)

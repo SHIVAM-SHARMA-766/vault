@@ -53,3 +53,12 @@ test('belowMinimum explains a password under a policy floor and passes one above
   assert.equal(belowMinimum('correct horse battery staple orbit lantern', 3), null)
   assert.equal(STRENGTH_LABELS.length, 5)
 })
+
+test('database and server passwords count for reuse; wallet passwords and PINs do not', () => {
+  const r = analyse([
+    { id: 'a', type: 'login', password: 'shared-but-long-Passw0rd!', updatedAt: new Date().toISOString() },
+    { id: 'b', type: 'database', password: 'shared-but-long-Passw0rd!', updatedAt: new Date().toISOString() },
+    { id: 'c', type: 'cryptoWallet', password: 'shared-but-long-Passw0rd!', updatedAt: new Date().toISOString() },
+  ])
+  assert.equal(r.counts.reused, 2)
+})
