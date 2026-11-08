@@ -151,7 +151,7 @@ button { font: inherit; color: inherit; }
 
 /* :where() keeps this at element specificity, so .search input and
    .input-wrap input can adjust padding without fighting it. */
-input:where(:not([type=checkbox]):not([type=range])), textarea, select {
+input:where(:not([type=checkbox]):not([type=range]):not([type=radio])), textarea, select {
   width: 100%; height: 40px; padding: 0 12px;
   background: var(--surface); color: var(--text);
   border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
@@ -311,7 +311,7 @@ input.mono { font-family: var(--mono); }
 }
 .sidebar-foot svg { flex: none; margin-top: 2px; }
 
-.list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--bg); }
+.list { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); background: var(--bg); }
 .list-head { display: flex; align-items: baseline; gap: 8px; padding: 18px 18px 10px; }
 .list-head h2 { font-size: 16px; font-weight: 650; }
 .list > .alert { margin: 0 12px 10px; }
@@ -869,7 +869,7 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .radio:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .radio:has(input:checked) .muted { color: var(--text-2); }
 .radio:has(input:disabled) { opacity: .6; cursor: not-allowed; }
-.radio input { margin-top: 3px; }
+.radio input { margin-top: 3px; width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
 .radio > span { display: grid; gap: 2px; }
 .pill-warn { background: var(--warn-soft); color: var(--warn); }
 .test-restore { flex: 1 1 100%; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
@@ -877,3 +877,16 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .alert-ok { color: var(--ok-text); }
 :root[data-theme="dark"] .alert-ok { color: var(--ok); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .alert-ok { color: var(--ok); } }
+
+/* The getting-started checklist beside a new vault. */
+.getting-started { max-width: 520px; margin: 56px auto; padding: 0 24px; }
+.getting-started h2 { font-size: 20px; }
+.getting-started > .muted { margin: 4px 0 18px; }
+.getting-started ol { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 14px; }
+.getting-started li { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.getting-started h3 { font-size: 14.5px; }
+.getting-started p { margin-top: 3px; }
+.gs-mark { flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--line-strong); }
+.gs-done .gs-mark { border-color: var(--ok); background: var(--ok); color: var(--surface); }
+.gs-done h3 { color: var(--muted); text-decoration: line-through; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

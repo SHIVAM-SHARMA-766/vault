@@ -102,3 +102,10 @@ test('with no support address, email has no Reply-To and no help line', async ()
   assert.equal(sent.replyTo, undefined)
   assert.doesNotMatch(sent.text, /Need help/)
 })
+
+test('a new server says it is waiting for its owner, and stops once anyone exists', async () => {
+  const h = harness({ allowRegistration: false })
+  assert.equal((await h.request('GET', '/api/instance')).body['firstRun'], true)
+  const { h: h2 } = await setup()
+  assert.equal((await h2.request('GET', '/api/instance')).body['firstRun'], false)
+})

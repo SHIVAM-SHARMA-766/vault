@@ -35,12 +35,6 @@ export function Orgs({ state }: { state: session.Unlocked }) {
 
         {teams.error ? <p className="alert alert-error"><IconAlert size={16} />{teams.error}</p> : null}
 
-        <section className="settings-card" aria-labelledby="o-fp">
-          <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
-          <p className="muted small">When you join an organization, an admin confirms you by checking this matches what they see. Read it to them on a call or in person — not by email or chat.</p>
-          <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
-        </section>
-
         {teams.invitations.length ? (
           <section className="settings-card" aria-labelledby="o-inv">
             <div className="settings-card-head"><IconUser size={18} /><h2 id="o-inv">Invitations</h2></div>
@@ -70,6 +64,12 @@ export function Orgs({ state }: { state: session.Unlocked }) {
           <p className="hint">The name is encrypted for members. People you invite see it in their invitation before they join.</p>
           <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={!name.trim()}>Create</button></div>
         </form>
+
+        <section className="settings-card" aria-labelledby="o-fp">
+          <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
+          <p className="muted small">When you join an organization, an admin confirms you by checking this matches what they see. Read it to them on a call or in person — not by email or chat.</p>
+          <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
+        </section>
       </main>
     </Shell>
   )
@@ -98,7 +98,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
     return (
       <section className="settings-card">
         <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill">Waiting</span></div>
-        <p className="muted small">You have joined. An admin must confirm you — by checking your fingerprint above — before anything is shared with you.</p>
+        <p className="muted small">You have joined. An admin must confirm you — by checking your fingerprint (below) — before anything is shared with you.</p>
       </section>
     )
   }

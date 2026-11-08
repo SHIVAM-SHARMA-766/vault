@@ -52,3 +52,4 @@ export {
   effectiveLockMinutes,
   normalizePrefs,
 } from './prefs.js'
+export { type Failure, friendlyError } from './errors.js'

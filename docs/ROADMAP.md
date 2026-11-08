@@ -300,7 +300,7 @@ multiplies the cost of every rough edge, so they are paid down first.
   `node scripts/bench.mjs`. Backup streaming not needed at intended sizes.
 - [x] Accessibility: every screen passes axe-core WCAG 2.1 AA in light and dark (contrast fixed),
   checked in CI.
-- [ ] Error messages, empty states and onboarding reviewed end to end.
+- [x] Error messages, empty states and onboarding reviewed end to end (E0, E3, E8 below).
 - [ ] Test gaps: ~~a live SMTP test~~ (done: STARTTLS delivery and plain-text refusal, in CI); real export files for import, an ARM board, a timed install — need the operator.
 - [ ] Documentation and screenshots refreshed.
 
@@ -337,9 +337,9 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ⬜ D11 Share one item with one person · ⬜ D12 Notify on access to a sensitive item
 
 **E. UI/UX**
-- ⬜ E0 Screen-by-screen audit · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch
-- ⬜ E3 Onboarding and empty states · ⬜ E4 Command palette and shortcuts · ⬜ E5 Bulk actions · ⬜ E6 Richer list views
-- ⬜ E7 Phone layout pass · ⬜ E8 Plain-language errors · ⬜ E9 Languages · ⬜ E10 Notification centre
+- ✅ E0 Screen-by-screen audit (first pass: phone layout bug, registration-aware sign-in, org page order) · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch
+- ✅ E3 Getting-started checklist beside a new vault · ⬜ E4 Command palette and shortcuts · ⬜ E5 Bulk actions · ⬜ E6 Richer list views
+- ⬜ E7 Phone layout pass · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ⬜ E10 Notification centre
 
 **F. Personal settings**
 - ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults

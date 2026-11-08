@@ -22,6 +22,8 @@ export interface Session {
   expiresIn: number
 }
 
+import { friendlyError } from '@vault/core'
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
@@ -59,7 +61,7 @@ async function request<T>(
       cache: 'no-store',
     })
   } catch {
-    throw new ApiError(0, 'network', 'Could not reach the server.')
+    throw new ApiError(0, 'network', friendlyError({ status: 0, code: 'network', message: '' }))
   }
 
   const text = await response.text()
@@ -68,19 +70,24 @@ async function request<T>(
     try {
       payload = JSON.parse(text) as Record<string, unknown>
     } catch {
-      throw new ApiError(response.status, 'malformed', 'The server sent something unreadable.')
+      // Usually a proxy's error page while the server restarts.
+      throw new ApiError(response.status, 'malformed', friendlyError({ status: response.status, code: 'malformed', message: '' }))
     }
   }
 
   if (!response.ok) {
     const retryAfter = Number(response.headers.get('retry-after') ?? '')
+    const code = String(payload['error'] ?? 'error')
     const error = new ApiError(
       response.status,
-      String(payload['error'] ?? 'error'),
-      // A server fault carries a request id that matches the server's log;
-      // quoting it is how a self-hoster finds the line.
-      String(payload['message'] ?? 'Something went wrong.')
-        + (response.status >= 500 && typeof payload['requestId'] === 'string' ? ` (reference ${String(payload['requestId']).slice(0, 8)})` : ''),
+      code,
+      // Plain words and a next step (packages/core errors.ts). A server fault
+      // keeps its request id, which matches the server's log.
+      friendlyError({
+        status: response.status, code, message: String(payload['message'] ?? ''),
+        retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined,
+        requestId: typeof payload['requestId'] === 'string' ? payload['requestId'] : undefined,
+      }),
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
     if (Array.isArray(payload['details'])) error.details = payload['details'] as { path: string; message: string }[]
@@ -95,7 +102,7 @@ export interface UpdateStatus {
   publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
 }
 export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
-export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean }
 
 export type BackupFrequency = 'off' | 'daily' | 'weekly' | 'monthly'
 export interface BackupSchedule { frequency: BackupFrequency; hour: number; weekday: number; tzOffsetMinutes: number; keep: number }

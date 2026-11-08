@@ -1,8 +1,9 @@
 name: CI
 
 on:
+  # Every pull request, including ones stacked on another branch: a stack's
+  # top PR then tests everything beneath it.
   pull_request:
-    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -348,7 +349,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Installer tests (dry run)
-        run: node --test tests/install/
+        run: node --test tests/install/*.test.mjs
 
       # The business profile exactly as a customer starts it — through the
       # one-line installer, on localhost (Caddy's local CA): healthy over TLS,

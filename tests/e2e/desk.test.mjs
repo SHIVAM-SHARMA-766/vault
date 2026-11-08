@@ -9,6 +9,12 @@ import { start } from './helpers.mjs'
 test('access request → approved with an invitation; support ticket → conversation', async () => {
   const s = await start()
   try {
+    // The owner exists and registration is closed, so the sign-in screen
+    // offers a request for access.
+    const owner = await s.person()
+    await s.register(owner, 'owner@example.test')
+    await s.setRegistration(false)
+
     // A visitor without an account asks for access from the sign-in screen.
     const visitor = await s.person()
     await visitor.goto(`${s.base}/app/`)
@@ -25,8 +31,6 @@ test('access request → approved with an invitation; support ticket → convers
     await visitor.waitForSelector('text=Nobody can reset a forgotten master password')
 
     // The owner sees it in the service desk and approves it.
-    const owner = await s.person()
-    await s.register(owner, 'owner@example.test')
     await s.menu(owner, 'Admin panel')
     await owner.locator('.sidebar .side-item', { hasText: 'Service desk' }).click()
     await owner.waitForSelector('td:has-text("Access request from Riya Sen")')
@@ -38,6 +42,7 @@ test('access request → approved with an invitation; support ticket → convers
     assert.equal(await owner.inputValue('#d-status'), 'resolved')
 
     // A member asks for help; the owner answers; the member replies.
+    await s.setRegistration(true)
     const member = await s.person()
     await s.register(member, 'member@example.test')
     await s.menu(member, 'Help & support')
