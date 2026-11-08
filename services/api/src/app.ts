@@ -56,7 +56,7 @@ export function buildRouter(app: App): Router {
     }, { auth: 'access' as const })
 
   router.post('/api/auth/logout', authed((u, e) => auth.logout(app, u, e)), 'Revoke one session, or all of them')
-  router.put('/api/auth/password-score', authed((u, e) => auth.setPasswordScore(app, u, e)), 'Report the master password\'s strength score, for organization policies')
+  router.put('/api/auth/password-score', authed((u, e) => auth.setPasswordScore(app, u, e)), 'Report the master password\'s strength score, for organization and server policies')
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)), 'Replace the recovery key')

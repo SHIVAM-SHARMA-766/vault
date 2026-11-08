@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto'
 import type { App } from '../context.js'
 import type { LambdaEvent } from '../http.js'
 import { activitySk, userPk } from '../keys.js'
+import { getSettings } from '../system.js'
 
 export type ActivityKind =
   | 'register'
@@ -27,7 +28,6 @@ export type ActivityKind =
   | 'emergency-request'
   | 'emergency-access'
 
-const RETENTION_SECONDS = 90 * 24 * 60 * 60
 
 /** Best effort. A failure to record an event must never fail the operation
  *  that succeeded — losing a log line is far better than telling a user their
@@ -47,7 +47,7 @@ export async function recordActivity(
       at,
       ip: event.requestContext.http.sourceIp,
       userAgent: (event.requestContext.http.userAgent ?? '').slice(0, 200),
-      expiresAt: Math.floor(app.now() / 1000) + RETENTION_SECONDS,
+      expiresAt: Math.floor(app.now() / 1000) + (await getSettings(app)).policy.activityDays * 86_400,
     })
   } catch (err) {
     console.error('failed to record activity', kind, err)

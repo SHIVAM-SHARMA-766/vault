@@ -19,6 +19,7 @@ import { publishToDisk } from './site.js'
 import { ensureSetup } from './system.js'
 import { createMailer } from './mail.js'
 import { tick as tickPersonalBackups } from './personal-backup.js'
+import { applyRetention } from './retention.js'
 import { closeStaleTickets } from './routes/desk.js'
 import { migrateItemPartitions } from './routes/orgs.js'
 import { backupsEnabled, runBackup } from './backup.js'
@@ -100,6 +101,12 @@ export async function start(): Promise<void> {
     .catch((err: unknown) => console.error('expiry sweep failed:', (err as Error).message))
   void sweep()
   setInterval(sweep, 15 * 60 * 1000).unref()
+
+  // Logs older than the server policy's retention, after it was shortened.
+  const retention = () => applyRetention(app)
+    .catch((err: unknown) => console.error('retention pass failed:', (err as Error).message))
+  void retention()
+  setInterval(retention, 6 * 3_600_000).unref()
 
   // Personal backups that have fallen due (decisions/0017).
   const personal = () => tickPersonalBackups(app)

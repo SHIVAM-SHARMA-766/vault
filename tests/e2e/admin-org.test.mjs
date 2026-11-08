@@ -17,7 +17,7 @@ test('the setup checklist reflects the server, and ticks items as they are done'
     const before = await left()
     assert.ok(before >= 4, `${before} left on a fresh server`)
     await owner.fill('#pf-email', 'help@example.test')
-    await owner.getByRole('button', { name: 'Save' }).click()
+    await owner.locator('form[aria-labelledby=profile-title]').getByRole('button', { name: 'Save' }).click()
     await owner.waitForSelector('text=Name and support contact saved')
     await owner.reload(); await s.unlock(owner, 'owner@example.test')
     await owner.waitForSelector('#setup-title')

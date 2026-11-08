@@ -238,6 +238,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
           </div>
 
           {vault.error ? <p className="alert alert-error"><IconAlert size={16} />{vault.error}</p> : null}
+          {state.policyGap ? <p className="alert alert-warn list-alert" data-testid="server-policy-gap"><IconAlert size={16} /><span>{state.policyGap} <Link to="/app/settings/security">Open Security</Link></span></p> : null}
           {teams.orgs.filter((o) => o.policyGap).map((o) => <p key={o.id} className="alert alert-warn list-alert"><IconAlert size={16} />{o.name}: {o.policyGap}</p>)}
 
           {vault.loading ? (

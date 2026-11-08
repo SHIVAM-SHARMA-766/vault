@@ -47,13 +47,17 @@ export function issueAccessToken(userId: string, key: string, now = Date.now(), 
   )
 }
 
+/** `notAfter` (epoch seconds) caps the expiry, for a session policy that ends
+ *  a device's sign-in at a fixed time however often it refreshes. */
 export function issueRefreshToken(
   userId: string,
   key: string,
   now = Date.now(),
+  notAfter?: number,
 ): { token: string; tokenId: string; expiresAt: number } {
   const tokenId = randomUUID()
-  const expiresAt = Math.floor(now / 1000) + REFRESH_TTL_SECONDS
+  const sliding = Math.floor(now / 1000) + REFRESH_TTL_SECONDS
+  const expiresAt = notAfter !== undefined ? Math.min(sliding, notAfter) : sliding
   return {
     token: issueToken({ sub: userId, typ: 'refresh', exp: expiresAt, jti: tokenId }, key),
     tokenId,

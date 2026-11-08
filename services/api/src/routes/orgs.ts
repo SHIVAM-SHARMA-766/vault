@@ -27,6 +27,7 @@ import {
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
 import { requireEmail, requireSealed, requireSharedKey } from '../validate.js'
+import { getSettings } from '../system.js'
 
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type Permission = 'view' | 'edit' | 'manage'
@@ -217,16 +218,15 @@ export async function migrateItemPartitions(app: App): Promise<number> {
 // id, in which collection. Writes, grants and membership changes are recorded
 // here as they happen; opening, revealing and copying happen only in a
 // member's app, which reports them (and a modified app could stay silent —
-// the log says so). Kept for a year.
+// the log says so). Kept as long as the server policy's audit retention.
 
-const EVENT_RETENTION_SECONDS = 365 * 24 * 60 * 60
 export const CLIENT_EVENTS = ['view', 'reveal', 'copy'] as const
 
 export async function orgEvent(app: App, orgId: string, actor: string, action: string, extra: { collectionId?: string; itemId?: string; target?: string; reported?: boolean } = {}): Promise<void> {
   const at = new Date(app.now()).toISOString()
   await app.store.put({
     pk: orgPk(orgId), sk: orgEventSk(at, randomUUID().slice(0, 8)), at, actor, action, ...extra,
-    expiresAt: Math.floor(app.now() / 1000) + EVENT_RETENTION_SECONDS,
+    expiresAt: Math.floor(app.now() / 1000) + (await getSettings(app)).policy.auditDays * 86_400,
   })
 }
 

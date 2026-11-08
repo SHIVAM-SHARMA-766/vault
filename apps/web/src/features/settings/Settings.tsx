@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { passwordStrength } from '@vault/core'
+import { belowMinimum, passwordStrength } from '@vault/core'
 import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey } from '@vault/crypto'
 
 import { ApiError, api } from '../../lib/api.js'
@@ -35,7 +35,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id']
 
 export function Settings({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
-  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus } | null>(null)
+  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus; policy: { minPasswordScore: number }; policyGap: string | null } | null>(null)
   const [version, setVersion] = useState(0)
   const tab: Tab = TABS.find((t) => t.id === requested)?.id ?? 'account'
   const info = TABS.find((t) => t.id === tab)!
@@ -46,7 +46,10 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
       try {
         const info = await api.me(await session.token())
         const fingerprint = info.identity ? await identityFingerprint(fromBase64Url(info.identity.publicKey)) : null
-        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor })
+        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor, policy: info.policy, policyGap: info.policyGap })
+        // Turning on two-factor here may close a policy gap; the vault's
+        // banner follows.
+        session.patch({ policyGap: info.policyGap })
       } catch { /* sections that need it say so */ }
     })()
   }, [version])
@@ -77,6 +80,8 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
             <p className="muted">{info.intro}</p>
           </div>
 
+          {me?.policyGap ? <p className="alert alert-warn"><IconAlert size={16} /><span>{me.policyGap}</span></p> : null}
+
           {tab === 'account' ? <>
             <section className="settings-card" aria-labelledby="s-account">
               <div className="settings-card-head"><IconUser size={18} /><h2 id="s-account">Account</h2></div>
@@ -86,7 +91,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
                 <div><dt>Created</dt><dd>{me ? new Date(me.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'}</dd></div>
               </dl>
             </section>
-            <ChangePassword state={state} />
+            <ChangePassword state={state} minScore={me?.policy.minPasswordScore ?? 0} />
             <RotateRecovery state={state} />
             <section className="settings-card" aria-labelledby="s-identity">
               <div className="settings-card-head"><IconShield size={18} /><h2 id="s-identity">Identity key</h2></div>
@@ -117,7 +122,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
   )
 }
 
-function ChangePassword({ state }: { state: session.Unlocked }) {
+function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore: number }) {
   const toast = useToast()
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
@@ -129,6 +134,8 @@ function ChangePassword({ state }: { state: session.Unlocked }) {
     e.preventDefault()
     setError('')
     if (next.length < MIN_LENGTH) return setError(`The new master password must be at least ${MIN_LENGTH} characters.`)
+    const weak = belowMinimum(next, minScore)
+    if (weak) return setError(weak)
     if (next !== confirm) return setError('The new passwords do not match.')
     if (next === current) return setError('The new master password is the same as the current one.')
     setBusy(true)
