@@ -23,9 +23,10 @@ test('the list is exactly the EFF large wordlist', () => {
 })
 
 test('options shape the passphrase', () => {
-  const plain = generatePassphrase(WORDS, { words: 6, separator: '-', capitalize: false, digit: false })
-  assert.equal(plain.split('-').length, 6)
-  for (const w of plain.split('-')) assert.ok(WORDS.includes(w), w)
+  // Four words (drop-down, felt-tip, t-shirt, yo-yo) contain a hyphen, so split on a dot.
+  const plain = generatePassphrase(WORDS, { words: 6, separator: '.', capitalize: false, digit: false })
+  assert.equal(plain.split('.').length, 6)
+  for (const w of plain.split('.')) assert.ok(WORDS.includes(w), w)
   const shaped = generatePassphrase(WORDS, { words: 4, separator: ' ', capitalize: true, digit: true })
   const parts = shaped.split(' ')
   assert.equal(parts.length, 4)

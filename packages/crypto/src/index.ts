@@ -165,3 +165,18 @@ export {
   sealCollectionKeyForRecovery,
   sealOrgKeyForRecovery,
 } from './orgrecovery.js'
+
+export {
+  type Grant,
+  type SigningKeyPair,
+  endorsementBytes,
+  fullFingerprint,
+  generateSigningKeyPair,
+  grantBytes,
+  signBytes,
+  signGrant,
+  unwrapSigningPrivateKey,
+  verifyBytes,
+  verifyGrant,
+  wrapSigningPrivateKey,
+} from './signing.js'

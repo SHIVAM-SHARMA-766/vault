@@ -364,6 +364,15 @@ mark goes.
 once: create a group, add confirmed members, then in a collection's **Access** choose **Give
 access to a group**. People added to the group later get the group's collections.
 
+**Signed keys.** Every key someone shares with you in an organization is signed by its owner
+or an admin the owner trusts, and your app checks the signature before using it. A collection
+whose key does not check out shows **Key not trusted** and stays closed: ask an admin to share it
+again. Your fingerprint now covers two keys, one for sharing and one for signing, so it changed
+once when your app added the second. Admins see **Re-confirm…** next to members whose fingerprint
+changed: compare it with them, as when you first confirmed them. If an organization's owner key
+ever changes (for example after a recovery), you will see *The owner's key changed*; compare the
+new owner's fingerprint before trusting it.
+
 **Recovery key.** Creating an organization shows its **recovery key** once: keep it offline. If
 every owner and admin ever loses access, any member can choose **Recover with the recovery
 key…**, enter it, and become the owner, with every collection the key covers. The owner can

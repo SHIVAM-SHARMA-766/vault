@@ -426,7 +426,10 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     policy: { requireTwoFactor: policy.requireTwoFactor, minPasswordScore: policy.minPasswordScore, maxIdleMinutes: policy.maxIdleMinutes, shareLinks: policy.shareLinks, shareLinkMaxDays: policy.shareLinkMaxDays },
     policyGap: serverPolicyGap(policy, profile),
     identity: profile.publicKey && profile.wrappedPrivateKey
-      ? { publicKey: profile.publicKey, wrappedPrivateKey: profile.wrappedPrivateKey }
+      ? {
+          publicKey: profile.publicKey, wrappedPrivateKey: profile.wrappedPrivateKey,
+          ...((profile as { signingPublicKey?: string }).signingPublicKey ? { signingPublicKey: (profile as { signingPublicKey?: string }).signingPublicKey, wrappedSigningKey: (profile as { wrappedSigningKey?: string }).wrappedSigningKey } : {}),
+        }
       : null,
   })
 }
@@ -655,4 +658,19 @@ export async function regenerateRecoveryCodes(app: App, userId: string, event: L
   await app.store.put({ ...fresh, recoveryCodes: codes.map((c) => hashRecoveryCode(c, app.config.pepper)) })
   await recordActivity(app, userId, 'regenerate-2fa-recovery-codes', event)
   return json(200, { recoveryCodes: codes })
+}
+
+/** Enrols the account's signing key (decisions/0025), once. Like the identity
+ *  key, it is never replaced silently: rotation would be its own flow. */
+export async function setSigningKey(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const b = parseJsonBody<Record<string, unknown>>(event)
+  const pub = typeof b['signingPublicKey'] === 'string' && /^[A-Za-z0-9_-]{87}$/.test(b['signingPublicKey']) ? b['signingPublicKey'] : null
+  if (!pub) throw badRequest('signingPublicKey must be a P-256 public key.')
+  const wrapped = requireSealed(b['wrappedSigningKey'], 'wrappedSigningKey', 4096)
+  const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as (Profile & { signingPublicKey?: string }) | null
+  if (!profile) throw unauthorized()
+  if (profile.signingPublicKey) throw conflict('This account already has a signing key.')
+  await app.store.put({ ...profile, signingPublicKey: pub, wrappedSigningKey: wrapped, updatedAt: new Date(app.now()).toISOString() })
+  await recordActivity(app, userId, 'enrol-identity', event)
+  return json(200, { ok: true })
 }

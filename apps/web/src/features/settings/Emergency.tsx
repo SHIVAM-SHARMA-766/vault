@@ -5,10 +5,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-import { type EntryContent, fromBase64Url, identityFingerprint, openEmergencyKey, openEntry, sealEmergencyKey } from '@vault/crypto'
+import { type EntryContent, fromBase64Url, openEmergencyKey, openEntry, sealEmergencyKey } from '@vault/crypto'
 
 import { type EmergencyGrant, type EmergencyTrust, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
+import { fingerprintOf } from '../orgs/trust.js'
 import { IconAlert, IconCheck, IconShield, IconX } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { myIdentity } from '../orgs/model.js'
@@ -65,7 +66,7 @@ export function Emergency({ state }: { state: session.Unlocked }) {
                 <span className="muted small">{STATUS[g.status] ?? g.status} · waits {g.waitDays} day{g.waitDays === 1 ? '' : 's'}{g.status === 'requested' ? ` · opens ${when(g.opensAt)}` : ''}</span>
               </div>
               <div className="device-actions">
-                {g.status === 'accepted' && g.granteePublicKey ? <button className="btn btn-primary btn-sm" onClick={async () => setConfirming({ g, fp: await identityFingerprint(fromBase64Url(g.granteePublicKey!)) })}>Confirm…</button> : null}
+                {g.status === 'accepted' && g.granteePublicKey ? <button className="btn btn-primary btn-sm" onClick={async () => setConfirming({ g, fp: await fingerprintOf(g.granteePublicKey!, g.granteeSigningKey ?? null) })}>Confirm…</button> : null}
                 {g.status === 'requested' ? <>
                   <button className="btn btn-danger btn-sm" onClick={() => act((t) => api.emergency.reject(t, g.id), 'Request rejected')}>Reject</button>
                   <button className="btn btn-secondary btn-sm" onClick={() => act((t) => api.emergency.approve(t, g.id), 'Access approved')}>Approve now</button>

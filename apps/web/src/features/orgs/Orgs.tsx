@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { fromBase64Url, identityFingerprint } from '@vault/crypto'
+import { fingerprintOf, loadTrust, saveTrust } from './trust.js'
 
 import { type OrgMember, type OrgPending, type SharePermission, api } from '../../lib/api.js'
 import { Link } from '../../lib/router.js'
@@ -84,6 +84,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
   const [members, setMembers] = useState<OrgMember[]>([])
   const [pending, setPending] = useState<OrgPending[]>([])
   const [confirming, setConfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
+  const [reconfirming, setReconfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
   const [email, setEmail] = useState('')
   const [label, setLabel] = useState('')
   const [inviteGroups, setInviteGroups] = useState<string[]>([])
@@ -125,7 +126,10 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
             </div>
             <div className="device-actions">
               {admin && m.status === 'accepted' ? (
-                <button className="btn btn-primary btn-sm" onClick={async () => setConfirming({ m, fp: await identityFingerprint(fromBase64Url(m.publicKey)) })}>Confirm…</button>
+                <button className="btn btn-primary btn-sm" onClick={async () => setConfirming({ m, fp: await fingerprintOf(m.publicKey, m.currentSigningKey ?? null) })}>Confirm…</button>
+              ) : null}
+              {admin && m.status === 'confirmed' && m.currentSigningKey && m.currentSigningKey !== m.signingPublicKey && m.userId !== selfId ? (
+                <button className="btn btn-secondary btn-sm" title="Their fingerprint changed: a signing key was added" onClick={async () => setReconfirming({ m, fp: await fingerprintOf(m.publicKey, m.currentSigningKey ?? null) })}>Re-confirm…</button>
               ) : null}
               {admin && m.role !== 'owner' && m.userId !== selfId ? (
                 <button className="icon-btn icon-danger" aria-label={`Remove ${m.label}`} title="Remove" onClick={async () => {
@@ -153,6 +157,26 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
           </li>
         ))}
       </ul>
+
+      {reconfirming ? (
+        <div className="confirm" role="dialog" aria-label="Re-confirm member">
+          <p><strong>{reconfirming.m.label}&apos;s fingerprint changed</strong> because their app added a signing key, which lets it check who shared a key with it. Re-confirm only if they read you exactly this:</p>
+          <p className="fingerprint"><code>{reconfirming.fp}</code></p>
+          <div className="confirm-actions">
+            <button className="btn btn-secondary btn-sm" onClick={() => setReconfirming(null)}>Cancel</button>
+            <button className="btn btn-primary btn-sm" onClick={async () => {
+              try { await api.orgs.reconfirm(await session.token(), org.id, reconfirming.m.userId); toast(`${reconfirming.m.label} re-confirmed`); setReconfirming(null); await loadMembers(); await teams.load() }
+              catch (err) { toast(err instanceof Error ? err.message : 'Could not re-confirm.', 'error') }
+            }}><IconCheck size={15} />It matches — re-confirm</button>
+          </div>
+        </div>
+      ) : null}
+
+      {org.ownerChanged ? (
+        <div className="alert alert-warn" role="alert"><IconAlert size={16} />
+          <span><strong>The owner&apos;s key changed.</strong> Keys they share are not trusted until you check: ask the owner to read you their fingerprint (Organizations → Your fingerprint), and compare it with the one in this organization&apos;s member list. <button className="link" onClick={async () => { await resetOwnerPin(org.id, teams); toast('The new owner key is trusted') }}>It matches — trust the new key</button></span>
+        </div>
+      ) : null}
 
       {confirming ? (
         <div className="confirm" role="dialog" aria-label="Confirm member">
@@ -246,6 +270,7 @@ function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams
         <span className="device-name"><IconFolder size={15} /> {c.name}
           {c.rotationNeeded ? <span className="pill pill-danger" title="Someone lost access; their copy of the key should be retired">Key rotation due</span> : null}
         </span>
+        {c.untrusted ? <span className="pill pill-danger" title="Its signature did not check out against an admin you trust">Key not trusted</span> : null}
         <span className="muted small">{c.permission ? PERMISSION_LABEL[c.permission] : 'You have no access'}{c.hidePasswords ? ' · passwords hidden' : ''}{c.until ? ` · until ${when(c.until)}` : ''}</span>
         {!c.permission ? (
           c.requested ? <span className="pill">Access requested</span> : (
@@ -623,4 +648,14 @@ function OrgRecovery({ org, teams }: { org: OrgView; teams: Teams }) {
       {shown ? <RecoveryKeyShown org={org.name} recoveryKey={shown} onDone={() => setShown(null)} /> : null}
     </div>
   )
+}
+
+/** After the member compares the owner's new fingerprint: pin the new key. */
+async function resetOwnerPin(orgId: string, teams: Teams): Promise<void> {
+  const state = session.get()
+  if (!state) return
+  const t = await loadTrust(orgId, state.vaultKey)
+  const { ownerSigningKey: _k, ownerId: _o, requireSigned: _r, ...rest } = t
+  await saveTrust(orgId, state.vaultKey, rest)
+  await teams.load()
 }

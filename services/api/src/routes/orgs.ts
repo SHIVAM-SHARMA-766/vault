@@ -54,6 +54,10 @@ interface Member extends Item {
   /** Groups chosen when they were invited (B2). Joined by the admin's app at
    *  confirmation, because group access needs keys sealed to them there. */
   pendingGroups?: string[]
+  /** The signing key as it was when the member was (re)confirmed (0025). */
+  signingPublicKey?: string
+  /** For an admin: the owner's signature endorsing their keys to sign grants. */
+  endorsement?: string
 }
 
 interface Access extends Item {
@@ -67,6 +71,9 @@ interface Access extends Item {
   viaGroup?: string
   /** A check-out (D7): access ends at this instant (ISO 8601). */
   until?: string
+  /** The granting admin's signature over this grant (decisions/0025), and who. */
+  signature?: string
+  signedBy?: string
 }
 
 interface Group extends Item {
@@ -94,6 +101,13 @@ interface Collection extends Item {
 }
 
 const now = (app: App) => new Date(app.now()).toISOString()
+/** A grant signature (0025): ECDSA P-256 in P1363 form, 64 bytes base64url. */
+const optSignature = (v: unknown): string | undefined => {
+  if (v === undefined || v === null) return undefined
+  if (typeof v !== 'string' || !/^[A-Za-z0-9_-]{86}$/.test(v)) throw badRequest('signature must be an ECDSA P-256 signature.')
+  return v
+}
+const signed = (v: unknown, by: string) => { const sig = optSignature(v); return sig ? { signature: sig, signedBy: by } : {} }
 const body = (event: LambdaEvent) => parseJsonBody<Record<string, unknown>>(event)
 const label = (v: unknown, field = 'label') => {
   if (v === undefined || v === null) return ''
@@ -291,7 +305,8 @@ export async function createOrg(app: App, userId: string, event: LambdaEvent): P
     if (err instanceof AlreadyExists) throw conflict('An organization with that id exists.')
     throw err
   }
-  const owner: Member = { pk: orgPk(orgId), sk: orgMemberSk(userId), userId, role: 'owner', status: 'confirmed', label: label(b['label']) || 'Owner', publicKey, orgKeyBlob, joinedAt: at, confirmedAt: at }
+  const ownerSigning = await signingKeyOf(app, userId)
+  const owner: Member = { pk: orgPk(orgId), sk: orgMemberSk(userId), userId, role: 'owner', status: 'confirmed', label: label(b['label']) || 'Owner', publicKey, orgKeyBlob, joinedAt: at, confirmedAt: at, ...(ownerSigning ? { signingPublicKey: ownerSigning } : {}) }
   await app.store.put(owner)
   await app.store.put({ pk: userPk(userId), sk: userOrgSk(orgId), orgId })
   await app.store.put({ pk: SYSTEM_PK, sk: systemOrgSk(orgId), orgId, createdAt: at, createdBy: userId })
@@ -474,8 +489,11 @@ export async function declineInvite(app: App, userId: string, orgId: string): Pr
 export async function members(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
   const me = await requireMember(app, orgId, userId, { confirmed: true })
   const rows = await app.store.query(orgPk(orgId))
-  const list = (rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[]).map((m) => ({
+  const memberRows = rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[]
+  const current = new Map(await Promise.all(memberRows.map(async (m) => [m.userId, await signingKeyOf(app, m.userId)] as const)))
+  const list = memberRows.map((m) => ({
     userId: m.userId, role: m.role, status: m.status, label: m.label, publicKey: m.publicKey, joinedAt: m.joinedAt, confirmedAt: m.confirmedAt ?? null,
+    signingPublicKey: m.signingPublicKey ?? null, currentSigningKey: current.get(m.userId) ?? null, endorsement: m.endorsement ?? null,
     pendingGroups: me.role === 'member' ? [] : (m.pendingGroups ?? []),
   }))
   const pending = me.role === 'member' ? [] : rows.filter((r) => r.sk.startsWith(ORG_PENDING_PREFIX))
@@ -494,7 +512,8 @@ export async function confirmMember(app: App, userId: string, event: LambdaEvent
   // If the account's key changed since it accepted, the admin confirmed a
   // fingerprint that is no longer current. Refuse rather than seal to it.
   if ((await publicKeyOf(app, target)) !== m.publicKey) throw conflict('This member\'s identity key changed after they accepted. Remove them and invite again.')
-  await app.store.put({ ...m, status: 'confirmed', orgKeyBlob, confirmedAt: now(app) })
+  const signingPublicKey = await signingKeyOf(app, target)
+  await app.store.put({ ...m, status: 'confirmed', orgKeyBlob, confirmedAt: now(app), ...(signingPublicKey ? { signingPublicKey } : {}) })
   await orgEvent(app, orgId, userId, 'member.confirm', { target })
   return json(200, { ok: true })
 }
@@ -506,7 +525,9 @@ export async function setMemberRole(app: App, userId: string, event: LambdaEvent
   const m = await member(app, orgId, target)
   if (!m) throw notFound()
   if (m.role === 'owner') throw forbidden()
-  await app.store.put({ ...m, role })
+  const endorsement = role === 'admin' ? optSignature(body(event)['endorsement']) : undefined
+  const { endorsement: _e, ...rest } = m
+  await app.store.put({ ...rest, role, ...(endorsement ? { endorsement } : {}) })
   return json(200, { ok: true })
 }
 
@@ -578,7 +599,7 @@ export async function collections(app: App, userId: string, orgId: string): Prom
     const requested = !a && me.role === 'member' ? Boolean(await app.store.get(orgPk(orgId), requestSk(c.id, userId))) : false
     out.push({
       id: c.id, nameBlob: c.nameBlob, keyVersion: c.keyVersion, rotationNeeded: !!c.rotationNeeded, recoveryCovered: Boolean(c.recoveryBlob),
-      access: a ? { keyBlob: a.keyBlob, keyVersion: a.keyVersion, permission: a.permission, hidePasswords: a.hidePasswords, ...(a.until ? { until: a.until } : {}) } : null,
+      access: a ? { keyBlob: a.keyBlob, keyVersion: a.keyVersion, permission: a.permission, hidePasswords: a.hidePasswords, ...(a.until ? { until: a.until } : {}), ...(a.signature ? { signature: a.signature, signedBy: a.signedBy } : {}) } : null,
       ...(requested ? { requested } : {}),
     })
   }
@@ -599,7 +620,7 @@ export async function createCollection(app: App, userId: string, event: LambdaEv
     if (err instanceof AlreadyExists) throw conflict('A collection with that id exists.')
     throw err
   }
-  const a: Access = { pk: orgPk(orgId), sk: accessSk(collectionId, userId), collectionId, userId, keyBlob, keyVersion: 1, permission: 'manage', hidePasswords: false }
+  const a: Access = { pk: orgPk(orgId), sk: accessSk(collectionId, userId), collectionId, userId, keyBlob, keyVersion: 1, permission: 'manage', hidePasswords: false, ...signed(b['signature'], userId) }
   await app.store.put(a)
   await orgEvent(app, orgId, userId, 'collection.create', { collectionId })
   return json(201, { id: collectionId })
@@ -624,7 +645,7 @@ export async function deleteCollection(app: App, userId: string, orgId: string, 
 export async function collectionAccess(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {
   await requireAccess(app, orgId, collectionId, userId, 'manage')
   const grants = (await app.store.query(orgPk(orgId), accessPrefix(collectionId))) as Access[]
-  return json(200, { access: grants.map((a) => ({ userId: a.userId, permission: a.permission, hidePasswords: a.hidePasswords, keyVersion: a.keyVersion, viaGroup: a.viaGroup ?? null })) })
+  return json(200, { access: grants.map((a) => ({ userId: a.userId, permission: a.permission, hidePasswords: a.hidePasswords, keyVersion: a.keyVersion, viaGroup: a.viaGroup ?? null, signed: Boolean(a.signature) })) })
 }
 
 /** Grants or changes a member's access. A new grant must carry the
@@ -643,6 +664,8 @@ export async function grantAccess(app: App, userId: string, event: LambdaEvent, 
     keyVersion: b['keyBlob'] === undefined && existing ? existing.keyVersion : c.keyVersion,
     permission: b['permission'] as Permission, hidePasswords: b['hidePasswords'] === true,
     ...(typeof b['viaGroup'] === 'string' && isValidId(b['viaGroup']) ? { viaGroup: b['viaGroup'] } : existing?.viaGroup ? { viaGroup: existing.viaGroup } : {}),
+    // A new key blob carries its own signature; a permission change keeps the old one.
+    ...(b['keyBlob'] === undefined && existing?.signature && existing.signedBy ? { signature: existing.signature, signedBy: existing.signedBy } : signed(b['signature'], userId)),
   }
   // A check-out (D7): access for a few hours or days, then it ends by itself.
   if (b['hours'] !== undefined && b['hours'] !== null) {
@@ -735,12 +758,13 @@ export async function rotateCollection(app: App, userId: string, event: LambdaEv
   if (!same(current.map((a) => a.userId), grants.map((g) => String(g['userId'])))) throw new HttpError(409, 'conflict', 'Who can open this collection changed; reload and rotate again.')
   if (!same(stored.map((i) => String(i['id'])), [...itemsIn.map((i) => String(i['id'])), ...drop])) throw new HttpError(409, 'conflict', 'The items changed; reload and rotate again.')
   const version = c.keyVersion + 1
-  const sealedGrants = grants.map((g) => ({ userId: String(g['userId']), keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob') }))
+  const sealedGrants = grants.map((g) => ({ userId: String(g['userId']), keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob'), sig: signed(g['signature'], userId) }))
   const sealedItems = itemsIn.map((i) => ({ id: String(i['id']), blob: requireSealed(i['blob'], 'blob') }))
   const at = now(app)
   for (const g of sealedGrants) {
     const a = current.find((x) => x.userId === g.userId)!
-    await app.store.put({ ...a, keyBlob: g.keyBlob, keyVersion: version })
+    const { signature: _s, signedBy: _b, ...unsigned } = a
+    await app.store.put({ ...unsigned, keyBlob: g.keyBlob, keyVersion: version, ...g.sig })
   }
   for (const d of drop) await app.store.delete(collectionItemsPk(orgId, collectionId), itemSk(d))
   for (const i of sealedItems) {
@@ -845,11 +869,12 @@ export async function grantGroup(app: App, userId: string, event: LambdaEvent, o
   const need: string[] = []
   for (const m of g.members) if (!(await access(app, orgId, collectionId, m))) need.push(m)
   const given = new Map(sealed.map((x) => [String(x['userId']), requireSharedKey(x['keyBlob'], 'keyBlob')]))
+  const sigs = new Map(sealed.map((x) => [String(x['userId']), signed(x['signature'], userId)]))
   const missing = need.filter((m) => !given.has(m))
   if (missing.length) throw new HttpError(409, 'conflict', 'The group\'s members changed; reload and try again.')
   await app.store.put({ pk: orgPk(orgId), sk: groupAccessSk(collectionId, groupId), collectionId, groupId, permission, hidePasswords })
   for (const m of need) {
-    await app.store.put({ pk: orgPk(orgId), sk: accessSk(collectionId, m), collectionId, userId: m, keyBlob: given.get(m)!, keyVersion: c.keyVersion, permission, hidePasswords, viaGroup: groupId } as Access)
+    await app.store.put({ pk: orgPk(orgId), sk: accessSk(collectionId, m), collectionId, userId: m, keyBlob: given.get(m)!, keyVersion: c.keyVersion, permission, hidePasswords, viaGroup: groupId, ...sigs.get(m) } as Access)
   }
   await orgEvent(app, orgId, userId, 'access.grant-group', { collectionId, target: groupId })
   return json(200, { ok: true, granted: need.length })
@@ -973,15 +998,63 @@ export async function recoverOrg(app: App, userId: string, event: LambdaEvent, o
   for (const m of (await app.store.query(orgPk(orgId), ORG_MEMBER_PREFIX)) as Member[]) {
     if (m.role === 'owner' && m.userId !== userId) await app.store.put({ ...m, role: 'admin' })
   }
-  await app.store.put({ ...me, role: 'owner', status: 'confirmed', orgKeyBlob, confirmedAt: me.confirmedAt ?? now(app) })
+  const mySigning = await signingKeyOf(app, userId)
+  await app.store.put({ ...me, role: 'owner', status: 'confirmed', orgKeyBlob, confirmedAt: me.confirmedAt ?? now(app), ...(mySigning ? { signingPublicKey: mySigning } : {}) })
   let restored = 0
   for (const g of grants) {
     const c = (await app.store.get(orgPk(orgId), collectionSk(String(g['collectionId'] ?? '')))) as Collection | null
     if (!c || g['keyVersion'] !== c.keyVersion) continue
-    await app.store.put({ pk: orgPk(orgId), sk: accessSk(c.id, userId), collectionId: c.id, userId, keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob'), keyVersion: c.keyVersion, permission: 'manage', hidePasswords: false } as Access)
+    await app.store.put({ pk: orgPk(orgId), sk: accessSk(c.id, userId), collectionId: c.id, userId, keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob'), keyVersion: c.keyVersion, permission: 'manage', hidePasswords: false, ...signed(g['signature'], userId) } as Access)
     restored++
   }
   await orgEvent(app, orgId, userId, 'org.recover', { target: me.label })
   await addNotes(app, await managers(app, orgId, userId), 'org-recovered', { orgId, who: me.label })
   return json(200, { ok: true, restored })
+}
+
+// ── Signed key grants (decisions/0025) ─────────────────────────────────────
+
+async function signingKeyOf(app: App, userId: string): Promise<string | null> {
+  const profile = await app.store.get(userPk(userId), PROFILE_SK)
+  return typeof profile?.['signingPublicKey'] === 'string' ? profile['signingPublicKey'] : null
+}
+
+/** An admin re-confirms a member whose fingerprint changed because a signing
+ *  key was added: the snapshot is updated to the keys the admin compared. */
+export async function reconfirmMember(app: App, userId: string, orgId: string, target: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  const m = await member(app, orgId, target)
+  if (!m || m.status !== 'confirmed') throw notFound()
+  if ((await publicKeyOf(app, target)) !== m.publicKey) throw conflict('This member\'s identity key changed. Remove them and invite again.')
+  const signingPublicKey = await signingKeyOf(app, target)
+  if (!signingPublicKey) throw conflict('This member has no signing key yet; it is added at their next unlock.')
+  await app.store.put({ ...m, signingPublicKey })
+  await orgEvent(app, orgId, userId, 'member.reconfirm', { target })
+  return json(200, { ok: true })
+}
+
+/** The owner endorses an admin's keys to sign grants (or replaces it). */
+export async function endorseAdmin(app: App, userId: string, event: LambdaEvent, orgId: string, target: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { owner: true })
+  const m = await member(app, orgId, target)
+  if (!m || m.role !== 'admin') throw notFound()
+  const endorsement = optSignature(body(event)['endorsement'])
+  if (!endorsement) throw badRequest('endorsement is required.')
+  await app.store.put({ ...m, endorsement })
+  return json(200, { ok: true })
+}
+
+/** A member's sealed trust store for an organization: the owner signing key
+ *  they pinned, and whether unsigned grants are refused from now on. Sealed
+ *  with their vault key; the server stores what it cannot read or forge. */
+export async function getTrust(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId)
+  const row = await app.store.get(userPk(userId), `TRUST#${orgId}`)
+  return json(200, { blob: row?.['blob'] ?? null })
+}
+
+export async function putTrust(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId)
+  await app.store.put({ pk: userPk(userId), sk: `TRUST#${orgId}`, blob: requireSealed(body(event)['blob'], 'blob', 4096) })
+  return json(200, { ok: true })
 }
