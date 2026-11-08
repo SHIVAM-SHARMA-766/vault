@@ -49,10 +49,14 @@ export function App() {
 
 /** Once per unlock: learn the account's id and role, and enrol an identity
  *  key on accounts from before identity keys existed (decisions/0009). */
+let loadedFor: Uint8Array | null = null
+
 function useAccount(state: session.Unlocked) {
   // The vault key is a new object on every unlock, so this runs once per unlock.
   useEffect(() => {
-    void prefs.load(state.vaultKey)
+    // Once per unlock, not per mount: a language change remounts the tree,
+    // and loading again then could undo the change being saved.
+    if (loadedFor !== state.vaultKey) { loadedFor = state.vaultKey; void prefs.load(state.vaultKey) }
     void (async () => {
       try {
         const me = await api.me(await session.token())
