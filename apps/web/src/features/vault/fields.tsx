@@ -5,10 +5,12 @@
 import { useEffect, useState } from 'react'
 
 import { generateTotp } from '@vault/crypto'
-import { type FieldSpec, cardBrand, formatCardNumber, formatDate, isPast } from '@vault/core'
+import { type FieldSpec, cardBrand, formatCardNumber, isPast } from '@vault/core'
 
 import { IconExternal, IconEye, IconEyeOff } from '../../ui/icons.js'
 import { CopyButton, Generator, StrengthMeter } from '../../ui/kit.js'
+import { day } from '../../lib/format.js'
+import * as prefs from '../../lib/prefs.js'
 
 // ── Display ─────────────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ function DateRow({ label, value, expiry }: { label: string; value: string; expir
   return (
     <div className="field-row">
       <span className="field-label">{label}{expired ? <span className="pill pill-danger field-badge">Expired</span> : null}</span>
-      <div className="field-value"><span className="truncate">{formatDate(value)}</span></div>
+      <div className="field-value"><span className="truncate">{day(value)}</span></div>
     </div>
   )
 }
@@ -58,15 +60,33 @@ export function TextRow({ label, value, copy = true }: { label: string; value: s
   )
 }
 
+/** A reveal that hides itself again after the person's chosen time (F4). */
+function useReveal(): [boolean, (v: boolean) => void] {
+  const [revealed, setRevealed] = useState(false)
+  const seconds = prefs.usePrefs().autoHideSeconds
+  useEffect(() => {
+    if (!revealed || !seconds) return
+    const t = setTimeout(() => setRevealed(false), seconds * 1000)
+    return () => clearTimeout(t)
+  }, [revealed, seconds])
+  return [revealed, setRevealed]
+}
+
+/** The dots shown for a masked secret: a fixed row, unless the person chose
+ *  to see its length (F4). */
+export function mask(value: string): string {
+  return prefs.get().maskLength === 'actual' ? '•'.repeat(Math.min(value.length, 64)) : '••••••••••••'
+}
+
 export function SecretRow({ label, value, strength, display, badge }: {
   label: string; value: string; strength?: boolean; display?: ((v: string) => string) | undefined; badge?: string | null
 }) {
-  const [revealed, setRevealed] = useState(false)
+  const [revealed, setRevealed] = useReveal()
   return (
     <div className="field-row">
       <span className="field-label">{label}{badge ? <span className="pill field-badge">{badge}</span> : null}</span>
       <div className="field-value">
-        <span className="mono truncate">{revealed ? (display ? display(value) : value) : '•'.repeat(Math.min(value.length, 16))}</span>
+        <span className="mono truncate">{revealed ? (display ? display(value) : value) : mask(value)}</span>
         <span className="field-tools">
           <button type="button" className="icon-btn" onClick={() => setRevealed(!revealed)}
                   title={revealed ? 'Hide' : 'Reveal'} aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}>
@@ -90,7 +110,7 @@ function BlockRow({ label, value }: { label: string; value: string }) {
 }
 
 function SecretBlockRow({ label, value }: { label: string; value: string }) {
-  const [revealed, setRevealed] = useState(false)
+  const [revealed, setRevealed] = useReveal()
   return (
     <div className="field-row">
       <div className="label-row">

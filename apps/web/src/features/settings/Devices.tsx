@@ -8,11 +8,8 @@ import { type DeviceSession, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconClock, IconEdit, IconLock } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
+import { when } from '../../lib/format.js'
 
-const when = (iso: string) => {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
 
 export function Devices() {
   const toast = useToast()

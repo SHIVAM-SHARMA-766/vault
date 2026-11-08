@@ -14,6 +14,7 @@ import { enforce, type Limit } from '../ratelimit.js'
 import { AlreadyExists } from '../store.js'
 import { requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
+import { getSettings } from '../system.js'
 
 export const SHARE_EXPIRY_CHOICES = [3600, 86_400, 7 * 86_400, 30 * 86_400] as const
 export const SHARE_VIEW_CHOICES = [1, 2, 5, 10, null] as const
@@ -46,6 +47,10 @@ export async function createShare(app: App, userId: string, event: LambdaEvent):
   const maxViews = b['maxViews'] ?? null
   if (!(SHARE_VIEW_CHOICES as readonly unknown[]).includes(maxViews)) throw badRequest('maxViews must be 1, 2, 5, 10 or null.')
 
+  // The server's sharing policy (G4).
+  const { policy } = await getSettings(app)
+  if (!policy.shareLinks) throw new HttpError(403, 'policy_required', 'Share links are turned off on this server.')
+  if ((expiresIn as number) > policy.shareLinkMaxDays * 86_400) throw new HttpError(403, 'policy_required', `This server allows share links of at most ${policy.shareLinkMaxDays === 1 ? '1 day' : `${policy.shareLinkMaxDays} days`}.`)
   await enforce(app.store, 'share-create', userId, CREATE_LIMIT, app.now())
   const active = (await app.store.query(userPk(userId), USER_SHARE_PREFIX))
     .filter((r) => Number(r['expiresAt']) - INDEX_GRACE_SECONDS > nowS(app))

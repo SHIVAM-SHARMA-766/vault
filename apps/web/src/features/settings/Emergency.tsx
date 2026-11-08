@@ -13,12 +13,13 @@ import { IconAlert, IconCheck, IconShield, IconX } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { myIdentity } from '../orgs/model.js'
 import { SecretRow, TextRow } from '../vault/fields.js'
+import { when as fmtWhen } from '../../lib/format.js'
 
 const STATUS: Record<string, string> = {
   invited: 'Invited — has not accepted', accepted: 'Accepted — confirm their fingerprint', confirmed: 'Ready', requested: 'Has requested access',
   approved: 'Has access', rejected: 'Request rejected',
 }
-const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '')
+const when = (iso: string | null) => (iso ? fmtWhen(iso) : '')
 
 export function Emergency({ state }: { state: session.Unlocked }) {
   const toast = useToast()

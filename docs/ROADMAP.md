@@ -343,10 +343,10 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **F. Personal settings**
 - ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults
-- ⬜ F4 Reveal and count options · ⬜ F5 Email alerts · ⬜ F6 Default folder · ⬜ F7 Date, time and language · ✅ F8 Delete my account
+- ✅ F4 Reveal and count options (fixed-length mask, auto-hide) · ✅ F5 Email alerts (sign-in email switch; the server holds no address, so other alerts live in activity) · ✅ F6 Default folder · ✅ F7 Date and time styles (language is E9) · ✅ F8 Delete my account
 
 **G. Administrator settings**
-- ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ⬜ G2 IP allow-list · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ⬜ G4 Sharing policy
+- ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ⬜ G2 IP allow-list · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ✅ G4 Sharing policy (share links on/off and longest life)
 - ⬜ G5 Rate limits in the UI · ⬜ G6 Editable email templates · ✅ G7 Data retention (activity, audit and organization logs; shortening applies at once)
 
 ### Phase 4 — Browser extension

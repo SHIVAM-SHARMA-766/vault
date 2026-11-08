@@ -10,12 +10,12 @@ import * as session from '../../lib/session.js'
 import { IconAlert, IconHelp, IconPlus } from '../../ui/icons.js'
 import { Check, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
+import { when } from '../../lib/format.js'
 
 export const STATUS_LABEL: Record<string, string> = {
   open: 'Open', in_progress: 'In progress', waiting: 'Waiting for you', resolved: 'Resolved', closed: 'Closed',
 }
 const CATEGORY_LABEL: Record<string, string> = { question: 'Question', problem: 'Something is not working', account: 'My account', feature: 'Suggestion' }
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 export function Support({ state }: { state: session.Unlocked }) {
   const toast = useToast()

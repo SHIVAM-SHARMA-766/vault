@@ -11,15 +11,18 @@ import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import { ShareLinkDialog } from './ShareLink.js'
 import type { Decrypted, Folder, Version } from './model.js'
+import { when } from '../../lib/format.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
 
-export function EntryDetail({ entry, folders, issues, vaultKey, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
   /** Personal items only: lets the item be shared by link. */
   vaultKey?: Uint8Array | undefined
+  /** The server's longest allowed share link, in days. */
+  linkMaxDays?: number
   shared?: SharedInfo | null
   shareTargets?: { id: string; label: string }[]
   onShare?: (collectionId: string) => void
@@ -132,7 +135,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, shared = null, s
         <p className="muted small shared-note">Shared in {shared.where}. <button className="link" onClick={onUnshare}>Move to my vault</button></p>
       ) : null}
 
-      {linking && vaultKey ? <ShareLinkDialog entry={entry} vaultKey={vaultKey} onClose={() => setLinking(false)} /> : null}
+      {linking && vaultKey ? <ShareLinkDialog entry={entry} vaultKey={vaultKey} maxDays={linkMaxDays} onClose={() => setLinking(false)} /> : null}
 
       {showHistory ? <History entry={entry} load={loadHistory} onRestore={onRestore} /> : null}
 
@@ -163,8 +166,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, shared = null, s
 }
 
 export function formatDate(iso: string): string {
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  return when(iso)
 }
 
 /** What differs between a past version and the entry now, in words. */

@@ -10,11 +10,13 @@ import { linkFor, sealShare, toShared } from '../../lib/share.js'
 import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import { CopyButton } from '../../ui/kit.js'
+import { when } from '../../lib/format.js'
 
 const EXPIRY = [[3600, '1 hour'], [86_400, '1 day'], [7 * 86_400, '7 days'], [30 * 86_400, '30 days']] as const
 const VIEWS = [[1, 'Once'], [2, '2 times'], [5, '5 times'], [10, '10 times'], [null, 'No limit']] as const
 
-export function ShareLinkDialog({ entry, vaultKey, onClose }: { entry: EntryContent; vaultKey: Uint8Array; onClose: () => void }) {
+export function ShareLinkDialog({ entry, vaultKey, maxDays = 30, onClose }: { entry: EntryContent; vaultKey: Uint8Array; maxDays?: number; onClose: () => void }) {
+  const expiry = EXPIRY.filter(([v]) => v <= maxDays * 86_400)
   const [expiresIn, setExpiresIn] = useState<number>(86_400)
   const [maxViews, setMaxViews] = useState<number | null>(1)
   const [busy, setBusy] = useState(false)
@@ -41,7 +43,7 @@ export function ShareLinkDialog({ entry, vaultKey, onClose }: { entry: EntryCont
         <h2 id="sl-title">Share “{entry.name || 'Untitled'}” by link</h2>
         {link ? (
           <>
-            <p className="muted">Anyone with this link can open the item, until {new Date(link.expiresAt).toLocaleString()}{maxViews ? `, ${maxViews === 1 ? 'once' : `${maxViews} times`}` : ''}. Send it over a channel you trust.</p>
+            <p className="muted">Anyone with this link can open the item, until {when(link.expiresAt)}{maxViews ? `, ${maxViews === 1 ? 'once' : `${maxViews} times`}` : ''}. Send it over a channel you trust.</p>
             <div className="share-link">
               <input readOnly aria-label="Share link" value={link.url} onFocus={(e) => e.currentTarget.select()} className="mono" />
               <CopyButton value={link.url} label="link" />
@@ -56,7 +58,7 @@ export function ShareLinkDialog({ entry, vaultKey, onClose }: { entry: EntryCont
               <div className="field">
                 <label htmlFor="sl-expiry">Expires after</label>
                 <select id="sl-expiry" value={expiresIn} onChange={(e) => setExpiresIn(Number(e.target.value))}>
-                  {EXPIRY.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  {expiry.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </div>
               <div className="field">

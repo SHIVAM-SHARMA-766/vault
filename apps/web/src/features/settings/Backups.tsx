@@ -15,12 +15,13 @@ import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconClock, IconDownload, IconTrash, IconUpload } from '../../ui/icons.js'
 import { Check, PasswordInput, useToast } from '../../ui/kit.js'
 import { download, openPersonalBackup } from '../transfer/transfer.js'
+import { when } from '../../lib/format.js'
+import * as prefs from '../../lib/prefs.js'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const FREQ_LABELS: Record<BackupFrequency, string> = { off: 'Off — only when I press Back up now', daily: 'Every day', weekly: 'Every week', monthly: 'Every month (on the 1st)' }
 const size = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-const hourLabel = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+const hourLabel = (h: number) => { const c = prefs.get().clock; return new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', ...(c === 'system' ? {} : { hour12: c === '12h' }) }) }
 const where = (d: string) => d === 'server' ? 'On this server' : d.startsWith('s3:') ? `S3 · ${d.slice(3)}` : `WebDAV · ${d.slice(7)}`
 
 type DestForm =

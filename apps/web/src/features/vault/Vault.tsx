@@ -290,7 +290,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const type = (filter.kind === 'type' ? filter.type : 'login') as EntryType
     setSelectedId(null)
     const collectionId = filter.kind === 'collection' && canEdit(openCollections.find((c) => c.id === filter.id)?.permission) ? filter.id : undefined
-    setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : undefined), ...(collectionId ? { collectionId } : {}) })
+    // The open folder, else the person's default folder (F6) if it still exists.
+    const fallback = folders.some((f) => f.id === view.defaultFolderId) ? view.defaultFolderId : undefined
+    setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : collectionId ? undefined : fallback), ...(collectionId ? { collectionId } : {}) })
   }
 
   const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites' : filter.kind === 'archive' ? 'Archive'
@@ -463,7 +465,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                        shared={!!(mode.collectionId ?? sharedOf(entries.find((e) => e.id === mode.id)))}
                        onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
-            <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) ? undefined : state.vaultKey}
+            <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
                          shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? { where: `${c.orgName} / ${c.name}`, permission: sh.permission, hidePasswords: sh.hidePasswords } : null })()}
                          shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: `${c.orgName} / ${c.name}` }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}

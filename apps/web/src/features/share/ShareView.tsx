@@ -11,6 +11,7 @@ import { type SharedItem, openShareBlob, parseLink } from '../../lib/share.js'
 import { IconAlert, IconLock, IconShield } from '../../ui/icons.js'
 import { typeInfo } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from '../vault/fields.js'
+import { when } from '../../lib/format.js'
 
 export function ShareView() {
   const link = parseLink(location.pathname, location.hash)
@@ -61,7 +62,7 @@ function Shared({ item, sharedAt, viewsLeft, expiresAt }: { item: SharedItem; sh
   return (
     <>
       <h1 className="auth-title">{item.name || 'Untitled'}</h1>
-      <p className="muted small"><span className="badge"><info.Icon size={13} />{info.label}</span> Shared {new Date(sharedAt).toLocaleString()}</p>
+      <p className="muted small"><span className="badge"><info.Icon size={13} />{info.label}</span> Shared {when(sharedAt)}</p>
       <div className="fields">
         {spec.fields.map((f) => <FieldView key={f.key} spec={f} value={readField(entry, f)} entryType={item.type} />)}
         {entry.customFields.map((c, i) => c.hidden
@@ -71,7 +72,7 @@ function Shared({ item, sharedAt, viewsLeft, expiresAt }: { item: SharedItem; sh
       {item.notes ? <div className="notes"><span className="field-label">Notes</span><pre>{item.notes}</pre></div> : null}
       <p className="alert alert-warn"><IconAlert size={16} /><span>
         {viewsLeft === 0 ? 'This was the last view: the link no longer works. Save what you need now.'
-          : `The link works until ${new Date(expiresAt).toLocaleString()}${viewsLeft !== null ? ` for ${viewsLeft} more ${viewsLeft === 1 ? 'view' : 'views'}` : ''}.`}
+          : `The link works until ${when(expiresAt)}${viewsLeft !== null ? ` for ${viewsLeft} more ${viewsLeft === 1 ? 'view' : 'views'}` : ''}.`}
       </span></p>
     </>
   )

@@ -220,10 +220,19 @@ link such as `/app/settings/security` opens the right one after you unlock.
 | Auto-lock | 1, 5, 15, 30 minutes, 1 or 4 hours idle | 15 minutes |
 | Lock when I switch tab or window | on / off | off |
 | Clear copied secrets after | 10, 30 seconds, 1 or 2 minutes, never | 30 seconds |
+| Masked passwords show | the same dots for every password · one dot per character | the same dots (hides the length) |
+| Hide a revealed secret again after | 10, 30 seconds, 1 minute, keep it shown | 30 seconds |
+| Put new items in | No folder, or any folder (used when no folder is open) | No folder |
+| Dates | as the browser does · 31/12/2026 · 12/31/2026 · 2026-12-31 | as the browser does |
+| Times | as the browser does · 24-hour · 12-hour | as the browser does |
+| Email alerts | email me when my account signs in (when the server sends mail) | on |
 | Password generator | default length (8–64) and character sets | 20, all sets |
 
 Preferences are **encrypted with your vault key** and saved on the server, so they follow you to
-every device, and the server cannot read them. An organization can set a shorter auto-lock than
+every device, and the server cannot read them. The one exception is the email alert switch,
+which the server has to read to know whether to write to you. The server keeps only a
+fingerprint of your address, so it can email you only as you sign in. Alerts about other
+events, such as a share link being opened, appear in **Security activity** instead. An organization can set a shorter auto-lock than
 yours; when it does, the section says so.
 
 ### Backups
@@ -378,7 +387,7 @@ Staff with a role see **Admin panel** in the account menu. What each role can do
 | Users: label, disable, sign out, reset 2FA, delete | ✓ | ✓ | | | read |
 | Change roles | ✓ | | | | |
 | Registration mode (closed / invite / open) | ✓ | ✓ | | | read |
-| Policies (two-factor, password strength, auto-lock, sign-in length, log retention) | ✓ | ✓ | | | read |
+| Policies (two-factor, password strength, auto-lock, sign-in length, log retention, share links) | ✓ | ✓ | | | read |
 | Website: edit text, SEO, images | ✓ | ✓ | | ✓ | read |
 | Website: publish, roll back | ✓ | ✓ | | ✓ | |
 | Audit log | ✓ | ✓ | | | ✓ |
@@ -404,6 +413,7 @@ Overview → **Policies** sets rules for every account on the server:
 | Weakest master password | Sign-up and password change refuse anything weaker. Each person's app checks it — the server never sees a password — so an existing weaker password shows as a gap until it is changed |
 | Longest auto-lock | Caps everyone's auto-lock choice. An organization's own limit can only shorten it further |
 | Sign in again after | Ends every device's sign-in that many days after it signed in, however often it is used. Applies to devices already signed in |
+| Share links | Allowed up to 30, 7 or 1 days, or turned off. When off, the **Link** button disappears; links already made keep working until they expire or are revoked |
 | Keep account activity / audit and organization logs for | Older entries are deleted. Shortening a period deletes what is older at once (the panel warns first); lengthening keeps entries written from then on |
 
 No policy locks anyone out: an account that misses one keeps working and is told what to do.

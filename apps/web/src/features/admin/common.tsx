@@ -7,6 +7,7 @@ import { Link } from '../../lib/router.js'
 import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import type { useToast } from '../../ui/kit.js'
+import { when as fmtWhen } from '../../lib/format.js'
 
 export function useAdminData<T>(load: (token: string) => Promise<T>) {
   const [data, setData] = useState<T | null>(null)
@@ -48,9 +49,7 @@ export function ErrorBox({ error }: { error: string }) {
 }
 
 export function when(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  return fmtWhen(iso)
 }
 
 export function ago(iso: string | null | undefined): string {

@@ -315,7 +315,7 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
 export function requirePolicy(value: unknown): ServerPolicy {
   if (!value || typeof value !== 'object') throw badRequest('policy must be an object.')
   const v = value as Record<string, unknown>
-  if (typeof v['requireTwoFactor'] !== 'boolean') throw badRequest('policy.requireTwoFactor must be true or false.')
+  for (const k of ['requireTwoFactor', 'shareLinks']) if (typeof v[k] !== 'boolean') throw badRequest(`policy.${k} must be true or false.`)
   for (const k of Object.keys(POLICY_CHOICES) as (keyof typeof POLICY_CHOICES)[]) {
     const choices = POLICY_CHOICES[k] as readonly unknown[]
     if (!choices.includes(v[k])) throw badRequest(`policy.${k} must be one of: ${choices.map((c) => c ?? 'null').join(', ')}.`)
@@ -331,6 +331,7 @@ function describePolicy(p: ServerPolicy): string {
     p.sessionDays ? `session=${p.sessionDays}d` : null,
     `activity=${p.activityDays}d`,
     `audit=${p.auditDays}d`,
+    p.shareLinks ? `links<=${p.shareLinkMaxDays}d` : 'no-links',
   ].filter(Boolean).join(' ')
 }
 
