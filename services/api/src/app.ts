@@ -15,6 +15,7 @@ import * as auth from './routes/auth.js'
 import * as desk from './routes/desk.js'
 import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
+import * as prefs from './routes/prefs.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -22,6 +23,7 @@ import * as vault from './routes/vault.js'
 export function buildRouter(app: App): Router {
   const router = new Router()
 
+  router.get('/api/instance', () => admin.instanceRoute(app), 'This server\'s name, support contact and registration mode')
   router.get('/api/health', async () => json(200, { status: 'ok' }), 'Liveness check')
   router.get('/api/openapi.json', async () => json(200, openapi(router)), 'This document')
 
@@ -128,6 +130,8 @@ export function buildRouter(app: App): Router {
   router.get('/api/vault/history/:id', authed((u, _e, id) => vault.getHistory(app, u, id)), 'Previous versions of an entry')
   router.post('/api/vault/import', authed((u, e) => vault.bulkImport(app, u, e)), 'Create many sealed items at once; never overwrites')
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)), 'Add a sealed previous version')
+  router.get('/api/prefs', authed((u) => prefs.getPrefs(app, u)), 'My sealed preferences')
+  router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
   router.get('/api/activity', authed((u) => vault.getActivity(app, u)), 'Security events from the last ninety days')
 
   // The operator's routes. Same sign-in as everything else; each names the
@@ -149,8 +153,8 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)), 'Sign an account out everywhere')
   router.post('/api/admin/users/:id/reset-2fa', admined('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)), 'Turn off an account\'s two-factor sign-in')
   router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)), 'Delete an account and its vault')
-  router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)), 'Registration mode')
-  router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode')
+  router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)), 'Registration mode and instance profile')
+  router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode or the instance profile')
   router.get('/api/admin/invites', admined('invites.read', () => admin.listInvitesRoute(app)), 'Open invitations')
   router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)), 'Create an invitation code')
   router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)), 'Withdraw an invitation')

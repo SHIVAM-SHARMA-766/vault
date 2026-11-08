@@ -138,7 +138,7 @@ async function save(app: App, t: Ticket, patch: Partial<Ticket>, opts: { clearAs
 
 async function tellRequester(app: App, t: Ticket, subject: string, body: string): Promise<void> {
   if (!t.requester.email) return
-  await notify(app.mailer, {
+  await notify(app, {
     to: t.requester.email,
     subject: `[Vault #${t.number}] ${subject}`,
     text: `${body}\n\n— Vault support at ${app.config.origin}${t.kind === 'support' ? `\nOpen Help & support to reply: ${app.config.origin}/app/support` : ''}\nThis address is kept only until the request is closed.`,
@@ -301,7 +301,7 @@ export async function approveAccess(app: App, actor: string, actorRole: Role, ev
   let emailed = false
   if (t.requester.email && app.mailer) {
     const { inviteMessage } = await import('../mail.js')
-    emailed = await notify(app.mailer, { to: t.requester.email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) })
+    emailed = await notify(app, { to: t.requester.email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) })
   }
   await addMessage(app, id, { from: 'staff', author: 'Vault', body: emailed ? 'Approved. An invitation was emailed.' : 'Approved. An invitation code was issued to send to the requester.', internal: true })
   const next = await save(app, t, { status: 'resolved', lastFrom: 'staff' })

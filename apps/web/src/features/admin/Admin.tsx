@@ -6,13 +6,14 @@
 // Every action is checked again by the server. Hiding this panel from
 // non-admins is a courtesy, not the control.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import {
   type AdminAudit,
   type AdminInvite,
   type AdminOverview,
   type AdminUser,
+  type InstanceProfile,
   type Permission,
   type RegistrationMode,
   type Role,
@@ -21,6 +22,7 @@ import {
 import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Website } from './Website.js'
+import { refresh as refreshInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
@@ -169,6 +171,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
             </div>
 
             <MailCard on={data.mail} canWrite={canWrite} />
+            <ProfileCard canWrite={canWrite} />
 
             <div className="admin-card">
               <div className="admin-card-head"><span className="dot dot-ok" /><h2>Server</h2></div>
@@ -179,6 +182,49 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
         </>
       )}
     </Section>
+  )
+}
+
+/** The server's name and support contact: shown on the sign-in screen and the
+ *  help page, and the Reply-To of every email Vault sends. */
+function ProfileCard({ canWrite }: { canWrite: boolean }) {
+  const toast = useToast()
+  const [form, setForm] = useState<InstanceProfile | null>(null)
+  const [saved, setSaved] = useState<InstanceProfile | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const s = await api.admin.settings(await session.token())
+        setForm(s.profile); setSaved(s.profile)
+      } catch { /* the card says it could not load */ }
+    })()
+  }, [])
+  if (!form) return <div className="admin-card"><div className="admin-card-head"><h2>Name and support</h2></div><p className="muted small">Loading…</p></div>
+  const dirty = JSON.stringify(form) !== JSON.stringify(saved)
+  const set = (k: keyof InstanceProfile) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value })
+  return (
+    <form className="admin-card admin-card-wide" aria-labelledby="profile-title" onSubmit={async (e) => {
+      e.preventDefault()
+      if (await run(toast, (t) => api.admin.setProfile(t, form), 'Name and support contact saved')) { setSaved(form); refreshInstance() }
+    }}>
+      <div className="admin-card-head"><span className={`dot ${saved?.supportEmail ? 'dot-ok' : 'dot-muted'}`} /><h2 id="profile-title">Name and support</h2></div>
+      <p className="muted small">Shown on the sign-in screen and the help page. Replies to any email Vault sends go to the support address.</p>
+      <div className="grid-3">
+        <div className="field">
+          <label htmlFor="pf-name">Server name</label>
+          <input id="pf-name" maxLength={60} placeholder="Vault" disabled={!canWrite} value={form.name} onChange={set('name')} />
+        </div>
+        <div className="field">
+          <label htmlFor="pf-email">Support email</label>
+          <input id="pf-email" type="email" maxLength={254} placeholder="support@example.com" disabled={!canWrite} value={form.supportEmail} onChange={set('supportEmail')} />
+        </div>
+        <div className="field">
+          <label htmlFor="pf-url">Help page (optional)</label>
+          <input id="pf-url" type="url" maxLength={300} placeholder="https://…" disabled={!canWrite} value={form.supportUrl} onChange={set('supportUrl')} />
+        </div>
+      </div>
+      {canWrite ? <div className="settings-actions"><button className="btn btn-primary btn-sm" type="submit" disabled={!dirty}>Save</button></div> : null}
+    </form>
   )
 }
 

@@ -22,6 +22,8 @@ export const INVITE_PREFIX = 'INVITE#'
 export const AUDIT_PREFIX = 'AUDIT#'
 
 export const PROFILE_SK = 'PROFILE'
+/** An account's sealed preferences (routes/prefs.ts). */
+export const PREFS_SK = 'PREFS'
 export const EMAIL_SK = 'EMAIL'
 
 export const entrySk = (entryId: string) => `ENTRY#${entryId}`

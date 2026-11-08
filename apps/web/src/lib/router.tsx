@@ -12,7 +12,7 @@ import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 
 export type Route =
   | { name: 'vault' }
-  | { name: 'settings' }
+  | { name: 'settings'; tab?: string | null }
   | { name: 'transfer' }
   | { name: 'support' }
   | { name: 'orgs' }
@@ -20,7 +20,7 @@ export type Route =
 
 export function parse(pathname: string): Route {
   const parts = pathname.replace(/^\/app\/?/, '').split('/').filter(Boolean)
-  if (parts[0] === 'settings') return { name: 'settings' }
+  if (parts[0] === 'settings') return { name: 'settings', tab: parts[1] ?? null }
   if (parts[0] === 'import-export') return { name: 'transfer' }
   if (parts[0] === 'support') return { name: 'support' }
   if (parts[0] === 'orgs') return { name: 'orgs' }
@@ -31,7 +31,7 @@ export function parse(pathname: string): Route {
 export function href(route: Route): string {
   switch (route.name) {
     case 'vault': return '/app/'
-    case 'settings': return '/app/settings'
+    case 'settings': return route.tab ? `/app/settings/${route.tab}` : '/app/settings'
     case 'transfer': return '/app/import-export'
     case 'support': return '/app/support'
     case 'orgs': return '/app/orgs'

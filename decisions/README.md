@@ -36,6 +36,7 @@ someone who would otherwise assume it was an oversight.
 | [0014](0014-service-desk.md) | The built-in service desk: access requests, sign-in help, support |
 | [0015](0015-organizations-and-collections.md) | Organizations and collections as built: org key, invitations by digest, confirmation, key versions |
 | [0016](0016-teams-completion.md) | Key rotation, groups, policies, access audit, emergency access, operator view |
+| [0017](0017-personal-backups.md) | Personal backups: each person's own schedule and destination (S3, WebDAV, on the server) |
 
 ## A note on the numbering
 

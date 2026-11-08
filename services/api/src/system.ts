@@ -30,9 +30,25 @@ import { AlreadyExists, type Item } from './store.js'
 export type RegistrationMode = 'closed' | 'invite' | 'open'
 export const REGISTRATION_MODES: readonly RegistrationMode[] = ['closed', 'invite', 'open']
 
+/** What this server calls itself and where its people get help. Shown on the
+ *  sign-in screen and the help page, and used as the Reply-To of every email,
+ *  so a reply reaches the operator's support mailbox. All of it is public. */
+export interface InstanceProfile {
+  name: string
+  supportEmail: string
+  supportUrl: string
+}
+
 export interface Settings {
   registration: RegistrationMode
+  profile: InstanceProfile
   updatedAt?: string
+}
+
+function readProfile(value: unknown): InstanceProfile {
+  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  const str = (k: string) => (typeof v[k] === 'string' ? (v[k] as string) : '')
+  return { name: str('name'), supportEmail: str('supportEmail'), supportUrl: str('supportUrl') }
 }
 
 export async function getSettings(app: App): Promise<Settings> {
@@ -40,6 +56,7 @@ export async function getSettings(app: App): Promise<Settings> {
   const mode = item?.['registration']
   return {
     registration: REGISTRATION_MODES.includes(mode as RegistrationMode) ? (mode as RegistrationMode) : 'closed',
+    profile: readProfile(item?.['profile']),
     ...(typeof item?.['updatedAt'] === 'string' ? { updatedAt: item['updatedAt'] } : {}),
   }
 }

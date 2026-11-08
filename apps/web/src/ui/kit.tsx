@@ -3,13 +3,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { passwordStrength } from '@vault/core'
+import { describeSeconds, passwordStrength } from '@vault/core'
 import type { EntryType } from '@vault/crypto'
 
 import {
   IconAlert, IconBank, IconCard, IconCheck, IconCopy, IconEye, IconEyeOff, IconKey,
   IconNote, IconRefresh, IconTerminal, IconUser, IconWifi,
 } from './icons.js'
+import * as prefs from '../lib/prefs.js'
 
 // ── Toasts ────────────────────────────────────────────────────────────────
 
@@ -45,15 +46,16 @@ export const useToast = () => useContext(ToastContext)
 
 // ── Clipboard ─────────────────────────────────────────────────────────────
 
-/** How long a copied secret stays on the clipboard. Clearing is best effort:
- *  it only works while this tab is focused, and only if the clipboard still
- *  holds what was put there. */
-const CLIPBOARD_CLEAR_MS = 30_000
+/** How long a copied secret stays on the clipboard is a preference (thirty
+ *  seconds unless changed). Clearing is best effort: it only works while this
+ *  tab is focused, and only if the clipboard still holds what was put there. */
 let clearTimer: ReturnType<typeof setTimeout> | null = null
 
 async function copySecret(value: string): Promise<void> {
   await navigator.clipboard.writeText(value)
   if (clearTimer) clearTimeout(clearTimer)
+  const seconds = prefs.get().clipboardSeconds
+  if (!seconds) return
   clearTimer = setTimeout(async () => {
     try {
       if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText('')
@@ -61,7 +63,7 @@ async function copySecret(value: string): Promise<void> {
       // Reading the clipboard needs focus and permission; without them the
       // value stays, which is no worse than not trying.
     }
-  }, CLIPBOARD_CLEAR_MS)
+  }, seconds * 1000)
 }
 
 export function CopyButton({ value, label }: { value: string | undefined; label: string }) {
@@ -76,7 +78,8 @@ export function CopyButton({ value, label }: { value: string | undefined; label:
                 await copySecret(value)
                 setDone(true)
                 setTimeout(() => setDone(false), 1200)
-                toast(`${label} copied — clears in 30 seconds`)
+                const seconds = prefs.get().clipboardSeconds
+                toast(seconds ? `${label} copied — clears in ${describeSeconds(seconds)}` : `${label} copied`)
               } catch {
                 toast('The browser refused clipboard access', 'error')
               }
@@ -151,10 +154,12 @@ export function generatePassword(length: number, opts: { upper: boolean; digits:
 }
 
 export function Generator({ onUse }: { onUse: (password: string) => void }) {
-  const [length, setLength] = useState(20)
-  const [upper, setUpper] = useState(true)
-  const [digits, setDigits] = useState(true)
-  const [symbols, setSymbols] = useState(true)
+  // Starts from the account's generator defaults (Settings → Preferences).
+  const defaults = prefs.get().generator
+  const [length, setLength] = useState(defaults.length)
+  const [upper, setUpper] = useState(defaults.upper)
+  const [digits, setDigits] = useState(defaults.digits)
+  const [symbols, setSymbols] = useState(defaults.symbols)
   const [value, setValue] = useState('')
 
   const regenerate = useCallback(() => setValue(generatePassword(length, { upper, digits, symbols })),

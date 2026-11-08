@@ -40,6 +40,7 @@ import {
 } from '../roles.js'
 import {
   REGISTRATION_MODES,
+  type InstanceProfile,
   type RegistrationMode,
   type RegistryEntry,
   type RegistryFields,
@@ -257,14 +258,60 @@ export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
 }
 
 export async function putSettingsRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
-  const body = parseJsonBody<{ registration?: unknown }>(event)
-  if (!REGISTRATION_MODES.includes(body.registration as RegistrationMode)) {
-    throw badRequest(`registration must be one of: ${REGISTRATION_MODES.join(', ')}.`)
+  const body = parseJsonBody<{ registration?: unknown; profile?: unknown }>(event)
+  if (body.registration === undefined && body.profile === undefined) throw badRequest('Send registration, profile, or both.')
+  const current = await getSettings(app)
+  let registration = current.registration
+  if (body.registration !== undefined) {
+    if (!REGISTRATION_MODES.includes(body.registration as RegistrationMode)) {
+      throw badRequest(`registration must be one of: ${REGISTRATION_MODES.join(', ')}.`)
+    }
+    registration = body.registration as RegistrationMode
+    await audit(app, actor, 'settings.registration', undefined, registration)
   }
-  const registration = body.registration as RegistrationMode
-  await audit(app, actor, 'settings.registration', undefined, registration)
-  await putSettings(app, { registration, updatedAt: new Date(app.now()).toISOString() })
+  let profile = current.profile
+  if (body.profile !== undefined) {
+    profile = requireProfile(body.profile)
+    await audit(app, actor, 'settings.profile', undefined, profile.supportEmail || undefined)
+  }
+  await putSettings(app, { registration, profile, updatedAt: new Date(app.now()).toISOString() })
   return json(200, { ok: true })
+}
+
+/** The instance profile, as an admin sends it. Every field may be empty. */
+export function requireProfile(value: unknown): InstanceProfile {
+  if (!value || typeof value !== 'object') throw badRequest('profile must be an object.')
+  const v = value as Record<string, unknown>
+  const text = (k: string, max: number) => {
+    const x = v[k] ?? ''
+    if (typeof x !== 'string') throw badRequest(`profile.${k} must be text.`)
+    const t = x.trim()
+    if (t.length > max) throw badRequest(`profile.${k} must be at most ${max} characters.`)
+    if (/[\u0000-\u001f<>]/.test(t)) throw badRequest(`profile.${k} contains characters that are not allowed.`)
+    return t
+  }
+  const name = text('name', 60)
+  const supportEmail = text('supportEmail', 254)
+  if (supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) throw badRequest('profile.supportEmail must be an email address.')
+  const supportUrl = text('supportUrl', 300)
+  if (supportUrl) {
+    let ok = false
+    try { const u = new URL(supportUrl); ok = u.protocol === 'https:' || u.protocol === 'http:' } catch { /* refused below */ }
+    if (!ok) throw badRequest('profile.supportUrl must be an http(s) address.')
+  }
+  return { name, supportEmail, supportUrl }
+}
+
+/** What anyone may know about this server before signing in. */
+export async function instanceRoute(app: App): Promise<LambdaResponse> {
+  const { registration, profile } = await getSettings(app)
+  return json(200, {
+    name: profile.name || 'Vault',
+    supportEmail: profile.supportEmail,
+    supportUrl: profile.supportUrl,
+    registration: app.allowRegistration ? 'open' : registration,
+    mail: Boolean(app.mailer),
+  })
 }
 
 export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
@@ -303,7 +350,7 @@ export async function createInviteRoute(app: App, actor: string, actorRole: Role
   await audit(app, actor, 'invite.create', undefined, role === 'user' ? label : `${label} (${role})`)
   const { code, invite } = await createInvite(app, actor, label, days, role as string)
   // The address is used to send and then dropped; only the label is kept.
-  const emailed = email ? await notify(app.mailer, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
+  const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
   // The code is returned exactly once. Only its hash is stored.
   return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role } })
 }

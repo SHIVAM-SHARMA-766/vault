@@ -63,6 +63,31 @@
     }
   },
   "paths": {
+    "/api/instance": {
+      "get": {
+        "summary": "This server's name, support contact and registration mode",
+        "operationId": "getInstance",
+        "tags": [
+          "instance"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "summary": "Liveness check",
@@ -2986,6 +3011,62 @@
         }
       }
     },
+    "/api/prefs": {
+      "get": {
+        "summary": "My sealed preferences",
+        "operationId": "getPrefs",
+        "tags": [
+          "prefs"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Replace my sealed preferences",
+        "operationId": "putPrefs",
+        "tags": [
+          "prefs"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/activity": {
       "get": {
         "summary": "Security events from the last ninety days",
@@ -3317,7 +3398,7 @@
     },
     "/api/admin/settings": {
       "get": {
-        "summary": "Registration mode",
+        "summary": "Registration mode and instance profile",
         "operationId": "getAdminSettings",
         "tags": [
           "admin"
@@ -3345,7 +3426,7 @@
         }
       },
       "put": {
-        "summary": "Change the registration mode",
+        "summary": "Change the registration mode or the instance profile",
         "operationId": "putAdminSettings",
         "tags": [
           "admin"

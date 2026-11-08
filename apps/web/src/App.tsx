@@ -6,7 +6,9 @@ import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { api } from './lib/api.js'
 import { newIdentity } from './lib/identity.js'
+import { SupportContact, useInstance } from './lib/instance.js'
 import { useRoute } from './lib/router.js'
+import * as prefs from './lib/prefs.js'
 import * as session from './lib/session.js'
 import { IconArrowLeft, IconLock, IconShield } from './ui/icons.js'
 import { ToastProvider } from './ui/kit.js'
@@ -29,7 +31,7 @@ type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-h
 
 export function App() {
   const [unlocked, setUnlocked] = useState(session.get())
-  useEffect(() => session.subscribe(setUnlocked), [])
+  useEffect(() => session.subscribe((s) => { if (!s) prefs.reset(); setUnlocked(s) }), [])
 
   return (
     <ToastProvider>
@@ -43,6 +45,7 @@ export function App() {
 function useAccount(state: session.Unlocked) {
   // The vault key is a new object on every unlock, so this runs once per unlock.
   useEffect(() => {
+    void prefs.load(state.vaultKey)
     void (async () => {
       try {
         const me = await api.me(await session.token())
@@ -60,7 +63,7 @@ function useAccount(state: session.Unlocked) {
 function Signed({ state }: { state: session.Unlocked }) {
   useAccount(state)
   const route = useRoute()
-  if (route.name === 'settings') return <Suspense fallback={<Loading />}><Settings state={state} /></Suspense>
+  if (route.name === 'settings') return <Suspense fallback={<Loading />}><Settings state={state} tab={route.tab ?? null} /></Suspense>
   if (route.name === 'transfer') return <Suspense fallback={<Loading />}><Transfer state={state} /></Suspense>
   if (route.name === 'support') return <Suspense fallback={<Loading />}><Support state={state} /></Suspense>
   if (route.name === 'orgs') return <Suspense fallback={<Loading />}><Orgs state={state} /></Suspense>
@@ -84,6 +87,7 @@ function AuthScreen() {
   // sign-in, but the page should say where it leads.
   const forAdmin = location.pathname.startsWith('/app/admin')
   const place = forAdmin ? 'Admin panel' : 'Vault'
+  const instance = useInstance()
   const step = view === 'unlock' ? 'Sign in' : view === 'register' ? 'Create account' : view === 'request-access' ? 'Request access' : view === 'signin-help' ? 'Help signing in' : 'Recover'
 
   return (
@@ -100,7 +104,7 @@ function AuthScreen() {
             <li><IconLock size={16} /> Names, tags and folders are encrypted too</li>
           </ul>
         </div>
-        <p className="auth-foot">Zero-knowledge by design</p>
+        <p className="auth-foot">{instance && instance.name !== 'Vault' ? `${instance.name} · ` : ''}Zero-knowledge by design</p>
       </aside>
       <main className="auth-main">
         <div className="auth-card">
@@ -124,6 +128,7 @@ function AuthScreen() {
           ) : (
             <Recover onCancel={() => setView('unlock')} />
           )}
+          <SupportContact className="muted small auth-support" />
         </div>
       </main>
     </div>
