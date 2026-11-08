@@ -291,7 +291,11 @@ jobs:
       # Branded Chrome no longer loads an unpacked extension from the command
       # line, so the extension test (decisions/0029) runs in Playwright's own
       # Chromium build.
+      # Playwright 1.55 predates the runner's Ubuntu release; its 24.04 build
+      # runs there, on the libraries Chrome already brought.
       - name: Chromium for the extension test
+        env:
+          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
         run: |
           npx playwright-core install chromium
           echo "EXT_CHROME_PATH=$(node -e "import('playwright-core').then(m => console.log(m.chromium.executablePath()))")" >> "$GITHUB_ENV"
