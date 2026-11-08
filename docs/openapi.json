@@ -660,6 +660,103 @@
         }
       }
     },
+    "/api/auth/2fa/webauthn/options": {
+      "post": {
+        "summary": "Start adding a passkey or security key (master password required)",
+        "operationId": "postAuth2faWebauthnOptions",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/2fa/webauthn": {
+      "post": {
+        "summary": "Finish adding a passkey or security key",
+        "operationId": "postAuth2faWebauthn",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/2fa/webauthn/{id}/remove": {
+      "post": {
+        "summary": "Remove a passkey or security key (password and second factor)",
+        "operationId": "postAuth2faWebauthnIdRemove",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/2fa/recovery-codes": {
       "post": {
         "summary": "Replace the two-factor recovery codes",

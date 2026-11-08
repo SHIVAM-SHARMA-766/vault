@@ -119,7 +119,7 @@ export function Website({ canWrite, canPublish }: { canWrite: boolean; canPublis
   }
 
   function showDetails(err: ApiError) {
-    const details = err.details
+    const details = Array.isArray(err.details) ? err.details : undefined
     if (details) setServerErrors(Object.fromEntries(details.map((d) => [d.path, d.message])))
   }
 

@@ -1,6 +1,6 @@
 # 0023: The open crypto questions: signed key grants, a secret key, Argon2id, organization recovery
 
-Status: **Proposed** (the remaining item of phase 3.5's "decide the crypto questions")
+Status: Accepted by the operator on 2026-11-08 (built in stages; see ROADMAP)
 Date: 2026-11-08
 Backlog: D10; threat A15
 

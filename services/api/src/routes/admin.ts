@@ -75,6 +75,7 @@ import {
   serverPolicyGap,
 } from '../system.js'
 import { revokeAllSessions } from './auth.js'
+import { hasSecondFactor } from '../twofactor.js'
 
 const ADMIN_LIMIT: Limit = { max: 300, windowSeconds: 15 * 60 }
 
@@ -114,7 +115,7 @@ async function summarize(app: App, reg: RegistryEntry, policy: ServerPolicy): Pr
     disabled: reg.disabled === true,
     isAdmin: app.adminDigests.has(reg.emailDigest),
     role: roleFromDigest(app, reg.emailDigest, reg.role),
-    twoFactor: Boolean(profile?.['totp']),
+    twoFactor: hasSecondFactor(profile),
     policyGap: serverPolicyGap(policy, profile ?? null) !== null,
     entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
     folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
@@ -272,7 +273,7 @@ export async function resetTwoFactor(app: App, actor: string, actorRole: Role, i
   const profile = await app.store.get(userPk(id), PROFILE_SK)
   if (!profile) throw notFound()
   await audit(app, actor, 'user.reset-2fa', id)
-  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, ...rest } = profile
+  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, webauthn: _w, pendingWebauthn: _pw, webauthnLogin: _wl, ...rest } = profile
   await app.store.put(rest as typeof profile)
   return json(200, { ok: true })
 }

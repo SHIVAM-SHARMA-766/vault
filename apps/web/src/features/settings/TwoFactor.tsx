@@ -13,7 +13,14 @@ import { IconAlert, IconCheck, IconCopy, IconShield } from '../../ui/icons.js'
 import { Check, PasswordInput, useToast } from '../../ui/kit.js'
 import { proveCurrent } from './prove.js'
 
-export interface TwoFactorStatus { enabled: boolean; recoveryCodesLeft: number }
+export interface TwoFactorStatus {
+  /** Any second factor: the authenticator app or a key. */
+  enabled: boolean
+  /** The authenticator app (TOTP) in particular. */
+  totp?: boolean
+  recoveryCodesLeft: number
+  keys?: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[]
+}
 
 type View =
   | { kind: 'idle' }
@@ -30,6 +37,8 @@ export function TwoFactor({ state, status, reload }: { state: session.Unlocked; 
   const [error, setError] = useState('')
 
   const reset = () => { setView({ kind: 'idle' }); setPassword(''); setCode(''); setError('') }
+  // The app in particular; keys have their own card (SecurityKeys).
+  const app = status ? (status.totp ?? status.enabled) : false
 
   function explain(err: unknown) {
     setError(err instanceof ApiError && err.status === 401 && err.code === 'invalid_credentials' ? 'The master password is wrong.'
@@ -84,22 +93,22 @@ export function TwoFactor({ state, status, reload }: { state: session.Unlocked; 
   return (
     <section className="settings-card" aria-labelledby="s-2fa">
       <div className="settings-card-head">
-        <IconShield size={18} /><h2 id="s-2fa">Two-factor sign-in</h2>
-        {status ? <span className={`pill ${status.enabled ? 'pill-ok' : ''}`}>{status.enabled ? 'On' : 'Off'}</span> : null}
+        <IconShield size={18} /><h2 id="s-2fa">Authenticator app</h2>
+        {status ? <span className={`pill ${app ? 'pill-ok' : ''}`}>{app ? 'On' : 'Off'}</span> : null}
       </div>
 
       {view.kind === 'idle' ? (
         <>
           <p className="muted small">
-            {status?.enabled
-              ? `Signing in needs your master password and a code from your authenticator app. ${status.recoveryCodesLeft} recovery code${status.recoveryCodesLeft === 1 ? '' : 's'} left.`
+            {app
+              ? `Signing in can use a code from your authenticator app. ${status!.recoveryCodesLeft} recovery code${status!.recoveryCodesLeft === 1 ? '' : 's'} left.`
               : 'Ask for a code from an authenticator app (such as Aegis, Google Authenticator or 2FAS) as well as your master password when signing in. Someone who learns your password still cannot get in.'}
           </p>
           {status?.enabled && status.recoveryCodesLeft <= 3 ? (
             <p className="alert alert-warn"><IconAlert size={16} /><span>You are running low on recovery codes. Issue new ones.</span></p>
           ) : null}
           <div className="settings-actions">
-            {status?.enabled ? (
+            {app ? (
               <>
                 <button className="btn btn-secondary" onClick={() => setView({ kind: 'password', then: 'codes' })}>New recovery codes</button>
                 <button className="btn btn-danger-ghost" onClick={() => setView({ kind: 'password', then: 'disable' })}>Turn off</button>

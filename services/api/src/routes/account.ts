@@ -18,7 +18,7 @@ export async function deleteOwnAccount(app: App, userId: string, event: LambdaEv
   const body = parseJsonBody<Record<string, unknown>>(event)
   if (body['confirm'] !== DELETE_CONFIRMATION) throw badRequest(`Type ${DELETE_CONFIRMATION} to confirm.`)
   const profile = await profileWithPassword(app, userId, body)
-  if (profile.totp) await requireSecondFactor(app, profile, body, event)
+  await requireSecondFactor(app, profile, body, event)
 
   const { owned } = await leaveAllOrgs(app, userId, true)
   if (owned.length) {

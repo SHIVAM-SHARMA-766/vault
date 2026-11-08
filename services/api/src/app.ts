@@ -20,6 +20,7 @@ import * as orgs from './routes/orgs.js'
 import * as prefs from './routes/prefs.js'
 import * as shares from './routes/shares.js'
 import * as attachments from './routes/attachments.js'
+import * as webauthn from './routes/webauthn.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
 import { metricsRoute, recordRequest } from './metrics.js'
@@ -72,6 +73,9 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/2fa/setup', authed((u, e) => auth.setupTwoFactor(app, u, e)), 'Start TOTP enrolment')
   router.post('/api/auth/2fa/enable', authed((u, e) => auth.enableTwoFactor(app, u, e)), 'Confirm TOTP enrolment; returns recovery codes')
   router.post('/api/auth/2fa/disable', authed((u, e) => auth.disableTwoFactor(app, u, e)), 'Turn two-factor sign-in off')
+  router.post('/api/auth/2fa/webauthn/options', authed((u, e) => webauthn.registerOptions(app, u, e)), 'Start adding a passkey or security key (master password required)')
+  router.post('/api/auth/2fa/webauthn', authed((u, e) => webauthn.register(app, u, e)), 'Finish adding a passkey or security key')
+  router.post('/api/auth/2fa/webauthn/:id/remove', authed((u, e, id) => webauthn.removeKey(app, u, e, id)), 'Remove a passkey or security key (password and second factor)')
   router.post('/api/auth/2fa/recovery-codes', authed((u, e) => auth.regenerateRecoveryCodes(app, u, e)), 'Replace the two-factor recovery codes')
 
   router.get('/api/sessions', authed((_u, e) => sessions.list(app, e)), 'Signed-in devices')

@@ -333,7 +333,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ✅ D2 File attachments (key per file inside the sealed entry; personal items; in backups; [0020](../decisions/0020-attachments-and-offline-copy.md)) · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
 - ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ✅ D7 Access requests (request with a reason, approve for good or as a 1 h–1 week check-out that ends by itself, decline)
-- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys, proposed in [0022](../decisions/0022-passkeys.md) · ⬜ D10 The crypto decisions above, proposed in [0023](../decisions/0023-crypto-hardening.md)
+- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · 🟡 D9 Passkeys and security keys ([0022](../decisions/0022-passkeys.md)): ✅ as a second factor; ⬜ unlock with a passkey (PRF) next · ⬜ D10 The crypto decisions above, proposed in [0023](../decisions/0023-crypto-hardening.md)
 - ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ✅ D12 Notify on access to a sensitive item (owner and admins notified on open, reveal or copy)
 
 **E. UI/UX**

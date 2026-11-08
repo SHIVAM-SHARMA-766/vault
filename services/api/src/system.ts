@@ -22,6 +22,7 @@ import {
   registrySk,
 } from './keys.js'
 import { AlreadyExists, type Item } from './store.js'
+import { hasSecondFactor } from './twofactor.js'
 
 // ── Settings ──────────────────────────────────────────────────────────────
 
@@ -345,7 +346,7 @@ export async function audit(
 
 /** What stops this account meeting the server policy, if anything. */
 export function serverPolicyGap(policy: ServerPolicy, profile: Item | null): string | null {
-  if (policy.requireTwoFactor && !profile?.['totp']) return 'This server requires two-factor sign-in. Turn it on in Settings → Security.'
+  if (policy.requireTwoFactor && !hasSecondFactor(profile)) return 'This server requires two-factor sign-in. Turn it on in Settings → Security.'
   if (policy.minPasswordScore && Number(profile?.['passwordScore'] ?? 0) < policy.minPasswordScore) {
     return 'This server requires a stronger master password. Change it in Settings → Security.'
   }

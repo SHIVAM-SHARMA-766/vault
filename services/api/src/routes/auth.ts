@@ -54,6 +54,7 @@ import {
   sealSecret,
   twoFactorRequired,
   verifyTotp,
+  hasSecondFactor,
 } from '../twofactor.js'
 import { isStaff, permissionsOf, roleFromDigest } from '../roles.js'
 import {
@@ -68,6 +69,7 @@ import {
   touchLogin,
 } from '../system.js'
 import { assertNetwork } from '../networks.js'
+import { loginOptions, verifyLogin } from './webauthn.js'
 
 export interface Profile extends Item {
   userId: string
@@ -416,7 +418,10 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     role,
     isAdmin: isStaff(role),
     permissions: permissionsOf(role),
-    twoFactor: { enabled: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0 },
+    twoFactor: {
+      enabled: hasSecondFactor(profile as unknown as Record<string, unknown>), totp: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0,
+      keys: ((profile as { webauthn?: { id: string; name: string; createdAt: string; lastUsedAt?: string }[] }).webauthn ?? []).map((k) => ({ id: k.id, name: k.name, createdAt: k.createdAt, lastUsedAt: k.lastUsedAt ?? null })),
+    },
     // What the server asks of this account, and what it still misses.
     policy: { requireTwoFactor: policy.requireTwoFactor, minPasswordScore: policy.minPasswordScore, maxIdleMinutes: policy.maxIdleMinutes, shareLinks: policy.shareLinks, shareLinkMaxDays: policy.shareLinkMaxDays },
     policyGap: serverPolicyGap(policy, profile),
@@ -548,18 +553,28 @@ async function claimOnce(app: App, userId: string, sk: string, ttlSeconds: numbe
 export async function requireSecondFactor(
   app: App, profile: Profile, body: Record<string, unknown>, event: LambdaEvent,
 ): Promise<void> {
-  if (!profile.totp) return
+  if (!hasSecondFactor(profile as unknown as Record<string, unknown>)) return
   const code = typeof body['totpCode'] === 'string' ? body['totpCode'].replace(/\s/g, '') : ''
   const recovery = typeof body['recoveryCode'] === 'string' ? body['recoveryCode'] : ''
-  if (!code && !recovery) throw twoFactorRequired()
+  // A passkey or security key (decisions/0022).
+  if (body['webauthn'] !== undefined && !code && !recovery) {
+    if (await verifyLogin(app, profile, body['webauthn'])) return
+    throw new HttpError(401, 'invalid_two_factor', 'That key did not verify. Try again, or use another key, your authenticator app or a recovery code.')
+  }
+  if (!code && !recovery) {
+    const err = twoFactorRequired()
+    err.details = { methods: [...(profile.totp ? ['totp'] : []), ...((profile as { webauthn?: unknown[] }).webauthn?.length ? ['webauthn'] : []), 'recovery'], webauthn: await loginOptions(app, profile) }
+    throw err
+  }
+  if (code && !profile.totp) throw invalidTwoFactor()
 
   if (code) {
-    const step = await verifyTotp(openSecret(profile.totp.secret, app.config.pepper), code, app.now(), profile.totp.lastStep)
+    const step = await verifyTotp(openSecret(profile.totp!.secret, app.config.pepper), code, app.now(), profile.totp!.lastStep)
     if (step === null) throw invalidTwoFactor()
     // Claimed atomically, so two sign-ins racing with one code cannot both
     // pass the read-then-write of lastStep.
     if (!(await claimOnce(app, profile.userId, `TOTPSTEP#${step}`, 10 * 60))) throw invalidTwoFactor()
-    await app.store.put({ ...profile, totp: { ...profile.totp, lastStep: step } })
+    await app.store.put({ ...profile, totp: { ...profile.totp!, lastStep: step } })
     return
   }
   const hash = hashRecoveryCode(recovery, app.config.pepper)
@@ -621,8 +636,10 @@ export async function disableTwoFactor(app: App, userId: string, event: LambdaEv
   if (!profile.totp) return json(200, { ok: true })
   await requireSecondFactor(app, profile, body, event)
   const fresh = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile
-  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, ...rest } = fresh
-  await app.store.put(rest as Profile)
+  const { totp: _t, recoveryCodes, pendingTotp: _p, ...rest } = fresh
+  // Recovery codes stay while a security key is still a second factor.
+  const keysLeft = ((fresh as { webauthn?: unknown[] }).webauthn ?? []).length > 0
+  await app.store.put({ ...rest, ...(keysLeft && recoveryCodes ? { recoveryCodes } : {}) } as Profile)
   await recordActivity(app, userId, 'disable-2fa', event)
   return json(200, { ok: true })
 }
@@ -631,7 +648,7 @@ export async function disableTwoFactor(app: App, userId: string, event: LambdaEv
 export async function regenerateRecoveryCodes(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
   const body = parseJsonBody<Record<string, unknown>>(event)
   const profile = await profileWithPassword(app, userId, body)
-  if (!profile.totp) throw badRequest('Two-factor sign-in is not on.')
+  if (!hasSecondFactor(profile as unknown as Record<string, unknown>)) throw badRequest('Two-factor sign-in is not on.')
   await requireSecondFactor(app, profile, body, event)
   const fresh = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile
   const codes = newRecoveryCodes()

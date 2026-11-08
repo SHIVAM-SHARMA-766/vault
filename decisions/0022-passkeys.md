@@ -1,6 +1,6 @@
 # 0022: Passkeys and security keys
 
-Status: **Proposed**
+Status: Accepted by the operator on 2026-11-08 (built in stages; see ROADMAP)
 Date: 2026-11-08
 Backlog: D9
 

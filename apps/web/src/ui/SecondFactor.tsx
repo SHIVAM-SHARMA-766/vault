@@ -3,17 +3,47 @@
 
 import { useState } from 'react'
 
-import type { SecondFactor as Factor } from '../lib/api.js'
-import { IconAlert } from './icons.js'
+import type { SecondFactor as Factor, SecondFactorOffer } from '../lib/api.js'
+import { getAssertion, webauthnSupported } from '../lib/webauthn.js'
+import { IconAlert, IconKey } from './icons.js'
 
-export function SecondFactorStep({ onSubmit, onCancel, busy, error }: {
+export function SecondFactorStep({ onSubmit, onCancel, busy, error, offer }: {
   onSubmit: (factor: Factor) => void
   onCancel: () => void
   busy: boolean
   error: string
+  /** What the server offered; without it, code or recovery code. */
+  offer?: SecondFactorOffer | null
 }) {
-  const [useRecovery, setUseRecovery] = useState(false)
+  const hasKey = !!offer?.webauthn && webauthnSupported()
+  const hasTotp = !offer || offer.methods.includes('totp')
+  const [mode, setMode] = useState<'key' | 'code' | 'recovery'>(hasKey ? 'key' : 'code')
+  const useRecovery = mode === 'recovery'
+  const setUseRecovery = (v: boolean) => setMode(v ? 'recovery' : hasTotp ? 'code' : 'key')
   const [value, setValue] = useState('')
+  const [keyError, setKeyError] = useState('')
+
+  if (mode === 'key' && offer?.webauthn) {
+    return (
+      <div>
+        <span className="step">Two-factor sign-in</span>
+        <h2 className="auth-title">Use your passkey or security key</h2>
+        <p className="auth-sub">Touch your security key, or confirm with this device&apos;s passkey, when your browser asks.</p>
+        {error || keyError ? <p className="alert alert-error"><IconAlert size={16} />{error || keyError}</p> : null}
+        <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={async () => {
+          setKeyError('')
+          try { onSubmit({ webauthn: await getAssertion(offer.webauthn!) }) }
+          catch { setKeyError('The key did not answer. Try again, or use another way below.') }
+        }}>{busy ? <><span className="spinner" />Checking…</> : <><IconKey size={16} />Use my key</>}</button>
+        <p className="auth-switch">
+          {hasTotp ? <><button type="button" className="link" onClick={() => { setMode('code'); setValue('') }}>Use the authenticator app</button>{' · '}</> : null}
+          <button type="button" className="link" onClick={() => { setMode('recovery'); setValue('') }}>Use a recovery code</button>
+          {' · '}
+          <button type="button" className="link" onClick={onCancel}>Cancel</button>
+        </p>
+      </div>
+    )
+  }
   const ready = useRecovery ? value.replace(/[^0-9a-z]/gi, '').length >= 10 : /^\d{6}$/.test(value.replace(/\s/g, ''))
 
   return (
@@ -38,8 +68,9 @@ export function SecondFactorStep({ onSubmit, onCancel, busy, error }: {
       </button>
       <p className="auth-switch">
         <button type="button" className="link" onClick={() => { setUseRecovery(!useRecovery); setValue('') }}>
-          {useRecovery ? 'Use the authenticator app instead' : 'Lost your phone? Use a recovery code'}
+          {useRecovery ? (hasTotp ? 'Use the authenticator app instead' : 'Use my key instead') : 'Lost your phone? Use a recovery code'}
         </button>
+        {hasKey && mode === 'code' ? <>{' · '}<button type="button" className="link" onClick={() => setMode('key')}>Use my key</button></> : null}
         {' · '}
         <button type="button" className="link" onClick={onCancel}>Cancel</button>
       </p>

@@ -29,7 +29,8 @@ export class ApiError extends Error {
   readonly code: string
   readonly retryAfter: number | undefined
   /** Field-level problems the server reported, for a 400 on website content. */
-  details?: { path: string; message: string }[]
+  /** Field problems for a 400 on website content, or what a 401 offers (SecondFactorOffer). */
+  details?: { path: string; message: string }[] | Record<string, unknown>
 
   constructor(status: number, code: string, message: string, retryAfter?: number) {
     super(message)
@@ -90,7 +91,7 @@ async function request<T>(
       }),
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
-    if (Array.isArray(payload['details'])) error.details = payload['details'] as { path: string; message: string }[]
+    if (payload['details'] !== undefined) error.details = payload['details'] as NonNullable<ApiError['details']>
     throw error
   }
 
@@ -203,6 +204,12 @@ export const api = {
       request<{ ok: true }>('POST', '/api/auth/2fa/disable', { token, body: { currentAuthKey, ...second } }),
     recoveryCodes: (token: string, currentAuthKey: string, second: SecondFactor) =>
       request<{ recoveryCodes: string[] }>('POST', '/api/auth/2fa/recovery-codes', { token, body: { currentAuthKey, ...second } }),
+    keyOptions: (token: string, currentAuthKey: string) =>
+      request<{ options: Record<string, unknown> }>('POST', '/api/auth/2fa/webauthn/options', { token, body: { currentAuthKey } }),
+    addKey: (token: string, name: string, response: Record<string, unknown>) =>
+      request<{ id: string; name: string; recoveryCodes?: string[] }>('POST', '/api/auth/2fa/webauthn', { token, body: { name, response } }),
+    removeKey: (token: string, id: string, currentAuthKey: string, second?: SecondFactor) =>
+      request<{ ok: true }>('POST', `/api/auth/2fa/webauthn/${encodeURIComponent(id)}/remove`, { token, body: { currentAuthKey, ...second } }),
   },
 
   refresh: (refreshToken: string) =>
@@ -236,7 +243,7 @@ export const api = {
   /** Self-reported strength (0–4) of the master password, for organization policies. */
   passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -515,7 +522,9 @@ export interface TicketMessage { at: string; from: 'requester' | 'staff'; author
 export interface DeviceSession { id: string; device: string; name?: string; ip: string; createdAt: string; lastUsedAt: string; current: boolean }
 export type RegistrationMode = 'closed' | 'invite' | 'open'
 /** A two-factor code: six digits from the authenticator app, or a recovery code. */
-export type SecondFactor = { totpCode: string } | { recoveryCode: string }
+export type SecondFactor = { totpCode: string } | { recoveryCode: string } | { webauthn: Record<string, unknown> }
+/** What the server offers when it asks for a second factor (decisions/0022). */
+export interface SecondFactorOffer { methods: string[]; webauthn: Record<string, unknown> | null }
 /** Public key in the clear (base64url, 65 bytes); private key sealed under the vault key. */
 export interface Identity { publicKey: string; wrappedPrivateKey: string }
 export type Role = 'owner' | 'admin' | 'support' | 'marketing' | 'viewer' | 'user'

@@ -32,6 +32,7 @@ import { type Role, can, outranks, roleOf } from '../roles.js'
 import type { Item } from '../store.js'
 import { audit, createInvite, getRegistry } from '../system.js'
 import { requireEmail } from '../validate.js'
+import { hasSecondFactor } from '../twofactor.js'
 
 export type TicketKind = 'access' | 'signin' | 'support'
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
@@ -325,12 +326,12 @@ export async function resetTwoFactorFor(app: App, actor: string, actorRole: Role
   if (userId === actor) throw badRequest('That cannot be done to your own account.')
   if (!outranks(actorRole, await roleOf(app, userId))) throw forbidden()
   await audit(app, actor, 'desk.reset-2fa', userId, `ticket #${t.number}`)
-  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, ...rest } = profile
+  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, webauthn: _w, pendingWebauthn: _pw, webauthnLogin: _wl, ...rest } = profile
   await app.store.put(rest as typeof profile)
   await addMessage(app, id, { from: 'staff', author: 'Vault', body: 'Two-factor sign-in was reset for the account.', internal: true })
   await tellRequester(app, t, 'Two-factor sign-in was reset', 'Two-factor sign-in has been turned off for your account. Sign in with your master password, then turn two-factor sign-in on again in Settings with your new phone.')
   const next = await save(app, t, { status: 'resolved', lastFrom: 'staff' })
-  return json(200, { ticket: forStaff(next), hadTwoFactor: !!profile['totp'] })
+  return json(200, { ticket: forStaff(next), hadTwoFactor: hasSecondFactor(profile) })
 }
 
 /** Closes tickets resolved more than a week ago, which erases their addresses. */
