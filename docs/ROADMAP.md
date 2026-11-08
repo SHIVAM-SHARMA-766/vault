@@ -326,9 +326,9 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ⬜ B7 Audit export and SIEM stream · ⬜ B8 SSO (OIDC) · ⬜ B9 Offboarding with automatic rotation
 
 **C. Backups, per user (like Zoho)**
-- ⬜ C1 Schedule, time and retention in Settings · ⬜ C2 Destinations: download, email, S3-compatible, WebDAV
+- ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)
 - ⬜ C3 Google Drive / OneDrive · ⬜ C4 Encrypted offline copy that opens without the server
-- ⬜ C5 Backup history and test restore · ⬜ C6 Organization backups · ⬜ C7 Server backup settings in the admin UI
+- ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ⬜ C7 Server backup settings in the admin UI
 
 **D. Features others have**
 - ⬜ D1 More item types · ⬜ D2 File attachments · ⬜ D3 Secure share links · ⬜ D4 Archive

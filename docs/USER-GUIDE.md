@@ -176,6 +176,7 @@ link such as `/app/settings/security` opens the right one after you unlock.
 | **Account** | Your details; change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; your identity-key fingerprint |
 | **Security** | Two-factor sign-in (TOTP with any authenticator app, plus ten single-use recovery codes); signed-in devices; security activity |
 | **Preferences** | Theme, auto-lock, clipboard clearing and the password generator's defaults — see below |
+| **Backups** | Your own encrypted backups, on your schedule, here or in your own storage — see below |
 | **Emergency access** | People you trust to reach your vault if something happens to you |
 
 ### Preferences
@@ -193,6 +194,33 @@ link such as `/app/settings/security` opens the right one after you unlock.
 Preferences are **encrypted with your vault key** and saved on the server, so they follow you to
 every device, and the server cannot read them. An organization can set a shorter auto-lock than
 yours; when it does, the section says so.
+
+### Backups
+
+<img src="images/backups.png" alt="Backups: status, schedule and destination, copies and history" width="820">
+
+Settings → **Backups** keeps your own copies of your vault, independent of the server's backups.
+
+- **How often**: off (only **Back up now**), every day, every week on a day you pick, or every
+  month on the 1st — at an hour you choose, in your time zone.
+- **Where**: **on this server** (download any copy; protects against deleting something by
+  mistake, not against losing the server), **your S3-compatible bucket** (AWS, R2, B2, Wasabi,
+  MinIO…) or **your WebDAV folder** (Nextcloud, ownCloud, a NAS).
+- **Copies to keep**: older ones are deleted at the destination. At most 10 are kept on the server.
+- **History** lists every run and, when one fails, why.
+- **Test restore** fetches the newest copy and opens it in your browser, proving it can be
+  restored, without importing anything.
+
+Each backup is your vault exactly as the server holds it: encrypted. It opens only with the
+**master password you had when it was made**, or the recovery key from that time. If you change
+your master password, older backups still need the old one.
+
+**To restore**, download a copy (or take it from your bucket or folder), then Import & export →
+choose the file → enter that master password. Items are added to your vault; nothing is
+replaced. Duplicates are skipped if you leave that option on.
+
+For S3 or WebDAV, the server keeps the secret key or password encrypted so it can back up while
+you are away. Create one that can write only to that bucket or folder.
 
 ## Devices and activity
 

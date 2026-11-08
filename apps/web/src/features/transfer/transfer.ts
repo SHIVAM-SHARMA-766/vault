@@ -10,10 +10,14 @@ import {
   fromBase64Url,
   isExportFile,
   isWithinSizeLimit,
+  openEntry,
   openExport,
+  openFolder,
   sealEntry,
   sealExport,
   sealFolder,
+  unlock,
+  unlockWithRecoveryKey,
   unwrapVaultKey,
   wipe,
 } from '@vault/crypto'
@@ -25,6 +29,8 @@ import type { Decrypted, Folder } from '../vault/model.js'
 
 /** Files larger than this are not password exports. */
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024
+/** A personal backup carries every item's ciphertext, so it may be larger. */
+export const MAX_BACKUP_BYTES = 25 * 1024 * 1024
 /** The API's per-request limits (services/api/src/routes/vault.ts), and a
  *  byte budget that stays under the server's 4 MB body limit. */
 const BATCH_ENTRIES = 100
@@ -67,10 +73,12 @@ export function fromImported(items: ImportedItem[]): Candidate[] {
   }))
 }
 
-/** Reads a picked file. Our own encrypted export needs its password; the
- *  caller asks for it when `needsPassword` comes back. */
-export function readSource(text: string): Source | { needsPassword: true } {
-  if (isExportFile(text)) return { needsPassword: true }
+/** Reads a picked file. Our own encrypted export needs its password, and a
+ *  personal backup the master password (or recovery key) it was made under;
+ *  the caller asks when `needsPassword` comes back. */
+export function readSource(text: string): Source | { needsPassword: 'export' | 'backup' } {
+  if (isPersonalBackup(text)) return { needsPassword: 'backup' }
+  if (isExportFile(text)) return { needsPassword: 'export' }
   const r = readImport(text)
   return { format: r.format, candidates: fromImported(r.items), warnings: r.warnings }
 }
@@ -83,6 +91,62 @@ export async function openOwnExport(text: string, password: string): Promise<Sou
     format: 'Vault (encrypted export)',
     candidates: payload.entries.map(({ folderId, ...content }) => ({ content, folder: folderPath(folders, folderId) })),
     warnings: [],
+  }
+}
+
+// ── Personal backups (decisions/0017) ─────────────────────────────────────
+
+/** The server writes the format first, so a glance at the start suffices. */
+export const isPersonalBackup = (text: string) => /^\s*\{\s*"format"\s*:\s*"vault-personal-backup"/.test(text.slice(0, 200))
+
+export interface OpenedBackup {
+  createdAt: string
+  entries: (EntryContent & { id: string })[]
+  folders: Folder[]
+  /** Items whose ciphertext did not open (damaged, or from another key). */
+  failed: number
+}
+
+/** Opens a personal backup in this browser with the master password — or the
+ *  recovery key — that was current when it was made. Nothing is sent
+ *  anywhere. Throws UnsealError when the secret is wrong. */
+export async function openPersonalBackup(text: string, secret: string, how: 'password' | 'recovery'): Promise<OpenedBackup> {
+  let file: { format?: string; version?: number; createdAt?: string; kdf?: { algorithm: string; iterations: number; salt: string }; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[] }
+  try { file = JSON.parse(text) } catch { throw new Error('This backup file is damaged: it is not valid JSON.') }
+  if (file.format !== 'vault-personal-backup' || file.version !== 1) throw new Error('This is not a Vault personal backup, or it is from a newer version.')
+  let key: Uint8Array
+  if (how === 'recovery') {
+    if (!file.recovery?.wrappedVaultKey) throw new Error('This backup was made without a recovery key; use the master password.')
+    key = await unlockWithRecoveryKey(secret, file.recovery.wrappedVaultKey)
+  } else {
+    if (!file.kdf || !file.wrappedVaultKey) throw new Error('This backup file is damaged: its key is missing.')
+    // A file is something anyone could hand you: refuse a key-stretching
+    // setting that would freeze this tab, or one too weak to be ours.
+    if (file.kdf.algorithm !== 'PBKDF2-HMAC-SHA256' || !Number.isInteger(file.kdf.iterations) || file.kdf.iterations < 600_000 || file.kdf.iterations > 10_000_000) {
+      throw new Error('This backup file uses key settings Vault does not create, so it was not opened.')
+    }
+    key = (await unlock(secret, file.kdf as never, file.wrappedVaultKey, fromBase64Url(file.kdf.salt))).vaultKey
+  }
+  try {
+    let failed = 0
+    const folders = (await Promise.all((file.folders ?? []).map(async (f) => {
+      try { return { ...(await openFolder(f.id, f.blob, key)), id: f.id } } catch { failed++; return null }
+    }))).filter((f): f is Folder => f !== null)
+    const entries = (await Promise.all((file.entries ?? []).map(async (e) => {
+      try { return { ...(await openEntry(e.id, e.blob, key)), id: e.id } } catch { failed++; return null }
+    }))).filter((e): e is EntryContent & { id: string } => e !== null)
+    return { createdAt: file.createdAt ?? '', entries, folders, failed }
+  } finally {
+    wipe(key)
+  }
+}
+
+/** A backup's items, as import candidates in the folders they were in. */
+export function backupSource(b: OpenedBackup): Source {
+  return {
+    format: `Vault personal backup (${new Date(b.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })})`,
+    candidates: b.entries.map(({ id: _id, folderId, ...content }) => ({ content, folder: folderPath(b.folders, folderId) })),
+    warnings: b.failed ? [`${b.failed} item${b.failed === 1 ? '' : 's'} in the backup could not be opened and will be skipped.`] : [],
   }
 }
 

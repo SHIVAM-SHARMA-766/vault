@@ -12,11 +12,12 @@ import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey }
 import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { href, navigate } from '../../lib/router.js'
-import { IconAlert, IconCheck, IconKey, IconLock, IconShield, IconSliders, IconUser, IconUsers } from '../../ui/icons.js'
+import { IconAlert, IconCheck, IconDownload, IconKey, IconLock, IconShield, IconSliders, IconUser, IconUsers } from '../../ui/icons.js'
 import { Check, CopyButton, PasswordInput, StrengthMeter, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { proveCurrent } from './prove.js'
 import { Activity, Devices } from './Devices.js'
+import { Backups } from './Backups.js'
 import { Emergency } from './Emergency.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
@@ -27,6 +28,7 @@ const TABS = [
   { id: 'account', label: 'Account', Icon: IconUser, intro: 'Your sign-in details, master password and keys.' },
   { id: 'security', label: 'Security', Icon: IconShield, intro: 'Two-factor sign-in, the devices signed in to your account, and recent activity.' },
   { id: 'preferences', label: 'Preferences', Icon: IconSliders, intro: 'How Vault looks and behaves. Saved encrypted, so they follow you to every device.' },
+  { id: 'backups', label: 'Backups', Icon: IconDownload, intro: 'Your own encrypted backups, on your schedule, kept here or in your own storage.' },
   { id: 'emergency', label: 'Emergency access', Icon: IconUsers, intro: 'People you trust to reach your vault if something happens to you.' },
 ] as const
 type Tab = (typeof TABS)[number]['id']
@@ -105,6 +107,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
           </> : null}
 
           {tab === 'preferences' ? <Preferences state={state} /> : null}
+          {tab === 'backups' ? <Backups /> : null}
           {tab === 'emergency' ? <Emergency state={state} /> : null}
         </main>
       </div>

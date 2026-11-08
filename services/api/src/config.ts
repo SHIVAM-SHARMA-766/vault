@@ -60,6 +60,8 @@ export interface Config {
     intervalHours: number
     s3?: { endpoint: string; region: string; bucket: string; accessKey: string; secretKey: string; prefix: string }
   }
+  /** Each person's own backups (decisions/0017). */
+  personalBackup: { remote: boolean; allowPrivate: boolean }
 }
 
 export interface Variable {
@@ -109,6 +111,8 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'BACKUP_S3_ACCESS_KEY', required: false, description: 'Access key id. Give it permission to write objects in that bucket and nothing else.' },
   { name: 'BACKUP_S3_SECRET_KEY', required: false, secret: true, description: 'Secret access key.' },
   { name: 'BACKUP_S3_PREFIX', required: false, default: 'vault/', description: 'Key prefix for backup objects.' },
+  { name: 'PERSONAL_BACKUP_REMOTE', required: false, default: 'true', description: '"false" limits personal backups to copies kept on this server: no outbound connections to people\'s own S3 buckets or WebDAV folders.' },
+  { name: 'PERSONAL_BACKUP_ALLOW_PRIVATE', required: false, default: 'false', description: '"true" lets personal backups reach private and loopback addresses, and plain http — for a NAS on the LAN. Leave it off on a server reachable from the internet: it lets any account make this server connect inside your network.' },
 ]
 
 let cached: Config | null = null
@@ -171,6 +175,7 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },
     backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
     mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
+    personalBackup: { remote: get('PERSONAL_BACKUP_REMOTE') !== 'false', allowPrivate: get('PERSONAL_BACKUP_ALLOW_PRIVATE') === 'true' },
   }
   const smtpHost = get('SMTP_HOST')
   if (smtpHost && !get('MAIL_FROM')) problems.push('MAIL_FROM is required with SMTP_HOST')

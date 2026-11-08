@@ -27,6 +27,7 @@ import {
   registrySk,
   userPk,
 } from '../keys.js'
+import { bkdueSk } from '../personal-backup.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
@@ -250,6 +251,7 @@ export async function deleteUser(app: App, actor: string, actorRole: Role, event
   for (const item of await app.store.query(userPk(id))) await app.store.delete(item.pk, item.sk)
   await app.store.delete(emailPk(reg.emailDigest), EMAIL_SK)
   await app.store.delete(SYSTEM_PK, registrySk(id))
+  await app.store.delete(SYSTEM_PK, bkdueSk(id))
   return json(200, { ok: true })
 }
 

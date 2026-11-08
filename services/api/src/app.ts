@@ -12,6 +12,7 @@ import { openapi } from './openapi.js'
 import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
+import * as backups from './routes/backups.js'
 import * as desk from './routes/desk.js'
 import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
@@ -132,6 +133,12 @@ export function buildRouter(app: App): Router {
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)), 'Add a sealed previous version')
   router.get('/api/prefs', authed((u) => prefs.getPrefs(app, u)), 'My sealed preferences')
   router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
+  router.get('/api/backups', authed((u) => backups.getBackups(app, u)), 'My backup schedule, destination, runs and copies')
+  router.put('/api/backups/config', authed((u, e) => backups.putConfig(app, u, e)), 'Set my backup schedule and destination')
+  router.post('/api/backups/run', authed((u) => backups.runNow(app, u)), 'Back up now')
+  router.get('/api/backups/latest', authed((u) => backups.latest(app, u)), 'The newest backup, fetched back from its destination (for a test restore)')
+  router.get('/api/backups/copies/:id', authed((u, _e, id) => backups.getCopy(app, u, id)), 'Download a copy kept on the server')
+  router.delete('/api/backups/copies/:id', authed((u, _e, id) => backups.deleteCopy(app, u, id)), 'Delete a copy kept on the server')
   router.get('/api/activity', authed((u) => vault.getActivity(app, u)), 'Security events from the last ninety days')
 
   // The operator's routes. Same sign-in as everything else; each names the

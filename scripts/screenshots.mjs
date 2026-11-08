@@ -121,6 +121,13 @@ try {
   await shot(page, 'devices')
   await s.settings(page, 'Preferences')
   await shot(page, 'preferences')
+  await s.settings(page, 'Backups')
+  await page.selectOption('#b-freq', 'daily')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.waitForSelector('text=Backup settings saved')
+  await page.getByRole('button', { name: 'Back up now' }).click()
+  await page.waitForSelector('.backup-runs li')
+  await shot(page, 'backups')
 
   // Organizations: create one with a collection, and share an item into it.
   await s.menu(page, 'Organizations')
