@@ -298,6 +298,17 @@ particular device maker, and needs no metadata service). Admin and help-desk two
 clear keys as well as the authenticator app, after the verification those flows already require
 (A13).
 
+### A22 — The organization recovery key
+
+The recovery key ([0026](../decisions/0026-organization-recovery-key.md)) is the secret half of a
+key pair, and the org key and every collection key are also sealed to its public half. Whoever
+holds it can take an organization over, and that is its purpose, so it is shown once and meant to
+be kept offline. The server stores only ciphertext and a SHA-256 verifier of a separate HKDF
+branch. Learning that branch at a recovery attempt does not let the server open anything.
+Attempts are rate limited (5 per hour per member), refusals are audited, and a recovery notifies
+every remaining owner and admin. A hostile server could seal collection keys to a recovery key
+of its own, which is A15 again: signed key grants (0025) will cover recovery copies too.
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

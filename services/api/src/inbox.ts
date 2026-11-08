@@ -23,6 +23,7 @@ export type NoteKind =
   | 'member-accepted'     // someone accepted my organization's invitation; confirm them
   | 'backup-failed'       // my scheduled backup failed
   | 'emergency-request'   // my trusted contact asked for access
+  | 'org-recovered'       // someone used the organization recovery key
 
 const MAX_NOTES = 200
 

@@ -15,7 +15,7 @@
 // answers the same whether or not the address has an account (threat A7), and
 // the invitation appears when that person signs in.
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, conflict, forbidden, json, notFound, parseJsonBody } from '../http.js'
@@ -29,6 +29,7 @@ import { AlreadyExists, type Item } from '../store.js'
 import { requireEmail, requireSealed, requireSharedKey } from '../validate.js'
 import { getSettings } from '../system.js'
 import { addNote, addNotes } from '../inbox.js'
+import { enforce, type Limit } from '../ratelimit.js'
 import { streamAudit } from '../audit-stream.js'
 import { hasSecondFactor } from '../twofactor.js'
 
@@ -87,6 +88,8 @@ interface Collection extends Item {
   keyVersion: number
   /** Set when someone lost access: the key should be rotated (step 4). */
   rotationNeeded?: boolean
+  /** This version's key sealed to the organization recovery key (0026). */
+  recoveryBlob?: string
   createdAt: string
 }
 
@@ -305,6 +308,7 @@ export async function myOrgs(app: App, userId: string): Promise<LambdaResponse> 
     const policies = { ...DEFAULT_POLICIES, ...((meta['policies'] as Partial<Policies>) ?? {}) }
     orgs.push({
       id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', kind: meta['kind'] === 'direct' ? 'direct' : 'team', role: m.role, status: m.status, policies,
+      recovery: meta['recovery'] ? { createdAt: (meta['recovery'] as Record<string, unknown>)['createdAt'], publicKey: (meta['recovery'] as Record<string, unknown>)['publicKey'] } : null,
       policyGap: m.status === 'confirmed' ? await policyGap(app, orgId, userId) : null,
       ...(m.orgKeyBlob ? { orgKeyBlob: m.orgKeyBlob } : {}),
     })
@@ -573,7 +577,7 @@ export async function collections(app: App, userId: string, orgId: string): Prom
     // that seals it anyway), so a member can ask for one they lack (D7).
     const requested = !a && me.role === 'member' ? Boolean(await app.store.get(orgPk(orgId), requestSk(c.id, userId))) : false
     out.push({
-      id: c.id, nameBlob: c.nameBlob, keyVersion: c.keyVersion, rotationNeeded: !!c.rotationNeeded,
+      id: c.id, nameBlob: c.nameBlob, keyVersion: c.keyVersion, rotationNeeded: !!c.rotationNeeded, recoveryCovered: Boolean(c.recoveryBlob),
       access: a ? { keyBlob: a.keyBlob, keyVersion: a.keyVersion, permission: a.permission, hidePasswords: a.hidePasswords, ...(a.until ? { until: a.until } : {}) } : null,
       ...(requested ? { requested } : {}),
     })
@@ -587,7 +591,8 @@ export async function createCollection(app: App, userId: string, event: LambdaEv
   const collectionId = id(b['id'], 'id')
   const nameBlob = requireSealed(b['nameBlob'], 'nameBlob', 4096)
   const keyBlob = requireSharedKey(b['keyBlob'], 'keyBlob')
-  const c: Collection = { pk: orgPk(orgId), sk: collectionSk(collectionId), id: collectionId, nameBlob, keyVersion: 1, createdAt: now(app) }
+  const recoveryBlob = b['recoveryBlob'] === undefined ? undefined : requireSharedKey(b['recoveryBlob'], 'recoveryBlob')
+  const c: Collection = { pk: orgPk(orgId), sk: collectionSk(collectionId), id: collectionId, nameBlob, keyVersion: 1, createdAt: now(app), ...(recoveryBlob ? { recoveryBlob } : {}) }
   try {
     await app.store.put(c, { mustNotExist: true })
   } catch (err) {
@@ -742,8 +747,10 @@ export async function rotateCollection(app: App, userId: string, event: LambdaEv
     const old = stored.find((x) => x['id'] === i.id)!
     await app.store.put({ ...old, blob: i.blob, keyVersion: version, updatedAt: at, updatedBy: userId })
   }
-  const { rotationNeeded: _r, ...rest } = c
-  await app.store.put({ ...rest, keyVersion: version, rotatedAt: at } as Collection)
+  // The old version's recovery copy no longer matches; a new one comes with the rotation.
+  const { rotationNeeded: _r, recoveryBlob: _old, ...rest } = c
+  const recoveryBlob = b['recoveryBlob'] === undefined ? undefined : requireSharedKey(b['recoveryBlob'], 'recoveryBlob')
+  await app.store.put({ ...rest, keyVersion: version, rotatedAt: at, ...(recoveryBlob ? { recoveryBlob } : {}) } as Collection)
   await orgEvent(app, orgId, userId, 'collection.rotate', { collectionId, ...(drop.length ? { target: `${drop.length} unreadable item(s) removed` } : {}) })
   return json(200, { keyVersion: version })
 }
@@ -886,4 +893,95 @@ export async function deleteItem(app: App, userId: string, orgId: string, collec
   await app.store.delete(orgPk(orgId), staleSk(collectionId, itemId))
   await orgEvent(app, orgId, userId, 'item.delete', { collectionId, itemId })
   return json(200, { ok: true })
+}
+
+// ── Organization recovery key (decisions/0026) ─────────────────────────────
+
+const RECOVER_LIMIT: Limit = { max: 5, windowSeconds: 3600 }
+const PUBLIC_KEY = /^[A-Za-z0-9_-]{87}$/   // 65 bytes, base64url
+
+/** The owner sets (or replaces) the recovery key: its public key, the escrow
+ *  of its private key, the verifier, the org key sealed to it, and the
+ *  collection keys their app could seal to it. */
+export async function setRecovery(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { owner: true })
+  const b = body(event)
+  const publicKey = typeof b['publicKey'] === 'string' && PUBLIC_KEY.test(b['publicKey']) ? b['publicKey'] : null
+  if (!publicKey) throw badRequest('publicKey must be a P-256 public key.')
+  const escrow = requireSealed(b['escrow'], 'escrow', 4096)
+  const verifier = typeof b['verifier'] === 'string' && /^[A-Za-z0-9_-]{43}$/.test(b['verifier']) ? b['verifier'] : null
+  if (!verifier) throw badRequest('verifier must be a SHA-256 digest.')
+  const orgKeyRecovery = requireSharedKey(b['orgKeyRecovery'], 'orgKeyRecovery')
+  const blobs = Array.isArray(b['collections']) ? (b['collections'] as Record<string, unknown>[]) : []
+  const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
+  if (!meta) throw notFound()
+  // A new key replaces every old copy: drop them first, then write the new ones.
+  for (const c of (await app.store.query(orgPk(orgId), COLLECTION_PREFIX)) as Collection[]) {
+    const given = blobs.find((x) => x['id'] === c.id)
+    const { recoveryBlob: _o, ...rest } = c
+    await app.store.put({ ...rest, ...(given ? { recoveryBlob: requireSharedKey(given['recoveryBlob'], 'recoveryBlob') } : {}) } as Collection)
+  }
+  await app.store.put({ ...meta, recovery: { publicKey, escrow, verifier, orgKeyRecovery, createdAt: now(app), createdBy: userId } })
+  await orgEvent(app, orgId, userId, 'recovery.set')
+  return json(200, { ok: true })
+}
+
+/** What a member needs to attempt recovery: everything here is ciphertext
+ *  only the recovery key opens. Any member, confirmed or not. */
+export async function getRecovery(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId)
+  const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
+  const r = meta?.['recovery'] as Record<string, unknown> | undefined
+  if (!r) throw notFound()
+  const colls = (await app.store.query(orgPk(orgId), COLLECTION_PREFIX)) as Collection[]
+  return json(200, {
+    publicKey: r['publicKey'], escrow: r['escrow'], orgKeyRecovery: r['orgKeyRecovery'], createdAt: r['createdAt'],
+    collections: colls.map((c) => ({ id: c.id, keyVersion: c.keyVersion, recoveryBlob: c.recoveryBlob ?? null })),
+  })
+}
+
+/** Someone who manages a collection adds its missing recovery copy. */
+export async function setCollectionRecovery(app: App, userId: string, event: LambdaEvent, orgId: string, collectionId: string): Promise<LambdaResponse> {
+  const { c } = await requireAccess(app, orgId, collectionId, userId, 'manage')
+  const b = body(event)
+  if (b['keyVersion'] !== c.keyVersion) throw new HttpError(409, 'conflict', 'The collection key changed; reload and try again.')
+  await app.store.put({ ...c, recoveryBlob: requireSharedKey(b['recoveryBlob'], 'recoveryBlob') })
+  return json(200, { ok: true })
+}
+
+/** Recovery: a member proves the recovery key and hands over the org key and
+ *  collection keys, opened from their recovery copies and re-sealed to
+ *  themselves. They become the owner; the previous owner becomes an admin;
+ *  everyone who manages the organization is told. */
+export async function recoverOrg(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
+  const me = await requireMember(app, orgId, userId)
+  await enforce(app.store, 'org-recover', `${orgId}:${userId}`, RECOVER_LIMIT, app.now())
+  const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
+  const r = meta?.['recovery'] as Record<string, unknown> | undefined
+  if (!r) throw notFound()
+  const b = body(event)
+  const auth = typeof b['auth'] === 'string' ? Buffer.from(b['auth'], 'base64url') : Buffer.alloc(0)
+  const digest = createHash('sha256').update(auth).digest()
+  const want = Buffer.from(String(r['verifier']), 'base64url')
+  if (auth.length !== 32 || want.length !== digest.length || !timingSafeEqual(digest, want)) {
+    await orgEvent(app, orgId, userId, 'recovery.refused')
+    throw new HttpError(403, 'forbidden', 'That is not this organization\'s recovery key.')
+  }
+  const orgKeyBlob = requireSharedKey(b['orgKeyBlob'], 'orgKeyBlob')
+  const grants = Array.isArray(b['grants']) ? (b['grants'] as Record<string, unknown>[]) : []
+  if (me.publicKey !== (await publicKeyOf(app, userId))) throw conflict('Your identity key changed; sign in again first.')
+  for (const m of (await app.store.query(orgPk(orgId), ORG_MEMBER_PREFIX)) as Member[]) {
+    if (m.role === 'owner' && m.userId !== userId) await app.store.put({ ...m, role: 'admin' })
+  }
+  await app.store.put({ ...me, role: 'owner', status: 'confirmed', orgKeyBlob, confirmedAt: me.confirmedAt ?? now(app) })
+  let restored = 0
+  for (const g of grants) {
+    const c = (await app.store.get(orgPk(orgId), collectionSk(String(g['collectionId'] ?? '')))) as Collection | null
+    if (!c || g['keyVersion'] !== c.keyVersion) continue
+    await app.store.put({ pk: orgPk(orgId), sk: accessSk(c.id, userId), collectionId: c.id, userId, keyBlob: requireSharedKey(g['keyBlob'], 'keyBlob'), keyVersion: c.keyVersion, permission: 'manage', hidePasswords: false } as Access)
+    restored++
+  }
+  await orgEvent(app, orgId, userId, 'org.recover', { target: me.label })
+  await addNotes(app, await managers(app, orgId, userId), 'org-recovered', { orgId, who: me.label })
+  return json(200, { ok: true, restored })
 }

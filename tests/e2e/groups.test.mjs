@@ -16,6 +16,10 @@ test('a group with a collection gives its members access', async () => {
     await s.menu(alice, 'Organizations')
     await alice.fill('#o-name', 'Acme')
     await alice.getByRole('button', { name: 'Create', exact: true }).click()
+    // The organization's recovery key is shown once (decisions/0026).
+    await alice.waitForSelector('#ork-title')
+    await alice.getByLabel('I have stored it somewhere safe').check()
+    await alice.getByRole('button', { name: 'Done' }).click()
     await alice.fill('input[aria-label="New collection name"]', 'Servers')
     await alice.getByRole('button', { name: 'Add collection' }).click()
     await alice.waitForSelector('.collection-row:has-text("Servers")')

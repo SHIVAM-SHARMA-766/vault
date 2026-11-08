@@ -263,3 +263,66 @@ test('invitations and acceptances notify; notifications are read one by one or a
   assert.equal((await h.request('POST', '/api/notifications/read', { token: owner.token, body: {} })).status, 400)
   assert.ok(!JSON.stringify(h.store.dump().filter((r) => r.sk.startsWith('NOTE#'))).includes(ben.email), 'no addresses in notifications')
 })
+
+// ── Organization recovery key (decisions/0026) ─────────────────────────────
+
+test('the recovery key restores an organization to a member, with its collections, and is refused otherwise', async () => {
+  const { createOrgRecovery, deriveOrgRecovery, openOrgRecoveryEscrow, openCollectionKeyFromRecovery, openOrgKeyFromRecovery, sealCollectionKeyForRecovery, sealOrgKeyForRecovery, openCollectionKey, toBase64Url: b64 } = await import('@vault/crypto')
+  const { h, owner, ana, ben } = await people()
+  const org = await newOrg(h, owner)
+  await join(h, owner, ana, org, 'Ana')
+  // Not set yet.
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/recovery`, { token: ana.token })).status, 404)
+
+  // The owner creates the recovery key and seals the org key and the collection key to it.
+  const rec = await createOrgRecovery(org.orgId)
+  const body = {
+    publicKey: rec.publicKey, escrow: rec.escrow, verifier: rec.verifier,
+    orgKeyRecovery: await sealOrgKeyForRecovery(rec.pair.publicKey, org.orgKey, org.orgId),
+    collections: [{ id: org.collId, recoveryBlob: await sealCollectionKeyForRecovery(rec.pair.publicKey, org.collKey, org.collId, 1) }],
+  }
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/recovery`, { token: ana.token, body })).status, 403, 'owner only')
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/recovery`, { token: owner.token, body })).status, 200)
+  const mine = (await h.request('GET', '/api/orgs', { token: owner.token })).body['orgs'] as { id: string; recovery: unknown }[]
+  assert.ok(mine.find((o) => o.id === org.orgId)!.recovery)
+
+  // Ana (who cannot open the collection) recovers with the key.
+  const got = (await h.request('GET', `/api/orgs/${org.orgId}/recovery`, { token: ana.token })).body as { publicKey: string; escrow: string; orgKeyRecovery: string; collections: { id: string; keyVersion: number; recoveryBlob: string }[] }
+  const { kek, auth } = await deriveOrgRecovery(rec.recoveryKey, org.orgId)
+  const priv = await openOrgRecoveryEscrow(kek, got.escrow, org.orgId)
+  const pub = rec.pair.publicKey
+  const orgKey = await openOrgKeyFromRecovery(priv, pub, got.orgKeyRecovery, org.orgId)
+  const collKey = await openCollectionKeyFromRecovery(priv, pub, got.collections[0]!.recoveryBlob, org.collId, 1)
+  const grants = [{ collectionId: org.collId, keyVersion: 1, keyBlob: await sealCollectionKey(ana.keys.publicKey, collKey, org.collId, 1) }]
+  const recoverBody = { auth: b64(auth), orgKeyBlob: await sealOrgKey(ana.keys.publicKey, orgKey, org.orgId), grants }
+
+  // The wrong key, or someone outside the organization, is refused.
+  const wrong = await deriveOrgRecovery(new Uint8Array(32).fill(9), org.orgId)
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/recover`, { token: ana.token, body: { ...recoverBody, auth: b64(wrong.auth) } })).status, 403)
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/recover`, { token: ben.token, body: recoverBody })).status, 404)
+
+  const ok = await h.request('POST', `/api/orgs/${org.orgId}/recover`, { token: ana.token, body: recoverBody })
+  assert.equal(ok.status, 200)
+  assert.equal(ok.body['restored'], 1)
+  const members = (await h.request('GET', `/api/orgs/${org.orgId}/members`, { token: ana.token })).body['members'] as { userId: string; role: string }[]
+  assert.equal(members.find((m) => m.userId === ana.userId)!.role, 'owner')
+  assert.equal(members.find((m) => m.userId === owner.userId)!.role, 'admin', 'the previous owner stays, as an admin')
+  // Her app can now open the collection key it was given.
+  const cols = (await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ana.token })).body['collections'] as { access: { keyBlob: string } }[]
+  assert.deepEqual(await openCollectionKey(ana.keys.privateKey, ana.keys.publicKey, cols[0]!.access.keyBlob, org.collId, 1), org.collKey)
+  // The previous owner is told.
+  const n = (await h.request('GET', '/api/notifications', { token: owner.token })).body['notes'] as { kind: string }[]
+  assert.ok(n.some((x) => x.kind === 'org-recovered'))
+})
+
+test('recovery attempts are limited', async () => {
+  const { createOrgRecovery, sealOrgKeyForRecovery, toBase64Url: b64 } = await import('@vault/crypto')
+  const { h, owner, ana } = await people()
+  const org = await newOrg(h, owner)
+  await join(h, owner, ana, org, 'Ana')
+  const rec = await createOrgRecovery(org.orgId)
+  await h.request('PUT', `/api/orgs/${org.orgId}/recovery`, { token: owner.token, body: { publicKey: rec.publicKey, escrow: rec.escrow, verifier: rec.verifier, orgKeyRecovery: await sealOrgKeyForRecovery(rec.pair.publicKey, org.orgKey, org.orgId), collections: [] } })
+  let last = 0
+  for (let i = 0; i < 6; i++) last = (await h.request('POST', `/api/orgs/${org.orgId}/recover`, { token: ana.token, body: { auth: b64(new Uint8Array(32).fill(i)), orgKeyBlob: 'x', grants: [] } })).status
+  assert.equal(last, 429)
+})

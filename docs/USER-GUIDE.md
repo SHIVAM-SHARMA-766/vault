@@ -364,6 +364,13 @@ mark goes.
 once: create a group, add confirmed members, then in a collection's **Access** choose **Give
 access to a group**. People added to the group later get the group's collections.
 
+**Recovery key.** Creating an organization shows its **recovery key** once: keep it offline. If
+every owner and admin ever loses access, any member can choose **Recover with the recovery
+key…**, enter it, and become the owner, with every collection the key covers. The owner can
+**Replace the recovery key** (the old one stops working), and the organization card shows how many
+collections it covers. Collections are added to it automatically when someone who manages them
+opens the organization.
+
 **Joining one.** After you accept an invitation, the vault shows a note with your fingerprint
 until an admin confirms you: read it to them on a call or in person. Once you are confirmed, it
 tells you once where shared items appear.
