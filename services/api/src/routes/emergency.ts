@@ -36,6 +36,9 @@ interface Grant extends Item {
   granteeDigest: string
   granteeId?: string
   granteePublicKey?: string
+  /** Their signing key at acceptance (decisions/0025), so the fingerprint the
+   *  grantor compares covers both keys, as everywhere else. */
+  granteeSigningKey?: string
   /** What the contact is called, for the grantor. */
   label: string
   /** What the grantor is called, for the contact (typed by the grantor). */
@@ -79,9 +82,11 @@ async function asGrantee(app: App, userId: string, id: string): Promise<Grant> {
 const opensAt = (g: Grant) => g.requestedAt ? new Date(Date.parse(g.requestedAt) + g.waitDays * 86_400_000).toISOString() : null
 const isOpen = (app: App, g: Grant) => g.status === 'approved' || (g.status === 'requested' && Date.parse(opensAt(g)!) <= app.now())
 
-const forGrantor = (app: App, g: Grant) => ({
+const forGrantor = (app: App, g: Grant, currentSigning?: string | null) => ({
   id: g.id, label: g.label, waitDays: g.waitDays, status: isOpen(app, g) && g.status === 'requested' ? 'approved' : g.status,
-  granteePublicKey: g.status === 'accepted' ? g.granteePublicKey ?? null : null, requestedAt: g.requestedAt ?? null, opensAt: opensAt(g),
+  granteePublicKey: g.status === 'accepted' ? g.granteePublicKey ?? null : null,
+  granteeSigningKey: g.status === 'accepted' ? g.granteeSigningKey ?? currentSigning ?? null : null,
+  requestedAt: g.requestedAt ?? null, opensAt: opensAt(g),
 })
 const forGrantee = (app: App, g: Grant) => ({
   id: g.id, fromName: g.fromName, waitDays: g.waitDays, status: isOpen(app, g) ? 'approved' : g.status,
@@ -112,7 +117,10 @@ export async function create(app: App, userId: string, event: LambdaEvent): Prom
 
 export async function mine(app: App, userId: string): Promise<LambdaResponse> {
   const grants = (await app.store.query(userPk(userId), EMERGENCY_PREFIX)) as Grant[]
-  return json(200, { grants: grants.map((g) => forGrantor(app, g)) })
+  // Grants accepted before signing keys existed: show the grantee's current one.
+  const signing = await Promise.all(grants.map(async (g) => (g.status === 'accepted' && !g.granteeSigningKey && g.granteeId
+    ? ((await app.store.get(userPk(g.granteeId), PROFILE_SK))?.['signingPublicKey'] as string | undefined) ?? null : null)))
+  return json(200, { grants: grants.map((g, i) => forGrantor(app, g, signing[i])) })
 }
 
 export async function confirm(app: App, userId: string, event: LambdaEvent, id: string): Promise<LambdaResponse> {
@@ -166,7 +174,7 @@ export async function accept(app: App, userId: string, id: string): Promise<Lamb
   if (!inv) throw notFound()
   if (typeof me['publicKey'] !== 'string') throw new HttpError(409, 'conflict', 'Your identity key is created on your next unlock.')
   const g = await grantFor(app, String(inv['grantorId']), id)
-  await app.store.put({ ...g, status: 'accepted', granteeId: userId, granteePublicKey: me['publicKey'] })
+  await app.store.put({ ...g, status: 'accepted', granteeId: userId, granteePublicKey: me['publicKey'], ...(typeof me['signingPublicKey'] === 'string' ? { granteeSigningKey: me['signingPublicKey'] } : {}) })
   await app.store.put({ pk: userPk(userId), sk: emergencyTrustSk(id), id, grantorId: g.grantorId })
   await app.store.delete(inv.pk, inv.sk)
   return json(200, { ok: true })

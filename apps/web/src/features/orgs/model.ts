@@ -7,16 +7,30 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import {
-  type EntryContent, createOrgRecovery, deriveOrgRecovery, fromRecoveryString, openCollectionKeyFromRecovery, openOrgKeyFromRecovery, openOrgRecoveryEscrow, sealCollectionKeyForRecovery, sealOrgKeyForRecovery, toBase64Url, toRecoveryString, fromBase64Url, generateCollectionKey, generateOrgKey, identityFingerprint, isWithinSizeLimit,
+  type EntryContent, endorsementBytes, signBytes, signGrant, unwrapSigningPrivateKey, verifyBytes, createOrgRecovery, deriveOrgRecovery, fromRecoveryString, openCollectionKeyFromRecovery, openOrgKeyFromRecovery, openOrgRecoveryEscrow, sealCollectionKeyForRecovery, sealOrgKeyForRecovery, toBase64Url, toRecoveryString, fromBase64Url, generateCollectionKey, generateOrgKey, isWithinSizeLimit,
   openCollectionKey, openCollectionMeta, openOrgKey, openOrgMeta, openSharedItem, sealCollectionKey,
   sealCollectionMeta, sealOrgKey, sealOrgMeta, sealSharedItem, unwrapIdentityPrivateKey, wipe, openGroupMeta, sealGroupMeta,
 } from '@vault/crypto'
 
-import { type OrgInvitation, type OrgPolicies, type OrgRole, type SharePermission, api } from '../../lib/api.js'
+import { type OrgInvitation, type OrgMember, type OrgPolicies, type OrgRole, type SharePermission, api } from '../../lib/api.js'
+import { checkGrant, fingerprintOf, loadTrust, saveTrust, trustedSigners } from './trust.js'
 import * as session from '../../lib/session.js'
 import type { Decrypted } from '../vault/model.js'
 
-export interface Identity { publicKey: Uint8Array; privateKey: Uint8Array; fingerprint: string }
+export interface Identity {
+  publicKey: Uint8Array
+  privateKey: Uint8Array
+  fingerprint: string
+  /** The signing key pair (0025), once enrolled. */
+  signingPublicKey?: Uint8Array
+  signingPrivateKey?: Uint8Array
+  /** base64url forms, as the server holds them. */
+  publicKeyB64: string
+  signingKeyB64: string | null
+}
+
+/** Forget the cached identity (after a signing key is enrolled). */
+export function forgetIdentity(): void { if (cached) { wipe(cached.identity.privateKey); if (cached.identity.signingPrivateKey) wipe(cached.identity.signingPrivateKey) } cached = null }
 
 let cached: { vaultKey: Uint8Array; identity: Identity } | null = null
 
@@ -32,7 +46,17 @@ export async function myIdentity(vaultKey: Uint8Array): Promise<Identity> {
   if (!me.identity) throw new Error('Your identity key is being created; unlock again in a moment.')
   const publicKey = fromBase64Url(me.identity.publicKey)
   const privateKey = await unwrapIdentityPrivateKey(me.identity.wrappedPrivateKey, vaultKey)
-  cached = { vaultKey, identity: { publicKey, privateKey, fingerprint: await identityFingerprint(publicKey) } }
+  const signing = me.identity.signingPublicKey && me.identity.wrappedSigningKey
+    ? { signingPublicKey: fromBase64Url(me.identity.signingPublicKey), signingPrivateKey: await unwrapSigningPrivateKey(me.identity.wrappedSigningKey, vaultKey) }
+    : {}
+  cached = {
+    vaultKey,
+    identity: {
+      publicKey, privateKey, ...signing,
+      publicKeyB64: me.identity.publicKey, signingKeyB64: me.identity.signingPublicKey ?? null,
+      fingerprint: await fingerprintOf(me.identity.publicKey, me.identity.signingPublicKey ?? null),
+    },
+  }
   return cached.identity
 }
 
@@ -51,6 +75,8 @@ export interface OrgView {
   policies: OrgPolicies
   /** Why this account cannot open the organization's collections, if it cannot. */
   policyGap: string | null
+  /** The owner's signing key differs from the one this account pinned (0025). */
+  ownerChanged?: boolean
 }
 
 export interface CollectionView {
@@ -64,6 +90,10 @@ export interface CollectionView {
   direct?: boolean
   /** This version's key has a copy sealed to the recovery key (0026). */
   recoveryCovered?: boolean
+  /** The grant's signature did not verify against a trusted admin (0025). */
+  untrusted?: boolean
+  /** The grant is from before signing (accepted until fully migrated). */
+  unsigned?: boolean
   /** I asked for access and am waiting (D7). */
   requested?: boolean
   /** My access is a check-out that ends then (D7). */
@@ -113,11 +143,22 @@ export function useTeams(vaultKey: Uint8Array) {
         const name = meta.name
         views.push({ ...base, name, key, ...(meta.peer ? { peer: meta.peer } : {}) })
         if (row.policyGap) continue
+        // Signed key grants (0025): who this account trusts to hand out keys here.
+        const members = (await api.orgs.members(token, row.id).catch(() => ({ members: [] as OrgMember[] }))).members
+        const ts = await trustedSigners(row.id, members, await loadTrust(row.id, vaultKey), vaultKey)
+        if (ts.ownerChanged) views[views.length - 1]!.ownerChanged = true
+        const statuses: string[] = []
         const stale = new Set((await api.orgs.stale(token, row.id).catch(() => ({ items: [] }))).items.map((s) => `${s.collectionId}/${s.itemId}`))
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
           const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), ...(c.requested ? { requested: true } : {}), ...(c.recoveryCovered ? { recoveryCovered: true } : {}), ...(c.access?.until ? { until: c.access.until } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
-          if (c.access && c.access.keyVersion === c.keyVersion) {
+          const status = c.access && c.access.keyVersion === c.keyVersion
+            ? await checkGrant(row.id, c.id, c.keyVersion, c.access, { publicKey: me.publicKeyB64, signingKey: me.signingKeyB64, ...(session.get()?.userId ? { userId: session.get()!.userId } : {}) }, ts.signers, ts.trust)
+            : null
+          if (status) statuses.push(status)
+          if (status === 'bad') view.untrusted = true
+          if (status === 'unsigned') view.unsigned = true
+          if (c.access && c.access.keyVersion === c.keyVersion && status !== 'bad') {
             view.key = await openCollectionKey(me.privateKey, me.publicKey, c.access.keyBlob, c.id, c.keyVersion)
             view.permission = c.access.permission
             for (const it of (await api.orgs.items(token, row.id, c.id)).items) {
@@ -130,6 +171,12 @@ export function useTeams(vaultKey: Uint8Array) {
           }
           colls.push(view)
         }
+        // Every grant here verified: from now on refuse unsigned ones (0025).
+        if (statuses.length && statuses.every((x) => x === 'signed') && !ts.trust.requireSigned && !ts.ownerChanged) {
+          void saveTrust(row.id, vaultKey, { ...ts.trust, requireSigned: true })
+        }
+        // An owner endorses its admins' keys; a manager re-signs old grants.
+        if (me.signingPrivateKey) void upkeep(row.id, row.role, members, colls.filter((x) => x.orgId === row.id), me)
       }
       // Collections this account manages that lack a recovery copy get one
       // now (0026), so a recovery key created before them still covers them.
@@ -155,6 +202,41 @@ export function useTeams(vaultKey: Uint8Array) {
     const c = collections.find((x) => x.id === id)
     if (!c?.key) throw new Error('You cannot open that collection.')
     return c as CollectionView & { key: Uint8Array }
+  }
+
+  /** A signature over a grant to `recipient` (0025), when this account can sign. */
+  async function signFor(orgId: string, collectionId: string, version: number, recipientPublicKey: string, recipientSigningKey: string | null | undefined, keyBlob: string): Promise<{ signature?: string }> {
+    const me = await myIdentity(vaultKey)
+    if (!me.signingPrivateKey) return {}
+    const recipient = await fingerprintOf(recipientPublicKey, recipientSigningKey ?? null)
+    return { signature: await signGrant(me.signingPrivateKey, { orgId, collectionId, version, recipient, keyBlob }) }
+  }
+
+  /** Background upkeep after a load: the owner endorses admins whose keys it
+   *  confirmed; a manager re-seals and signs grants made before signing. */
+  async function upkeep(orgId: string, role: string, members: OrgMember[], colls: CollectionView[], me: Identity) {
+    try {
+      const token = await session.token()
+      if (role === 'owner') {
+        for (const m of members) {
+          if (m.role !== 'admin' || m.status !== 'confirmed' || !m.signingPublicKey) continue
+          const bytes = endorsementBytes(orgId, await fingerprintOf(m.publicKey, m.signingPublicKey))
+          if (m.endorsement && me.signingPublicKey && await verifyBytes(me.signingPublicKey, bytes, m.endorsement)) continue
+          await api.orgs.endorse(token, orgId, m.userId, await signBytes(me.signingPrivateKey!, bytes))
+        }
+      }
+      for (const c of colls) {
+        if (!c.key || c.permission !== 'manage') continue
+        const { access } = await api.orgs.access(token, orgId, c.id)
+        for (const a of access as { userId: string; permission: SharePermission; hidePasswords: boolean; signed?: boolean; viaGroup?: string | null }[]) {
+          if (a.signed) continue
+          const m = members.find((x) => x.userId === a.userId)
+          if (!m || m.status !== 'confirmed') continue
+          const keyBlob = await sealCollectionKey(fromBase64Url(m.publicKey), c.key, c.id, c.keyVersion)
+          await api.orgs.grant(token, orgId, c.id, m.userId, { permission: a.permission, hidePasswords: a.hidePasswords, keyBlob, ...(a.viaGroup ? { viaGroup: a.viaGroup } : {}), ...(await signFor(orgId, c.id, c.keyVersion, m.publicKey, m.signingPublicKey, keyBlob)) })
+        }
+      }
+    } catch { /* tried again at the next load */ }
   }
 
   /** Creates an organization, and its recovery key (0026): returned once, as
@@ -209,7 +291,8 @@ export function useTeams(vaultKey: Uint8Array) {
         if (!c.recoveryBlob) continue
         try {
           const key = await openCollectionKeyFromRecovery(priv, pub, c.recoveryBlob, c.id, c.keyVersion)
-          grants.push({ collectionId: c.id, keyVersion: c.keyVersion, keyBlob: await sealCollectionKey(me.publicKey, key, c.id, c.keyVersion) })
+          const keyBlob = await sealCollectionKey(me.publicKey, key, c.id, c.keyVersion)
+          grants.push({ collectionId: c.id, keyVersion: c.keyVersion, keyBlob, ...(await signFor(orgId, c.id, c.keyVersion, me.publicKeyB64, me.signingKeyB64, keyBlob)) })
         } catch { /* a copy from an older key: skipped */ }
       }
       const res = await api.orgs.recover(token, orgId, { auth: toBase64Url(auth), orgKeyBlob: await sealOrgKey(me.publicKey, orgKey, orgId), grants })
@@ -225,8 +308,9 @@ export function useTeams(vaultKey: Uint8Array) {
     const id = crypto.randomUUID()
     const key = generateCollectionKey()
     const recoveryPub = org.recovery?.publicKey ? fromBase64Url(org.recovery.publicKey) : null
+    const selfBlob = await sealCollectionKey(me.publicKey, key, id, 1)
     await api.orgs.createCollection(await session.token(), orgId, {
-      id, nameBlob: await sealCollectionMeta(orgId, id, { name }, org.key), keyBlob: await sealCollectionKey(me.publicKey, key, id, 1),
+      id, nameBlob: await sealCollectionMeta(orgId, id, { name }, org.key), keyBlob: selfBlob, ...(await signFor(orgId, id, 1, me.publicKeyB64, me.signingKeyB64, selfBlob)),
       ...(recoveryPub ? { recoveryBlob: await sealCollectionKeyForRecovery(recoveryPub, key, id, 1) } : {}),
     })
     await load()
@@ -260,7 +344,8 @@ export function useTeams(vaultKey: Uint8Array) {
     await api.orgs.create(token, { id: orgId, kind: 'direct', hint: both, label: mine, nameBlob: await sealOrgMeta(orgId, { name: both, peer: address }, orgKey), orgKeyBlob: await sealOrgKey(me.publicKey, orgKey, orgId) })
     const collId = crypto.randomUUID()
     const collKey = generateCollectionKey()
-    await api.orgs.createCollection(token, orgId, { id: collId, nameBlob: await sealCollectionMeta(orgId, collId, { name: both }, orgKey), keyBlob: await sealCollectionKey(me.publicKey, collKey, collId, 1) })
+    const selfBlob = await sealCollectionKey(me.publicKey, collKey, collId, 1)
+    await api.orgs.createCollection(token, orgId, { id: collId, nameBlob: await sealCollectionMeta(orgId, collId, { name: both }, orgKey), keyBlob: selfBlob, ...(await signFor(orgId, collId, 1, me.publicKeyB64, me.signingKeyB64, selfBlob)) })
     await api.orgs.invite(token, orgId, address, who, 'member')
     const itemId = crypto.randomUUID()
     const blob = await sealSharedItem(collId, itemId, 1, rest, collKey)
@@ -290,8 +375,12 @@ export function useTeams(vaultKey: Uint8Array) {
 
   async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean, viaGroup?: string, hours?: number) {
     const c = coll(collectionId)
-    await api.orgs.grant(await session.token(), c.orgId, c.id, userId, {
-      permission, hidePasswords, keyBlob: await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion), ...(viaGroup ? { viaGroup } : {}), ...(hours ? { hours } : {}),
+    const token = await session.token()
+    const m = (await api.orgs.members(token, c.orgId)).members.find((x) => x.userId === userId)
+    const keyBlob = await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion)
+    await api.orgs.grant(token, c.orgId, c.id, userId, {
+      permission, hidePasswords, keyBlob, ...(viaGroup ? { viaGroup } : {}), ...(hours ? { hours } : {}),
+      ...(await signFor(c.orgId, c.id, c.keyVersion, publicKey, m?.signingPublicKey, keyBlob)),
     })
   }
 
@@ -317,7 +406,8 @@ export function useTeams(vaultKey: Uint8Array) {
     if (!g) throw new Error('That group is gone.')
     const grants = await Promise.all(g.members.filter((u) => !access.some((a) => a.userId === u)).map(async (u) => {
       const m = members.find((x) => x.userId === u)!
-      return { userId: u, keyBlob: await sealCollectionKey(fromBase64Url(m.publicKey), c.key, c.id, c.keyVersion) }
+      const keyBlob = await sealCollectionKey(fromBase64Url(m.publicKey), c.key, c.id, c.keyVersion)
+      return { userId: u, keyBlob, ...(await signFor(c.orgId, c.id, c.keyVersion, m.publicKey, m.signingPublicKey, keyBlob)) }
     }))
     await api.orgs.grantGroup(token, c.orgId, c.id, groupId, { permission, hidePasswords, grants })
   }
@@ -348,7 +438,8 @@ export function useTeams(vaultKey: Uint8Array) {
     const grants = await Promise.all(access.map(async (a) => {
       const m = members.find((x) => x.userId === a.userId)
       if (!m) throw new Error('A member with access has left; reload and try again.')
-      return { userId: a.userId, keyBlob: await sealCollectionKey(fromBase64Url(m.publicKey), key, c.id, version) }
+      const keyBlob = await sealCollectionKey(fromBase64Url(m.publicKey), key, c.id, version)
+      return { userId: a.userId, keyBlob, ...(await signFor(c.orgId, c.id, version, m.publicKey, m.signingPublicKey, keyBlob)) }
     }))
     // An item this member cannot decrypt (planted by someone holding an old
     // key, or damaged) is dropped rather than allowed to block the rotation.

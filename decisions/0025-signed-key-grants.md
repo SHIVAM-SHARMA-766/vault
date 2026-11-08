@@ -1,6 +1,6 @@
 # 0025: Signed key grants (closes threat A15)
 
-Status: Accepted (design); implementation follows, with test vectors before code
+Status: Accepted; implemented 2026-11-08
 Date: 2026-11-08
 Implements: [0023](0023-crypto-hardening.md) §1
 
@@ -68,3 +68,36 @@ time it opens the organization. After every row is signed, unsigned grants are r
   compare members' today.
 - A server can still withhold grants or delete rows (denial of service), but can no longer
   substitute keys.
+
+## As built (2026-11-08)
+
+- **Encoding:** a pipe-joined string, not canonical JSON:
+  `vault.grant.v1|org|collection|version|recipientFingerprint|base64url(SHA-256(keyBlob))`. Every
+  field is an id, a number, hex or base64url, so `|` cannot occur, and the code refuses it if it
+  does. Known-answer vectors are pinned, and the pinned signature is cross-checked with Node's
+  crypto (P1363 encoding).
+- **Pinning the owner:** a member's app pins the owner's signing key the first time it sees it
+  (trust on first use), in a trust store sealed with the member's vault key
+  (`vault.trust.v1:<org>`). If the owner's key or identity later differs, keys signed under
+  trust are refused, the organization shows *The owner's key changed*, and the member re-pins
+  only after comparing fingerprints. An organization recovery (0026) causes this on purpose.
+- **Migration rule, refined:**
+  - A grant with no signature, **or signed by someone this account does not trust yet** (an
+    admin the owner has still to re-confirm), is accepted as *unsigned* until the account has
+    seen every grant it holds in the organization verify once.
+  - After that, the trust store records `requireSigned` and such grants are refused.
+  - A signature from a **trusted** signer that does not verify is always refused.
+  - A forged signature by an untrusted key gains an attacker nothing over a missing one, so
+    treating both alike loses no protection and keeps existing organizations working during
+    the switch.
+- **Upkeep:**
+  - An owner's app endorses each confirmed admin, over their full fingerprint.
+  - A manager's app re-seals and signs, from its own copy of the collection key, every grant
+    still unsigned. It never signs a blob it did not make.
+  - Members whose fingerprint changed because a signing key was added show **Re-confirm** to
+    admins.
+- **Tests:**
+  - crypto: known answers; refusal of every changed field, of another key, and of junk
+  - API: enrolment once, signature storage and preservation, the trust store, re-confirm, endorse
+  - end to end: Playwright rewrites the server's answer, and a swapped key blob, then a stripped
+    signature after full signing, both show *Key not trusted* and the key is not used

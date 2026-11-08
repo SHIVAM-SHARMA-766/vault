@@ -224,6 +224,8 @@ audit log with its actor, and a member's app opens only the version the server s
 (a signing key beside the encryption key) and verify it against confirmed members' keys.
 Found by the phase 3.5 independent review.
 
+**Status (2026-11-08): mitigated** by signed key grants ([0025](../decisions/0025-signed-key-grants.md)). Grants are signed by the owner or an endorsed admin and checked by members against a pinned owner key. The remaining gap is first contact, because the owner's key is pinned on first use: a member who wants certainty compares the owner's fingerprint once. A server can still withhold or delete grants, which is a denial of service, not a disclosure.
+
 ### A16 — Personal backups: credentials held for people, and requests to their addresses
 
 Personal backups ([0017](../decisions/0017-personal-backups.md)) add two things the server did

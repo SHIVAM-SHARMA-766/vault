@@ -5,7 +5,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { api } from './lib/api.js'
-import { newIdentity } from './lib/identity.js'
+import { newIdentity, newSigningKey } from './lib/identity.js'
 import { BrandMark, SupportContact, useInstance } from './lib/instance.js'
 import { useRoute } from './lib/router.js'
 import * as prefs from './lib/prefs.js'
@@ -18,6 +18,7 @@ import { Unlock } from './features/auth/Unlock.js'
 import { PublicRequest } from './features/desk/PublicRequest.js'
 import { Vault } from './features/vault/Vault.js'
 import { t, useLocale } from './lib/i18n.js'
+import { forgetIdentity } from './features/orgs/model.js'
 
 // Screens most visits never open load on demand, so unlocking the vault does
 // not wait for the admin panel, the website editor or import parsers.
@@ -65,6 +66,13 @@ function useAccount(state: session.Unlocked) {
         if (!me.identity) {
           try {
             await api.setIdentity(await session.token(), await newIdentity(state.vaultKey))
+          } catch { /* tried again on the next unlock */ }
+        }
+        // A signing key for signed key grants (decisions/0025), once.
+        if (!me.identity?.signingPublicKey) {
+          try {
+            await api.setSigningKey(await session.token(), await newSigningKey(state.vaultKey))
+            forgetIdentity()
           } catch { /* tried again on the next unlock */ }
         }
       } catch { /* the vault still works; staff screens just stay hidden */ }

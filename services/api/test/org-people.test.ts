@@ -326,3 +326,60 @@ test('recovery attempts are limited', async () => {
   for (let i = 0; i < 6; i++) last = (await h.request('POST', `/api/orgs/${org.orgId}/recover`, { token: ana.token, body: { auth: b64(new Uint8Array(32).fill(i)), orgKeyBlob: 'x', grants: [] } })).status
   assert.equal(last, 429)
 })
+
+// ── Signed key grants (decisions/0025) ─────────────────────────────────────
+
+test('signing keys enrol once; grants carry and keep signatures; trust stores are private', async () => {
+  const { generateSigningKeyPair, wrapSigningPrivateKey, toBase64Url: b64 } = await import('@vault/crypto')
+  const { h, owner, ana } = await people()
+  const pair = await generateSigningKeyPair()
+  const body = { signingPublicKey: b64(pair.publicKey), wrappedSigningKey: await wrapSigningPrivateKey(pair.privateKey, new Uint8Array(32).fill(1)) }
+  assert.equal((await h.request('POST', '/api/auth/identity/signing', { token: ana.token, body: { ...body, signingPublicKey: 'short' } })).status, 400)
+  assert.equal((await h.request('POST', '/api/auth/identity/signing', { token: ana.token, body })).status, 200)
+  assert.equal((await h.request('POST', '/api/auth/identity/signing', { token: ana.token, body })).status, 409, 'never replaced silently')
+  assert.equal(((await h.request('GET', '/api/auth/me', { token: ana.token })).body['identity'] as { signingPublicKey: string }).signingPublicKey, body.signingPublicKey)
+
+  const org = await newOrg(h, owner)
+  await join(h, owner, ana, org, 'Ana')
+  const members = (await h.request('GET', `/api/orgs/${org.orgId}/members`, { token: owner.token })).body['members'] as { userId: string; signingPublicKey: string | null; currentSigningKey: string | null }[]
+  const anaRow = members.find((m) => m.userId === ana.userId)!
+  assert.equal(anaRow.signingPublicKey, body.signingPublicKey, 'snapshot taken at confirmation')
+
+  const sig = 'A'.repeat(86)
+  const keyBlob = await sealCollectionKey(ana.keys.publicKey, org.collKey, org.collId, 1)
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/collections/${org.collId}/access/${ana.userId}`, { token: owner.token, body: { permission: 'view', keyBlob, signature: 'nope' } })).status, 400)
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/collections/${org.collId}/access/${ana.userId}`, { token: owner.token, body: { permission: 'view', keyBlob, signature: sig } })).status, 200)
+  let mine = ((await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ana.token })).body['collections'] as { access: { signature?: string; signedBy?: string } }[])[0]!
+  assert.deepEqual([mine.access.signature, mine.access.signedBy], [sig, owner.userId])
+  // A permission change without a new key keeps the signature; a new key without one drops it.
+  await h.request('PUT', `/api/orgs/${org.orgId}/collections/${org.collId}/access/${ana.userId}`, { token: owner.token, body: { permission: 'edit' } })
+  mine = ((await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ana.token })).body['collections'] as typeof mine[])[0]!
+  assert.equal(mine.access.signature, sig)
+  await h.request('PUT', `/api/orgs/${org.orgId}/collections/${org.collId}/access/${ana.userId}`, { token: owner.token, body: { permission: 'edit', keyBlob } })
+  mine = ((await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ana.token })).body['collections'] as typeof mine[])[0]!
+  assert.equal(mine.access.signature, undefined)
+
+  // The trust store is per account and sealed; the server only stores it.
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/trust`, { token: ana.token })).body['blob'], null)
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/trust`, { token: ana.token, body: { blob: 'plain' } })).status, 400)
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/trust`, { token: ana.token, body: { blob: sealedBlob('trust') } })).status, 200)
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/trust`, { token: owner.token })).body['blob'], null, "the owner sees their own, not Ana's")
+})
+
+test('re-confirming takes the new signing key; only the owner endorses admins', async () => {
+  const { generateSigningKeyPair, wrapSigningPrivateKey, toBase64Url: b64 } = await import('@vault/crypto')
+  const { h, owner, ana } = await people()
+  const org = await newOrg(h, owner)
+  await join(h, owner, ana, org, 'Ana')   // confirmed before Ana had a signing key
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/members/${ana.userId}/reconfirm`, { token: owner.token })).status, 409, 'nothing to re-confirm yet')
+  const pair = await generateSigningKeyPair()
+  await h.request('POST', '/api/auth/identity/signing', { token: ana.token, body: { signingPublicKey: b64(pair.publicKey), wrappedSigningKey: await wrapSigningPrivateKey(pair.privateKey, new Uint8Array(32).fill(1)) } })
+  let row = ((await h.request('GET', `/api/orgs/${org.orgId}/members`, { token: owner.token })).body['members'] as { userId: string; signingPublicKey: string | null; currentSigningKey: string | null }[]).find((m) => m.userId === ana.userId)!
+  assert.deepEqual([row.signingPublicKey, row.currentSigningKey], [null, b64(pair.publicKey)], 'the admin sees it changed')
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/members/${ana.userId}/reconfirm`, { token: owner.token })).status, 200)
+  row = ((await h.request('GET', `/api/orgs/${org.orgId}/members`, { token: owner.token })).body['members'] as typeof row[]).find((m) => m.userId === ana.userId)!
+  assert.equal(row.signingPublicKey, b64(pair.publicKey))
+  await h.request('PUT', `/api/orgs/${org.orgId}/members/${ana.userId}`, { token: owner.token, body: { role: 'admin' } })
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/members/${ana.userId}/endorse`, { token: ana.token, body: { endorsement: 'A'.repeat(86) } })).status, 403)
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/members/${ana.userId}/endorse`, { token: owner.token, body: { endorsement: 'A'.repeat(86) } })).status, 200)
+})

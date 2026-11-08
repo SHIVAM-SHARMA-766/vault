@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 
 import { belowMinimum, passwordStrength } from '@vault/core'
-import { changePassword, fromBase64Url, identityFingerprint, rotateRecoveryKey } from '@vault/crypto'
+import { changePassword, rotateRecoveryKey } from '@vault/crypto'
 
 import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
@@ -26,6 +26,7 @@ import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 import { day } from '../../lib/format.js'
 import { t } from '../../lib/i18n.js'
+import { fingerprintOf } from '../orgs/trust.js'
 
 const MIN_LENGTH = 12
 
@@ -49,7 +50,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
     void (async () => {
       try {
         const info = await api.me(await session.token())
-        const fingerprint = info.identity ? await identityFingerprint(fromBase64Url(info.identity.publicKey)) : null
+        const fingerprint = info.identity ? await fingerprintOf(info.identity.publicKey, info.identity.signingPublicKey ?? null) : null
         setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor, policy: info.policy, policyGap: info.policyGap })
         // Turning on two-factor here may close a policy gap; the vault's
         // banner follows.
