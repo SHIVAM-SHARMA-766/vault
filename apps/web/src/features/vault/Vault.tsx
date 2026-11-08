@@ -279,7 +279,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                        shared={!!(mode.collectionId ?? sharedOf(entries.find((e) => e.id === mode.id)))}
                        onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
-            <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []}
+            <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) ? undefined : state.vaultKey}
                          shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? { where: `${c.orgName} / ${c.name}`, permission: sh.permission, hidePasswords: sh.hidePasswords } : null })()}
                          shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: `${c.orgName} / ${c.name}` }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}

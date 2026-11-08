@@ -907,3 +907,10 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .admin-checklist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
 .admin-checklist .gs-mark { width: 18px; height: 18px; }
 .admin-checklist .gs-done > span:last-child { color: var(--muted); text-decoration: line-through; }
+
+/* Share links (D3) */
+.share-link { display: flex; gap: 8px; align-items: center; margin: 4px 0 8px; }
+.share-link input { flex: 1; min-width: 0; }
+.share-page { grid-template-columns: 1fr; }
+.share-card { max-width: 560px; }
+.share-card .fields { margin: 12px 0; }

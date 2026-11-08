@@ -6,17 +6,20 @@ import { useEffect, useState } from 'react'
 import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconAlert, IconArrowLeft, IconClock, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
+import { ShareLinkDialog } from './ShareLink.js'
 import type { Decrypted, Folder, Version } from './model.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
 
-export function EntryDetail({ entry, folders, issues, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, issues, vaultKey, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
+  /** Personal items only: lets the item be shared by link. */
+  vaultKey?: Uint8Array | undefined
   shared?: SharedInfo | null
   shareTargets?: { id: string; label: string }[]
   onShare?: (collectionId: string) => void
@@ -35,6 +38,7 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
   const [confirming, setConfirming] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [linking, setLinking] = useState(false)
   const [target, setTarget] = useState('')
   const readOnly = shared?.permission === 'view'
   const hidden = shared?.hidePasswords === true
@@ -67,6 +71,9 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
           )}
           {!shared && shareTargets.length ? (
             <button className={`btn btn-secondary btn-sm ${sharing ? 'btn-pressed' : ''}`} onClick={() => setSharing(!sharing)} aria-label="Share"><IconUsers size={15} /><span className="btn-label">Share</span></button>
+          ) : null}
+          {vaultKey && !shared ? (
+            <button className="btn btn-secondary btn-sm" onClick={() => setLinking(true)} disabled={entry.unreadable} aria-label="Share by link"><IconLink size={15} /><span className="btn-label">Link</span></button>
           ) : null}
           {onToggleArchive ? (
             <button className="btn btn-secondary btn-sm" onClick={onToggleArchive} disabled={entry.unreadable}
@@ -124,6 +131,8 @@ export function EntryDetail({ entry, folders, issues, shared = null, shareTarget
       {shared && !readOnly ? (
         <p className="muted small shared-note">Shared in {shared.where}. <button className="link" onClick={onUnshare}>Move to my vault</button></p>
       ) : null}
+
+      {linking && vaultKey ? <ShareLinkDialog entry={entry} vaultKey={vaultKey} onClose={() => setLinking(false)} /> : null}
 
       {showHistory ? <History entry={entry} load={loadHistory} onRestore={onRestore} /> : null}
 

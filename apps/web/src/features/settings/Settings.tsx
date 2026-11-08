@@ -20,6 +20,7 @@ import { Activity, Devices } from './Devices.js'
 import { Backups } from './Backups.js'
 import { DeleteAccount } from './DeleteAccount.js'
 import { Emergency } from './Emergency.js'
+import { ShareLinks } from './ShareLinks.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 
@@ -110,6 +111,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
           {tab === 'security' ? <>
             <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
             <Devices />
+            <ShareLinks vaultKey={state.vaultKey} />
             <Activity />
           </> : null}
 

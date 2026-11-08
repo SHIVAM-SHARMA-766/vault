@@ -110,6 +110,10 @@ const KIND: Record<string, string> = {
   'regenerate-2fa-recovery-codes': 'New two-factor recovery codes',
   'used-2fa-recovery-code': 'A two-factor recovery code was used',
   'revoke-session': 'A device was signed out',
+  'share-create': 'A share link was made',
+  'share-open': 'One of your share links was opened',
+  'emergency-request': 'Emergency access was requested',
+  'emergency-access': 'Emergency access was used',
 }
 
 export function Activity() {

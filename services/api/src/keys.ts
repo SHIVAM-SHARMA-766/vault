@@ -107,3 +107,12 @@ export const EMERGENCY_TRUST_PREFIX = 'EMTRUST#'
 /** The operator's index of organizations, in the SYSTEM partition. */
 export const systemOrgSk = (orgId: string) => `ORG#${orgId}`
 export const SYSTEM_ORG_PREFIX = 'ORG#'
+
+// ── Share links (decisions/0018) ──────────────────────────────────────────
+// The sealed copy lives in its own partition, so opening a link reads one
+// row without knowing whose it is; the owner keeps an index row.
+export const sharePk = (shareId: string) => `SHARE#${shareId}`
+export const SHARE_META_SK = 'META'
+export const SHARE_VIEWS_SK = 'VIEWS'
+export const userShareSk = (shareId: string) => `SHARE#${shareId}`
+export const USER_SHARE_PREFIX = 'SHARE#'

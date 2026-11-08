@@ -163,3 +163,6 @@ export const IconTicket = (p: P) => (
 export const IconWallet = (p: P) => (
   <Svg {...p}><path d="M4 7.5V18a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2 2 2 0 0 1 2-2h12v4" /><path d="M16.5 14.5h.01" /></Svg>
 )
+export const IconLink = (p: P) => (
+  <Svg {...p}><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6" /><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4L12 18.4" /></Svg>
+)

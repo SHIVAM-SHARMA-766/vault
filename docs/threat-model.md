@@ -244,6 +244,18 @@ destinations off (`PERSONAL_BACKUP_REMOTE=false`) or deliberately allow LAN dest
 wrapped vault key: an attacker with a copy faces the same offline PBKDF2 guessing as with the
 database (A2).
 
+### A17 — Share links: a link that leaks, or a server that ignores its limits
+
+A share link ([0018](../decisions/0018-share-links.md)) carries its own key in the `#fragment`,
+which browsers do not send to the server or in a referrer. The server stores only ciphertext,
+bound to the link id. **Anyone holding the whole link can open the item** while it lasts, so
+expiry and view limits are fixed choices (at most 30 days), the page warns the sender, the
+owner sees every open (with the address) in their activity, and a live link can be revoked.
+Opening takes a click, so a chat preview cannot spend a one-view link, and opens are rate
+limited per address. **The limits are enforced by the server, not by cryptography**: a hostile
+or compromised server keeps the ciphertext and can serve it again, but still cannot read it.
+Only the link holder has the key. Deleting the account removes every live copy.
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).
