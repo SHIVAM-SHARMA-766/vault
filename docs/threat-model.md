@@ -256,6 +256,16 @@ limited per address. **The limits are enforced by the server, not by cryptograph
 or compromised server keeps the ciphertext and can serve it again, but still cannot read it.
 Only the link holder has the key. Deleting the account removes every live copy.
 
+### A18 — The breach check's relay
+
+On request, the browser sends a 5-character SHA-1 prefix per password to `/api/breach/range`,
+and the server relays it to Pwned Passwords ([0019](../decisions/0019-breach-check.md)). A
+prefix matches hundreds of known passwords and responses are padded, so neither the server nor
+the breach service learns a password or a full hash. The service sees the server's address,
+not the person's. A hostile server could fake a range, hiding a breach or inventing one, but
+cannot learn passwords from it. Results are held in memory until lock. `BREACH_CHECK=false`
+removes the relay.
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).

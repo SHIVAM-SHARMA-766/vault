@@ -68,13 +68,23 @@ export function passwordStrength(password: string): Strength {
   return { score: 4, label: 'Excellent' }
 }
 
-export type Issue = 'weak' | 'reused' | 'old' | 'insecure'
+export type Issue = 'breached' | 'weak' | 'reused' | 'old' | 'insecure' | 'expired' | 'expiring'
+
+/** Issues about a password, which the score counts. Expiry is about the
+ *  item, shown beside them but not scored. */
+export const PASSWORD_ISSUES: readonly Issue[] = ['breached', 'weak', 'reused', 'old', 'insecure']
+
+/** How far ahead "expiring soon" looks. */
+export const EXPIRING_DAYS = 30
 
 export const ISSUES: readonly { issue: Issue; label: string; advice: string }[] = [
+  { issue: 'breached', label: 'Breached', advice: 'This password appears in known data breaches, so attackers try it first. Change it here and everywhere else it is used.' },
   { issue: 'weak', label: 'Weak', advice: 'Easy to guess. Replace it with a generated password.' },
   { issue: 'reused', label: 'Reused', advice: 'The same password is used elsewhere in this vault. One leak opens every site that shares it.' },
   { issue: 'old', label: 'Old', advice: 'Not changed in over a year.' },
   { issue: 'insecure', label: 'Unencrypted site', advice: 'The saved website uses http://, so the password crosses the network in the clear.' },
+  { issue: 'expired', label: 'Expired', advice: 'Its expiry date has passed. Renew it, or update the date.' },
+  { issue: 'expiring', label: 'Expiring soon', advice: `It expires within ${EXPIRING_DAYS} days.` },
 ]
 
 export interface HealthInput {
@@ -85,6 +95,8 @@ export interface HealthInput {
   /** When the password last changed, if known; otherwise updatedAt is used. */
   passwordChangedAt?: string | undefined
   updatedAt: string
+  /** Type-specific fields, read for expiry dates. */
+  fields?: Record<string, string> | undefined
 }
 
 export interface HealthReport {
@@ -92,14 +104,28 @@ export interface HealthReport {
   checked: number
   issues: Map<string, Issue[]>
   counts: Record<Issue, number>
-  /** 0–100: the share of checked entries with no issue. 100 for an empty vault. */
+  /** Entries with a password issue (expiry not counted). */
+  failing: number
+  /** 0–100: the share of checked entries with no password issue. 100 for an empty vault. */
   score: number
 }
 
 const OLD_DAYS = 365
 const PASSWORD_TYPES = new Set(['login', 'wifi', 'database', 'server'])
 
-export function analyse(entries: readonly HealthInput[], now = Date.now()): HealthReport {
+/** When an item stops being valid, as epoch ms at the end of its last day,
+ *  from a YYYY-MM-DD `expires` field or a card's MM/YY expiry. */
+export function expiryOf(e: Pick<HealthInput, 'type' | 'fields'>): number | null {
+  const date = e.fields?.['expires']
+  const iso = date ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(date) : null
+  if (iso) return Date.UTC(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]) + 1) - 1
+  const card = e.type === 'card' ? /^(\d{2})\/(\d{2})$/.exec(e.fields?.['expiry'] ?? '') : null
+  if (card && Number(card[1]) >= 1 && Number(card[1]) <= 12) return Date.UTC(2000 + Number(card[2]), Number(card[1]), 1) - 1
+  return null
+}
+
+/** `breached` holds the ids of entries whose password a breach check found. */
+export function analyse(entries: readonly HealthInput[], now = Date.now(), breached: ReadonlySet<string> = new Set()): HealthReport {
   // Types whose password a person chose and could reuse: not a card PIN or a
   // wallet password, which are checked by nobody else.
   const withPassword = entries.filter((e) => PASSWORD_TYPES.has(e.type) && e.password)
@@ -107,9 +133,11 @@ export function analyse(entries: readonly HealthInput[], now = Date.now()): Heal
   for (const e of withPassword) uses.set(e.password!, (uses.get(e.password!) ?? 0) + 1)
 
   const issues = new Map<string, Issue[]>()
-  const counts: Record<Issue, number> = { weak: 0, reused: 0, old: 0, insecure: 0 }
+  const counts: Record<Issue, number> = { breached: 0, weak: 0, reused: 0, old: 0, insecure: 0, expired: 0, expiring: 0 }
+  let failing = 0
   for (const e of withPassword) {
     const found: Issue[] = []
+    if (breached.has(e.id)) found.push('breached')
     if (passwordStrength(e.password!).score <= 1) found.push('weak')
     if ((uses.get(e.password!) ?? 0) > 1) found.push('reused')
     const changed = Date.parse(e.passwordChangedAt ?? e.updatedAt)
@@ -118,8 +146,29 @@ export function analyse(entries: readonly HealthInput[], now = Date.now()): Heal
     if (found.length) {
       issues.set(e.id, found)
       for (const i of found) counts[i]++
+      failing++
     }
   }
-  const score = withPassword.length ? Math.round(100 * (withPassword.length - issues.size) / withPassword.length) : 100
-  return { checked: withPassword.length, issues, counts, score }
+  for (const e of entries) {
+    const end = expiryOf(e)
+    if (end === null) continue
+    const issue: Issue | null = end < now ? 'expired' : end - now < EXPIRING_DAYS * 86_400_000 ? 'expiring' : null
+    if (!issue) continue
+    issues.set(e.id, [...(issues.get(e.id) ?? []), issue])
+    counts[issue]++
+  }
+  const score = withPassword.length ? Math.round(100 * (withPassword.length - failing) / withPassword.length) : 100
+  return { checked: withPassword.length, failing, issues, counts, score }
+}
+
+/** How many breaches a Pwned Passwords range response says a password's
+ *  SHA-1 suffix (the 35 hex characters after the 5 sent) appeared in. Padding
+ *  lines (count 0) and other suffixes count as zero. */
+export function breachCount(rangeBody: string, suffix: string): number {
+  const want = suffix.toUpperCase()
+  for (const line of rangeBody.split(/\r?\n/)) {
+    const [s, n] = line.trim().split(':')
+    if (s && s.toUpperCase() === want) return Number(n) || 0
+  }
+  return 0
 }

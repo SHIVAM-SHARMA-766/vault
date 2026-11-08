@@ -914,3 +914,7 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .share-page { grid-template-columns: 1fr; }
 .share-card { max-width: 560px; }
 .share-card .fields { margin: 12px 0; }
+
+/* Breach check (D5) */
+.breach-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
+.breach-line .hint { flex-basis: 100%; }

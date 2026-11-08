@@ -40,7 +40,7 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string } = {}): Harness {
+export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string } = {}): Harness {
   const store = new MemoryStore()
   const outbox: Message[] = []
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
@@ -61,6 +61,7 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
       personalBackup: { remote: options.remoteBackups ?? true, allowPrivate: options.allowPrivate ?? false },
       version: options.version ?? 'dev',
       updateCheck: { enabled: Boolean(options.updateUrl), url: options.updateUrl ?? '' },
+      breachCheck: { enabled: Boolean(options.breachUrl), url: options.breachUrl ?? '' },
       mail: { host: options.mail ? 'smtp.test' : '', port: 587, user: '', password: '', from: 'Vault <vault@vault.test>', signInNotices: true },
       db: {
         driver: 'mysql',

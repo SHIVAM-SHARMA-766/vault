@@ -102,7 +102,7 @@ export interface UpdateStatus {
   publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
 }
 export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
-export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean }
 /** Server-wide rules set by an administrator (G1, G3, G7). */
 export interface ShareRow {
   id: string
@@ -343,6 +343,7 @@ export const api = {
     revoke: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/shares/${encodeURIComponent(id)}`, { token }),
     open: (id: string) => request<{ blob: string; expiresAt: string; viewsLeft: number | null }>('POST', `/api/shares/${encodeURIComponent(id)}/open`, {}),
   },
+  breachRange: (token: string, prefix: string) => request<{ range: string }>('GET', `/api/breach/range/${prefix}`, { token }),
   prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),
   putPrefs: (token: string, blob: string) => request<{ updatedAt: string }>('PUT', '/api/prefs', { token, body: { blob } }),
   backups: {

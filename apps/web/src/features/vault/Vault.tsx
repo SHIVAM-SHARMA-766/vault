@@ -8,6 +8,8 @@ import { ISSUES, analyse, descendants, folderPath, matches, subtitle, typeSpec }
 
 import { Link } from '../../lib/router.js'
 import { api } from '../../lib/api.js'
+import { checkBreaches } from '../../lib/breach.js'
+import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconInbox, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
 import { Monogram, TYPES, typeInfo, useToast } from '../../ui/kit.js'
@@ -59,7 +61,27 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   // Archived items stay out of every list, count and check but the Archive.
   const active = useMemo(() => entries.filter((e) => !e.archived), [entries])
-  const health = useMemo(() => analyse(active.filter((e) => !e.unreadable)), [active])
+  // Breach results, by password, for this unlock only (lib/breach.ts).
+  const [breaches, setBreaches] = useState<Map<string, number> | null>(null)
+  const [breachProgress, setBreachProgress] = useState<string | null>(null)
+  const instance = useInstance()
+  const health = useMemo(() => {
+    const ok = active.filter((e) => !e.unreadable)
+    const hit = new Set(breaches ? ok.filter((e) => e.password && (breaches.get(e.password) ?? 0) > 0).map((e) => e.id) : [])
+    return analyse(ok, Date.now(), hit)
+  }, [active, breaches])
+
+  async function runBreachCheck() {
+    setBreachProgress('Checking…')
+    try {
+      const passwords = active.filter((e) => !e.unreadable && e.password && ['login', 'wifi', 'database', 'server'].includes(e.type)).map((e) => e.password!)
+      setBreaches(await checkBreaches(passwords, (done, total) => setBreachProgress(`Checking… ${done} of ${total}`)))
+      setBreachProgress(null)
+    } catch (err) {
+      setBreachProgress(null)
+      toast(err instanceof Error ? err.message : 'The breach check failed.', 'error')
+    }
+  }
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: active.length, favorites: 0, unfiled: 0, health: health.issues.size, archive: entries.length - active.length }
@@ -221,7 +243,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                 <strong>{health.score}</strong><span>/ 100</span>
               </div>
               <div className="health-text">
-                <span className="small">{health.checked ? `${health.checked - health.issues.size} of ${health.checked} passwords have no issues` : 'No passwords to check yet'}</span>
+                <span className="small">{health.checked ? `${health.checked - health.failing} of ${health.checked} passwords have no issues` : 'No passwords to check yet'}</span>
                 <div className="health-chips">
                   <button className={`chip ${!filter.issue ? 'chip-active' : ''}`} onClick={() => setFilter({ kind: 'health' })}>All issues</button>
                   {ISSUES.map(({ issue, label }) => (
@@ -229,6 +251,14 @@ export function Vault({ state }: { state: session.Unlocked }) {
                             onClick={() => setFilter({ kind: 'health', issue })}>{label} {health.counts[issue]}</button>
                   ))}
                 </div>
+                {instance?.breachCheck && health.checked ? (
+                  <div className="breach-line">
+                    {breachProgress ? <span className="small muted" role="status">{breachProgress}</span>
+                      : breaches ? <span className="small" role="status">{health.counts.breached ? `${health.counts.breached} ${health.counts.breached === 1 ? 'password was' : 'passwords were'} found in known breaches.` : 'No password was found in known breaches.'}</span>
+                      : <button className="btn btn-secondary btn-sm" onClick={() => void runBreachCheck()}>Check for breaches</button>}
+                    <span className="hint">Only the first 5 characters of each password&apos;s SHA-1 hash are sent, through this server, to Have I Been Pwned. Your passwords never leave this browser.</span>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -246,7 +276,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <div className="skeletons">{[0, 1, 2, 3, 4].map((i) => <div key={i} className="skeleton" />)}</div>
           ) : visible.length === 0 && filter.kind === 'health' ? (
             <div className="empty"><div className="empty-icon"><IconShield size={28} /></div><h3>{health.checked ? 'No issues' : 'Nothing to check'}</h3>
-              <p>{health.checked ? 'Every password here is unique, strong, recent and used over https.' : 'Logins and Wi-Fi passwords are checked once you add some.'}</p></div>
+              <p>{health.checked ? 'Every password here is unique, strong, recent and used over https, and nothing has expired or expires soon.' : 'Passwords of logins, Wi-Fi, databases and servers are checked once you add some; cards and documents for expiry.'}</p></div>
           ) : visible.length === 0 && filter.kind === 'archive' ? (
             <div className="empty"><div className="empty-icon"><IconInbox size={28} /></div><h3>Nothing archived</h3>
               <p>Archive an item you no longer use but want to keep: it leaves your lists, search and health check until you restore it.</p></div>

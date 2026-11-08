@@ -3170,6 +3170,45 @@
         }
       }
     },
+    "/api/breach/range/{prefix}": {
+      "get": {
+        "summary": "Pwned Passwords range for a 5-character SHA-1 prefix, relayed for the breach check",
+        "operationId": "getBreachRangePrefix",
+        "tags": [
+          "breach"
+        ],
+        "parameters": [
+          {
+            "name": "prefix",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/prefs": {
       "get": {
         "summary": "My sealed preferences",

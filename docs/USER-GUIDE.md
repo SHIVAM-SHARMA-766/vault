@@ -152,8 +152,14 @@ lists the ones with a problem:
 | **Reused** | The same password is on more than one item | Give each site its own |
 | **Old** | Not changed in over a year | Change it at the site, then here |
 | **Unencrypted site** | The saved website starts with `http://` | Use the site's `https://` address |
+| **Breached** | Found in known data breaches (after **Check for breaches**) | Change it everywhere it is used |
+| **Expired** / **Expiring soon** | A card, passport, licence, membership or API credential whose expiry date has passed, or falls within 30 days (not scored) | Renew it, or update the date |
 
-The check runs in your browser. Nothing about your passwords is sent anywhere to compute it.
+These checks run in your browser. **Check for breaches** is the one exception, and only when you
+press it: for each password it sends just the first 5 characters of its SHA-1 hash, through
+your server, to Have I Been Pwned. The answer covers hundreds of passwords, and your browser
+picks out the match itself. Results are forgotten when the vault locks. Your server's operator
+can turn this off.
 
 ## Import and export
 

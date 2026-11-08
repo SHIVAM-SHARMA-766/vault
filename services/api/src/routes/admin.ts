@@ -373,6 +373,7 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
     supportUrl: profile.supportUrl,
     registration: app.allowRegistration ? 'open' : registration,
     mail: Boolean(app.mailer),
+    breachCheck: app.config.breachCheck.enabled,
     // The weakest master password this server accepts (0–4), so the sign-up
     // form can say so before anyone types one.
     minPasswordScore: policy.minPasswordScore,
