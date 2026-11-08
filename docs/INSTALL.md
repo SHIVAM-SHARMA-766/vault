@@ -9,6 +9,7 @@ and keeping it healthy. Every setting is listed in [configuration.md](configurat
 
 - [Choose a profile](#choose-a-profile)
 - [Requirements](#requirements)
+- [Quick install](#quick-install)
 - [Install: personal](#install-personal)
 - [Install: business](#install-business)
 - [The first account](#the-first-account)
@@ -48,6 +49,30 @@ with a backup and a restore.
   - ports **80 and 443** reach it from the internet.
   For a server only reachable on your network, see
   [Behind your own reverse proxy](#behind-your-own-reverse-proxy).
+
+## Quick install
+
+On a Linux machine with Docker, one command asks for the address, writes the configuration
+with fresh secrets, starts Vault, and prints the link that creates your owner account:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh | sh
+```
+
+It asks three things: **personal or business**, the **address** people will use (a DNS name
+pointing at the machine, or `localhost` to try it out), and **where to install** (`/opt/vault`
+as root, `~/vault` otherwise). It prints your backup passphrase once — store a copy away from
+the machine. Read the script first if you prefer: it is short and commented.
+
+Without questions (cloud-init, automation):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh \
+  | VAULT_YES=1 VAULT_PROFILE=personal VAULT_HOSTNAME=vault.example.com sh
+```
+
+Running it again **upgrades**: it takes a backup of the running server, fetches the new
+version, keeps your `.env`, and restarts. The manual steps below do the same by hand.
 
 ## Install: personal
 
@@ -105,12 +130,26 @@ Open it and create your account; it becomes the **owner**, with the admin panel.
 recovery key it shows** — nobody, including you as the server's operator, can reset a
 forgotten master password.
 
+Then, in the admin panel's **Overview → Name and support**, give the server a name and a support
+address. Both are shown on the sign-in screen and the help page, and the support address becomes
+the Reply-To of every email Vault sends — so people who reply to an invitation or a sign-in
+notice reach you, not the no-reply sender.
+
 ## Inviting people
+
+The admin panel's Overview starts with **Finish setting up**: two-factor for you, a name and
+support address, mail, a recent backup, registration not open, and your first invitations. Each
+item ticks itself off.
 
 Admin panel → **Invitations** → who it is for, how long it lasts, and the role they start
 with. With [mail](#mail) set up, enter their address and they get the code and a link;
 otherwise copy the code to them yourself. Registration stays closed to everyone else
 (Overview → Registration: Closed / Invite only / Open).
+
+**Many people at once:** Invitations → *Invite many people at once…*, then paste one person per
+line (`email, name` — a spreadsheet column works). Everyone gets their own code by email, or,
+without mail, the codes are listed once for you to send. Invitations only work while
+registration is *Invite only* or *Open*; Vault warns if it is closed.
 
 ### Requests from people outside
 
@@ -173,6 +212,8 @@ Vault does not store email addresses — only keyed digests — so it mails some
 request carries their address, and does not keep it.
 
 ## Upgrading
+
+Run the installer again (it backs up first), or by hand:
 
 ```sh
 cd vault && git pull            # or change VAULT_IMAGE to the new version

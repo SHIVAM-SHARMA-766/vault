@@ -60,6 +60,12 @@ export interface Config {
     intervalHours: number
     s3?: { endpoint: string; region: string; bucket: string; accessKey: string; secretKey: string; prefix: string }
   }
+  /** Each person's own backups (decisions/0017). */
+  personalBackup: { remote: boolean; allowPrivate: boolean }
+  /** This build's version (the image sets it); "dev" otherwise. */
+  version: string
+  /** The admin panel's "a newer version is available". */
+  updateCheck: { enabled: boolean; url: string }
 }
 
 export interface Variable {
@@ -109,6 +115,11 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'BACKUP_S3_ACCESS_KEY', required: false, description: 'Access key id. Give it permission to write objects in that bucket and nothing else.' },
   { name: 'BACKUP_S3_SECRET_KEY', required: false, secret: true, description: 'Secret access key.' },
   { name: 'BACKUP_S3_PREFIX', required: false, default: 'vault/', description: 'Key prefix for backup objects.' },
+  { name: 'VAULT_VERSION', required: false, default: 'dev', description: 'This build\'s version. The container image sets it; leave it alone.' },
+  { name: 'UPDATE_CHECK', required: false, default: 'true', description: '"false" stops the admin panel checking for a newer release (at most every 12 hours, from the server).' },
+  { name: 'UPDATE_CHECK_URL', required: false, default: 'https://api.github.com/repos/SHIVAM-SHARMA-766/vault/releases/latest', description: 'Where to look for the latest release: a GitHub latest-release API address, for a fork or a mirror.' },
+  { name: 'PERSONAL_BACKUP_REMOTE', required: false, default: 'true', description: '"false" limits personal backups to copies kept on this server: no outbound connections to people\'s own S3 buckets or WebDAV folders.' },
+  { name: 'PERSONAL_BACKUP_ALLOW_PRIVATE', required: false, default: 'false', description: '"true" lets personal backups reach private and loopback addresses, and plain http — for a NAS on the LAN. Leave it off on a server reachable from the internet: it lets any account make this server connect inside your network.' },
 ]
 
 let cached: Config | null = null
@@ -171,6 +182,9 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },
     backup: { passphrase: '', dir: '', keep: 14, intervalHours: 24 },
     mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
+    personalBackup: { remote: get('PERSONAL_BACKUP_REMOTE') !== 'false', allowPrivate: get('PERSONAL_BACKUP_ALLOW_PRIVATE') === 'true' },
+    version: get('VAULT_VERSION') || 'dev',
+    updateCheck: { enabled: get('UPDATE_CHECK') !== 'false', url: get('UPDATE_CHECK_URL') },
   }
   const smtpHost = get('SMTP_HOST')
   if (smtpHost && !get('MAIL_FROM')) problems.push('MAIL_FROM is required with SMTP_HOST')

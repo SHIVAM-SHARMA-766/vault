@@ -300,12 +300,54 @@ multiplies the cost of every rough edge, so they are paid down first.
   `node scripts/bench.mjs`. Backup streaming not needed at intended sizes.
 - [x] Accessibility: every screen passes axe-core WCAG 2.1 AA in light and dark (contrast fixed),
   checked in CI.
-- [ ] Error messages, empty states and onboarding reviewed end to end.
+- [x] Error messages, empty states and onboarding reviewed end to end (E0, E3, E8 below).
 - [ ] Test gaps: ~~a live SMTP test~~ (done: STARTTLS delivery and plain-text refusal, in CI); real export files for import, an ARM board, a timed install — need the operator.
 - [ ] Documentation and screenshots refreshed.
 
 **Exit criteria:** no open 🔴 item in KNOWN-ISSUES without a recorded decision; every screen
 passes an accessibility check; the 5,000-item vault unlocks in under two seconds on a phone.
+
+#### Product backlog from the Zoho Vault / 1Password comparison (2026-11-07)
+
+The operator asked for everything below to be built one by one, each reviewed and tested. IDs
+are stable so work can be referred to by number. ✅ done · ⬜ open.
+
+**A. Handing Vault to one person**
+- ✅ A1 One-line installer: asks profile and address, writes `.env` with fresh secrets (mode 600), backs up before an upgrade, prints the setup link; CI installs through it
+- ⬜ A2 First-run wizard in the browser (mail, backups, registration, support contact)
+- ✅ A3 Server name and support contact set in the admin panel; shown on sign-in and help; Reply-To of every email
+- ⬜ A4 "Get Vault" page on the site
+- ✅ A5 Update checker in the admin panel (every 12 h from the server, `UPDATE_CHECK=false` turns it off)
+- ⬜ A6 No-domain mode (DuckDNS / Cloudflare Tunnel guide)
+
+**B. An organization on its own server**
+- ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column; group-on-invite and resend still open) · ⬜ B3 Branding (logo, colours)
+- ⬜ B4 Member onboarding · ⬜ B5 Helm chart and reverse-proxy guides · ⬜ B6 Metrics endpoint and dashboard
+- ⬜ B7 Audit export and SIEM stream · ⬜ B8 SSO (OIDC) · ⬜ B9 Offboarding with automatic rotation
+
+**C. Backups, per user (like Zoho)**
+- ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)
+- ⬜ C3 Google Drive / OneDrive · ⬜ C4 Encrypted offline copy that opens without the server
+- ✅ C5 Backup history, test restore, and restore through Import & export · ⬜ C6 Organization backups · ⬜ C7 Server backup settings in the admin UI
+
+**D. Features others have**
+- ⬜ D1 More item types · ⬜ D2 File attachments · ⬜ D3 Secure share links · ✅ D4 Archive
+- ⬜ D5 Breach check and a Watchtower-style dashboard · ⬜ D6 Expiry and rotation reminders · ⬜ D7 Access requests (check-out)
+- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ⬜ D9 Passkeys and security keys · ⬜ D10 The crypto decisions above
+- ⬜ D11 Share one item with one person · ⬜ D12 Notify on access to a sensitive item
+
+**E. UI/UX**
+- ✅ E0 Screen-by-screen audit (first pass: phone layout bug, registration-aware sign-in, org page order) · ✅ E1 Settings in sections (Account, Security, Preferences, Emergency) · ✅ E2 Theme switch
+- ✅ E3 Getting-started checklist beside a new vault · ⬜ E4 Command palette and shortcuts · ⬜ E5 Bulk actions · ⬜ E6 Richer list views
+- ⬜ E7 Phone layout pass · ✅ E8 Plain-language errors with a next step · ⬜ E9 Languages · ⬜ E10 Notification centre
+
+**F. Personal settings**
+- ✅ F1 Auto-lock time and lock-on-hide · ✅ F2 Clipboard clearing · ✅ F3 Generator defaults
+- ⬜ F4 Reveal and count options · ⬜ F5 Email alerts · ⬜ F6 Default folder · ⬜ F7 Date, time and language · ✅ F8 Delete my account
+
+**G. Administrator settings**
+- ⬜ G1 Session policy · ⬜ G2 IP allow-list · ⬜ G3 Password policy · ⬜ G4 Sharing policy
+- ⬜ G5 Rate limits in the UI · ⬜ G6 Editable email templates · ⬜ G7 Data retention
 
 ### Phase 4 — Browser extension
 

@@ -44,3 +44,22 @@ export async function s3Put(t: S3Target, key: string, body: Buffer, contentType 
     throw new Error(`S3 upload failed: ${res.status} ${text.match(/<Code>([^<]+)<\/Code>/)?.[1] ?? text}`)
   }
 }
+
+/** Something that sends one HTTP request: personal backups pass the guarded
+ *  sender from egress.ts, so a person's endpoint cannot reach the server's
+ *  own network. */
+export type Transport = (url: string, init: { method: string; headers: Record<string, string>; body?: Buffer }) => Promise<{ status: number; body: Buffer }>
+
+/** A signed PUT, GET or DELETE of one object, through the given transport. */
+export async function s3Object(t: S3Target, method: 'PUT' | 'GET' | 'DELETE', key: string, body: Buffer | undefined, send: Transport): Promise<Buffer> {
+  const url = new URL(`${t.endpoint.replace(/\/+$/, '')}/${encodeSegment(t.bucket)}/${key.split('/').map(encodeSegment).join('/')}`)
+  const extra: Record<string, string> = method === 'PUT' ? { 'content-type': 'application/json' } : {}
+  const headers = signV4(t, method, url, sha256(body ?? ''), extra, new Date())
+  const { host: _host, ...rest } = headers
+  const res = await send(url.toString(), { method, headers: rest, ...(body ? { body } : {}) })
+  if (res.status < 200 || res.status >= 300) {
+    const text = res.body.toString('utf8').slice(0, 300)
+    throw new Error(`S3 ${method} failed: ${res.status} ${text.match(/<Code>([^<]+)<\/Code>/)?.[1] ?? (text || '')}`.trim())
+  }
+  return res.body
+}

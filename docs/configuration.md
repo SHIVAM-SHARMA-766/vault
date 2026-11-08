@@ -75,6 +75,24 @@ into an empty database ([INSTALL.md](INSTALL.md#backups-and-restore)).
 | `BACKUP_S3_SECRET_KEY` | — | yes | Its secret |
 | `BACKUP_S3_PREFIX` | `vault/` | | Key prefix |
 
+### Version and updates
+
+| Variable | Default | Secret | Purpose |
+|---|---|---|---|
+| `VAULT_VERSION` | `dev` | | This build's version. The container image sets it |
+| `UPDATE_CHECK` | `true` | | `false` stops the admin panel checking for a newer release. When on, the server asks the release feed at most every 12 hours, with a generic client name and nothing about this install |
+| `UPDATE_CHECK_URL` | GitHub latest-release API for this project | | Another feed, for a fork or a mirror |
+
+### Personal backups
+
+Each person can back up their own vault on their own schedule (Settings → Backups;
+[decision 0017](../decisions/0017-personal-backups.md)). These settings bound what they may choose.
+
+| Variable | Default | Secret | Purpose |
+|---|---|---|---|
+| `PERSONAL_BACKUP_REMOTE` | `true` | | `false` keeps personal backups on this server only: no outbound connections to people's S3 buckets or WebDAV folders |
+| `PERSONAL_BACKUP_ALLOW_PRIVATE` | `false` | | `true` lets destinations be private or loopback addresses, over plain http — for a NAS on the LAN. Leave off on a server reachable from the internet |
+
 ## Where they live on the reference instance
 
 | File | Holds | Written by |

@@ -29,8 +29,10 @@
   color-scheme: light;
 }
 
+/* Dark: the system's choice unless the person picked light in Preferences,
+   or always when they picked dark (lib/prefs.ts sets data-theme). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0b0d12;
     --surface: #12151c;
     --surface-2: #181c25;
@@ -52,6 +54,28 @@
     --shadow-lg: 0 16px 40px rgb(0 0 0 / .5);
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #0b0d12;
+  --surface: #12151c;
+  --surface-2: #181c25;
+  --line: #232834;
+  --line-strong: #2f3543;
+  --text: #e8eaf0;
+  --text-2: #b4bac7;
+  --muted: #7d8596;
+  --accent: #7c74ff;
+  --accent-hover: #918aff;
+  --accent-soft: #1d1b3a;
+  --accent-text: #0b0a1f;
+  --danger: #f87171;
+  --danger-soft: #2a1416;
+  --warn: #fbbf24;
+  --warn-soft: #2a2111;
+  --ok: #4ade80;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / .5);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -127,7 +151,7 @@ button { font: inherit; color: inherit; }
 
 /* :where() keeps this at element specificity, so .search input and
    .input-wrap input can adjust padding without fighting it. */
-input:where(:not([type=checkbox]):not([type=range])), textarea, select {
+input:where(:not([type=checkbox]):not([type=range]):not([type=radio])), textarea, select {
   width: 100%; height: 40px; padding: 0 12px;
   background: var(--surface); color: var(--text);
   border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
@@ -287,7 +311,7 @@ input.mono { font-family: var(--mono); }
 }
 .sidebar-foot svg { flex: none; margin-top: 2px; }
 
-.list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--bg); }
+.list { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--line); background: var(--bg); }
 .list-head { display: flex; align-items: baseline; gap: 8px; padding: 18px 18px 10px; }
 .list-head h2 { font-size: 16px; font-weight: 650; }
 .list > .alert { margin: 0 12px 10px; }
@@ -388,6 +412,7 @@ input.mono { font-family: var(--mono); }
 .editor { display: flex; flex-direction: column; min-height: 100%; }
 .editor-body { flex: 1; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 14px; }
 .editor-foot {
   position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px;
   margin: 8px -32px -40px; padding: 14px 32px;
@@ -435,7 +460,7 @@ input.mono { font-family: var(--mono); }
   .back-sm { display: inline-flex; }
   .detail, .editor { padding: 16px 16px 32px; }
   .editor-foot { margin: 8px -16px -32px; padding: 12px 16px; }
-  .grid-2 { grid-template-columns: 1fr; }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
 }
 
 .generator-opts .check { align-items: center; }
@@ -470,6 +495,7 @@ input.mono { font-family: var(--mono); }
 .stat-note { font-size: 12.5px; color: var(--muted); }
 
 .admin-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.admin-card-wide { grid-column: 1 / -1; }
 .admin-card {
   display: flex; flex-direction: column; gap: 8px; padding: 18px;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow);
@@ -661,7 +687,7 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .settings-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; color: var(--accent); }
 .settings-card-head h2 { font-size: 15px; font-weight: 650; color: var(--text); }
 .settings-card > .muted.small { margin-bottom: 16px; line-height: 1.55; }
-.settings-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.settings-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 8px 0 0; }
 .facts dt { font-size: 12px; color: var(--muted); }
 .facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; }
@@ -828,3 +854,56 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .emergency-entry { border-top: 1px solid var(--line); padding: 8px 0; }
 .emergency-entry summary { cursor: pointer; font-weight: 600; }
 .rows-more { height: 1px; }
+
+/* The operator's support contact (admin → Overview → Name and support). */
+.support-contact { margin-top: 6px; }
+.support-contact a { color: var(--accent); }
+.auth-support { margin-top: 18px; text-align: center; }
+.my-fingerprint { margin-top: 12px; }
+.my-fingerprint .fingerprint { margin-top: 6px; }
+
+/* Settings → Backups */
+.dest-choice { border: 0; padding: 0; margin: 14px 0 6px; display: grid; gap: 8px; }
+.dest-choice legend { font-weight: 600; font-size: 13px; margin-bottom: 6px; padding: 0; }
+.radio { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
+.radio:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.radio:has(input:checked) .muted { color: var(--text-2); }
+.radio:has(input:disabled) { opacity: .6; cursor: not-allowed; }
+.radio input { margin-top: 3px; width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
+.radio > span { display: grid; gap: 2px; }
+.pill-warn { background: var(--warn-soft); color: var(--warn); }
+.test-restore { flex: 1 1 100%; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.backup-runs li { display: flex; gap: 8px; align-items: flex-start; }
+.alert-ok { color: var(--ok-text); }
+:root[data-theme="dark"] .alert-ok { color: var(--ok); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .alert-ok { color: var(--ok); } }
+
+/* The getting-started checklist beside a new vault. */
+.getting-started { max-width: 520px; margin: 56px auto; padding: 0 24px; }
+.getting-started h2 { font-size: 20px; }
+.getting-started > .muted { margin: 4px 0 18px; }
+.getting-started ol { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 14px; }
+.getting-started li { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.getting-started h3 { font-size: 14.5px; }
+.getting-started p { margin-top: 3px; }
+.gs-mark { flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 50%; border: 2px solid var(--line-strong); }
+.gs-done .gs-mark { border-color: var(--ok); background: var(--ok); color: var(--surface); }
+.gs-done h3 { color: var(--muted); text-decoration: line-through; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.generator-mode { grid-template-columns: 1fr 1fr; margin-bottom: 10px; }
+
+/* Admin → Invitations → Invite many */
+.bulk-invite { grid-column: 1 / -1; margin-bottom: 14px; }
+.bulk-invite h2 { font-size: 15px; margin-bottom: 10px; }
+.bulk-invite textarea { font-family: var(--mono); font-size: 13px; }
+.bulk-codes { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; font-size: 13px; }
+.bulk-codes li { display: flex; gap: 12px; justify-content: space-between; }
+
+/* Admin → Overview → Finish setting up */
+.admin-checklist { margin-bottom: 16px; }
+.admin-checklist .admin-card-head .muted { margin-left: auto; }
+.admin-checklist ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; }
+.admin-checklist li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; }
+.admin-checklist .gs-mark { width: 18px; height: 18px; }
+.admin-checklist .gs-done > span:last-child { color: var(--muted); text-decoration: line-through; }

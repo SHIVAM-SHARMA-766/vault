@@ -2,7 +2,8 @@
 # For one person, a family or a small team, on anything from a Raspberry Pi
 # to a cloud VM.
 #
-#   cp .env.example .env    # set VAULT_HOSTNAME (and ACME_EMAIL)
+#   cp .env.example .env    # set VAULT_HOSTNAME and BACKUP_PASSPHRASE
+#   (or run deploy/install.sh, which does all of this)
 #   docker compose up -d
 #   docker compose logs vault | grep -A6 "First-run setup"   # the owner link
 #

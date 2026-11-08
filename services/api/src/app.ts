@@ -4,17 +4,20 @@
 import { randomUUID } from 'node:crypto'
 
 import type { App } from './context.js'
-import { requireUser } from './context.js'
+import { requireLiveSession } from './context.js'
 import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './http.js'
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { Router } from './router.js'
 import { openapi } from './openapi.js'
+import * as account from './routes/account.js'
 import * as admin from './routes/admin.js'
 import type { Permission, Role } from './roles.js'
 import * as auth from './routes/auth.js'
+import * as backups from './routes/backups.js'
 import * as desk from './routes/desk.js'
 import * as emergency from './routes/emergency.js'
 import * as orgs from './routes/orgs.js'
+import * as prefs from './routes/prefs.js'
 import * as sessions from './routes/sessions.js'
 import * as site from './routes/site.js'
 import * as vault from './routes/vault.js'
@@ -22,6 +25,7 @@ import * as vault from './routes/vault.js'
 export function buildRouter(app: App): Router {
   const router = new Router()
 
+  router.get('/api/instance', () => admin.instanceRoute(app), 'This server\'s name, support contact and registration mode')
   router.get('/api/health', async () => json(200, { status: 'ok' }), 'Liveness check')
   router.get('/api/openapi.json', async () => json(200, openapi(router)), 'This document')
 
@@ -37,7 +41,7 @@ export function buildRouter(app: App): Router {
   const authed =
     (handler: (userId: string, event: LambdaEvent, param: string) => Promise<LambdaResponse>) =>
     Object.assign(async ({ event, param }: { event: LambdaEvent; param: string }) => {
-      const userId = requireUser(app, event)
+      const { userId } = await requireLiveSession(app, event)
       await enforce(app.store, 'api', userId, API_LIMIT, app.now())
       return handler(userId, event, param)
     }, { auth: 'access' as const })
@@ -46,7 +50,7 @@ export function buildRouter(app: App): Router {
   const authedP =
     (handler: (userId: string, event: LambdaEvent, params: string[]) => Promise<LambdaResponse>) =>
     Object.assign(async ({ event, params }: { event: LambdaEvent; params: string[] }) => {
-      const userId = requireUser(app, event)
+      const { userId } = await requireLiveSession(app, event)
       await enforce(app.store, 'api', userId, API_LIMIT, app.now())
       return handler(userId, event, params)
     }, { auth: 'access' as const })
@@ -56,6 +60,7 @@ export function buildRouter(app: App): Router {
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)), 'Replace the recovery key')
+  router.post('/api/account/delete', authed((u, e) => account.deleteOwnAccount(app, u, e)), 'Delete my own account (master password and second factor required)')
   router.put('/api/keys/identity', authed((u, e) => auth.setIdentity(app, u, e)), 'Store the identity key pair (once)')
   router.post('/api/auth/2fa/setup', authed((u, e) => auth.setupTwoFactor(app, u, e)), 'Start TOTP enrolment')
   router.post('/api/auth/2fa/enable', authed((u, e) => auth.enableTwoFactor(app, u, e)), 'Confirm TOTP enrolment; returns recovery codes')
@@ -128,6 +133,14 @@ export function buildRouter(app: App): Router {
   router.get('/api/vault/history/:id', authed((u, _e, id) => vault.getHistory(app, u, id)), 'Previous versions of an entry')
   router.post('/api/vault/import', authed((u, e) => vault.bulkImport(app, u, e)), 'Create many sealed items at once; never overwrites')
   router.post('/api/vault/history/:id', authed((u, e, id) => vault.addHistory(app, u, e, id)), 'Add a sealed previous version')
+  router.get('/api/prefs', authed((u) => prefs.getPrefs(app, u)), 'My sealed preferences')
+  router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
+  router.get('/api/backups', authed((u) => backups.getBackups(app, u)), 'My backup schedule, destination, runs and copies')
+  router.put('/api/backups/config', authed((u, e) => backups.putConfig(app, u, e)), 'Set my backup schedule and destination')
+  router.post('/api/backups/run', authed((u) => backups.runNow(app, u)), 'Back up now')
+  router.get('/api/backups/latest', authed((u) => backups.latest(app, u)), 'The newest backup, fetched back from its destination (for a test restore)')
+  router.get('/api/backups/copies/:id', authed((u, _e, id) => backups.getCopy(app, u, id)), 'Download a copy kept on the server')
+  router.delete('/api/backups/copies/:id', authed((u, _e, id) => backups.deleteCopy(app, u, id)), 'Delete a copy kept on the server')
   router.get('/api/activity', authed((u) => vault.getActivity(app, u)), 'Security events from the last ninety days')
 
   // The operator's routes. Same sign-in as everything else; each names the
@@ -149,14 +162,16 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)), 'Sign an account out everywhere')
   router.post('/api/admin/users/:id/reset-2fa', admined('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)), 'Turn off an account\'s two-factor sign-in')
   router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)), 'Delete an account and its vault')
-  router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)), 'Registration mode')
-  router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode')
+  router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)), 'Registration mode and instance profile')
+  router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode or the instance profile')
   router.get('/api/admin/invites', admined('invites.read', () => admin.listInvitesRoute(app)), 'Open invitations')
   router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)), 'Create an invitation code')
+  router.post('/api/admin/invites/bulk', admined('invites.write', (u, e, _p, r) => admin.bulkInviteRoute(app, u, r, e)), 'Invite many people at once')
   router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)), 'Withdraw an invitation')
   router.post('/api/admin/mail/test', admined('settings.write', (u, e) => admin.testMail(app, u, e)), 'Send a test email')
   router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
   router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
+  router.get('/api/admin/update', admined('overview.read', (_u, e) => admin.updateRoute(app, e)), 'This version, and whether a newer release is out')
   router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)), 'Staff audit log')
 
   router.get('/api/admin/desk', admined('desk.read', () => desk.queue(app)), 'The service desk queue')

@@ -67,7 +67,7 @@ import {
   touchLogin,
 } from '../system.js'
 
-interface Profile extends Item {
+export interface Profile extends Item {
   userId: string
   emailDigest: string
   kdf: KdfParams
@@ -136,7 +136,7 @@ async function issueSession(app: App, userId: string, event: LambdaEvent, family
 function sendSignInNotice(app: App, email: string, event: LambdaEvent, recovery: boolean): void {
   if (!app.mailer) return
   const at = new Date(app.now()).toUTCString()
-  void notify(app.mailer, { to: email, ...signInNotice(app.config.origin, describeDevice(event.requestContext.http.userAgent), event.requestContext.http.sourceIp, at, recovery) })
+  void notify(app, { to: email, ...signInNotice(app.config.origin, describeDevice(event.requestContext.http.userAgent), event.requestContext.http.sourceIp, at, recovery) })
 }
 
 export async function revokeAllSessions(app: App, userId: string): Promise<void> {
@@ -523,7 +523,7 @@ async function claimOnce(app: App, userId: string, sk: string, ttlSeconds: numbe
   }
 }
 
-async function requireSecondFactor(
+export async function requireSecondFactor(
   app: App, profile: Profile, body: Record<string, unknown>, event: LambdaEvent,
 ): Promise<void> {
   if (!profile.totp) return
@@ -548,7 +548,7 @@ async function requireSecondFactor(
   await recordActivity(app, profile.userId, 'used-2fa-recovery-code', event)
 }
 
-async function profileWithPassword(app: App, userId: string, body: Record<string, unknown>): Promise<Profile> {
+export async function profileWithPassword(app: App, userId: string, body: Record<string, unknown>): Promise<Profile> {
   const currentAuthKey = requireBase64UrlBytes(body['currentAuthKey'], 32, 'currentAuthKey')
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()

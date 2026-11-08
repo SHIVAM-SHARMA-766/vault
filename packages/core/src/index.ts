@@ -37,3 +37,28 @@ export {
 } from './import.js'
 export { type ExportEntry, toCsv } from './export.js'
 export { ISSUES, type HealthInput, type HealthReport, type Issue, type Strength, analyse, passwordStrength } from './health.js'
+export {
+  CLIPBOARD_CHOICES,
+  DEFAULT_PREFS,
+  GENERATOR_MAX,
+  GENERATOR_MIN,
+  LOCK_CHOICES,
+  SEPARATORS,
+  THEMES,
+  type GeneratorPrefs,
+  type Prefs,
+  type Theme,
+  describeMinutes,
+  describeSeconds,
+  effectiveLockMinutes,
+  normalizePrefs,
+} from './prefs.js'
+export { type Failure, friendlyError } from './errors.js'
+export {
+  BITS_PER_WORD,
+  PASSPHRASE_MAX_WORDS,
+  PASSPHRASE_MIN_WORDS,
+  type PassphraseOptions,
+  generatePassphrase,
+  passphraseBits,
+} from './passphrase.js'

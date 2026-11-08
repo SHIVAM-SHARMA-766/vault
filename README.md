@@ -195,11 +195,11 @@ The full design: [ARCHITECTURE.md](ARCHITECTURE.md) and the
 
 ## Run it on your own server
 
+One command on a Linux machine with Docker. It asks for the address, generates the secrets,
+starts Vault and prints the link that creates your owner account. Run it again to upgrade.
+
 ```sh
-git clone https://github.com/SHIVAM-SHARMA-766/vault.git && cd vault/deploy/personal
-cp .env.example .env          # set VAULT_HOSTNAME and BACKUP_PASSPHRASE
-docker compose up -d
-docker compose logs vault | grep -A6 "First-run setup"   # open the link, create the owner
+curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh | sh
 ```
 
 | | Personal | Business |

@@ -5,6 +5,7 @@ import { createAccount, deriveRecoveryProof } from '@vault/crypto'
 import { newIdentity } from '../../lib/identity.js'
 
 import { ApiError, api } from '../../lib/api.js'
+import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconArrowLeft } from '../../ui/icons.js'
 import { Check, CopyButton, PasswordInput, StrengthMeter } from '../../ui/kit.js'
@@ -22,6 +23,8 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
   const [recoveryKey, setRecoveryKey] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
   const [inviteCode, setInviteCode] = useState((setupCode || invited).toUpperCase())
+  const mode = useInstance()?.registration
+  const [showInvite, setShowInvite] = useState(false)
   const owner = setupCode !== ''
 
   async function submit(event: React.FormEvent) {
@@ -130,12 +133,17 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
         back in — the recovery key issued next is the only other way.
       </p>
 
-      {owner ? null : <div className="field">
+      {/* An open server needs no code; any other needs one (GET /api/instance). */}
+      {!owner && mode === 'open' && !invited && !showInvite ? (
+        <p className="hint"><button type="button" className="link" onClick={() => setShowInvite(true)}>I have an invitation code</button></p>
+      ) : null}
+      {owner || (mode === 'open' && !invited && !showInvite) ? null : <div className="field">
         <label htmlFor="r-invite">Invitation code</label>
-        <input id="r-invite" autoComplete="off" spellCheck={false} className="mono"
+        <input id="r-invite" autoComplete="off" spellCheck={false} className="mono" required={mode !== undefined && mode !== 'open'}
                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
                value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} />
-        <p className="hint">Accounts are opened by invitation. Leave blank only if registration is open.</p>
+        <p className="hint">{mode === undefined ? 'Accounts are opened by invitation. Leave blank only if registration is open.'
+          : 'This server opens accounts by invitation. It is in the email you were sent, or ask the person who runs it.'}</p>
       </div>}
 
       <div className="field">

@@ -22,6 +22,8 @@ export interface Session {
   expiresIn: number
 }
 
+import { friendlyError } from '@vault/core'
+
 export class ApiError extends Error {
   readonly status: number
   readonly code: string
@@ -59,7 +61,7 @@ async function request<T>(
       cache: 'no-store',
     })
   } catch {
-    throw new ApiError(0, 'network', 'Could not reach the server.')
+    throw new ApiError(0, 'network', friendlyError({ status: 0, code: 'network', message: '' }))
   }
 
   const text = await response.text()
@@ -68,19 +70,24 @@ async function request<T>(
     try {
       payload = JSON.parse(text) as Record<string, unknown>
     } catch {
-      throw new ApiError(response.status, 'malformed', 'The server sent something unreadable.')
+      // Usually a proxy's error page while the server restarts.
+      throw new ApiError(response.status, 'malformed', friendlyError({ status: response.status, code: 'malformed', message: '' }))
     }
   }
 
   if (!response.ok) {
     const retryAfter = Number(response.headers.get('retry-after') ?? '')
+    const code = String(payload['error'] ?? 'error')
     const error = new ApiError(
       response.status,
-      String(payload['error'] ?? 'error'),
-      // A server fault carries a request id that matches the server's log;
-      // quoting it is how a self-hoster finds the line.
-      String(payload['message'] ?? 'Something went wrong.')
-        + (response.status >= 500 && typeof payload['requestId'] === 'string' ? ` (reference ${String(payload['requestId']).slice(0, 8)})` : ''),
+      code,
+      // Plain words and a next step (packages/core errors.ts). A server fault
+      // keeps its request id, which matches the server's log.
+      friendlyError({
+        status: response.status, code, message: String(payload['message'] ?? ''),
+        retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined,
+        requestId: typeof payload['requestId'] === 'string' ? payload['requestId'] : undefined,
+      }),
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
     if (Array.isArray(payload['details'])) error.details = payload['details'] as { path: string; message: string }[]
@@ -88,6 +95,34 @@ async function request<T>(
   }
 
   return payload as T
+}
+
+export interface UpdateStatus {
+  enabled: boolean; current: string; latest: string | null; newer: boolean; url: string | null
+  publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
+}
+export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean }
+
+export type BackupFrequency = 'off' | 'daily' | 'weekly' | 'monthly'
+export interface BackupSchedule { frequency: BackupFrequency; hour: number; weekday: number; tzOffsetMinutes: number; keep: number }
+export type BackupDestination =
+  | { type: 'server' }
+  | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; hasSecret: true }
+  | { type: 'webdav'; url: string; username: string; hasSecret: true }
+export type BackupDestinationInput =
+  | { type: 'server' }
+  | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; secretKey?: string }
+  | { type: 'webdav'; url: string; username: string; password?: string }
+export interface BackupRun { id: string; at: string; ok: boolean; destination: string; name: string; bytes: number; entries: number; reason: 'scheduled' | 'manual'; error?: string }
+export interface BackupState {
+  schedule: BackupSchedule
+  destination: BackupDestination
+  nextRunAt: string | null
+  runs: BackupRun[]
+  copies: { id: string; name: string; at: string; bytes: number }[]
+  remoteAllowed: boolean
+  serverKeepMax: number
 }
 
 export const api = {
@@ -278,6 +313,21 @@ export const api = {
     request<{ ok: true }>('PUT', `/api/sessions/${encodeURIComponent(id)}/name`, { token, body: { name } }),
   revokeSession: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`, { token }),
+  deleteAccount: (token: string, body: { currentAuthKey: string; confirm: 'DELETE'; totpCode?: string }) =>
+    request<{ ok: true }>('POST', '/api/account/delete', { token, body }),
+  /** What anyone may know about this server before signing in. */
+  instance: () => request<Instance>('GET', '/api/instance'),
+  prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),
+  putPrefs: (token: string, blob: string) => request<{ updatedAt: string }>('PUT', '/api/prefs', { token, body: { blob } }),
+  backups: {
+    get: (token: string) => request<BackupState>('GET', '/api/backups', { token }),
+    save: (token: string, body: { schedule: BackupSchedule; destination: BackupDestinationInput }) =>
+      request<{ nextRunAt: string | null }>('PUT', '/api/backups/config', { token, body }),
+    run: (token: string) => request<{ run: BackupRun }>('POST', '/api/backups/run', { token }),
+    latest: (token: string) => request<{ name: string; body: string }>('GET', '/api/backups/latest', { token }),
+    copy: (token: string, id: string) => request<{ name: string; body: string }>('GET', `/api/backups/copies/${encodeURIComponent(id)}`, { token }),
+    deleteCopy: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/backups/copies/${encodeURIComponent(id)}`, { token }),
+  },
   activity: (token: string) =>
     request<{ events: { kind: string; at: string; ip: string; device: string }[] }>('GET', '/api/activity', { token }),
 
@@ -309,12 +359,17 @@ export const api = {
     deleteUser: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/delete`, { token, body: { confirm: id } }),
     settings: (token: string) =>
-      request<{ registration: RegistrationMode; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+      request<{ registration: RegistrationMode; profile: InstanceProfile; updatedAt?: string; registrationForcedOpen: boolean }>('GET', '/api/admin/settings', { token }),
+    update: (token: string, refresh = false) => request<UpdateStatus>('GET', `/api/admin/update${refresh ? '?refresh=1' : ''}`, { token }),
+    setProfile: (token: string, profile: InstanceProfile) =>
+      request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { profile } }),
     setRegistration: (token: string, registration: RegistrationMode) =>
       request<{ ok: true }>('PUT', '/api/admin/settings', { token, body: { registration } }),
     invites: (token: string) => request<{ invites: AdminInvite[] }>('GET', '/api/admin/invites', { token }),
+    bulkInvite: (token: string, people: { email: string; name?: string }[], days: number, role: Role) =>
+      request<{ results: { email: string; label: string; emailed: boolean; expiresAt: string; code?: string }[]; mail: boolean; warning?: string }>('POST', '/api/admin/invites/bulk', { token, body: { people, days, role } }),
     createInvite: (token: string, label: string, days: number, role: Role = 'user', email = '') =>
-      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role } }>(
+      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string; role: Role }; warning?: string }>(
         'POST', '/api/admin/invites', { token, body: { label, days, role, ...(email ? { email } : {}) } },
       ),
     orgs: (token: string) => request<{ orgs: AdminOrg[] }>('GET', '/api/admin/orgs', { token }),
@@ -418,6 +473,7 @@ export interface AdminOverview {
   lastBackup: { at: string | null; object: string | null; bytes: number | null } | null
   mail: boolean
   openTickets: number
+  version: string
   serverTime: string
   uptimeSeconds: number
 }

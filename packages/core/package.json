@@ -10,6 +10,10 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
+    },
+    "./words": {
+      "types": "./dist/src/words.d.ts",
+      "default": "./dist/src/words.js"
     }
   },
   "scripts": {

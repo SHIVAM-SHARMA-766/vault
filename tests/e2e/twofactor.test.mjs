@@ -17,7 +17,7 @@ test('turn on two-factor, then sign in with a code and with a recovery code', as
   try {
     const page = await s.person()
     await s.register(page, 'grace@example.test')
-    await s.menu(page, 'Account settings')
+    await s.settings(page, 'Security')
     await page.getByRole('button', { name: 'Turn on' }).click()
     await page.fill('#tf-password', PASSWORD)
     await page.getByRole('button', { name: 'Continue' }).click()

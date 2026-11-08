@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- include:head -->
+  <title>{{get.seo.title}}</title>
+  <meta name="description" content="{{get.seo.description}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{get.seo.title}}">
+  <meta property="og:description" content="{{get.seo.description}}">
+  <meta property="og:image" content="{{absimg get.seo.image}}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+<!-- page:get -->
+<!-- include:header -->
+
+  <main id="main">
+    <section class="page-hero">
+      <div class="wrap">
+        <span class="kicker">{{get.hero.kicker}}</span>
+        <h1>{{get.hero.title}}</h1>
+        <p>{{get.hero.lede}}</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap prose">
+        <h2>{{get.install.title}}</h2>
+        <p>{{get.install.text}}</p>
+        <pre class="diagram install-cmd"><code>{{get.install.command}}</code></pre>
+        <p class="muted">{{get.install.note}} <a href="https://github.com/SHIVAM-SHARMA-766/vault/blob/main/docs/INSTALL.md">Full install guide →</a></p>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap">
+        <div class="section-head"><h2>{{get.steps.title}}</h2></div>
+        <div class="steps">
+{{#each get.steps.items}}
+          <article class="step">
+            <h3>{{.title}}</h3>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head"><h2>{{get.profiles.title}}</h2></div>
+        <div class="compare">
+{{#each get.profiles.items}}
+          <article class="card">
+            <h3>{{.title}}</h3>
+            <p class="muted">{{.for}}</p>
+            <p>{{.text}}</p>
+          </article>
+{{/each}}
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt">
+      <div class="wrap prose">
+        <h2>{{get.needs.title}}</h2>
+        <ul class="ticks">
+{{#each get.needs.items}}
+          <li>{{.text}}</li>
+{{/each}}
+        </ul>
+      </div>
+    </section>
+
+<!-- include:cta -->
+  </main>
+
+<!-- include:footer -->
+</body>
+</html>

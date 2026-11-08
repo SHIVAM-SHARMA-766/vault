@@ -59,6 +59,10 @@ master password.
 
 ## The vault
 
+**Get started.** A new vault shows a short checklist beside the list: add or import your first
+items, turn on two-factor sign-in, set up backups, and keep your recovery key safe. Steps tick
+themselves off as you do them; **Hide this** puts it away.
+
 <img src="images/vault.png" alt="The vault with GitHub open: username, password, website, a live one-time code and a hidden custom field" width="820">
 
 | Area | What it does |
@@ -96,6 +100,15 @@ fields** for anything else, and mark them hidden to mask them like a password.
 Copying a password clears the clipboard after a short time. **Favorite** an item with the
 star to pin it under Favorites.
 </details>
+
+**Archive.** An item you no longer use but want to keep: open it and choose **Archive**. It
+leaves your lists, counts, search and the health check, and waits under **Archive** in the
+sidebar until you **Restore** it. (Shared items cannot be archived — that would hide them from
+everyone.)
+
+**Passwords or passphrases.** The generator makes either. A passphrase is several random words
+from the EFF list (six words ≈ 78 bits), easier to type on a phone or read out. Pick which one it
+offers first, and its shape, in Settings → Preferences.
 
 ## Folders and history
 
@@ -166,14 +179,61 @@ your passwords in plain text.
 
 ## Account settings
 
-<img src="images/settings.png" alt="Account settings: account details, master password, two-factor sign-in" width="820">
+Account menu → **Account settings**. It has four sections, each with its own address, so a
+link such as `/app/settings/security` opens the right one after you unlock.
 
-| Section | What it does |
+<img src="images/settings.png" alt="Account settings, Security section: two-factor sign-in and signed-in devices" width="820">
+
+| Section | What is in it |
 |---|---|
-| Master password | Change it. Other devices are signed out. Your items are not re-encrypted, so it is instant |
-| Two-factor sign-in | Turn on TOTP with any authenticator app; you get ten single-use recovery codes |
-| Recovery key | Issue a new one; the old one stops working at once |
-| Identity key | A fingerprint to compare with someone before sharing with them |
+| **Account** | Your details; delete your account (master password, two-factor code and a typed DELETE; export first); change the master password (other devices are signed out, nothing is re-encrypted, so it is instant); issue a new recovery key; your identity-key fingerprint |
+| **Security** | Two-factor sign-in (TOTP with any authenticator app, plus ten single-use recovery codes); signed-in devices; security activity |
+| **Preferences** | Theme, auto-lock, clipboard clearing and the password generator's defaults — see below |
+| **Backups** | Your own encrypted backups, on your schedule, here or in your own storage — see below |
+| **Emergency access** | People you trust to reach your vault if something happens to you |
+
+### Preferences
+
+<img src="images/preferences.png" alt="Preferences: theme, auto-lock, clipboard and generator defaults" width="820">
+
+| Setting | Choices | Default |
+|---|---|---|
+| Appearance | Match system · Light · Dark | Match system |
+| Auto-lock | 1, 5, 15, 30 minutes, 1 or 4 hours idle | 15 minutes |
+| Lock when I switch tab or window | on / off | off |
+| Clear copied secrets after | 10, 30 seconds, 1 or 2 minutes, never | 30 seconds |
+| Password generator | default length (8–64) and character sets | 20, all sets |
+
+Preferences are **encrypted with your vault key** and saved on the server, so they follow you to
+every device, and the server cannot read them. An organization can set a shorter auto-lock than
+yours; when it does, the section says so.
+
+### Backups
+
+<img src="images/backups.png" alt="Backups: status, schedule and destination, copies and history" width="820">
+
+Settings → **Backups** keeps your own copies of your vault, independent of the server's backups.
+
+- **How often**: off (only **Back up now**), every day, every week on a day you pick, or every
+  month on the 1st — at an hour you choose, in your time zone.
+- **Where**: **on this server** (download any copy; protects against deleting something by
+  mistake, not against losing the server), **your S3-compatible bucket** (AWS, R2, B2, Wasabi,
+  MinIO…) or **your WebDAV folder** (Nextcloud, ownCloud, a NAS).
+- **Copies to keep**: older ones are deleted at the destination. At most 10 are kept on the server.
+- **History** lists every run and, when one fails, why.
+- **Test restore** fetches the newest copy and opens it in your browser, proving it can be
+  restored, without importing anything.
+
+Each backup is your vault exactly as the server holds it: encrypted. It opens only with the
+**master password you had when it was made**, or the recovery key from that time. If you change
+your master password, older backups still need the old one.
+
+**To restore**, download a copy (or take it from your bucket or folder), then Import & export →
+choose the file → enter that master password. Items are added to your vault; nothing is
+replaced. Duplicates are skipped if you leave that option on.
+
+For S3 or WebDAV, the server keeps the secret key or password encrypted so it can back up while
+you are away. Create one that can write only to that bucket or folder.
 
 ## Devices and activity
 
@@ -182,8 +242,8 @@ your passwords in plain text.
 - **Signed-in devices** lists every browser signed in to your account, with the address it
   signed in from and when it was last active. Rename one (✎) to recognise it, or **Sign out
   device**. **Sign out everywhere** signs out all of them, this one included.
-- **Locking** — the Lock button, 15 minutes idle, or closing the tab — signs this browser out
-  on the server too.
+- **Locking** — the Lock button, the auto-lock (15 minutes idle unless you change it in
+  Preferences), or closing the tab — signs this browser out on the server too.
 - **Security activity** shows sign-ins and account changes from the last 90 days.
 
 If you see a device you do not recognise: sign it out, then change your master password.
@@ -228,7 +288,8 @@ not meet them is told why and cannot open its collections until they do.
 ### Emergency access
 
 Settings → **Emergency access**: choose someone you trust and a waiting period. After they
-accept, confirm their fingerprint. If they ever request access, you will see it in Settings —
+accept, confirm their fingerprint (they see their own fingerprint on the same page, ready to read
+out to you). If they ever request access, you will see it in this section —
 **Reject** it, or **Approve now**; if you do nothing, they get a read-only view of your vault
 when the waiting period ends. Use this for the person who should be able to get in if something
 happens to you.
@@ -249,6 +310,9 @@ happens to you.
 
 Your email address is kept only until the request is closed, then erased.
 
+If the people running the server have set a support address, it is shown under the sign-in
+form and on the Help & support page, and replies to any email Vault sends reach them.
+
 **Signed in?** Account menu → **Help & support** → **New request**. Choose what it is about,
 describe it, and optionally have replies emailed to you. The conversation stays on the page:
 reply there, or close the request when you are done. Staff can read what you write but never
@@ -256,7 +320,8 @@ your vault — **never put a password, recovery key or code in a request.**
 
 ## On a phone, and in dark mode
 
-The same app adapts to a phone and follows your system's light or dark setting.
+The same app adapts to a phone. It follows your system's light or dark setting unless you pick
+one in Settings → Preferences; on a phone, the settings sections are the chips along the top.
 
 <p>
 <img src="images/mobile-list.png" alt="The vault on a phone" width="260">

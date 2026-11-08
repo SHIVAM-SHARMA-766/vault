@@ -3,13 +3,14 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { passwordStrength } from '@vault/core'
+import { PASSPHRASE_MAX_WORDS, PASSPHRASE_MIN_WORDS, describeSeconds, generatePassphrase, passphraseBits, passwordStrength } from '@vault/core'
 import type { EntryType } from '@vault/crypto'
 
 import {
   IconAlert, IconBank, IconCard, IconCheck, IconCopy, IconEye, IconEyeOff, IconKey,
   IconNote, IconRefresh, IconTerminal, IconUser, IconWifi,
 } from './icons.js'
+import * as prefs from '../lib/prefs.js'
 
 // ── Toasts ────────────────────────────────────────────────────────────────
 
@@ -45,15 +46,16 @@ export const useToast = () => useContext(ToastContext)
 
 // ── Clipboard ─────────────────────────────────────────────────────────────
 
-/** How long a copied secret stays on the clipboard. Clearing is best effort:
- *  it only works while this tab is focused, and only if the clipboard still
- *  holds what was put there. */
-const CLIPBOARD_CLEAR_MS = 30_000
+/** How long a copied secret stays on the clipboard is a preference (thirty
+ *  seconds unless changed). Clearing is best effort: it only works while this
+ *  tab is focused, and only if the clipboard still holds what was put there. */
 let clearTimer: ReturnType<typeof setTimeout> | null = null
 
 async function copySecret(value: string): Promise<void> {
   await navigator.clipboard.writeText(value)
   if (clearTimer) clearTimeout(clearTimer)
+  const seconds = prefs.get().clipboardSeconds
+  if (!seconds) return
   clearTimer = setTimeout(async () => {
     try {
       if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText('')
@@ -61,7 +63,7 @@ async function copySecret(value: string): Promise<void> {
       // Reading the clipboard needs focus and permission; without them the
       // value stays, which is no worse than not trying.
     }
-  }, CLIPBOARD_CLEAR_MS)
+  }, seconds * 1000)
 }
 
 export function CopyButton({ value, label }: { value: string | undefined; label: string }) {
@@ -76,7 +78,8 @@ export function CopyButton({ value, label }: { value: string | undefined; label:
                 await copySecret(value)
                 setDone(true)
                 setTimeout(() => setDone(false), 1200)
-                toast(`${label} copied — clears in 30 seconds`)
+                const seconds = prefs.get().clipboardSeconds
+                toast(seconds ? `${label} copied — clears in ${describeSeconds(seconds)}` : `${label} copied`)
               } catch {
                 toast('The browser refused clipboard access', 'error')
               }
@@ -150,35 +153,65 @@ export function generatePassword(length: number, opts: { upper: boolean; digits:
   return out
 }
 
+/** The EFF list is 60 KB; it loads the first time someone asks for a passphrase. */
+let wordsPromise: Promise<readonly string[]> | null = null
+const loadWords = () => (wordsPromise ??= import('@vault/core/words').then((m) => m.WORDS))
+
 export function Generator({ onUse }: { onUse: (password: string) => void }) {
-  const [length, setLength] = useState(20)
-  const [upper, setUpper] = useState(true)
-  const [digits, setDigits] = useState(true)
-  const [symbols, setSymbols] = useState(true)
+  // Starts from the account's generator defaults (Settings → Preferences).
+  const defaults = prefs.get().generator
+  const [mode, setMode] = useState(defaults.mode)
+  const [length, setLength] = useState(defaults.length)
+  const [upper, setUpper] = useState(defaults.upper)
+  const [digits, setDigits] = useState(defaults.digits)
+  const [symbols, setSymbols] = useState(defaults.symbols)
+  const [words, setWords] = useState(defaults.words)
+  const [capitalize, setCapitalize] = useState(defaults.capitalize)
+  const [digit, setDigit] = useState(defaults.digit)
   const [value, setValue] = useState('')
 
-  const regenerate = useCallback(() => setValue(generatePassword(length, { upper, digits, symbols })),
-    [length, upper, digits, symbols])
+  const regenerate = useCallback(() => {
+    if (mode === 'password') { setValue(generatePassword(length, { upper, digits, symbols })); return }
+    void loadWords().then((list) => setValue(generatePassphrase(list, { words, separator: defaults.separator, capitalize, digit })))
+  }, [mode, length, upper, digits, symbols, words, capitalize, digit, defaults.separator])
   useEffect(regenerate, [regenerate])
 
   return (
     <div className="generator">
+      <div className="segmented generator-mode" role="radiogroup" aria-label="Kind">
+        {(['password', 'passphrase'] as const).map((m) => (
+          <button key={m} type="button" role="radio" aria-checked={mode === m} className={mode === m ? 'seg-active' : ''} onClick={() => setMode(m)}>
+            {m === 'password' ? 'Password' : 'Passphrase'}
+          </button>
+        ))}
+      </div>
       <div className="generator-out">
         <code>{value}</code>
         <button type="button" className="icon-btn" onClick={regenerate} title="Regenerate" aria-label="Regenerate">
           <IconRefresh size={16} />
         </button>
       </div>
-      <div className="generator-opts">
-        <label className="range">
-          <span>Length <strong>{length}</strong></span>
-          <input type="range" min={8} max={64} value={length} onChange={(e) => setLength(Number(e.target.value))} />
-        </label>
-        <Check checked={upper} onChange={setUpper}>A–Z</Check>
-        <Check checked={digits} onChange={setDigits}>0–9</Check>
-        <Check checked={symbols} onChange={setSymbols}>!@#</Check>
-      </div>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onUse(value)}>Use this password</button>
+      {mode === 'password' ? (
+        <div className="generator-opts">
+          <label className="range">
+            <span>Length <strong>{length}</strong></span>
+            <input type="range" min={8} max={64} value={length} onChange={(e) => setLength(Number(e.target.value))} />
+          </label>
+          <Check checked={upper} onChange={setUpper}>A–Z</Check>
+          <Check checked={digits} onChange={setDigits}>0–9</Check>
+          <Check checked={symbols} onChange={setSymbols}>!@#</Check>
+        </div>
+      ) : (
+        <div className="generator-opts">
+          <label className="range">
+            <span>Words <strong>{words}</strong> <span className="muted">· about {Math.round(passphraseBits({ words, digit }))} bits</span></span>
+            <input type="range" min={PASSPHRASE_MIN_WORDS} max={PASSPHRASE_MAX_WORDS} value={words} onChange={(e) => setWords(Number(e.target.value))} />
+          </label>
+          <Check checked={capitalize} onChange={setCapitalize}>Capitals</Check>
+          <Check checked={digit} onChange={setDigit}>A digit</Check>
+        </div>
+      )}
+      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onUse(value)}>Use this {mode}</button>
     </div>
   )
 }

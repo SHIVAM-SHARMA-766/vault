@@ -15,7 +15,7 @@ test('devices are listed, can be named and signed out, and activity is shown', a
     await phone.goto(`${s.base}/app/`)
     await s.unlock(phone, 'kai@example.test')
 
-    await s.menu(laptop, 'Account settings')
+    await s.settings(laptop, 'Security')
     await laptop.waitForSelector('.device-row >> nth=1')
     assert.equal(await laptop.locator('.device-row').count(), 2)
     assert.equal(await laptop.locator('.device-row').first().locator('.pill', { hasText: 'This device' }).count(), 1)
@@ -33,7 +33,7 @@ test('devices are listed, can be named and signed out, and activity is shown', a
     // Activity lists the sign-ins and the sign-out.
     await laptop.reload()
     await s.unlock(laptop, 'kai@example.test')
-    await s.menu(laptop, 'Account settings')
+    await s.settings(laptop, 'Security')
     await laptop.waitForSelector('.activity-list li')
     const activity = await laptop.textContent('.activity-list')
     assert.match(activity, /Account created/)

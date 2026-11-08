@@ -44,6 +44,9 @@ export interface EntryContent {
    *  them. Absent on entries saved before types had their own fields. */
   fields?: Record<string, string>
   favorite: boolean
+  /** Out of sight but kept: left out of lists, counts, search and the health
+   *  check until restored. Inside the blob, so the server cannot tell. */
+  archived?: boolean
   /** Which folder this belongs to. Inside the blob rather than beside it, so
    *  the organisation of the vault is hidden along with its contents. */
   folderId?: string

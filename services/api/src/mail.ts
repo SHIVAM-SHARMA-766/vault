@@ -8,11 +8,15 @@
 // sign-in or the invitation that triggered it.
 
 import type { Config } from './config.js'
+import type { App } from './context.js'
+import { getSettings } from './system.js'
 
 export interface Message {
   to: string
   subject: string
   text: string
+  /** The operator's support mailbox, when one is set (admin → Overview → Name and support). */
+  replyTo?: string
 }
 
 export interface Mailer {
@@ -34,16 +38,25 @@ export async function createMailer(config: Config): Promise<Mailer | undefined> 
   })
   return {
     async send(msg) {
-      await transport.sendMail({ from: m.from, to: msg.to, subject: msg.subject, text: msg.text })
+      await transport.sendMail({ from: m.from, to: msg.to, subject: msg.subject, text: msg.text, ...(msg.replyTo ? { replyTo: msg.replyTo } : {}) })
     },
   }
 }
 
-/** Sends without letting a failure reach the caller. */
-export async function notify(mailer: Mailer | undefined, message: Message): Promise<boolean> {
+/** Sends without letting a failure reach the caller. When the operator has set
+ *  a support address, replies go there and the message says how to get help. */
+export async function notify(app: App, message: Message): Promise<boolean> {
+  const mailer = app.mailer
   if (!mailer) return false
   try {
-    await mailer.send(message)
+    const { profile } = await getSettings(app)
+    const help = profile.supportEmail || profile.supportUrl
+      ? `\n\nNeed help? ${[profile.supportEmail, profile.supportUrl].filter(Boolean).join(' · ')}` : ''
+    await mailer.send({
+      ...message,
+      text: message.text + help,
+      ...(profile.supportEmail ? { replyTo: profile.supportEmail } : {}),
+    })
     return true
   } catch (err) {
     console.error('mail not sent:', (err as Error).message)

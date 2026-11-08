@@ -260,6 +260,80 @@
    "text": "Because the server cannot read your vault, it cannot let you back in either. When you sign up you get a recovery key, shown once and never sent anywhere. It is the only other way in. Keep it somewhere safe and offline.\n\nLose both the master password and the recovery key, and nobody — including whoever runs the server — can open the vault."
   }
  },
+ "get": {
+  "seo": {
+   "title": "Run your own Vault — install in one command",
+   "description": "Vault is self-hosted: one command installs it on your own server, for yourself, your family or your company. Zero-knowledge: the server cannot read it.",
+   "image": null
+  },
+  "hero": {
+   "kicker": "Run your own",
+   "title": "Your own Vault, on your own server",
+   "lede": "Vault is software you run yourself — for you, your family, or your whole company. Your vault is encrypted on each device, and the server you run holds nothing that opens it."
+  },
+  "install": {
+   "title": "One command",
+   "text": "On a Linux machine with Docker, this asks for the address people will use, generates every secret, starts Vault with HTTPS, and prints the link that creates your owner account.",
+   "command": "curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh | sh",
+   "note": "Prefer to read it first? The installer is a short, commented shell script in the repository. Running it again upgrades Vault, after taking a backup."
+  },
+  "steps": {
+   "title": "What happens",
+   "items": [
+    {
+     "title": "It asks three questions",
+     "text": "Personal or business, the address (a DNS name pointing at the machine, or localhost to try it), and where to install."
+    },
+    {
+     "title": "It writes the configuration",
+     "text": "Fresh secrets are generated on your machine and saved where only you can read them. Nothing is sent anywhere."
+    },
+    {
+     "title": "It starts Vault behind HTTPS",
+     "text": "Caddy obtains a certificate automatically. Vault creates its database and is ready in a minute or two."
+    },
+    {
+     "title": "You open the setup link",
+     "text": "It creates the owner account. From the admin panel you invite people, set your support address and check backups."
+    }
+   ]
+  },
+  "profiles": {
+   "title": "Personal or business",
+   "items": [
+    {
+     "title": "Personal",
+     "for": "You, your family, a small team",
+     "text": "Vault on SQLite, plus Caddy for HTTPS. One data volume to back up. Runs on 1 GB of RAM — a Raspberry Pi works."
+    },
+    {
+     "title": "Business",
+     "for": "A company",
+     "text": "Vault on PostgreSQL, plus Caddy. A database your team can back up, monitor and replicate. Organizations, groups, policies and an audit log included."
+    }
+   ]
+  },
+  "needs": {
+   "title": "What you need",
+   "items": [
+    {
+     "text": "A Linux machine with Docker and Docker Compose v2 — amd64 or arm64, 1 GB RAM"
+    },
+    {
+     "text": "A DNS name pointing at it, with ports 80 and 443 open (or localhost to try it out)"
+    },
+    {
+     "text": "Ten minutes"
+    },
+    {
+     "text": "Optional: an SMTP server, to email invitations and sign-in notices"
+    },
+    {
+     "text": "Optional: an S3-compatible bucket, for off-site copies of the server backup"
+    }
+   ]
+  }
+ },
  "faq": {
   "seo": {
    "title": "FAQ — Vault",

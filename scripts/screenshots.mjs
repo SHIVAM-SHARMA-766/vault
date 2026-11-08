@@ -58,8 +58,14 @@ try {
   await site.goto(`${s.base}/`)
   await shot(site, 'website')
 
+  // The owner signs up first; then registration closes, as on a real server.
+  const page = await s.person({ width: 1440, height: 900 })
+  await s.register(page, OWNER)
+  await s.setRegistration(false)
+
   // A visitor asks for access (a service desk ticket).
   await site.goto(`${s.base}/app/`)
+  await shot(site, 'sign-in')
   await site.getByRole('button', { name: 'Request access' }).click()
   await site.fill('#pr-name', 'Vikram Mehta')
   await site.fill('#pr-email', 'vikram@example.com')
@@ -68,11 +74,7 @@ try {
   await site.getByRole('button', { name: 'Send request' }).click()
   await site.waitForSelector('text=Your request number')
 
-  // Sign-up's recovery key screen.
-  const page = await s.person({ width: 1440, height: 900 })
-  await page.goto(`${s.base}/app/`)
-  await shot(page, 'sign-in')
-  await s.register(page, OWNER)
+  await s.setRegistration(true)
 
   // Import the demo vault through the product's own Import screen.
   await s.menu(page, 'Import & export')
@@ -113,12 +115,21 @@ try {
   await page.locator('.row-item', { hasText: 'Prod database' }).click()
   await shot(page, 'folders')
 
-  // Settings: two-factor and devices.
-  await s.menu(page, 'Account settings')
+  // Settings: security (two-factor and devices), then preferences.
+  await s.settings(page, 'Security')
   await page.waitForSelector('.device-row')
   await shot(page, 'settings')
   await page.locator('#s-sessions').scrollIntoViewIfNeeded()
   await shot(page, 'devices')
+  await s.settings(page, 'Preferences')
+  await shot(page, 'preferences')
+  await s.settings(page, 'Backups')
+  await page.selectOption('#b-freq', 'daily')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.waitForSelector('text=Backup settings saved', { state: 'attached' })
+  await page.getByRole('button', { name: 'Back up now' }).click()
+  await page.waitForSelector('.backup-runs li')
+  await shot(page, 'backups')
 
   // Organizations: create one with a collection, and share an item into it.
   await s.menu(page, 'Organizations')
@@ -149,7 +160,7 @@ try {
   await shot(page, 'shared-item')
 
   // Emergency access.
-  await s.menu(page, 'Account settings')
+  await s.settings(page, 'Emergency access')
   await page.fill('#em-email', 'ravi@example.com')
   await page.fill('#em-label', 'Ravi (brother)')
   await page.getByRole('button', { name: 'Add trusted contact' }).click()

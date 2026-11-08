@@ -224,6 +224,26 @@ audit log with its actor, and a member's app opens only the version the server s
 (a signing key beside the encryption key) and verify it against confirmed members' keys.
 Found by the phase 3.5 independent review.
 
+### A16 — Personal backups: credentials held for people, and requests to their addresses
+
+Personal backups ([0017](../decisions/0017-personal-backups.md)) add two things the server did
+not do before. **It holds a secret on someone's behalf**: the S3 secret key or WebDAV password
+for their destination, because a schedule runs while nobody is signed in. Each is sealed with
+AES-256-GCM under a key derived from SERVER_PEPPER and bound to the account, so a database dump
+alone does not reveal them, and the UI tells people to create credentials limited to one bucket
+or folder. Someone holding the database *and* the pepper can read them — and can then reach only
+storage that holds ciphertext.
+
+**It connects to addresses a person typed** (SSRF). A destination must be `https://`; the host is
+resolved by our own lookup and the connection made to the approved address (no second
+resolution for DNS rebinding); loopback, private, link-local, CGNAT, multicast and reserved
+addresses are refused, including IPv4-mapped IPv6 spellings; redirects are not followed;
+responses are size-capped; runs and test fetches are rate-limited. An operator can turn remote
+destinations off (`PERSONAL_BACKUP_REMOTE=false`) or deliberately allow LAN destinations
+(`PERSONAL_BACKUP_ALLOW_PRIVATE=true`). The backup file itself carries only ciphertext and the
+wrapped vault key: an attacker with a copy faces the same offline PBKDF2 guessing as with the
+database (A2).
+
 ### A11 — Public-key substitution
 
 The server hands out identity public keys ([0009](../decisions/0009-identity-keys-and-sharing.md)).
@@ -237,7 +257,7 @@ fingerprints are shown to both people so they can be compared out of band.
 **Account changes need the password, not just a session.** Changing the master password
 and issuing a new recovery key both require proof of the current master password (or, for a
 password reset, of the recovery key), checked by the server. A stolen access token can read
-ciphertext for fifteen minutes; it cannot take the account's ways back in away from its owner.
+ciphertext for at most fifteen minutes, and not at all once its device is signed out (every request checks the session); it cannot take the account's ways back in away from its owner.
 
 
 Collection items are stored per organization and collection (`COLLI#<org>#<collection>`):

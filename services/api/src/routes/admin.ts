@@ -27,6 +27,8 @@ import {
   registrySk,
   userPk,
 } from '../keys.js'
+import { bkdueSk } from '../personal-backup.js'
+import { updateStatus } from '../updates.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
@@ -40,6 +42,7 @@ import {
 } from '../roles.js'
 import {
   REGISTRATION_MODES,
+  type InstanceProfile,
   type RegistrationMode,
   type RegistryEntry,
   type RegistryFields,
@@ -124,6 +127,7 @@ export async function overview(app: App): Promise<LambdaResponse> {
     openTickets: await openTicketCount(app),
     serverTime: new Date(now).toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
+    version: app.config.version,
   })
 }
 
@@ -245,11 +249,20 @@ export async function deleteUser(app: App, actor: string, actorRole: Role, event
   const { owned } = await leaveAllOrgs(app, id, true)
   if (owned.length) throw new HttpError(409, 'conflict', `This account owns ${owned.length} organization(s) (${owned.join(', ')}). Delete them first under Organizations.`)
   await audit(app, actor, 'user.delete', id, reg.label)
+  await eraseAccount(app, id, reg.emailDigest)
+  return json(200, { ok: true })
+}
+
+/** Removes an account and everything it holds: its partition (vault,
+ *  history, sessions, preferences, backups), its address pointer, its place
+ *  in the registry, and its backup schedule; it leaves its organizations.
+ *  The caller has already refused when it owns any. */
+export async function eraseAccount(app: App, id: string, emailDigest: string): Promise<void> {
   await leaveAllOrgs(app, id, false)
   for (const item of await app.store.query(userPk(id))) await app.store.delete(item.pk, item.sk)
-  await app.store.delete(emailPk(reg.emailDigest), EMAIL_SK)
+  await app.store.delete(emailPk(emailDigest), EMAIL_SK)
   await app.store.delete(SYSTEM_PK, registrySk(id))
-  return json(200, { ok: true })
+  await app.store.delete(SYSTEM_PK, bkdueSk(id))
 }
 
 export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
@@ -257,14 +270,115 @@ export async function getSettingsRoute(app: App): Promise<LambdaResponse> {
 }
 
 export async function putSettingsRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
-  const body = parseJsonBody<{ registration?: unknown }>(event)
-  if (!REGISTRATION_MODES.includes(body.registration as RegistrationMode)) {
-    throw badRequest(`registration must be one of: ${REGISTRATION_MODES.join(', ')}.`)
+  const body = parseJsonBody<{ registration?: unknown; profile?: unknown }>(event)
+  if (body.registration === undefined && body.profile === undefined) throw badRequest('Send registration, profile, or both.')
+  const current = await getSettings(app)
+  let registration = current.registration
+  if (body.registration !== undefined) {
+    if (!REGISTRATION_MODES.includes(body.registration as RegistrationMode)) {
+      throw badRequest(`registration must be one of: ${REGISTRATION_MODES.join(', ')}.`)
+    }
+    registration = body.registration as RegistrationMode
+    await audit(app, actor, 'settings.registration', undefined, registration)
   }
-  const registration = body.registration as RegistrationMode
-  await audit(app, actor, 'settings.registration', undefined, registration)
-  await putSettings(app, { registration, updatedAt: new Date(app.now()).toISOString() })
+  let profile = current.profile
+  if (body.profile !== undefined) {
+    profile = requireProfile(body.profile)
+    await audit(app, actor, 'settings.profile', undefined, profile.supportEmail || undefined)
+  }
+  await putSettings(app, { registration, profile, updatedAt: new Date(app.now()).toISOString() })
   return json(200, { ok: true })
+}
+
+/** The instance profile, as an admin sends it. Every field may be empty. */
+export function requireProfile(value: unknown): InstanceProfile {
+  if (!value || typeof value !== 'object') throw badRequest('profile must be an object.')
+  const v = value as Record<string, unknown>
+  const text = (k: string, max: number) => {
+    const x = v[k] ?? ''
+    if (typeof x !== 'string') throw badRequest(`profile.${k} must be text.`)
+    const t = x.trim()
+    if (t.length > max) throw badRequest(`profile.${k} must be at most ${max} characters.`)
+    if (/[\u0000-\u001f<>]/.test(t)) throw badRequest(`profile.${k} contains characters that are not allowed.`)
+    return t
+  }
+  const name = text('name', 60)
+  const supportEmail = text('supportEmail', 254)
+  if (supportEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail)) throw badRequest('profile.supportEmail must be an email address.')
+  const supportUrl = text('supportUrl', 300)
+  if (supportUrl) {
+    let ok = false
+    try { const u = new URL(supportUrl); ok = u.protocol === 'https:' || u.protocol === 'http:' } catch { /* refused below */ }
+    if (!ok) throw badRequest('profile.supportUrl must be an http(s) address.')
+  }
+  return { name, supportEmail, supportUrl }
+}
+
+/** Staff only: this version and whether a newer one is out. */
+export async function updateRoute(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const force = new URLSearchParams(event.rawQueryString ?? '').get('refresh') === '1'
+  return json(200, await updateStatus(app, { force }))
+}
+
+/** What anyone may know about this server before signing in. */
+export async function instanceRoute(app: App): Promise<LambdaResponse> {
+  const { registration, profile } = await getSettings(app)
+  return json(200, {
+    name: profile.name || 'Vault',
+    supportEmail: profile.supportEmail,
+    supportUrl: profile.supportUrl,
+    registration: app.allowRegistration ? 'open' : registration,
+    mail: Boolean(app.mailer),
+    // A new server waiting for its owner: the sign-in screen offers the setup code.
+    firstRun: (await listRegistry(app)).length === 0,
+  })
+}
+
+/** Invitations do not work while registration is closed; say so at the
+ *  moment one is made, rather than when the invitee is refused. */
+async function closedWarning(app: App): Promise<{ warning?: string }> {
+  if (app.allowRegistration) return {}
+  const { registration } = await getSettings(app)
+  return registration === 'closed' ? { warning: 'Registration is closed, so these invitations will not work until you set it to Invite only (Overview → Registration).' } : {}
+}
+
+/** At most this many invitations in one request. */
+export const BULK_INVITE_MAX = 100
+
+/** Many invitations at once: a list of people (an address, and a name the
+ *  admin will recognise), one role and one lifetime. Each address is used to
+ *  send and dropped, as with a single invitation; without mail the codes come
+ *  back for the admin to hand out. Validated whole before anything is made. */
+export async function bulkInviteRoute(app: App, actor: string, actorRole: Role, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ people?: unknown; days?: unknown; role?: unknown }>(event)
+  if (!Array.isArray(body.people) || body.people.length === 0) throw badRequest('people must be a non-empty list.')
+  if (body.people.length > BULK_INVITE_MAX) throw badRequest(`At most ${BULK_INVITE_MAX} people at a time.`)
+  const role = body.role === undefined ? 'user' : body.role
+  if (!(GRANTABLE_ROLES as readonly unknown[]).includes(role)) throw badRequest(`role must be one of: ${GRANTABLE_ROLES.join(', ')}.`)
+  if (role !== 'user' && !can(actorRole, 'roles.write')) throw forbidden()
+  const days = body.days === undefined ? 7 : body.days
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30) throw badRequest('days must be a whole number from 1 to 30.')
+
+  const seen = new Set<string>()
+  const people = body.people.map((p, i) => {
+    const r = (p && typeof p === 'object' ? p : {}) as Record<string, unknown>
+    let email: string
+    try { email = requireEmail(r['email']).trim().toLowerCase() } catch { throw badRequest(`Line ${i + 1}: not an email address.`) }
+    if (seen.has(email)) throw badRequest(`Line ${i + 1}: ${email} is listed twice.`)
+    seen.add(email)
+    const name = typeof r['name'] === 'string' ? r['name'].trim() : ''
+    if (name.length > 80) throw badRequest(`Line ${i + 1}: the name is longer than 80 characters.`)
+    return { email, label: name || `Invitation ${i + 1}` }
+  })
+
+  await audit(app, actor, 'invite.bulk', undefined, `${people.length} (${role as string})`)
+  const results = []
+  for (const p of people) {
+    const { code, invite } = await createInvite(app, actor, p.label, days, role as string)
+    const emailed = await notify(app, { to: p.email, ...inviteMessage(app.config.origin, code, p.label, invite.expiresAt) })
+    results.push({ email: p.email, label: p.label, emailed, expiresAt: invite.expiresAt, ...(emailed ? {} : { code }) })
+  }
+  return json(201, { results, mail: Boolean(app.mailer), ...(await closedWarning(app)) })
 }
 
 export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
@@ -303,9 +417,9 @@ export async function createInviteRoute(app: App, actor: string, actorRole: Role
   await audit(app, actor, 'invite.create', undefined, role === 'user' ? label : `${label} (${role})`)
   const { code, invite } = await createInvite(app, actor, label, days, role as string)
   // The address is used to send and then dropped; only the label is kept.
-  const emailed = email ? await notify(app.mailer, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
+  const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
   // The code is returned exactly once. Only its hash is stored.
-  return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role } })
+  return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role }, ...(await closedWarning(app)) })
 }
 
 export async function deleteInviteRoute(app: App, actor: string, id: string): Promise<LambdaResponse> {
