@@ -44,6 +44,14 @@ export { type ExportEntry, toCsv } from './export.js'
 export { EXPIRING_DAYS, ISSUES, PASSWORD_ISSUES, breachCount, expiryOf, type HealthInput, type HealthReport, type Issue, type Strength, STRENGTH_LABELS, analyse, belowMinimum, passwordStrength } from './health.js'
 export {
   CLIPBOARD_CHOICES,
+  AUTO_HIDE_CHOICES,
+  CLOCKS,
+  DATE_STYLES,
+  MASK_LENGTHS,
+  type Clock,
+  type DateStyle,
+  type MaskLength,
+  formatWhen,
   DENSITIES,
   LIST_SORTS,
   type Density,

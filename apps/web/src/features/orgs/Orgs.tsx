@@ -13,6 +13,7 @@ import { IconAlert, IconCheck, IconFolder, IconPlus, IconShield, IconUser, IconX
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Shell } from '../../ui/Shell.js'
 import { type CollectionView, type OrgView, type Teams, useTeams } from './model.js'
+import { when } from '../../lib/format.js'
 
 const PERMISSION_LABEL: Record<SharePermission, string> = { view: 'Can view', edit: 'Can edit', manage: 'Can manage' }
 
@@ -407,7 +408,7 @@ function Activity({ org, teams, members }: { org: OrgView; teams: Teams; members
                 : e.action.startsWith('access.') || e.action.startsWith('collection.') ? coll(e.collectionId) + (e.target && e.action !== 'access.grant-group' ? ` (${who(e.target)})` : '')
                 : e.action.startsWith('member.') ? (members.find((m) => m.userId === e.target)?.label ?? e.target ?? '') : ''
               return <li key={i}><span><strong>{who(e.actor)}</strong> {ACTION_LABEL[e.action] ?? e.action} {target}</span>
-                <span className="muted small">{new Date(e.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}{e.reported ? ' · reported by app' : ''}</span></li>
+                <span className="muted small">{when(e.at)}{e.reported ? ' · reported by app' : ''}</span></li>
             })}
           </ul>
         </div>

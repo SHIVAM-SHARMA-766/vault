@@ -2,16 +2,21 @@
 // generator's defaults. Each change applies at once and is saved sealed under
 // the vault key (lib/prefs.ts), so it follows the account to every device.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
+import { openFolder } from '@vault/crypto'
 import {
-  CLIPBOARD_CHOICES, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
-  describeMinutes, describeSeconds, passphraseBits,
+  AUTO_HIDE_CHOICES, CLIPBOARD_CHOICES, type Clock, type DateStyle, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
+  describeMinutes, describeSeconds, flattenTree, folderTree, formatWhen, passphraseBits,
 } from '@vault/core'
+
+import { api } from '../../lib/api.js'
+import { useInstance } from '../../lib/instance.js'
+import type { Folder } from '../vault/model.js'
 
 import * as prefs from '../../lib/prefs.js'
 import * as session from '../../lib/session.js'
-import { IconClock, IconCopy, IconKey, IconSun } from '../../ui/icons.js'
+import { IconClock, IconCopy, IconEye, IconFolder, IconInbox, IconKey, IconSun } from '../../ui/icons.js'
 import { Check, useToast } from '../../ui/kit.js'
 
 const THEME_LABELS: Record<Theme, string> = { system: 'Match system', light: 'Light', dark: 'Dark' }
@@ -85,8 +90,111 @@ export function Preferences({ state }: { state: session.Unlocked }) {
         </div>
       </section>
 
+      <section className="settings-card" aria-labelledby="p-secrets">
+        <div className="settings-card-head"><IconEye size={18} /><h2 id="p-secrets">Secrets on screen</h2></div>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="p-mask">Masked passwords show</label>
+            <select id="p-mask" value={p.maskLength} disabled={saving} onChange={(e) => void change({ maskLength: e.target.value as Prefs['maskLength'] })}>
+              <option value="fixed">The same dots for every password</option>
+              <option value="actual">One dot per character</option>
+            </select>
+            <p className="hint">The same dots hide how long a password is from anyone looking at your screen.</p>
+          </div>
+          <div className="field">
+            <label htmlFor="p-autohide">Hide a revealed secret again after</label>
+            <select id="p-autohide" value={p.autoHideSeconds} disabled={saving} onChange={(e) => void change({ autoHideSeconds: Number(e.target.value) })}>
+              {AUTO_HIDE_CHOICES.map((s) => <option key={s} value={s}>{s === 0 ? 'Keep it shown' : describeSeconds(s)}</option>)}
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <DefaultFolder state={state} p={p} saving={saving} change={change} />
+
+      <section className="settings-card" aria-labelledby="p-dates">
+        <div className="settings-card-head"><IconClock size={18} /><h2 id="p-dates">Dates and times</h2></div>
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="p-date">Dates</label>
+            <select id="p-date" value={p.dateStyle} disabled={saving} onChange={(e) => void change({ dateStyle: e.target.value as DateStyle })}>
+              <option value="system">As my browser does</option>
+              <option value="dmy">Day/month/year (31/12/2026)</option>
+              <option value="mdy">Month/day/year (12/31/2026)</option>
+              <option value="ymd">Year-month-day (2026-12-31)</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="p-clock">Times</label>
+            <select id="p-clock" value={p.clock} disabled={saving} onChange={(e) => void change({ clock: e.target.value as Clock })}>
+              <option value="system">As my browser does</option>
+              <option value="24h">24-hour (17:05)</option>
+              <option value="12h">12-hour (5:05 pm)</option>
+            </select>
+          </div>
+        </div>
+        <p className="hint" data-testid="date-preview">Now: {formatWhen(new Date().toISOString(), p, { time: true })}</p>
+      </section>
+
+      <EmailAlerts />
+
       <GeneratorDefaults p={p} saving={saving} change={change} />
     </>
+  )
+}
+
+/** Where a new item goes when no folder is open (F6). */
+function DefaultFolder({ state, p, saving, change }: { state: session.Unlocked; p: Prefs; saving: boolean; change: (n: Partial<Prefs>) => Promise<void> }) {
+  const [folders, setFolders] = useState<Folder[] | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { folders: sealed } = await api.vault(await session.token())
+        const opened = await Promise.all(sealed.map(async (f) => { try { return { ...(await openFolder(f.id, f.blob, state.vaultKey)), id: f.id } } catch { return null } }))
+        setFolders(opened.filter((f): f is Folder => f !== null))
+      } catch { setFolders([]) }
+    })()
+  }, [state.vaultKey])
+  const options = folders ? flattenTree(folderTree(folders)) : []
+  const missing = p.defaultFolderId && folders && !folders.some((f) => f.id === p.defaultFolderId)
+  return (
+    <section className="settings-card" aria-labelledby="p-folder">
+      <div className="settings-card-head"><IconFolder size={18} /><h2 id="p-folder">New items</h2></div>
+      <div className="field">
+        <label htmlFor="p-default-folder">Put new items in</label>
+        <select id="p-default-folder" value={missing ? '' : p.defaultFolderId} disabled={saving || folders === null} onChange={(e) => void change({ defaultFolderId: e.target.value })}>
+          <option value="">No folder</option>
+          {options.map((n) => <option key={n.folder.id} value={n.folder.id}>{'\u00a0\u00a0'.repeat(n.depth)}{n.folder.name}</option>)}
+        </select>
+        <p className="hint">Used when no folder is open. Opening a folder first still puts the item there.</p>
+      </div>
+    </section>
+  )
+}
+
+/** The one email alert a zero-knowledge server can send (F5). */
+function EmailAlerts() {
+  const toast = useToast()
+  const mail = useInstance()?.mail
+  const [on, setOn] = useState<boolean | null>(null)
+  const [available, setAvailable] = useState(false)
+  useEffect(() => {
+    void (async () => {
+      try { const a = await api.alerts(await session.token()); setOn(a.signIn); setAvailable(a.available) } catch { setOn(null) }
+    })()
+  }, [])
+  if (!mail || on === null) return null
+  return (
+    <section className="settings-card" aria-labelledby="p-alerts">
+      <div className="settings-card-head"><IconInbox size={18} /><h2 id="p-alerts">Email alerts</h2></div>
+      {available ? (
+        <Check checked={on} onChange={async (v) => {
+          try { await api.setAlerts(await session.token(), v); setOn(v); toast(v ? 'Sign-in emails on' : 'Sign-in emails off') }
+          catch (err) { toast(err instanceof Error ? err.message : 'Could not save.', 'error') }
+        }}>Email me when my account signs in on a device</Check>
+      ) : <p className="muted small">This server does not send sign-in emails.</p>}
+      <p className="hint">This server keeps only a fingerprint of your address, so it can write to you only as you sign in. Signing in with your recovery key is always announced.</p>
+    </section>
   )
 }
 

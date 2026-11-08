@@ -24,6 +24,7 @@ import {
 } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
 import { Link } from '../../lib/router.js'
+import { when as fmtWhen } from '../../lib/format.js'
 
 const PAGE_OF: Record<string, string> = {
   global: 'index.html', home: 'index.html', features: 'features.html', how: 'how-it-works.html',
@@ -35,9 +36,7 @@ const mediaUrl = (m: SiteMedia) => `/media/${m.id}.${MEDIA_EXT[m.type] ?? 'png'}
 type View = { kind: 'section'; id: string } | { kind: 'images' } | { kind: 'history' }
 
 function when(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+  return fmtWhen(iso)
 }
 
 function setAt(obj: SiteContent, path: (string | number)[], value: unknown): SiteContent {

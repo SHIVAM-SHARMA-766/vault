@@ -23,6 +23,7 @@ import { Emergency } from './Emergency.js'
 import { ShareLinks } from './ShareLinks.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
+import { day } from '../../lib/format.js'
 
 const MIN_LENGTH = 12
 
@@ -89,7 +90,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
               <dl className="facts">
                 <div><dt>Email</dt><dd>{state.email}</dd></div>
                 <div><dt>Role</dt><dd>{state.role && state.role !== 'user' ? state.role[0]!.toUpperCase() + state.role.slice(1) : 'Member'}</dd></div>
-                <div><dt>Created</dt><dd>{me ? new Date(me.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—'}</dd></div>
+                <div><dt>Created</dt><dd>{me ? day(me.createdAt) : '—'}</dd></div>
               </dl>
             </section>
             <ChangePassword state={state} minScore={me?.policy.minPasswordScore ?? 0} />

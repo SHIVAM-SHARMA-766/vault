@@ -4,6 +4,7 @@
 // without an owner) or is the server's only owner.
 
 import type { App } from '../context.js'
+import { PROFILE_SK, userPk } from '../keys.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, json, parseJsonBody } from '../http.js'
 import { roleFromDigest } from '../roles.js'
 import { audit, listRegistry } from '../system.js'
@@ -34,4 +35,22 @@ export async function deleteOwnAccount(app: App, userId: string, event: LambdaEv
   await audit(app, userId, 'user.self-delete', userId)
   await eraseAccount(app, userId, profile.emailDigest)
   return json(200, { ok: true })
+}
+
+/** Email alerts the server can send (F5). It holds no address, only a hash,
+ *  so it can write only while the person is signing in and has just typed
+ *  theirs: the sign-in notice is the one alert there is. Recovery-key
+ *  sign-ins are always announced. */
+export async function getAlerts(app: App, userId: string): Promise<LambdaResponse> {
+  const profile = await app.store.get(userPk(userId), PROFILE_SK)
+  return json(200, { signIn: profile?.['signInAlerts'] !== false, available: Boolean(app.mailer) && app.config.mail.signInNotices })
+}
+
+export async function putAlerts(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {
+  const b = parseJsonBody<{ signIn?: unknown }>(event)
+  if (typeof b.signIn !== 'boolean') throw badRequest('signIn must be true or false.')
+  const profile = await app.store.get(userPk(userId), PROFILE_SK)
+  if (!profile) throw new HttpError(401, 'unauthorized', 'Sign in again.')
+  await app.store.put({ ...profile, signInAlerts: b.signIn })
+  return json(200, { signIn: b.signIn })
 }

@@ -62,6 +62,8 @@ export function buildRouter(app: App): Router {
   router.get('/api/auth/me', authed((u) => auth.me(app, u)), 'Profile, KDF parameters and wrapped vault key')
   router.post('/api/auth/change-password', authed((u, e) => auth.changePassword(app, u, e)), 'Rewrap the vault key under a new master password')
   router.post('/api/auth/recovery/rotate', authed((u, e) => auth.rotateRecovery(app, u, e)), 'Replace the recovery key')
+  router.get('/api/account/alerts', authed((u) => account.getAlerts(app, u)), 'My email alert settings')
+  router.put('/api/account/alerts', authed((u, e) => account.putAlerts(app, u, e)), 'Turn the sign-in email on or off')
   router.post('/api/account/delete', authed((u, e) => account.deleteOwnAccount(app, u, e)), 'Delete my own account (master password and second factor required)')
   router.put('/api/keys/identity', authed((u, e) => auth.setIdentity(app, u, e)), 'Store the identity key pair (once)')
   router.post('/api/auth/2fa/setup', authed((u, e) => auth.setupTwoFactor(app, u, e)), 'Start TOTP enrolment')

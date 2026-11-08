@@ -56,6 +56,9 @@ export interface ServerPolicy {
   activityDays: number
   /** How long the admin audit log and organization event logs are kept. */
   auditDays: number
+  /** Whether people may share an item by link (G4), and for how long at most. */
+  shareLinks: boolean
+  shareLinkMaxDays: number
 }
 
 export const POLICY_CHOICES = {
@@ -64,10 +67,11 @@ export const POLICY_CHOICES = {
   sessionDays: [null, 1, 7, 14, 30],
   activityDays: [30, 90, 180, 365],
   auditDays: [90, 365, 730, 1825],
+  shareLinkMaxDays: [1, 7, 30],
 } as const
 
 export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
-  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365,
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30,
 })
 
 /** A stored policy, with anything missing or out of range taken from the
@@ -83,6 +87,8 @@ export function readPolicy(value: unknown): ServerPolicy {
     sessionDays: pick('sessionDays'),
     activityDays: pick('activityDays'),
     auditDays: pick('auditDays'),
+    shareLinks: v['shareLinks'] !== false,
+    shareLinkMaxDays: pick('shareLinkMaxDays'),
   }
 }
 

@@ -31,11 +31,13 @@ export interface Unlocked {
   permissions?: Permission[]
   /** What the server policy asks that this account has not done yet. */
   policyGap?: string | null
+  /** The server's sharing policy (G4): links allowed, and their longest life in days. */
+  shareLinks?: { allowed: boolean; maxDays: number }
 }
 
 /** Updates fields of the unlocked state without touching the keys. */
 export function patch(fields: Partial<Pick<Unlocked,
-  'userId' | 'isAdmin' | 'role' | 'permissions' | 'policyGap' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
+  'userId' | 'isAdmin' | 'role' | 'permissions' | 'policyGap' | 'shareLinks' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
 >>): void {
   if (!current) return
   current = { ...current, ...fields }

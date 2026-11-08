@@ -26,6 +26,7 @@ import { MAX_FOLDER_DEPTH, type ImportedItem, duplicateKey, folderPath, readImpo
 import { api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import type { Decrypted, Folder } from '../vault/model.js'
+import { when } from '../../lib/format.js'
 
 /** Files larger than this are not password exports. */
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024
@@ -144,7 +145,7 @@ export async function openPersonalBackup(text: string, secret: string, how: 'pas
 /** A backup's items, as import candidates in the folders they were in. */
 export function backupSource(b: OpenedBackup): Source {
   return {
-    format: `Vault personal backup (${new Date(b.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })})`,
+    format: `Vault personal backup (${when(b.createdAt)})`,
     candidates: b.entries.map(({ id: _id, folderId, ...content }) => ({ content, folder: folderPath(b.folders, folderId) })),
     warnings: b.failed ? [`${b.failed} item${b.failed === 1 ? '' : 's'} in the backup could not be opened and will be skipped.`] : [],
   }

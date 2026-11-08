@@ -18,7 +18,7 @@ async function setup() {
   return { h, owner: String(owner['accessToken']), user: String(user['accessToken']), userRefresh: String(user['refreshToken']) }
 }
 
-const POLICY = { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365 }
+const POLICY = { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30 }
 const setPolicy = (h: Awaited<ReturnType<typeof setup>>['h'], token: string, policy: Record<string, unknown>) =>
   h.request('PUT', '/api/admin/settings', { token, body: { policy: { ...POLICY, ...policy } } })
 
@@ -26,7 +26,7 @@ test('with nothing set, the policy is the permissive default', async () => {
   const { h, owner, user } = await setup()
   assert.deepEqual((await h.request('GET', '/api/admin/settings', { token: owner })).body['policy'], POLICY)
   const me = (await h.request('GET', '/api/auth/me', { token: user })).body
-  assert.deepEqual(me['policy'], { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null })
+  assert.deepEqual(me['policy'], { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, shareLinks: true, shareLinkMaxDays: 30 })
   assert.equal(me['policyGap'], null)
   assert.equal((await h.request('GET', '/api/instance')).body['minPasswordScore'], 0)
 })
@@ -155,4 +155,20 @@ test('shortening retention removes older rows at once; lengthening removes nothi
   assert.ok(left.every((r) => String(r['at']) >= cutoff), 'no row older than 30 days of activity / 90 of audit survives')
   assert.ok(left.some((r) => r.sk.startsWith('AUDIT#') && r['action'] === 'settings.policy'), 'the change itself is recorded')
   assert.deepEqual(await applyRetention(h.app), { audit: 0, activity: 0, orgEvents: 0 }, 'a second pass finds nothing')
+})
+
+test('the sharing policy can turn share links off, or cap how long they last', async () => {
+  const { h, owner, user } = await setup()
+  const link = (expiresIn: number) => h.request('POST', '/api/shares', {
+    token: user, body: { id: fixtureB64(`p${expiresIn}`, 16).replace(/=+$/, ''), blob: 'v1.aaaa.bbbb', labelBlob: 'v1.cccc.dddd', expiresIn, maxViews: 1 },
+  })
+  assert.equal((await setPolicy(h, owner, { shareLinkMaxDays: 7 })).status, 200)
+  assert.equal((await link(30 * 86_400)).status, 403)
+  assert.equal((await link(7 * 86_400)).status, 201)
+  await setPolicy(h, owner, { shareLinks: false })
+  const refused = await link(3600)
+  assert.equal(refused.status, 403)
+  assert.match(String(refused.body['message']), /turned off/)
+  assert.equal(((await h.request('GET', '/api/auth/me', { token: user })).body['policy'] as { shareLinks: boolean }).shareLinks, false)
+  assert.equal((await setPolicy(h, owner, { shareLinks: 'no' })).status, 400)
 })

@@ -52,7 +52,7 @@ function useAccount(state: session.Unlocked) {
     void (async () => {
       try {
         const me = await api.me(await session.token())
-        session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions, policyGap: me.policyGap })
+        session.patch({ userId: me.userId, isAdmin: me.isAdmin, role: me.role, permissions: me.permissions, policyGap: me.policyGap, shareLinks: { allowed: me.policy.shareLinks, maxDays: me.policy.shareLinkMaxDays } })
         session.setServerIdleLimit(me.policy.maxIdleMinutes)
         if (!me.identity) {
           try {

@@ -372,6 +372,16 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
             {AUDIT_CHOICES.map((d) => <option key={d} value={d}>{days(d)}</option>)}
           </select>
         </div>
+        <div className="field">
+          <label htmlFor="pol-links">Share links</label>
+          <select id="pol-links" disabled={!canWrite} value={form.shareLinks ? String(form.shareLinkMaxDays) : 'off'}
+                  onChange={(e) => setForm({ ...form, shareLinks: e.target.value !== 'off', shareLinkMaxDays: e.target.value === 'off' ? form.shareLinkMaxDays : Number(e.target.value) })}>
+            <option value="30">Allowed, up to 30 days</option>
+            <option value="7">Allowed, up to 7 days</option>
+            <option value="1">Allowed, up to 1 day</option>
+            <option value="off">Turned off</option>
+          </select>
+        </div>
       </div>
       {shorter ? <p className="alert alert-warn"><IconAlert size={16} /><span>Saving deletes log entries older than the new period. That cannot be undone.</span></p> : null}
       {missing > 0 ? <p className="muted small">{missing === 1 ? '1 account does' : `${missing} accounts do`} not meet these yet. <button type="button" className="link" onClick={onGo}>See Users</button></p> : null}

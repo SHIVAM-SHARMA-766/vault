@@ -3,14 +3,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_PREFS, describeMinutes, describeSeconds, effectiveLockMinutes, normalizePrefs } from '../src/index.js'
+import { DEFAULT_PREFS, describeMinutes, describeSeconds, effectiveLockMinutes, normalizePrefs, formatWhen } from '../src/index.js'
 
 test('nothing, or not an object, gives the defaults', () => {
   for (const raw of [undefined, null, 42, 'dark', [], {}]) assert.deepEqual(normalizePrefs(raw), DEFAULT_PREFS)
 })
 
 test('valid values are kept', () => {
-  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
+  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', maskLength: 'actual', autoHideSeconds: 0, defaultFolderId: 'abc-1', dateStyle: 'dmy', clock: '12h', generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
   assert.deepEqual(normalizePrefs(p), p)
 })
 
@@ -66,4 +66,24 @@ test('list sort and density default sensibly and refuse anything else', () => {
   assert.equal(normalizePrefs({}).density, 'comfortable')
   assert.equal(normalizePrefs({ listSort: 'updated', density: 'compact' }).listSort, 'updated')
   assert.equal(normalizePrefs({ listSort: 'random', density: 'tiny' }).density, 'comfortable')
+})
+
+test('reveal, default folder and date options default safely and refuse junk', () => {
+  const p = normalizePrefs({})
+  assert.deepEqual([p.maskLength, p.autoHideSeconds, p.defaultFolderId, p.dateStyle, p.clock], ['fixed', 30, '', 'system', 'system'])
+  const q = normalizePrefs({ maskLength: 'actual', autoHideSeconds: 10, defaultFolderId: 'f6c0e7a2-1b3d-4c5e-8f90-123456789abc', dateStyle: 'ymd', clock: '24h' })
+  assert.deepEqual([q.maskLength, q.autoHideSeconds, q.dateStyle, q.clock], ['actual', 10, 'ymd', '24h'])
+  assert.equal(q.defaultFolderId, 'f6c0e7a2-1b3d-4c5e-8f90-123456789abc')
+  const r = normalizePrefs({ autoHideSeconds: 7, defaultFolderId: '<script>', dateStyle: 'roman', clock: 13 })
+  assert.deepEqual([r.autoHideSeconds, r.defaultFolderId, r.dateStyle, r.clock], [30, '', 'system', 'system'])
+})
+
+test('dates follow the chosen style and clock; calendar dates never shift by zone', () => {
+  const at = '2026-03-04T17:05:00Z'
+  const opts = { locale: 'en-GB', timeZone: 'UTC' }
+  assert.equal(formatWhen(at, { dateStyle: 'dmy', clock: '24h' }, { ...opts, time: true }), '04/03/2026, 17:05')
+  assert.equal(formatWhen(at, { dateStyle: 'mdy', clock: '24h' }, opts), '03/04/2026')
+  assert.equal(formatWhen(at, { dateStyle: 'ymd', clock: '12h' }, { ...opts, time: true }).replace(/\s/g, ' '), '2026-03-04, 5:05 pm')
+  assert.equal(formatWhen('2026-03-04', { dateStyle: 'dmy', clock: '24h' }, { locale: 'en-GB', timeZone: 'Pacific/Kiritimati', time: true }), '04/03/2026')
+  assert.equal(formatWhen('not a date', { dateStyle: 'dmy', clock: '24h' }), 'not a date')
 })

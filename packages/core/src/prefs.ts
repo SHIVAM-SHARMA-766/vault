@@ -23,6 +23,17 @@ export const LIST_SORTS: readonly ListSort[] = ['name', 'updated', 'type']
 export type Density = 'comfortable' | 'compact'
 export const DENSITIES: readonly Density[] = ['comfortable', 'compact']
 
+/** Masked secrets: a fixed row of dots, which hides the length, or one dot
+ *  per character. */
+export type MaskLength = 'fixed' | 'actual'
+export const MASK_LENGTHS: readonly MaskLength[] = ['fixed', 'actual']
+/** Seconds a revealed secret stays visible; 0 keeps it until hidden. */
+export const AUTO_HIDE_CHOICES = [0, 10, 30, 60] as const
+export type DateStyle = 'system' | 'dmy' | 'mdy' | 'ymd'
+export const DATE_STYLES: readonly DateStyle[] = ['system', 'dmy', 'mdy', 'ymd']
+export type Clock = 'system' | '12h' | '24h'
+export const CLOCKS: readonly Clock[] = ['system', '12h', '24h']
+
 export interface GeneratorPrefs {
   mode: 'password' | 'passphrase'
   length: number
@@ -45,6 +56,12 @@ export interface Prefs {
   generator: GeneratorPrefs
   listSort: ListSort
   density: Density
+  maskLength: MaskLength
+  autoHideSeconds: number
+  /** Where a new item goes when no folder is open; '' for none. */
+  defaultFolderId: string
+  dateStyle: DateStyle
+  clock: Clock
 }
 
 export const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -54,6 +71,11 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   clipboardSeconds: 30,
   listSort: 'name',
   density: 'comfortable',
+  maskLength: 'fixed',
+  autoHideSeconds: 30,
+  defaultFolderId: '',
+  dateStyle: 'system',
+  clock: 'system',
   generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
@@ -75,6 +97,11 @@ export function normalizePrefs(raw: unknown): Prefs {
     clipboardSeconds: pick(r['clipboardSeconds'], CLIPBOARD_CHOICES as readonly number[], d.clipboardSeconds),
     listSort: pick(r['listSort'], LIST_SORTS, d.listSort),
     density: pick(r['density'], DENSITIES, d.density),
+    maskLength: pick(r['maskLength'], MASK_LENGTHS, d.maskLength),
+    autoHideSeconds: pick(r['autoHideSeconds'], AUTO_HIDE_CHOICES as readonly number[], d.autoHideSeconds),
+    defaultFolderId: typeof r['defaultFolderId'] === 'string' && /^[A-Za-z0-9-]{0,64}$/.test(r['defaultFolderId']) ? r['defaultFolderId'] : d.defaultFolderId,
+    dateStyle: pick(r['dateStyle'], DATE_STYLES, d.dateStyle),
+    clock: pick(r['clock'], CLOCKS, d.clock),
     generator: {
       mode: pick(g['mode'], ['password', 'passphrase'] as const, d.generator.mode),
       length,
@@ -101,4 +128,28 @@ export function describeMinutes(m: number): string {
 }
 export function describeSeconds(s: number): string {
   return s === 0 ? 'Never' : s < 60 ? `${s} seconds` : `${s / 60} minute${s === 60 ? '' : 's'}`
+}
+
+/** A date (and optionally its time) as the person asked to see them. `iso`
+ *  is an ISO 8601 instant, or YYYY-MM-DD for a calendar date (shown as is,
+ *  never shifted by time zone). */
+export function formatWhen(iso: string, prefs: Pick<Prefs, 'dateStyle' | 'clock'>, opts: { time?: boolean; locale?: string; timeZone?: string } = {}): string {
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso)
+  const d = new Date(dateOnly ? `${iso}T00:00:00Z` : iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const tz = dateOnly ? 'UTC' : opts.timeZone
+  const parts = (o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat(opts.locale, { ...o, ...(tz ? { timeZone: tz } : {}) })
+    .formatToParts(d).reduce<Record<string, string>>((m, p) => { m[p.type] = p.value; return m }, {})
+  let date: string
+  if (prefs.dateStyle === 'system') {
+    date = new Intl.DateTimeFormat(opts.locale, { year: 'numeric', month: 'short', day: 'numeric', ...(tz ? { timeZone: tz } : {}) }).format(d)
+  } else {
+    const p = parts({ year: 'numeric', month: '2-digit', day: '2-digit' })
+    date = prefs.dateStyle === 'dmy' ? `${p['day']}/${p['month']}/${p['year']}` : prefs.dateStyle === 'mdy' ? `${p['month']}/${p['day']}/${p['year']}` : `${p['year']}-${p['month']}-${p['day']}`
+  }
+  if (!opts.time || dateOnly) return date
+  const time = new Intl.DateTimeFormat(opts.locale, {
+    hour: 'numeric', minute: '2-digit', ...(prefs.clock === 'system' ? {} : { hour12: prefs.clock === '12h' }), ...(tz ? { timeZone: tz } : {}),
+  }).format(d)
+  return `${date}, ${time}`
 }

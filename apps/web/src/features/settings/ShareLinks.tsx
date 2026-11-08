@@ -8,6 +8,7 @@ import { openLabel } from '../../lib/share.js'
 import * as session from '../../lib/session.js'
 import { IconLink } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
+import { when } from '../../lib/format.js'
 
 const STATUS: Record<ShareRow['status'], [string, string]> = {
   live: ['Live', 'pill-ok'], used: ['Used up', ''], expired: ['Expired', ''], revoked: ['Revoked', 'pill-danger'],
@@ -43,7 +44,7 @@ export function ShareLinks({ vaultKey }: { vaultKey: Uint8Array }) {
                 <div className="device-text">
                   <span className="device-name">{r.name}<span className={`pill ${cls}`}>{label}</span></span>
                   <span className="muted small">
-                    Opened {r.views}{r.maxViews ? ` of ${r.maxViews}` : ''} {r.views === 1 && !r.maxViews ? 'time' : 'times'} · made {new Date(r.createdAt).toLocaleString()} · {r.status === 'live' ? 'expires' : 'expired'} {new Date(r.expiresAt).toLocaleString()}
+                    Opened {r.views}{r.maxViews ? ` of ${r.maxViews}` : ''} {r.views === 1 && !r.maxViews ? 'time' : 'times'} · made {when(r.createdAt)} · {r.status === 'live' ? 'expires' : 'expired'} {when(r.expiresAt)}
                   </span>
                 </div>
                 {r.status === 'live' ? <div className="device-actions"><button className="btn btn-danger-ghost btn-sm" onClick={() => void revoke(r)} aria-label={`Revoke link to ${r.name}`}>Revoke</button></div> : null}

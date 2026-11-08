@@ -121,6 +121,8 @@ export interface ServerPolicy {
   sessionDays: number | null
   activityDays: number
   auditDays: number
+  shareLinks: boolean
+  shareLinkMaxDays: number
 }
 
 export type BackupFrequency = 'off' | 'daily' | 'weekly' | 'monthly'
@@ -221,7 +223,7 @@ export const api = {
   /** Self-reported strength (0–4) of the master password, for organization policies. */
   passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes'>; policyGap: string | null }>(
+    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; recoveryCodesLeft: number }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -343,6 +345,8 @@ export const api = {
     revoke: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/shares/${encodeURIComponent(id)}`, { token }),
     open: (id: string) => request<{ blob: string; expiresAt: string; viewsLeft: number | null }>('POST', `/api/shares/${encodeURIComponent(id)}/open`, {}),
   },
+  alerts: (token: string) => request<{ signIn: boolean; available: boolean }>('GET', '/api/account/alerts', { token }),
+  setAlerts: (token: string, signIn: boolean) => request<{ signIn: boolean }>('PUT', '/api/account/alerts', { token, body: { signIn } }),
   breachRange: (token: string, prefix: string) => request<{ range: string }>('GET', `/api/breach/range/${prefix}`, { token }),
   prefs: (token: string) => request<{ blob: string | null; updatedAt?: string }>('GET', '/api/prefs', { token }),
   putPrefs: (token: string, blob: string) => request<{ updatedAt: string }>('PUT', '/api/prefs', { token, body: { blob } }),

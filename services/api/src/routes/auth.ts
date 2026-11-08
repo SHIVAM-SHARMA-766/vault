@@ -290,7 +290,9 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   await requireSecondFactor(app, profile, body, event)
 
   await touchLogin(app, profile.userId, profile)
-  if (app.config.mail.signInNotices) sendSignInNotice(app, email, event, false)
+  // The person can turn the ordinary sign-in email off (F5). Signing in with
+  // the recovery key always sends one.
+  if (app.config.mail.signInNotices && profile['signInAlerts'] !== false) sendSignInNotice(app, email, event, false)
   await recordActivity(app, profile.userId, 'login', event)
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
@@ -412,7 +414,7 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
     permissions: permissionsOf(role),
     twoFactor: { enabled: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0 },
     // What the server asks of this account, and what it still misses.
-    policy: { requireTwoFactor: policy.requireTwoFactor, minPasswordScore: policy.minPasswordScore, maxIdleMinutes: policy.maxIdleMinutes },
+    policy: { requireTwoFactor: policy.requireTwoFactor, minPasswordScore: policy.minPasswordScore, maxIdleMinutes: policy.maxIdleMinutes, shareLinks: policy.shareLinks, shareLinkMaxDays: policy.shareLinkMaxDays },
     policyGap: serverPolicyGap(policy, profile),
     identity: profile.publicKey && profile.wrappedPrivateKey
       ? { publicKey: profile.publicKey, wrappedPrivateKey: profile.wrappedPrivateKey }
