@@ -4,15 +4,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ISSUES, analyse, descendants, folderPath, matches, subtitle, typeSpec } from '@vault/core'
+import { ISSUES, type ListSort, analyse, descendants, flattenTree, folderTree, folderPath, matches, subtitle, typeSpec } from '@vault/core'
 
 import { Link } from '../../lib/router.js'
 import { api } from '../../lib/api.js'
 import { checkBreaches } from '../../lib/breach.js'
 import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
-import { IconAlert, IconInbox, IconPlus, IconSearch, IconShield, IconStar } from '../../ui/icons.js'
-import { Monogram, TYPES, typeInfo, useToast } from '../../ui/kit.js'
+import { IconAlert, IconInbox, IconPlus, IconRows, IconSearch, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
+import { Monogram, TYPES, copySecret, typeInfo, useToast } from '../../ui/kit.js'
+import * as prefs from '../../lib/prefs.js'
+import { navigate } from '../../lib/router.js'
+import { CommandPalette, type PaletteAction, ShortcutsDialog } from './CommandPalette.js'
 import { Shell } from '../../ui/Shell.js'
 import { EntryDetail } from './EntryDetail.js'
 import { EntryForm } from './EntryForm.js'
@@ -40,21 +43,55 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const [filter, setFilter] = useState<Filter>({ kind: 'all' })
   const [query, setQuery] = useState('')
   const [dialog, setDialog] = useState<Dialog>(null)
+  const [palette, setPalette] = useState(false)
+  const [shortcuts, setShortcuts] = useState(false)
+  // Several items picked for one action (E5); null when not selecting.
+  const [picked, setPicked] = useState<Set<string> | null>(null)
+  const [bulkConfirm, setBulkConfirm] = useState(false)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const view = prefs.usePrefs()
   const searchRef = useRef<HTMLInputElement>(null)
 
-  // "/" jumps to search, Escape backs out of whatever is open.
+  // Keyboard shortcuts (E4; the list is in CommandPalette.tsx). Single keys
+  // only when nothing is being typed and no dialog is open.
+  const keyState = useRef({ mode, dialog, palette, shortcuts, picked, selectedId, visible: [] as Decrypted[] })
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const k = keyState.current
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement
-      if (e.key === '/' && !typing) { e.preventDefault(); searchRef.current?.focus() }
-      if (e.key === 'Escape' && !typing && !dialog) {
-        if (mode.kind === 'edit') setMode({ kind: 'view' })
-        else setSelectedId(null)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette((p) => !p); return }
+      if (typing || k.dialog || k.palette || k.shortcuts || e.ctrlKey || e.metaKey || e.altKey) {
+        if (e.key === 'Escape' && !typing && !k.dialog && !k.palette && !k.shortcuts) setSelectedId(null)
+        return
+      }
+      const step = (d: number) => {
+        const list = k.visible
+        if (!list.length) return
+        const i = list.findIndex((x) => x.id === k.selectedId)
+        const next = list[Math.max(0, Math.min(list.length - 1, i < 0 ? 0 : i + d))]!
+        setSelectedId(next.id); setMode({ kind: 'view' })
+        document.querySelector(`[data-row="${next.id}"]`)?.scrollIntoView({ block: 'nearest' })
+      }
+      switch (e.key) {
+        case '/': e.preventDefault(); searchRef.current?.focus(); break
+        case 'n': if (k.mode.kind !== 'edit') { e.preventDefault(); startNew() } break
+        case 'j': e.preventDefault(); step(1); break
+        case 'k': e.preventDefault(); step(-1); break
+        case 'e': { const sel = entries.find((x) => x.id === k.selectedId); if (sel && k.mode.kind !== 'edit' && !sel.unreadable) { e.preventDefault(); setMode({ kind: 'edit', draft: withTypeDefaults(contentOf(sel)), id: sel.id }) } break }
+        case 's': e.preventDefault(); setPicked((p) => (p ? null : new Set())); break
+        case 'l': e.preventDefault(); session.lock(); break
+        case '?': e.preventDefault(); setShortcuts(true); break
+        case 'Escape':
+          if (k.picked) setPicked(null)
+          else if (k.mode.kind === 'edit') setMode({ kind: 'view' })
+          else setSelectedId(null)
+          break
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [mode.kind, dialog])
+    // Re-bound every render, so the handler always sees current state.
+  })
 
   const folderIds = useMemo(() => new Set(folders.map((f) => f.id)), [folders])
   const inFolder = (e: Decrypted) => (e.folderId && folderIds.has(e.folderId) ? e.folderId : undefined)
@@ -119,8 +156,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
       if (filter.kind === 'unfiled' && (inFolder(e) || sharedOf(e))) return false
       if (scope && !(e.folderId && scope.has(e.folderId))) return false
       return matches(e, query, folderPath(folders, inFolder(e)))
-    })
-  }, [entries, folders, filter, query, folderIds, health])
+    }).sort(sorter(view.listSort))
+  }, [entries, folders, filter, query, folderIds, health, view.listSort])
+  keyState.current = { mode, dialog, palette, shortcuts, picked, selectedId, visible }
 
   const selected = entries.find((e) => e.id === selectedId) ?? null
 
@@ -191,6 +229,63 @@ export function Vault({ state }: { state: session.Unlocked }) {
     } catch (err) { toast(err instanceof Error ? err.message : 'Could not move it.', 'error') }
   }
 
+  // ── Bulk actions (E5): personal items only; shared ones belong to a collection.
+  const pickable = (e: Decrypted) => !sharedOf(e) && !e.unreadable
+  const pickedItems = picked ? vault.entries.filter((e) => picked.has(e.id) && pickable(e)) : []
+  function togglePick(id: string) {
+    setPicked((p) => { const n = new Set(p ?? []); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  }
+  async function bulk(change: (c: EntryContent) => EntryContent, done: (n: number) => string) {
+    setBulkBusy(true)
+    try {
+      for (const e of pickedItems) await vault.saveEntry(change(contentOf(e)), e.id, { reload: false })
+      await vault.load()
+      toast(done(pickedItems.length))
+      setPicked(null)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not change them all.', 'error')
+      await vault.load()
+    } finally { setBulkBusy(false); setBulkConfirm(false) }
+  }
+  async function bulkDelete() {
+    setBulkBusy(true)
+    try {
+      const token = await session.token()
+      for (const e of pickedItems) await api.deleteEntry(token, e.id)
+      if (selectedId && picked?.has(selectedId)) setSelectedId(null)
+      toast(`${pickedItems.length} ${pickedItems.length === 1 ? 'item' : 'items'} deleted`)
+      setPicked(null)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not delete them all.', 'error')
+    } finally { await vault.load(); setBulkBusy(false); setBulkConfirm(false) }
+  }
+  const plural = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`
+
+  // ── Command palette actions (E4).
+  const go = (f: Filter) => { setFilter(f); setSelectedId(null); setMode({ kind: 'view' }) }
+  const paletteActions: PaletteAction[] = [
+    { id: 'new', label: 'New item', keys: 'N', run: startNew },
+    { id: 'all', label: 'Go to All items', run: () => go({ kind: 'all' }) },
+    { id: 'fav', label: 'Go to Favorites', run: () => go({ kind: 'favorites' }) },
+    { id: 'health', label: 'Go to Password health', hint: 'weak, reused, breached, expiring', run: () => go({ kind: 'health' }) },
+    { id: 'archive', label: 'Go to Archive', run: () => go({ kind: 'archive' }) },
+    { id: 'select', label: 'Select several items', keys: 'S', run: () => setPicked(new Set()) },
+    { id: 'sort-name', label: 'Sort by name', run: () => void prefs.save(state.vaultKey, { listSort: 'name' }) },
+    { id: 'sort-updated', label: 'Sort by recently changed', run: () => void prefs.save(state.vaultKey, { listSort: 'updated' }) },
+    { id: 'sort-type', label: 'Sort by type', run: () => void prefs.save(state.vaultKey, { listSort: 'type' }) },
+    { id: 'density', label: view.density === 'compact' ? 'Comfortable list' : 'Compact list', run: () => void prefs.save(state.vaultKey, { density: view.density === 'compact' ? 'comfortable' : 'compact' }) },
+    { id: 'settings', label: 'Open Settings', run: () => navigate('/app/settings') },
+    { id: 'security', label: 'Open Settings → Security', hint: 'two-factor, devices, share links', run: () => navigate('/app/settings/security') },
+    { id: 'prefs', label: 'Open Settings → Preferences', hint: 'theme, auto-lock, clipboard', run: () => navigate('/app/settings/preferences') },
+    { id: 'backups', label: 'Open Settings → Backups', run: () => navigate('/app/settings/backups') },
+    { id: 'transfer', label: 'Import or export', run: () => navigate('/app/import-export') },
+    { id: 'orgs', label: 'Open Organizations', run: () => navigate('/app/orgs') },
+    ...(state.isAdmin ? [{ id: 'admin', label: 'Open the admin panel', run: () => navigate('/app/admin') }] : []),
+    { id: 'theme', label: 'Switch to dark or light theme', run: () => { const t = view.theme === 'dark' ? 'light' : 'dark'; void prefs.save(state.vaultKey, { theme: t }) } },
+    { id: 'keys', label: 'Keyboard shortcuts', keys: '?', run: () => setShortcuts(true) },
+    { id: 'lock', label: 'Lock the vault', keys: 'L', run: () => session.lock() },
+  ]
+
   function startNew() {
     const type = (filter.kind === 'type' ? filter.type : 'login') as EntryType
     setSelectedId(null)
@@ -236,7 +331,61 @@ export function Vault({ state }: { state: session.Unlocked }) {
           <div className="list-head">
             <h2 className="truncate">{title}</h2>
             <span className="muted">{visible.length}</span>
+            <div className="list-tools">
+              <select aria-label="Sort by" className="select-sm" value={view.listSort} onChange={(e) => void prefs.save(state.vaultKey, { listSort: e.target.value as ListSort })}>
+                <option value="name">Name</option>
+                <option value="updated">Recently changed</option>
+                <option value="type">Type</option>
+              </select>
+              <button className="icon-btn" aria-pressed={view.density === 'compact'} title={view.density === 'compact' ? 'Comfortable rows' : 'Compact rows'}
+                      aria-label="Compact rows" onClick={() => void prefs.save(state.vaultKey, { density: view.density === 'compact' ? 'comfortable' : 'compact' })}>
+                <IconRows size={16} />
+              </button>
+              <button className={`btn btn-ghost btn-sm ${picked ? 'btn-pressed' : ''}`} aria-pressed={!!picked} onClick={() => { setPicked(picked ? null : new Set()); setBulkConfirm(false) }}>
+                {picked ? 'Done' : 'Select'}
+              </button>
+            </div>
           </div>
+          {picked ? (
+            <div className="bulk-bar" role="toolbar" aria-label="Selected items">
+              <label className="check bulk-all">
+                <input type="checkbox" aria-label="Select all shown"
+                       checked={visible.filter(pickable).length > 0 && visible.filter(pickable).every((e) => picked.has(e.id))}
+                       onChange={(e) => setPicked(e.target.checked ? new Set(visible.filter(pickable).map((x) => x.id)) : new Set())} />
+                <span>{pickedItems.length ? `${pickedItems.length} selected` : 'Select items'}</span>
+              </label>
+              {bulkConfirm ? (
+                <span className="bulk-actions">
+                  <span className="small"><strong>Delete {plural(pickedItems.length)}?</strong> This cannot be undone.</span>
+                  <button className="btn btn-secondary btn-sm" onClick={() => setBulkConfirm(false)}>Cancel</button>
+                  <button className="btn btn-danger btn-sm" disabled={bulkBusy} onClick={() => void bulkDelete()}>Delete permanently</button>
+                </span>
+              ) : (
+                <span className="bulk-actions">
+                  <button className="btn btn-secondary btn-sm" disabled={!pickedItems.length || bulkBusy}
+                          onClick={() => void bulk((c) => ({ ...c, favorite: !pickedItems.every((e) => e.favorite) }), (n) => pickedItems.every((e) => e.favorite) ? `${plural(n)} removed from favorites` : `${plural(n)} added to favorites`)}>
+                    <IconStar size={14} />{pickedItems.length && pickedItems.every((e) => e.favorite) ? 'Unfavorite' : 'Favorite'}
+                  </button>
+                  <select aria-label="Move to folder" className="select-sm" disabled={!pickedItems.length || bulkBusy} value=""
+                          onChange={(e) => {
+                            const to = e.target.value
+                            if (!to) return
+                            const name = to === '-' ? 'No folder' : folderPath(folders, to)
+                            void bulk((c) => { const { folderId: _f, ...rest } = c; return to === '-' ? rest : { ...rest, folderId: to } }, (n) => `${plural(n)} moved to ${name}`)
+                          }}>
+                    <option value="">Move to…</option>
+                    <option value="-">No folder</option>
+                    {flattenTree(folderTree(folders)).map((n) => <option key={n.folder.id} value={n.folder.id}>{'\u00a0\u00a0'.repeat(n.depth)}{n.folder.name}</option>)}
+                  </select>
+                  <button className="btn btn-secondary btn-sm" disabled={!pickedItems.length || bulkBusy}
+                          onClick={() => void bulk((c) => { const { archived: _a, ...rest } = c; return filter.kind === 'archive' ? rest : { ...rest, archived: true } }, (n) => filter.kind === 'archive' ? `${plural(n)} restored` : `${plural(n)} archived`)}>
+                    <IconInbox size={14} />{filter.kind === 'archive' ? 'Restore' : 'Archive'}
+                  </button>
+                  <button className="btn btn-danger-ghost btn-sm" disabled={!pickedItems.length || bulkBusy} onClick={() => setBulkConfirm(true)}><IconTrash size={14} />Delete</button>
+                </span>
+              )}
+            </div>
+          ) : null}
           {filter.kind === 'health' ? (
             <div className="health-summary">
               <div className={`health-score ${health.score >= 80 ? 'is-good' : health.score >= 50 ? 'is-fair' : 'is-poor'}`}>
@@ -283,11 +432,16 @@ export function Vault({ state }: { state: session.Unlocked }) {
           ) : visible.length === 0 ? (
             <EmptyState hasEntries={entries.length > 0} onNew={startNew} />
           ) : (
-            <ul className="rows">
+            <ul className={`rows ${view.density === 'compact' ? 'rows-compact' : ''}`}>
               {visible.slice(0, shown).map((e) => (
-                <li key={e.id}>
-                  <button className={`row-item ${e.id === selectedId ? 'row-active' : ''}`}
-                          onClick={() => { setSelectedId(e.id); setMode({ kind: 'view' }) }}>
+                <li key={e.id} data-row={e.id} className={picked ? 'row-pickable' : ''}>
+                  {picked ? (
+                    <input type="checkbox" className="row-pick" aria-label={`Select ${e.name || 'Untitled'}`} disabled={!pickable(e)}
+                           title={pickable(e) ? undefined : 'Shared items are changed in their collection'}
+                           checked={picked.has(e.id)} onChange={() => togglePick(e.id)} />
+                  ) : null}
+                  <button className={`row-item ${e.id === selectedId ? 'row-active' : ''} ${picked?.has(e.id) ? 'row-picked' : ''}`}
+                          onClick={() => { if (picked) { if (pickable(e)) togglePick(e.id); return } setSelectedId(e.id); setMode({ kind: 'view' }) }}>
                     <Monogram name={e.name} />
                     <span className="row-text">
                       <span className="row-name">{e.name || 'Untitled'}{e.favorite ? <span className="row-star"><IconStar size={12} filled /></span> : null}</span>
@@ -372,12 +526,32 @@ export function Vault({ state }: { state: session.Unlocked }) {
           </div>
         </div>
       ) : null}
+      {palette ? (
+        <CommandPalette items={entries.filter((e) => !e.archived)} actions={paletteActions}
+                        onOpenItem={(id) => { go({ kind: 'all' }); setSelectedId(id) }}
+                        onCopyPassword={(item) => {
+                          if (!item.password) { toast('That item has no password', 'error'); return }
+                          if (sharedOf(item)?.hidePasswords) { toast('Hidden by your organization’s policy', 'error'); return }
+                          void copySecret(item.password).then(() => toast(`Password for ${item.name} copied`), () => toast('The browser refused clipboard access', 'error'))
+                        }}
+                        onClose={() => setPalette(false)} />
+      ) : null}
+      {shortcuts ? <ShortcutsDialog onClose={() => setShortcuts(false)} /> : null}
     </Shell>
   )
 }
 
 /** The stored content of an entry, personal or shared: without the fields
  *  this client adds to know where a shared item lives. */
+/** The list's order (E6). Name is the default; updated puts the newest
+ *  first; type groups items by kind, then name. */
+function sorter(by: ListSort): (a: Decrypted, b: Decrypted) => number {
+  const byName = (a: Decrypted, b: Decrypted) => a.name.localeCompare(b.name)
+  if (by === 'updated') return (a, b) => b.updatedAt.localeCompare(a.updatedAt) || byName(a, b)
+  if (by === 'type') return (a, b) => typeInfo(a.type).label.localeCompare(typeInfo(b.type).label) || byName(a, b)
+  return byName
+}
+
 function contentOf(e: Decrypted): EntryContent {
   const { orgId: _o, collectionId: _c, permission: _p, hidePasswords: _h, ...rest } = e as SharedEntry
   return stripMeta(rest as Decrypted)
