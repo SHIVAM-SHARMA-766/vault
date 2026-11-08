@@ -8,6 +8,7 @@ import * as session from '../lib/session.js'
 import { Link, navigate } from '../lib/router.js'
 import { IconGrid, IconKey, IconLock, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
 import { BrandMark } from '../lib/instance.js'
+import { NotificationBell } from './Notifications.js'
 
 const ROLE_LABEL: Record<string, string> = { owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer' }
 
@@ -29,6 +30,7 @@ export function Shell({ state, tag, center, actions, children }: {
         {center}
         <div className="topbar-actions">
           {actions}
+          <NotificationBell />
           <AccountMenu state={state} />
           <button className="btn btn-ghost" onClick={session.lock} title="Lock vault" aria-label="Lock vault">
             <IconLock size={16} /><span className="hide-sm">Lock</span>

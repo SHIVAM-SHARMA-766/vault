@@ -60,6 +60,10 @@ export interface CollectionView {
   rotationNeeded: boolean
   /** In a direct share with one person (D11). */
   direct?: boolean
+  /** I asked for access and am waiting (D7). */
+  requested?: boolean
+  /** My access is a check-out that ends then (D7). */
+  until?: string
   key?: Uint8Array
   permission?: SharePermission
   hidePasswords: boolean
@@ -73,6 +77,8 @@ export interface SharedEntry extends Decrypted {
   hidePasswords: boolean
   /** Someone who could open this has left; its password should change (B9). */
   exposed?: boolean
+  /** Admins are told when it is opened (D12). */
+  sensitive?: boolean
 }
 
 export const canEdit = (p?: SharePermission) => p === 'edit' || p === 'manage'
@@ -106,15 +112,15 @@ export function useTeams(vaultKey: Uint8Array) {
         const stale = new Set((await api.orgs.stale(token, row.id).catch(() => ({ items: [] }))).items.map((s) => `${s.collectionId}/${s.itemId}`))
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
-          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
+          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), ...(c.requested ? { requested: true } : {}), ...(c.access?.until ? { until: c.access.until } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
           if (c.access && c.access.keyVersion === c.keyVersion) {
             view.key = await openCollectionKey(me.privateKey, me.publicKey, c.access.keyBlob, c.id, c.keyVersion)
             view.permission = c.access.permission
             for (const it of (await api.orgs.items(token, row.id, c.id)).items) {
               try {
                 // `exposed` is the server's word (B9), never the blob's.
-                const { exposed: _x, ...content } = (await openSharedItem(c.id, it.id, it.keyVersion, it.blob, view.key)) as EntryContent & { exposed?: unknown }
-                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords, ...(stale.has(`${c.id}/${it.id}`) ? { exposed: true } : {}) })
+                const { exposed: _x, sensitive: _s, ...content } = (await openSharedItem(c.id, it.id, it.keyVersion, it.blob, view.key)) as EntryContent & { exposed?: unknown; sensitive?: unknown }
+                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords, ...(stale.has(`${c.id}/${it.id}`) ? { exposed: true } : {}), ...(it.sensitive ? { sensitive: true } : {}) })
               } catch { /* an item under an older key; rotation re-seals it */ }
             }
           }
@@ -216,10 +222,10 @@ export function useTeams(vaultKey: Uint8Array) {
     await api.orgs.confirm(await session.token(), orgId, userId, await sealOrgKey(fromBase64Url(publicKey), org.key, orgId))
   }
 
-  async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean, viaGroup?: string) {
+  async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean, viaGroup?: string, hours?: number) {
     const c = coll(collectionId)
     await api.orgs.grant(await session.token(), c.orgId, c.id, userId, {
-      permission, hidePasswords, keyBlob: await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion), ...(viaGroup ? { viaGroup } : {}),
+      permission, hidePasswords, keyBlob: await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion), ...(viaGroup ? { viaGroup } : {}), ...(hours ? { hours } : {}),
     })
   }
 
@@ -295,7 +301,7 @@ export function useTeams(vaultKey: Uint8Array) {
   async function saveShared(collectionId: string, content: EntryContent, id?: string): Promise<string> {
     const c = coll(collectionId)
     const itemId = id ?? crypto.randomUUID()
-    const { folderId: _f, exposed: _x, ...rest } = content as EntryContent & { exposed?: unknown }
+    const { folderId: _f, exposed: _x, sensitive: _s, ...rest } = content as EntryContent & { exposed?: unknown; sensitive?: unknown }
     const blob = await sealSharedItem(c.id, itemId, c.keyVersion, rest, c.key)
     if (!isWithinSizeLimit(blob)) throw new Error('That item is too large to store.')
     // A new password clears the "someone who left could have seen it" mark (B9).

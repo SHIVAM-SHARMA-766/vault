@@ -176,3 +176,90 @@ test('a direct share is between two people: a third invitation is refused; it sa
   const teams = (await h.request('GET', '/api/orgs', { token: owner.token })).body['orgs'] as { id: string; kind: string }[]
   assert.equal(teams.find((o) => o.id === team.orgId)!.kind, 'team')
 })
+
+// ── Notification centre, access requests and check-outs, sensitive items (E10, D7, D12)
+
+const notes = async (h: H, token: string) => (await h.request('GET', '/api/notifications', { token })).body as { notes: { id: string; kind: string; read: boolean; data: Record<string, unknown> }[]; unread: number }
+
+test('a member asks for a collection; admins are told; a check-out grants it for hours, then it ends', async () => {
+  const { h, owner, ana } = await people()
+  const org = await newOrg(h, owner)
+  await join(h, owner, ana, org, 'Ana')
+  // Members see collections they cannot open, so they can ask.
+  const cols = (await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ana.token })).body['collections'] as { id: string; access: unknown; requested?: boolean }[]
+  assert.deepEqual(cols.map((c) => [c.id, c.access]), [[org.collId, null]])
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/collections/${org.collId}/items`, { token: ana.token })).status, 404, 'seeing the name is not opening it')
+
+  assert.equal((await h.request('POST', `/api/orgs/${org.orgId}/collections/${org.collId}/request`, { token: ana.token, body: { reason: 'Quarter-end close' } })).status, 201)
+  const ownerNotes = await notes(h, owner.token)
+  const req = ownerNotes.notes.find((n) => n.kind === 'access-request')!
+  assert.equal(req.data['who'], 'Ana')
+  assert.equal(req.data['reason'], 'Quarter-end close')
+  assert.equal(((await h.request('GET', `/api/orgs/${org.orgId}/requests`, { token: owner.token })).body['requests'] as unknown[]).length, 1)
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/requests`, { token: ana.token })).status, 403)
+  assert.equal(((await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ana.token })).body['collections'] as { requested?: boolean }[])[0]!.requested, true)
+
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/collections/${org.collId}/access/${ana.userId}`, { token: owner.token, body: {
+    permission: 'view', hours: 5, keyBlob: await sealCollectionKey(ana.keys.publicKey, org.collKey, org.collId, 1),
+  } })).status, 400, 'only offered lengths')
+  assert.equal((await h.request('PUT', `/api/orgs/${org.orgId}/collections/${org.collId}/access/${ana.userId}`, { token: owner.token, body: {
+    permission: 'view', hours: 8, keyBlob: await sealCollectionKey(ana.keys.publicKey, org.collKey, org.collId, 1),
+  } })).status, 200)
+  const granted = (await notes(h, ana.token)).notes.find((n) => n.kind === 'access-granted')!
+  assert.ok(granted.data['until'])
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/collections/${org.collId}/items`, { token: ana.token })).status, 200)
+  assert.equal(((await h.request('GET', `/api/orgs/${org.orgId}/requests`, { token: owner.token })).body['requests'] as unknown[]).length, 0, 'fulfilled')
+
+  h.setNow(h.app.now() + 9 * 3_600_000)
+  // Her token from setup has expired by now; sign in again.
+  const anaAgain = String((await h.request('POST', '/api/auth/login', { body: { email: ana.email, authKey: fixtureB64(ana.email) } })).body['accessToken'])
+  const ownerAgain = String((await h.request('POST', '/api/auth/login', { body: { email: owner.email, authKey: fixtureB64(owner.email) } })).body['accessToken'])
+  assert.equal((await h.request('GET', `/api/orgs/${org.orgId}/collections/${org.collId}/items`, { token: anaAgain })).status, 404, 'the check-out ran out')
+  assert.ok((await notes(h, anaAgain)).notes.some((n) => n.kind === 'access-ended'))
+  const col = ((await h.request('GET', `/api/orgs/${org.orgId}/collections`, { token: ownerAgain })).body['collections'] as { rotationNeeded: boolean }[])[0]!
+  assert.equal(col.rotationNeeded, true, 'her copy of the key should be retired')
+})
+
+test('a request can be turned down, and the member is told', async () => {
+  const { h, owner, ana } = await people()
+  const org = await newOrg(h, owner)
+  await join(h, owner, ana, org, 'Ana')
+  await h.request('POST', `/api/orgs/${org.orgId}/collections/${org.collId}/request`, { token: ana.token, body: {} })
+  assert.equal((await h.request('DELETE', `/api/orgs/${org.orgId}/collections/${org.collId}/request/${ana.userId}`, { token: ana.token })).status, 404)
+  assert.equal((await h.request('DELETE', `/api/orgs/${org.orgId}/collections/${org.collId}/request/${ana.userId}`, { token: owner.token })).status, 200)
+  assert.ok((await notes(h, ana.token)).notes.some((n) => n.kind === 'access-denied'))
+})
+
+test('sensitive items: managers mark them; members opening them is reported to managers', async () => {
+  const x = await orgWithItems()
+  const { h, owner, ana, orgId, collId, items } = x
+  assert.equal((await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${items[0]}/sensitive`, { token: ana.token, body: { sensitive: true } })).status, 403, 'edit is not manage')
+  assert.equal((await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${items[0]}/sensitive`, { token: owner.token, body: { sensitive: true } })).status, 200)
+  const list = (await h.request('GET', `/api/orgs/${orgId}/collections/${collId}/items`, { token: ana.token })).body['items'] as { id: string; sensitive?: boolean }[]
+  assert.equal(list.find((i) => i.id === items[0])!.sensitive, true)
+  // An edit keeps the mark.
+  await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${items[0]}`, { token: owner.token, body: { blob: sealedBlob('again'), keyVersion: 1 } })
+  await h.request('POST', `/api/orgs/${orgId}/events`, { token: ana.token, body: { action: 'reveal', collectionId: collId, itemId: items[0] } })
+  await h.request('POST', `/api/orgs/${orgId}/events`, { token: ana.token, body: { action: 'view', collectionId: collId, itemId: items[1] } })
+  const ownerNotes = (await notes(h, owner.token)).notes.filter((n) => n.kind === 'sensitive-opened')
+  assert.equal(ownerNotes.length, 1, 'only the sensitive one')
+  assert.deepEqual([ownerNotes[0]!.data['who'], ownerNotes[0]!.data['action'], ownerNotes[0]!.data['itemId']], ['Ana', 'reveal', items[0]])
+  assert.ok(!(await notes(h, ana.token)).notes.some((n) => n.kind === 'sensitive-opened'))
+})
+
+test('invitations and acceptances notify; notifications are read one by one or all at once', async () => {
+  const { h, owner, ben } = await people()
+  const org = await newOrg(h, owner)
+  await h.request('POST', `/api/orgs/${org.orgId}/invites`, { token: owner.token, body: { email: ben.email, label: 'Ben' } })
+  let b = await notes(h, ben.token)
+  assert.equal(b.notes[0]!.kind, 'org-invite')
+  assert.equal(b.unread, 1)
+  await h.request('POST', `/api/orgs/${org.orgId}/accept`, { token: ben.token })
+  const o = await notes(h, owner.token)
+  assert.ok(o.notes.some((n) => n.kind === 'member-accepted' && n.data['who'] === 'Ben'))
+  b = (await h.request('POST', '/api/notifications/read', { token: ben.token, body: { ids: [b.notes[0]!.id] } })).body as typeof b
+  assert.equal(b.unread, 0)
+  assert.equal((await h.request('POST', '/api/notifications/read', { token: owner.token, body: { all: true } })).body['unread'], 0)
+  assert.equal((await h.request('POST', '/api/notifications/read', { token: owner.token, body: {} })).status, 400)
+  assert.ok(!JSON.stringify(h.store.dump().filter((r) => r.sk.startsWith('NOTE#'))).includes(ben.email), 'no addresses in notifications')
+})

@@ -26,6 +26,7 @@ import {
 import type { Item } from '../store.js'
 import { requireEmail, requireSharedKey } from '../validate.js'
 import { recordActivity } from './activity.js'
+import { addNote } from '../inbox.js'
 
 type Status = 'invited' | 'accepted' | 'confirmed' | 'requested' | 'approved' | 'rejected'
 
@@ -176,6 +177,7 @@ export async function request(app: App, userId: string, event: LambdaEvent, id: 
   if (g.status !== 'confirmed' && g.status !== 'rejected') throw conflict(g.status === 'requested' || g.status === 'approved' ? 'Already requested.' : 'They have not confirmed you yet.')
   await app.store.put({ ...g, status: 'requested', requestedAt: new Date(app.now()).toISOString() })
   await recordActivity(app, g.grantorId, 'emergency-request', event)
+  await addNote(app, g.grantorId, 'emergency-request', { grantId: g.id ?? null })
   return json(200, { ok: true, opensAt: new Date(app.now() + g.waitDays * 86_400_000).toISOString() })
 }
 

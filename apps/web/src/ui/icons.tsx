@@ -169,3 +169,6 @@ export const IconLink = (p: P) => (
 export const IconRows = (p: P) => (
   <Svg {...p}><path d="M4 6h16M4 10h16M4 14h16M4 18h16" /></Svg>
 )
+export const IconBell = (p: P) => (
+  <Svg {...p}><path d="M6 9a6 6 0 1 1 12 0c0 5 2 6.5 2 6.5H4S6 14 6 9Z" /><path d="M10 19a2 2 0 0 0 4 0" /></Svg>
+)

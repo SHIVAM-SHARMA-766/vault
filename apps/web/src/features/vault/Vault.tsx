@@ -467,7 +467,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
                        onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
             <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
-                         shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? { where: (c.direct ? c.name : `${c.orgName} / ${c.name}`), permission: sh.permission, hidePasswords: sh.hidePasswords } : null })()}
+                         shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? {
+                           where: (c.direct ? c.name : `${c.orgName} / ${c.name}`), permission: sh.permission, hidePasswords: sh.hidePasswords, sensitive: !!sh.sensitive,
+                           ...(sh.permission === 'manage' ? { onSensitive: async (v: boolean) => {
+                             try { await api.orgs.setSensitive(await session.token(), sh.orgId, sh.collectionId, sh.id, v); await teams.load(); toast(v ? 'Marked sensitive: admins are told when it is opened' : 'No longer sensitive') }
+                             catch (err) { toast(err instanceof Error ? err.message : 'Could not change it.', 'error') }
+                           } } : {}),
+                         } : null })()}
                          shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: (c.direct ? c.name : `${c.orgName} / ${c.name}`) }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}
                          onShareWithPerson={sharedOf(selected) ? undefined : async (email) => {
@@ -565,7 +571,7 @@ function sorter(by: ListSort): (a: Decrypted, b: Decrypted) => number {
 
 function contentOf(e: Decrypted): EntryContent {
   // Everything the app adds about where an item sits stays out of what is sealed.
-  const { orgId: _o, collectionId: _c, permission: _p, hidePasswords: _h, exposed: _x, ...rest } = e as SharedEntry
+  const { orgId: _o, collectionId: _c, permission: _p, hidePasswords: _h, exposed: _x, sensitive: _s, ...rest } = e as SharedEntry
   return stripMeta(rest as Decrypted)
 }
 

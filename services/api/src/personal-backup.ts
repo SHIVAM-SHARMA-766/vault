@@ -15,6 +15,7 @@ import type { App } from './context.js'
 import { EgressRefused, checkDestinationUrl, guardedRequest } from './egress.js'
 import { ENTRY_PREFIX, FOLDER_PREFIX, PREFS_SK, PROFILE_SK, SYSTEM_PK, userPk } from './keys.js'
 import { type S3Target, type Transport, s3Object } from './s3.js'
+import { addNote } from './inbox.js'
 
 export const BKCFG_SK = 'BKCFG'
 export const BKRUN_PREFIX = 'BKRUN#'
@@ -277,6 +278,8 @@ export async function runBackup(app: App, userId: string, reason: Run['reason'])
     run.ok = true
   } catch (err) {
     run.error = describe(err)
+    // A scheduled run fails while nobody is watching; say so where they will look.
+    if (reason === 'scheduled') await addNote(app, userId, 'backup-failed', { error: run.error })
   }
   await app.store.put({ pk: userPk(userId), sk: `${BKRUN_PREFIX}${run.id}`, ...run })
   await prune(app, userId, cfg)
