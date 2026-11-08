@@ -63,6 +63,9 @@ export interface EntryContent {
   /** When the password last changed (ISO 8601), for the health check's "old"
    *  finding. Set by the client on save; absent on older entries. */
   passwordChangedAt?: string
+  /** Remind me to change the password this many days after it last changed
+   *  (D6); absent for never. */
+  rotateDays?: number
 }
 
 export interface FolderContent {

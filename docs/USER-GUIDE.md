@@ -153,6 +153,8 @@ lists the ones with a problem:
 | **Old** | Not changed in over a year | Change it at the site, then here |
 | **Unencrypted site** | The saved website starts with `http://` | Use the site's `https://` address |
 | **Breached** | Found in known data breaches (after **Check for breaches**) | Change it everywhere it is used |
+| **Change due** | You set **Remind me to change the password** on the item (every 30, 90 or 180 days, or yearly) and the time has passed | Change it at the site, then here |
+| **Seen by someone who left** | A shared item someone who has since left the organization could open | Change it at the site, then here |
 | **Expired** / **Expiring soon** | A card, passport, licence, membership or API credential whose expiry date has passed, or falls within 30 days (not scored) | Renew it, or update the date |
 
 These checks run in your browser. **Check for breaches** is the one exception, and only when you
@@ -308,7 +310,13 @@ Account menu → **Organizations**.
    **Can manage** (manage lets them share it onward). **Hide passwords** lets someone use a
    login without seeing its password in the app — a policy, not encryption.
 
-**Share an item** by opening it and choosing **Share** → a collection. It moves into the
+**Share with one person.** Open an item, choose **Share**, and type the address of someone
+with an account on this server. Vault makes a private space for the two of you (shown in
+Organizations as a **Direct share**), moves the item into it, and invites them. Once they
+accept and you confirm their fingerprint, they can open and edit it. Further items shared with
+the same person go into the same space. Removing them works like any member removal.
+
+**Share an item with a team** by opening it and choosing **Share** → a collection. It moves into the
 collection, re-encrypted with the collection's key; everyone with access sees it under
 **Shared** in the sidebar. **Move to my vault** takes it back.
 
@@ -426,6 +434,16 @@ Overview → **Policies** sets rules for every account on the server:
 
 No policy locks anyone out: an account that misses one keeps working and is told what to do.
 Every change is in the audit log.
+</details>
+
+<details>
+<summary>First-run setup wizard</summary>
+
+On a new server, the owner's first visit to the admin panel opens **Set up this server**. It
+covers the name and support address, who can join (invite only is recommended), sign-in rules
+(two-factor sign-in, strong master passwords, a short auto-lock), whether mail and backups work
+(with a test email), and inviting people. Any step can be skipped, and **Step by step…** on the
+Overview checklist opens it again.
 </details>
 
 <details>

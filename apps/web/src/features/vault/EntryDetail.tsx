@@ -11,11 +11,11 @@ import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import { ShareLinkDialog } from './ShareLink.js'
 import type { Decrypted, Folder, Version } from './model.js'
-import { when } from '../../lib/format.js'
+import { day, when } from '../../lib/format.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean }
 
-export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
@@ -26,6 +26,8 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
   shared?: SharedInfo | null
   shareTargets?: { id: string; label: string }[]
   onShare?: (collectionId: string) => void
+  /** Personal items: share with one person by address (D11). */
+  onShareWithPerson?: ((email: string) => Promise<void>) | undefined
   onUnshare?: () => void
   /** For shared items: report opening, revealing and copying to the organization's audit. */
   onAudit?: (action: 'view' | 'reveal' | 'copy') => void
@@ -43,6 +45,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
   const [sharing, setSharing] = useState(false)
   const [linking, setLinking] = useState(false)
   const [target, setTarget] = useState('')
+  const [person, setPerson] = useState('')
   const readOnly = shared?.permission === 'view'
   const hidden = shared?.hidePasswords === true
   const secretKinds = new Set(['secret', 'secretBlock', 'totp'])
@@ -72,7 +75,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
             <button className={`btn btn-secondary btn-sm ${showHistory ? 'btn-pressed' : ''}`} onClick={() => setShowHistory(!showHistory)}
                     disabled={entry.unreadable} aria-pressed={showHistory} aria-label="History"><IconClock size={15} /><span className="btn-label">History</span></button>
           )}
-          {!shared && shareTargets.length ? (
+          {!shared && (shareTargets.length || onShareWithPerson) ? (
             <button className={`btn btn-secondary btn-sm ${sharing ? 'btn-pressed' : ''}`} onClick={() => setSharing(!sharing)} aria-label="Share"><IconUsers size={15} /><span className="btn-label">Share</span></button>
           ) : null}
           {vaultKey && !shared ? (
@@ -119,15 +122,28 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
 
       {sharing ? (
         <div className="confirm">
-          <p><strong>Share “{entry.name}”</strong> by moving it into a collection. It is re-encrypted with the collection’s key and leaves your personal vault; everyone who can open the collection can read it.</p>
-          <div className="confirm-actions">
-            <select aria-label="Collection" value={target} onChange={(e) => setTarget(e.target.value)}>
-              <option value="">Choose a collection…</option>
-              {shareTargets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
-            </select>
-            <button className="btn btn-secondary btn-sm" onClick={() => setSharing(false)}>Cancel</button>
-            <button className="btn btn-primary btn-sm" disabled={!target} onClick={() => { onShare?.(target); setSharing(false) }}>Move to collection</button>
-          </div>
+          {onShareWithPerson ? (
+            <form className="share-person" onSubmit={async (e) => { e.preventDefault(); await onShareWithPerson(person); setPerson(''); setSharing(false) }}>
+              <p><strong>Share “{entry.name}” with a person</strong> who has an account on this server. It moves to a space only the two of you share, encrypted to their key once you have checked their fingerprint.</p>
+              <div className="confirm-actions">
+                <input type="email" required aria-label="Their email address" placeholder="Their email address" value={person} onChange={(e) => setPerson(e.target.value)} />
+                <button type="submit" className="btn btn-primary btn-sm" disabled={!person.trim()}>Share</button>
+              </div>
+            </form>
+          ) : null}
+          {shareTargets.length ? (
+            <>
+              <p><strong>Or move it into a collection.</strong> It is re-encrypted with the collection’s key and leaves your personal vault; everyone who can open the collection can read it.</p>
+              <div className="confirm-actions">
+                <select aria-label="Collection" value={target} onChange={(e) => setTarget(e.target.value)}>
+                  <option value="">Choose a collection…</option>
+                  {shareTargets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </select>
+                <button className="btn btn-primary btn-sm" disabled={!target} onClick={() => { onShare?.(target); setSharing(false) }}>Move to collection</button>
+              </div>
+            </>
+          ) : null}
+          <div className="confirm-actions"><button className="btn btn-secondary btn-sm" onClick={() => setSharing(false)}>Cancel</button></div>
         </div>
       ) : null}
 
@@ -160,7 +176,9 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
         <div className="tags">{entry.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
       ) : null}
 
-      <p className="detail-foot">Last modified {formatDate(entry.updatedAt)}</p>
+      <p className="detail-foot">Last modified {formatDate(entry.updatedAt)}{entry.rotateDays && entry.password ? (
+        <> · Change reminder every {entry.rotateDays} days, next {day(new Date(Date.parse(entry.passwordChangedAt ?? entry.updatedAt) + entry.rotateDays * 86_400_000).toISOString())}</>
+      ) : null}</p>
     </article>
   )
 }

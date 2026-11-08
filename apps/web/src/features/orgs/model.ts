@@ -39,6 +39,10 @@ export async function myIdentity(vaultKey: Uint8Array): Promise<Identity> {
 export interface OrgView {
   id: string
   name: string
+  /** 'direct': a space between two people, made by "Share with a person" (D11). */
+  kind: 'team' | 'direct'
+  /** For a direct share, the other person's address (sealed in the org's name). */
+  peer?: string
   role: OrgRole
   status: 'accepted' | 'confirmed'
   key?: Uint8Array
@@ -54,6 +58,8 @@ export interface CollectionView {
   name: string
   keyVersion: number
   rotationNeeded: boolean
+  /** In a direct share with one person (D11). */
+  direct?: boolean
   key?: Uint8Array
   permission?: SharePermission
   hidePasswords: boolean
@@ -90,16 +96,17 @@ export function useTeams(vaultKey: Uint8Array) {
       const colls: CollectionView[] = []
       const entries: SharedEntry[] = []
       for (const row of rows) {
-        const base = { id: row.id, role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap }
+        const base = { id: row.id, kind: row.kind ?? 'team', role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap }
         if (row.status !== 'confirmed' || !row.orgKeyBlob) { views.push({ ...base, name: row.hint || 'Organization' }); continue }
         const key = await openOrgKey(me.privateKey, me.publicKey, row.orgKeyBlob, row.id)
-        const name = (await openOrgMeta(row.id, row.nameBlob, key)).name
-        views.push({ ...base, name, key })
+        const meta = await openOrgMeta(row.id, row.nameBlob, key)
+        const name = meta.name
+        views.push({ ...base, name, key, ...(meta.peer ? { peer: meta.peer } : {}) })
         if (row.policyGap) continue
         const stale = new Set((await api.orgs.stale(token, row.id).catch(() => ({ items: [] }))).items.map((s) => `${s.collectionId}/${s.itemId}`))
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
-          const view: CollectionView = { orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
+          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
           if (c.access && c.access.keyVersion === c.keyVersion) {
             view.key = await openCollectionKey(me.privateKey, me.publicKey, c.access.keyBlob, c.id, c.keyVersion)
             view.permission = c.access.permission
@@ -152,6 +159,53 @@ export function useTeams(vaultKey: Uint8Array) {
     })
     await load()
     return id
+  }
+
+  /** Shares one item with one person (D11). The first time, a direct space
+   *  is made for the two of you (an organization of two, with one collection),
+   *  they are invited, and the item is sealed into it at once; they can open it
+   *  after accepting and after you confirm their fingerprint. Later items to
+   *  the same person go into the same space. */
+  async function shareWithPerson(email: string, content: EntryContent): Promise<{ itemId: string; collectionId: string; waiting: boolean }> {
+    const address = email.trim().toLowerCase()
+    const token = await session.token()
+    const existing = orgs.find((o) => o.kind === 'direct' && o.peer === address && o.key)
+    const { folderId: _f, exposed: _x, ...rest } = content as EntryContent & { exposed?: unknown }
+    if (existing) {
+      const c = collections.find((x) => x.orgId === existing.id && x.key)
+      if (!c) throw new Error('That shared space has no collection you can open.')
+      const itemId = await saveShared(c.id, rest)
+      const { members } = await api.orgs.members(token, existing.id)
+      return { itemId, collectionId: c.id, waiting: !members.some((m) => m.status === 'confirmed' && m.role !== 'owner') }
+    }
+    const me = await myIdentity(vaultKey)
+    const orgId = crypto.randomUUID()
+    const orgKey = generateOrgKey()
+    const who = address.split('@')[0]!
+    const mine = (session.get()?.email ?? '').split('@')[0] || 'Me'
+    // Named for both of you, so it reads the same from either side.
+    const both = `${mine} & ${who}`.slice(0, 80)
+    await api.orgs.create(token, { id: orgId, kind: 'direct', hint: both, label: mine, nameBlob: await sealOrgMeta(orgId, { name: both, peer: address }, orgKey), orgKeyBlob: await sealOrgKey(me.publicKey, orgKey, orgId) })
+    const collId = crypto.randomUUID()
+    const collKey = generateCollectionKey()
+    await api.orgs.createCollection(token, orgId, { id: collId, nameBlob: await sealCollectionMeta(orgId, collId, { name: both }, orgKey), keyBlob: await sealCollectionKey(me.publicKey, collKey, collId, 1) })
+    await api.orgs.invite(token, orgId, address, who, 'member')
+    const itemId = crypto.randomUUID()
+    const blob = await sealSharedItem(collId, itemId, 1, rest, collKey)
+    if (!isWithinSizeLimit(blob)) throw new Error('That item is too large to store.')
+    await api.orgs.putItem(token, orgId, collId, itemId, blob, 1)
+    await load()
+    return { itemId, collectionId: collId, waiting: true }
+  }
+
+  /** After confirming the other person in a direct share, they get its
+   *  collection at once — that is the point of it. */
+  async function grantDirect(orgId: string, userId: string, publicKey: string) {
+    const org = orgs.find((o) => o.id === orgId)
+    if (org?.kind !== 'direct') return
+    for (const c of collections.filter((x) => x.orgId === orgId && x.key && x.permission === 'manage')) {
+      await grant(c.id, userId, publicKey, 'edit', false)
+    }
   }
 
   /** Confirms a member: the admin has compared fingerprints; seal the org key
@@ -258,7 +312,7 @@ export function useTeams(vaultKey: Uint8Array) {
     await load()
   }
 
-  return { orgs, collections, shared, invitations, identity, error, load, createOrg, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
+  return { orgs, collections, shared, invitations, identity, error, load, shareWithPerson, grantDirect, createOrg, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
 }
 
 export type Teams = ReturnType<typeof useTeams>

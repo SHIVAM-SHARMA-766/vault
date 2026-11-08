@@ -40,7 +40,9 @@ export const openCollectionKey = (privateKey: Uint8Array, ownPublicKey: Uint8Arr
   openFromSender(privateKey, ownPublicKey, blob, collectionKeyContext(collectionId, version))
 
 /** Names and other organization-level metadata, under the org key. */
-export interface OrgMeta { name: string }
+/** `peer`: for a direct share (D11), the other person's address, so the
+ *  sender's app finds the same space next time. Sealed like the name. */
+export interface OrgMeta { name: string; peer?: string }
 export interface CollectionMeta { name: string; parentId?: string }
 
 const orgMetaAad = (orgId: string) => utf8Encode(`vault.org.v1:${orgId}`)

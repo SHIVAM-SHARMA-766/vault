@@ -298,7 +298,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   const title = filter.kind === 'all' ? 'All items' : filter.kind === 'favorites' ? 'Favorites' : filter.kind === 'archive' ? 'Archive'
     : filter.kind === 'health' ? 'Password health'
-    : filter.kind === 'collection' ? (() => { const c = openCollections.find((x) => x.id === filter.id); return c ? `${c.orgName} / ${c.name}` : 'Collection' })()
+    : filter.kind === 'collection' ? (() => { const c = openCollections.find((x) => x.id === filter.id); return c ? (c.direct ? c.name : `${c.orgName} / ${c.name}`) : 'Collection' })()
     : filter.kind === 'unfiled' ? 'No folder' : filter.kind === 'type' ? typeInfo(filter.type as EntryType).plural
     : folderPath(folders, filter.id) || 'Folder'
   const paneOpen = mode.kind === 'edit' || selected !== null
@@ -467,9 +467,17 @@ export function Vault({ state }: { state: session.Unlocked }) {
                        onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
             <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
-                         shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? { where: `${c.orgName} / ${c.name}`, permission: sh.permission, hidePasswords: sh.hidePasswords } : null })()}
-                         shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: `${c.orgName} / ${c.name}` }))}
+                         shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? { where: (c.direct ? c.name : `${c.orgName} / ${c.name}`), permission: sh.permission, hidePasswords: sh.hidePasswords } : null })()}
+                         shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: (c.direct ? c.name : `${c.orgName} / ${c.name}`) }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}
+                         onShareWithPerson={sharedOf(selected) ? undefined : async (email) => {
+                           try {
+                             const r = await teams.shareWithPerson(email, contentOf(selected))
+                             await vault.deleteEntry(selected.id)
+                             setSelectedId(r.itemId)
+                             toast(r.waiting ? `Shared. ${email} can open it after they accept and you confirm their fingerprint in Organizations.` : `Shared with ${email}`)
+                           } catch (err) { toast(err instanceof Error ? err.message : 'Could not share it.', 'error') }
+                         }}
                          onUnshare={() => { const sh = sharedOf(selected); if (sh) void moveToVault(sh) }}
                          onAudit={(action) => { const sh = sharedOf(selected); if (sh) void session.token().then((t) => api.orgs.report(t, sh.orgId, action, sh.collectionId, sh.id)).catch(() => {}) }}
                          onBack={() => setSelectedId(null)}

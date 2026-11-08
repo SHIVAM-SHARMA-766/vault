@@ -290,7 +290,7 @@ export const api = {
 
   orgs: {
     list: (token: string) => request<{ orgs: OrgRow[] }>('GET', '/api/orgs', { token }),
-    create: (token: string, body: { id: string; hint: string; label: string; nameBlob: string; orgKeyBlob: string }) =>
+    create: (token: string, body: { id: string; hint: string; label: string; nameBlob: string; orgKeyBlob: string; kind?: 'team' | 'direct' }) =>
       request<{ id: string }>('POST', '/api/orgs', { token, body }),
     remove: (token: string, org: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}`, { token }),
     invitations: (token: string) => request<{ invitations: OrgInvitation[] }>('GET', '/api/orgs/invitations', { token }),
@@ -470,7 +470,7 @@ export interface AdminOrg {
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
-export interface OrgRow { id: string; nameBlob: string; hint: string; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
+export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
 export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
 export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[] }
 export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[] }

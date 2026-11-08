@@ -39,7 +39,7 @@ test('reuse, age and http are found; notes and cards are not checked', () => {
   assert.deepEqual(r.issues.get('d'), ['old'], 'the password age wins over the last edit')
   assert.deepEqual(r.issues.get('e'), ['weak'])
   assert.equal(r.issues.has('f'), false, 'a local address over http is not flagged; a recent change is not old')
-  assert.deepEqual(r.counts, { breached: 0, exposed: 0, weak: 1, reused: 2, old: 1, insecure: 1, expired: 0, expiring: 0 })
+  assert.deepEqual(r.counts, { breached: 0, exposed: 0, due: 0, weak: 1, reused: 2, old: 1, insecure: 1, expired: 0, expiring: 0 })
   assert.equal(r.score, 17)
 })
 
@@ -101,4 +101,17 @@ test('a shared password seen by someone who left is an issue, and is scored', ()
   const r = analyse([{ id: 's', type: 'login', password: 'unique-and-Long-Passw0rd!x', updatedAt: fresh }], Date.now(), new Set(), new Set(['s']))
   assert.deepEqual(r.issues.get('s'), ['exposed'])
   assert.equal(r.score, 0)
+})
+
+test('a rotation reminder falls due after the chosen days since the password changed', () => {
+  const now = Date.UTC(2026, 10, 8)
+  const ago = (d: number) => new Date(now - d * 86_400_000).toISOString()
+  const r = analyse([
+    { id: 'due', type: 'login', password: 'unique-and-Long-Passw0rd!a', passwordChangedAt: ago(91), rotateDays: 90, updatedAt: ago(1) },
+    { id: 'ok', type: 'login', password: 'unique-and-Long-Passw0rd!b', passwordChangedAt: ago(89), rotateDays: 90, updatedAt: ago(1) },
+    { id: 'none', type: 'login', password: 'unique-and-Long-Passw0rd!c', passwordChangedAt: ago(300), updatedAt: ago(1) },
+  ], now)
+  assert.deepEqual(r.issues.get('due'), ['due'])
+  assert.equal(r.issues.has('ok'), false)
+  assert.equal(r.issues.has('none'), false, 'no reminder asked, none given (old is a year)')
 })

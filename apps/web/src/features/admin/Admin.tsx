@@ -26,6 +26,7 @@ import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Website } from './Website.js'
 import { System } from './System.js'
+import { SetupWizard, wizardDone } from './SetupWizard.js'
 import { applyBranding, refresh as refreshInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
@@ -114,6 +115,11 @@ const loadOverview = (t: string) => api.admin.overview(t)
 function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolean }) {
   const toast = useToast()
   const { data, error, reload } = useAdminData(loadOverview)
+  // A new server (only its owner so far) opens the setup wizard once (A2).
+  const [wizard, setWizard] = useState(false)
+  // Cards below load their own settings; the wizard changes them, so they reload after it.
+  const [epoch, setEpoch] = useState(0)
+  useEffect(() => { if (data && canWrite && data.users <= 1 && !wizardDone()) setWizard(true) }, [data?.users])
 
   const backupAgeHours = data?.lastBackup?.at ? (Date.now() - Date.parse(data.lastBackup.at)) / 3_600_000 : null
   const backupStale = backupAgeHours === null || backupAgeHours > 36
@@ -128,7 +134,8 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
       <ErrorBox error={error} />
       {!data ? <div className="skeletons">{[0, 1].map((i) => <div key={i} className="skeleton" />)}</div> : (
         <>
-          <SetupChecklist data={data} onGo={onGo} />
+          <SetupChecklist data={data} onGo={onGo} onWizard={canWrite ? () => setWizard(true) : undefined} />
+          {wizard ? <SetupWizard data={data} onClose={() => { setWizard(false); setEpoch((n) => n + 1); void reload() }} onInvite={() => onGo('invites')} /> : null}
           <div className="stats">
             <Stat label="Accounts" value={data.users} note={data.disabledUsers ? `${data.disabledUsers} disabled` : 'all active'} onClick={() => onGo('users')} />
             <Stat label="Encrypted items" value={data.entries} note="across every vault" />
@@ -178,8 +185,8 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
             </div>
 
             <MailCard on={data.mail} canWrite={canWrite} />
-            <ProfileCard canWrite={canWrite} />
-            <PolicyCard canWrite={canWrite} missing={data.policyGapUsers} onGo={() => onGo('users')} />
+            <ProfileCard key={`p${epoch}`} canWrite={canWrite} />
+            <PolicyCard key={`y${epoch}`} canWrite={canWrite} missing={data.policyGapUsers} onGo={() => onGo('users')} />
 
             <div className="admin-card">
               <div className="admin-card-head"><span className="dot dot-ok" /><h2>Server</h2></div>
@@ -197,7 +204,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
 
 /** What a new server still needs, from what the server can see. Gone once
  *  everything is done. */
-function SetupChecklist({ data, onGo }: { data: AdminOverview; onGo: (t: Tab) => void }) {
+function SetupChecklist({ data, onGo, onWizard }: { data: AdminOverview; onGo: (t: Tab) => void; onWizard?: (() => void) | undefined }) {
   const [extra, setExtra] = useState<{ profile: boolean; twoFactor: boolean } | null>(null)
   useEffect(() => {
     void (async () => {
@@ -222,7 +229,8 @@ function SetupChecklist({ data, onGo }: { data: AdminOverview; onGo: (t: Tab) =>
   if (left === 0) return null
   return (
     <section className="admin-card admin-checklist" aria-labelledby="setup-title">
-      <div className="admin-card-head"><span className="dot dot-warn" /><h2 id="setup-title">Finish setting up</h2><span className="muted small">{left} of {steps.length} left</span></div>
+      <div className="admin-card-head"><span className="dot dot-warn" /><h2 id="setup-title">Finish setting up</h2><span className="muted small">{left} of {steps.length} left</span>
+        {onWizard ? <button className="btn btn-ghost btn-sm" onClick={onWizard}>Step by step…</button> : null}</div>
       <ul>
         {steps.map((x) => (
           <li key={x.text} className={x.done ? 'gs-done' : ''}>
