@@ -24,7 +24,9 @@ async function backUpNow(page) {
 }
 
 async function testRestore(page, secret) {
-  if (await page.getByRole('button', { name: 'Test restore…' }).count()) await page.getByRole('button', { name: 'Test restore…' }).click()
+  // Wait for the section to load before deciding whether the form is open.
+  await page.waitForSelector('#b-test-secret, button:has-text("Test restore…")')
+  if (!(await page.locator('#b-test-secret').count())) await page.getByRole('button', { name: 'Test restore…' }).click()
   await page.fill('#b-test-secret', secret)
   await page.getByRole('button', { name: 'Test', exact: true }).click()
   await page.waitForSelector('.test-restore .alert', { timeout: 60_000 })
