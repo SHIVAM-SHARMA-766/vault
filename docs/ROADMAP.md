@@ -37,7 +37,7 @@ flowchart LR
 | 2 — Self-hosted product | Anyone installs and upgrades it with one command | ✅ All 8 steps built 2026-11-07; licence, pricing and update channel still to decide |
 | 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | ✅ Built 2026-11-07 |
 | 3.5 — Improvement pass | Harden, polish and speed up everything built so far, before a second client | ⬜ Next |
-| 4 — Browser extension | Autofill, the main way a password manager is used | ⬜ Planned |
+| 4 — Browser extension | Autofill, the main way a password manager is used | 🟡 Stage 1 built ([0029](../decisions/0029-browser-extension.md)) |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
 | 6 — Enterprise | SSO, SCIM, HA | ⬜ Planned |
 
@@ -351,17 +351,24 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 ### Phase 4 — Browser extension
 
-- [ ] Manifest V3, Chrome and Firefox from one codebase, built from `packages/core` and the
-  crypto package.
-- [ ] **Points at the customer's server**: the server URL is chosen at first run, and the
-  extension's permissions are limited to that origin for API calls.
-- [ ] Autofill matched by exact origin and registrable domain (public suffix list bundled, not
-  fetched); never fills into a mismatched or cross-origin frame.
-- [ ] Save and update on form submit; generator in the page; TOTP fill.
-- [ ] Unlock with the master password; keys held in memory with the same idle rules as the web
-  client; the extension's own Content-Security-Policy.
-- [ ] Talks to the API directly; no page script is ever given the vault key.
-- [ ] Passkey storage and use, after autofill is solid.
+Design: [0029](../decisions/0029-browser-extension.md). Built in stages.
+
+- [x] Manifest V3, Chrome and Firefox from one codebase (`apps/extension`), built from
+  `packages/core` and the crypto package.
+- [x] **Points at the customer's server**: the server URL is chosen at first run, and the
+  extension's host permission is that origin only.
+- [x] Autofill matched by exact origin and registrable domain (Public Suffix List bundled, not
+  fetched); never fills into a mismatched or cross-origin frame (top frame only for now).
+- [x] Unlock with the master password (secret key, authenticator or recovery code); keys in
+  session storage with the account's idle rule; the extension's own Content-Security-Policy.
+- [x] Talks to the API directly; no page script is ever given the vault key. Fill on click
+  and by shortcut; copy username, password and TOTP code.
+- [ ] Shared collections, with the signed-grant checks (stage 2).
+- [ ] Optional all-sites permission: inline icon, save and update on form submit, generator
+  in the page (stage 3).
+- [ ] Store packages: Firefox Add-ons (free); Chrome Web Store needs a one-time developer fee,
+  the operator's decision (stage 4).
+- [ ] Passkey storage and use, after autofill is solid (stage 5).
 
 **Exit criteria:** fills and saves on the top sites in a test matrix; a phishing page on a
 look-alike domain gets nothing; published to the Chrome Web Store and Firefox Add-ons.

@@ -247,6 +247,11 @@ jobs:
       - name: Build and check the policy
         run: npm run build --workspace @vault/web
 
+      # The extension (decisions/0029). Its build refuses a shipped manifest
+      # that asks for standing access to websites or loosens its policy.
+      - name: Typecheck and build the extension
+        run: npm run build --workspace @vault/extension
+
   site:
     name: site — render, policy, links
     runs-on: ubuntu-latest
@@ -283,6 +288,18 @@ jobs:
       # Starts scripts/dev-stack.mjs per test and drives the runner's own
       # Chrome through sign-up, the vault, roles and website publishing, under
       # the Content-Security-Policy from the Caddyfile.
+      # Branded Chrome no longer loads an unpacked extension from the command
+      # line, so the extension test (decisions/0029) runs in Playwright's own
+      # Chromium build.
+      # Playwright 1.55 predates the runner's Ubuntu release; its 24.04 build
+      # runs there, on the libraries Chrome already brought.
+      - name: Chromium for the extension test
+        env:
+          PLAYWRIGHT_HOST_PLATFORM_OVERRIDE: ubuntu24.04-x64
+        run: |
+          npx playwright-core install chromium
+          echo "EXT_CHROME_PATH=$(node -e "import('playwright-core').then(m => console.log(m.chromium.executablePath()))")" >> "$GITHUB_ENV"
+
       - name: Browser tests
         run: npm run test:e2e
         env:

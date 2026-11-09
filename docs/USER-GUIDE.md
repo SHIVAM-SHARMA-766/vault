@@ -434,6 +434,32 @@ happens to you.
 
 <img src="images/emergency.png" alt="Emergency access in Settings: a trusted contact and the form to add one" width="820">
 
+## The browser extension
+
+Fill passwords without opening Vault: the extension for Chrome and Firefox
+([0029](../decisions/0029-browser-extension.md)).
+
+1. **Install.** Until it is in the stores, load it from a release: download
+   `vault-extension-chrome-*.zip` or `vault-extension-firefox-*.zip` and unzip it. In
+   Chrome, open `chrome://extensions`, turn on *Developer mode*, and choose *Load unpacked*.
+   In Firefox, open `about:debugging` → *This Firefox* → *Load Temporary Add-on*.
+2. **Connect.** Click the Vault button in the toolbar and enter your server's address, the one
+   you open Vault at. The extension asks to reach that address, and no other.
+3. **Unlock** with your email and master password, plus your secret key the first time if you
+   have one. A second factor works with an authenticator app or a recovery code. A security
+   key cannot be used from an extension.
+
+On a login page, open the extension: logins saved for that site are listed first. Click **Fill**,
+or press **Ctrl+Shift+L** (⌘⇧L on a Mac) to fill the best match without opening it. **User**,
+**Pass** and **Code** copy the username, the password, or the current two-factor code.
+
+- It fills only logins whose saved website matches the page: the same address, or the same
+  site over https (`accounts.example.com` for `www.example.com`). A look-alike address gets
+  nothing.
+- It cannot read or change any page until you click it or press the shortcut.
+- It locks after your account's idle limit (15 minutes unless your organization sets one), when
+  you click **Lock**, and when the browser closes.
+
 ## Help and support
 
 **No account yet, or locked out?** The sign-in screen has two links:

@@ -1,0 +1,51 @@
+/* The popup: the web app's tokens, at popup size. */
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9; --surface: #ffffff; --line: #dfe3ea; --text: #121620; --text-2: #4a5263;
+  --accent: #4f46e5; --accent-hover: #4338ca; --accent-text: #ffffff; --danger: #c0262d; --ok: #15803d;
+  --radius: 10px; --radius-sm: 7px;
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0b0d12; --surface: #12151c; --line: #262b36; --text: #e8eaf0; --text-2: #b4bac7;
+    --accent: #7c74ff; --accent-hover: #918aff; --accent-text: #0b0a1f; --danger: #ff7b7b; --ok: #4ade80; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); }
+/* Chrome gives extension pages its own body font at 75%; take the popup's back. */
+body { font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { width: 380px; min-height: 200px; max-height: 600px; }
+h1 { font-size: 17px; margin: 12px 0 6px; }
+h2 { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); margin: 12px 14px 4px; }
+p { margin: 6px 0; }
+code { font-size: 12px; overflow-wrap: anywhere; }
+.pad { padding: 14px; }
+.pad-x { padding: 0 14px; }
+.muted { color: var(--text-2); }
+.small { font-size: 12.5px; }
+label { display: block; font-weight: 600; font-size: 13px; margin: 10px 0 4px; }
+input { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: inherit; font: inherit; }
+input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; cursor: pointer; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--surface); color: inherit; padding: 7px 12px; }
+button:disabled { opacity: .6; cursor: default; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+button.ghost { background: transparent; }
+button.block { width: 100%; margin-top: 14px; padding: 9px 12px; }
+button.sm { padding: 3px 8px; font-size: 12.5px; }
+button.link { border: 0; background: none; padding: 0; color: var(--accent); text-decoration: underline; margin-top: 6px; font-size: 12.5px; }
+a { color: var(--accent); }
+.alert { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); border-radius: var(--radius-sm); padding: 8px 10px; margin: 10px 14px 0; font-size: 13px; }
+.pad .alert { margin: 10px 0 0; }
+.note { color: var(--ok); margin: 8px 14px 0; font-size: 13px; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.vault header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.vault .actions { display: flex; gap: 4px; }
+.search { margin: 10px 14px 0; width: calc(100% - 28px); }
+ul { list-style: none; margin: 0; padding: 0; }
+.row { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.row:hover { background: var(--surface); }
+.row-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.row-main strong, .row-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.foot { padding: 10px 14px; margin: 0; }
