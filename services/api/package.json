@@ -22,10 +22,10 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
-    "@types/node": "^20.14.0",
+    "@types/node": "^26.6.6",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.11.10",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   },
   "main": "./dist/src/main.js"
