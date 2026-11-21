@@ -21,7 +21,7 @@ export function describeNote(n: Note): { text: string; to: string } {
     case 'access-granted': return { text: `Your access request was approved${d['until'] ? `, until ${when(String(d['until']))}` : ''}.`, to: '/app/' }
     case 'access-denied': return { text: 'Your access request was turned down.', to: '/app/orgs' }
     case 'access-ended': return { text: 'A collection you checked out has closed again.', to: '/app/orgs' }
-    case 'sensitive-opened': return { text: `${who} ${d['action'] === 'reveal' ? 'revealed a password in' : d['action'] === 'copy' ? 'copied from' : 'opened'} a sensitive item.`, to: '/app/orgs' }
+    case 'sensitive-opened': return { text: `${who} ${d['action'] === 'reveal' ? 'revealed a password in' : d['action'] === 'copy' ? 'copied from' : d['action'] === 'fill' ? 'filled a page from' : 'opened'} a sensitive item.`, to: '/app/orgs' }
     case 'org-invite': return { text: `You are invited to join ${d['hint'] || 'an organization'}.`, to: '/app/orgs' }
     case 'member-accepted': return { text: `${who} accepted your invitation. Confirm their fingerprint to share with them.`, to: '/app/orgs' }
     case 'backup-failed': return { text: `Your scheduled backup failed${d['error'] ? `: ${d['error']}` : ''}.`, to: '/app/settings/backups' }

@@ -94,7 +94,6 @@ criterion asks for real files from three managers.
 [0029](../decisions/0029-browser-extension.md) is built in stages. What is missing now:
 
 - It is not yet in the Chrome or Firefox store, so it is loaded unpacked from a release zip.
-- It shows your own vault only, not shared collections.
 - It fills only when you click or press the shortcut. There is no icon inside login fields, and
   it does not offer to save a new password after you sign in.
 - It fills the top frame only, so a login form inside a same-site frame is not filled yet.

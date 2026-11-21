@@ -449,7 +449,7 @@ function PoliciesForm({ org, teams }: { org: OrgView; teams: Teams }) {
 }
 
 const ACTION_LABEL: Record<string, string> = {
-  'item.view': 'opened', 'item.reveal': 'revealed a secret in', 'item.copy': 'copied from', 'item.create': 'added', 'item.edit': 'edited', 'item.delete': 'deleted',
+  'item.view': 'opened', 'item.reveal': 'revealed a secret in', 'item.copy': 'copied from', 'item.fill': 'filled a page from', 'item.create': 'added', 'item.edit': 'edited', 'item.delete': 'deleted',
   'access.grant': 'gave access to', 'access.change': 'changed access to', 'access.revoke': 'removed access to', 'access.grant-group': 'gave a group access to',
   'collection.create': 'created', 'collection.delete': 'deleted', 'collection.rotate': 'rotated the key of',
   'member.invite': 'invited', 'member.confirm': 'confirmed', 'member.remove': 'removed', 'member.leave': 'left', 'policies.change': 'changed the policies',
@@ -466,7 +466,7 @@ function Activity({ org, teams, members }: { org: OrgView; teams: Teams; members
       <button className="link small" onClick={async () => { if (!open) setEvents((await api.orgs.events(await session.token(), org.id)).events); setOpen(!open) }}>{open ? 'Hide activity' : 'Activity…'}</button>
       {open ? (
         <div className="audit">
-          <p className="muted small">Who did what, for a year. Opening, revealing and copying are reported by each member's app.</p>
+          <p className="muted small">Who did what, for a year. Opening, revealing, copying and filling are reported by each member's app.</p>
           <ul className="activity-list">
             {events.length === 0 ? <li className="muted small">Nothing yet.</li> : events.map((e, i) => {
               const target = e.action.startsWith('item.') ? `${item(e.itemId)} in ${coll(e.collectionId)}`

@@ -40,6 +40,35 @@ function chromiumPath() {
   return [process.env.EXT_CHROME_PATH, '/usr/bin/chromium', '/usr/bin/chromium-browser'].find((p) => p && existsSync(p))
 }
 
+/** Chromium with the test build loaded; the extension's id, its background
+ *  worker, and a way to find a tab's id by URL. */
+async function launch() {
+  const exe = chromiumPath()
+  const ctx = await chromium.launchPersistentContext('', {
+    ...(exe ? { executablePath: exe } : {}),
+    headless: true,
+    args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`],
+  })
+  // Chromium runs service workers of its own too; ours is background.js.
+  const ours = (w) => w.url().endsWith('/background.js')
+  const worker = ctx.serviceWorkers().find(ours) ?? await ctx.waitForEvent('serviceworker', { predicate: ours })
+  // Its extension APIs are bound a moment after the worker starts.
+  for (let i = 0; i < 100 && !(await worker.evaluate(() => !!globalThis.chrome?.tabs)); i++) await new Promise((r) => setTimeout(r, 50))
+  const id = new URL(worker.url()).host
+  const tabOf = (url) => worker.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0]?.id, url)
+  return { ctx, worker, id, tabOf }
+}
+
+/** Connect the popup to the server and unlock it. */
+async function connect(popup, s, email) {
+  await popup.fill('#server', s.base)
+  await popup.getByRole('button', { name: 'Connect' }).click()
+  await popup.waitForSelector('h1:has-text("Unlock")')
+  await popup.fill('#email', email)
+  await popup.fill('#password', PASSWORD)
+  await popup.getByRole('button', { name: 'Unlock' }).click()
+}
+
 test('the extension connects, unlocks, fills the right site and nothing else, and locks', async () => {
   execFileSync('node', [`${ROOT}apps/extension/scripts/build.mjs`, '--test'], { stdio: 'ignore' })
   const s = await start({ owner: EMAIL })
@@ -58,19 +87,8 @@ test('the extension connects, unlocks, fills the right site and nothing else, an
     await web.click('.editor-foot .btn-primary')
     await web.waitForSelector('.detail h2:has-text("Example")')
 
-    const exe = chromiumPath()
-    ctx = await chromium.launchPersistentContext('', {
-      ...(exe ? { executablePath: exe } : {}),
-      headless: true,
-      args: [`--disable-extensions-except=${EXT}`, `--load-extension=${EXT}`],
-    })
-    // Chromium runs service workers of its own too; ours is background.js.
-    const ours = (w) => w.url().endsWith('/background.js')
-    const worker = ctx.serviceWorkers().find(ours) ?? await ctx.waitForEvent('serviceworker', { predicate: ours })
-    // Its extension APIs are bound a moment after the worker starts.
-    for (let i = 0; i < 100 && !(await worker.evaluate(() => !!globalThis.chrome?.tabs)); i++) await new Promise((r) => setTimeout(r, 50))
-    const id = new URL(worker.url()).host
-    const tabOf = (url) => worker.evaluate(async (u) => (await chrome.tabs.query({ url: u }))[0]?.id, url)
+    let worker, id, tabOf
+    ;({ ctx, worker, id, tabOf } = await launch())
 
     const login = await ctx.newPage()
     await login.goto(LOGIN)
@@ -136,6 +154,110 @@ test('the extension connects, unlocks, fills the right site and nothing else, an
   } finally {
     await ctx?.close()
     good.server.close(); other.server.close()
+    await s.stop()
+  }
+})
+
+test('shared collections: signed keys only, filled not copied when passwords are hidden, and reported', async () => {
+  execFileSync('node', [`${ROOT}apps/extension/scripts/build.mjs`, '--test'], { stdio: 'ignore' })
+  // Swapping the server's answers to the background needs Playwright to see
+  // service-worker traffic, which is experimental in Chromium.
+  process.env.PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS = '1'
+  const s = await start({ owner: 'alice@example.test' })
+  const good = await site()
+  const LOGIN = `http://127.0.0.1:${good.port}/login`
+  let ctx
+  try {
+    const alice = await s.person()
+    await s.register(alice, 'alice@example.test')
+    await s.setRegistration(true)
+    const bob = await s.person()
+    await s.register(bob, 'bob@example.test')
+
+    // Acme / Finance, shared with Bob, passwords hidden.
+    await s.menu(alice, 'Organizations')
+    await alice.fill('#o-name', 'Acme')
+    await alice.getByRole('button', { name: 'Create', exact: true }).click()
+    await alice.waitForSelector('#ork-title')
+    await alice.getByLabel('I have stored it somewhere safe').check()
+    await alice.getByRole('button', { name: 'Done' }).click()
+    await alice.fill('input[aria-label="New collection name"]', 'Finance')
+    await alice.getByRole('button', { name: 'Add collection' }).click()
+    await alice.waitForSelector('.collection-row:has-text("Finance")')
+    await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
+    await alice.fill('input[aria-label="Name for this member"]', 'Bob')
+    await alice.getByRole('button', { name: 'Invite', exact: true }).click()
+    await s.menu(bob, 'Organizations')
+    await bob.getByRole('button', { name: 'Accept' }).click()
+    await bob.waitForSelector('text=An admin must confirm you')
+    await alice.reload(); await s.unlock(alice, 'alice@example.test')
+    await s.menu(alice, 'Organizations')
+    await alice.locator('.device-row', { hasText: 'Bob' }).getByRole('button', { name: 'Confirm…' }).click()
+    await alice.getByRole('button', { name: 'It matches — confirm' }).click()
+    await alice.waitForSelector('text=Bob confirmed', { state: 'attached' })
+    await alice.locator('.collection-row', { hasText: 'Finance' }).getByRole('button', { name: 'Access' }).click()
+    await alice.selectOption('select[aria-label="Member"]', { label: 'Bob' })
+    await alice.getByLabel('Hide passwords').check()
+    await alice.getByRole('button', { name: 'Share', exact: true }).click()
+    await alice.waitForSelector('.access-list li:has-text("Bob")')
+
+    // An item for the login site, moved into Finance.
+    await s.menu(alice, 'Vault')
+    await alice.click('.topbar .btn-primary')
+    await alice.fill('#f-name', 'Payroll')
+    await alice.fill('#f-username', 'payroll@acme.test')
+    await alice.fill('#f-password', SITE_PASSWORD)
+    await alice.fill('#f-url', LOGIN)
+    await alice.click('.editor-foot .btn-primary')
+    await alice.waitForSelector('.detail h2:has-text("Payroll")')
+    await alice.locator('.detail-actions').getByRole('button', { name: 'Share', exact: true }).click()
+    await alice.selectOption('select[aria-label="Collection"]', { label: 'Acme / Finance' })
+    await alice.getByRole('button', { name: 'Move to collection' }).click()
+    await alice.waitForSelector('.badge-shared:has-text("Acme / Finance")')
+
+    // Bob's extension: the shared item, where it lives, no password to copy.
+    let tabOf, id
+    ;({ ctx, id, tabOf } = await launch())
+    const login = await ctx.newPage()
+    await login.goto(LOGIN)
+    const loginTab = await tabOf(LOGIN)
+    const popup = await ctx.newPage()
+    await popup.goto(`chrome-extension://${id}/popup.html?tab=${loginTab}`)
+    await connect(popup, s, 'bob@example.test')
+    const row = popup.locator('section[aria-label="For 127.0.0.1"] .row', { hasText: 'Payroll' })
+    await row.waitFor({ timeout: 60_000 })
+    await row.locator('.where:has-text("Acme / Finance")').waitFor()
+    assert.equal(await row.getByRole('button', { name: /Copy password/ }).count(), 0, 'hidden passwords cannot be copied')
+    const itemKey = await popup.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'items' })).result.items.find((i) => i.name === 'Payroll').id)
+    const reveal = await popup.evaluate(async (k) => chrome.runtime.sendMessage({ type: 'reveal', id: k, field: 'password' }), itemKey)
+    assert.match(reveal.error, /hides this password/, 'and the background refuses when asked directly')
+
+    // It fills, and the organization is told.
+    await Promise.all([popup.waitForEvent('close'), row.getByRole('button', { name: 'Fill' }).click()])
+    assert.equal(await login.inputValue('#user'), 'payroll@acme.test')
+    assert.equal(await login.inputValue('#pass'), SITE_PASSWORD)
+    await alice.waitForTimeout(500)
+    await s.menu(alice, 'Organizations')
+    await alice.getByRole('button', { name: 'Activity…' }).click()
+    await alice.locator('.audit li', { hasText: 'Bob filled a page from Payroll' }).waitFor()
+
+    // A server that swaps the sealed key in Bob's grant: the collection is
+    // refused and said so; his own items would still show.
+    await ctx.route('**/api/orgs/*/collections', async (route) => {
+      const res = await route.fetch()
+      const body = await res.json()
+      for (const c of body.collections) if (c.access) c.access.keyBlob = c.access.keyBlob.replace(/.$/, (ch) => (ch === 'A' ? 'B' : 'A'))
+      await route.fulfill({ response: res, json: body })
+    })
+    const again = await ctx.newPage()
+    await again.goto(`chrome-extension://${id}/popup.html?tab=${loginTab}`)
+    await again.getByRole('button', { name: 'Sync' }).click()
+    await again.waitForSelector('text=1 shared collection was not opened')
+    assert.equal(await again.locator('.row', { hasText: 'Payroll' }).count(), 0, 'the swapped key is not used')
+    assert.deepEqual(s.errors, [])
+  } finally {
+    await ctx?.close()
+    good.server.close()
     await s.stop()
   }
 })

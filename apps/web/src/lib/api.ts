@@ -323,7 +323,7 @@ export const api = {
       request<{ id: string }>('POST', `/api/orgs/${org}/collections`, { token, body }),
     deleteCollection: (token: string, org: string, coll: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}`, { token }),
     setPolicies: (token: string, org: string, policies: OrgPolicies) => request<{ policies: OrgPolicies }>('PUT', `/api/orgs/${org}/policies`, { token, body: policies }),
-    report: (token: string, org: string, action: 'view' | 'reveal' | 'copy', collectionId: string, itemId: string) =>
+    report: (token: string, org: string, action: 'view' | 'reveal' | 'copy' | 'fill', collectionId: string, itemId: string) =>
       request<{ ok: true }>('POST', `/api/orgs/${org}/events`, { token, body: { action, collectionId, itemId } }),
     events: (token: string, org: string) =>
       request<{ events: { at: string; actor: string; action: string; collectionId: string | null; itemId: string | null; target: string | null; reported: boolean }[] }>('GET', `/api/orgs/${org}/events`, { token }),

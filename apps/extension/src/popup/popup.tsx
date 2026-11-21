@@ -142,6 +142,7 @@ function Vault({ state, onLock }: { state: StateReply; onLock: () => void }) {
   const [tab, setTab] = useState<Tab>(null)
   const [query, setQuery] = useState('')
   const [note, setNote] = useState('')
+  const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const timer = useRef<number | undefined>(undefined)
 
@@ -157,7 +158,7 @@ function Vault({ state, onLock }: { state: StateReply; onLock: () => void }) {
       setTab(t)
       if (sync) await ask({ type: 'sync' })
       const res = await ask({ type: 'items', ...(t ? { pageUrl: t.url } : {}) })
-      setItems(res.items); setMatches(res.matches); setError('')
+      setItems(res.items); setMatches(res.matches); setNotice(res.notice ?? ''); setError('')
     } catch (err) { failed(err) }
   }
   useEffect(() => { void load() }, [])
@@ -183,7 +184,7 @@ function Vault({ state, onLock }: { state: StateReply; onLock: () => void }) {
   const byId = useMemo(() => new Map((items ?? []).map((i) => [i.id, i])), [items])
   const suggested = matches.map((id) => byId.get(id)).filter((i): i is ItemSummary => !!i)
   const q = query.trim().toLowerCase()
-  const shown = (items ?? []).filter((i) => !q || i.name.toLowerCase().includes(q) || i.username.toLowerCase().includes(q) || i.host.toLowerCase().includes(q))
+  const shown = (items ?? []).filter((i) => !q || [i.name, i.username, i.host, i.where ?? ''].some((t) => t.toLowerCase().includes(q)))
   let pageHost = ''
   try { pageHost = tab ? new URL(tab.url).hostname : '' } catch { /* not a web page */ }
 
@@ -199,6 +200,7 @@ function Vault({ state, onLock }: { state: StateReply; onLock: () => void }) {
       <input className="search" type="search" placeholder="Search your vault" aria-label="Search your vault" autoFocus value={query} onChange={(e) => setQuery(e.target.value)} />
       {error ? <p className="alert" role="alert">{error}</p> : null}
       {note ? <p className="note" role="status">{note}</p> : null}
+      {notice ? <p className="warn" role="status">{notice}</p> : null}
       {items === null ? <p className="muted pad">Decrypting…</p> : <>
         {!q && pageHost ? (
           <section aria-label={`For ${pageHost}`}>
@@ -224,11 +226,12 @@ function Row({ item, onFill, onCopy }: { item: ItemSummary; onFill?: () => void;
       <div className="row-main">
         <strong>{item.name}</strong>
         <span className="muted small">{item.username || item.host || '—'}</span>
+        {item.where ? <span className="where" title="Shared collection">{item.where}</span> : null}
       </div>
       <div className="row-actions">
         {onFill ? <button type="button" className="primary sm" onClick={onFill}>Fill</button> : null}
         {item.username ? <button type="button" className="ghost sm" onClick={() => onCopy('username')} aria-label={`Copy username for ${item.name}`}>User</button> : null}
-        {item.hasPassword ? <button type="button" className="ghost sm" onClick={() => onCopy('password')} aria-label={`Copy password for ${item.name}`}>Pass</button> : null}
+        {item.hasPassword && !item.passwordHidden ? <button type="button" className="ghost sm" onClick={() => onCopy('password')} aria-label={`Copy password for ${item.name}`}>Pass</button> : null}
         {item.hasTotp ? <button type="button" className="ghost sm" onClick={() => onCopy('totp')} aria-label={`Copy code for ${item.name}`}>Code</button> : null}
       </div>
     </li>

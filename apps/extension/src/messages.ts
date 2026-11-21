@@ -9,6 +9,10 @@ export interface ItemSummary {
   hasPassword: boolean
   hasTotp: boolean
   favorite: boolean
+  /** Where a shared item lives ("Acme / Finance"); absent for your own. */
+  where?: string
+  /** The collection hides passwords: it can be filled, not copied (0015). */
+  passwordHidden?: boolean
 }
 
 export type SecondFactorInput = { totpCode: string } | { recoveryCode: string }
@@ -31,7 +35,9 @@ export type UnlockReply =
   | { ok: true }
   | { ok: false; error: string; needSecretKey?: boolean; heldButRefused?: boolean; needSecond?: string[] }
 
-export interface ItemsReply { items: ItemSummary[]; matches: string[] }
+/** `notice`: something the person should know, such as a shared collection
+ *  whose key was refused (0025). */
+export interface ItemsReply { items: ItemSummary[]; matches: string[]; notice?: string }
 
 export type Reply<R extends Request> =
   R extends { type: 'state' } ? StateReply
