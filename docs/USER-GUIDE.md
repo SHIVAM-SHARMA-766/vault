@@ -457,6 +457,13 @@ or press **Ctrl+Shift+L** (⌘⇧L on a Mac) to fill the best match without open
   site over https (`accounts.example.com` for `www.example.com`). A look-alike address gets
   nothing.
 - It cannot read or change any page until you click it or press the shortcut.
+- **Inside pages (optional).** In the popup, turn on *Show Vault in login fields and offer to
+  save passwords*. Your browser asks for access to the sites you visit. Then:
+  - a Vault icon appears in login fields and lists that site's logins;
+  - in a sign-up form, it offers **Generate a strong password**;
+  - after you sign in with a new or changed password, it asks to **Save** or **Update**.
+
+  It never runs on your Vault server's own pages. Turn it off in the same place.
 - Items shared with you through an organization appear too, labelled with their collection
   (*Acme / Finance*). If the organization hides passwords, you can fill them but not copy them.
   Filling or copying a shared item shows in the organization's activity.

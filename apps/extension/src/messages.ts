@@ -1,6 +1,13 @@
 // What the popup may ask the background, and what it gets back. The popup is
 // given only what it shows or copies; the vault key never leaves the background.
 
+/** The URLs the inline content script may run on (decisions/0029, stage 3):
+ *  every site, as an optional permission the person grants. The test build
+ *  uses the loopback addresses it already holds, so no prompt has to be
+ *  clicked. */
+declare const __VAULT_TEST__: boolean
+export const INLINE_ORIGINS = __VAULT_TEST__ ? ['http://127.0.0.1/*', 'http://localhost/*'] : ['https://*/*', 'http://*/*']
+
 export interface ItemSummary {
   id: string
   name: string
@@ -28,8 +35,9 @@ export type Request =
   | { type: 'fill'; id: string; tabId: number }
   | { type: 'sync' }
   | { type: 'lock' }
+  | { type: 'setInline'; on: boolean }
 
-export interface StateReply { server: string | null; serverName: string | null; locked: boolean; email: string | null }
+export interface StateReply { server: string | null; serverName: string | null; locked: boolean; email: string | null; inline: boolean }
 
 export type UnlockReply =
   | { ok: true }
@@ -42,6 +50,7 @@ export interface ItemsReply { items: ItemSummary[]; matches: string[]; notice?: 
 export type Reply<R extends Request> =
   R extends { type: 'state' } ? StateReply
   : R extends { type: 'setServer' } ? { ok: true; name: string } | { ok: false; error: string }
+  : R extends { type: 'setInline' } ? { ok: true } | { ok: false; error: string }
   : R extends { type: 'unlock' } ? UnlockReply
   : R extends { type: 'items' } ? ItemsReply
   : R extends { type: 'reveal' } ? { value: string | null; expiresIn?: number }

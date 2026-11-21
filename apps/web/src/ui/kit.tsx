@@ -3,7 +3,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 
-import { PASSPHRASE_MAX_WORDS, PASSPHRASE_MIN_WORDS, describeSeconds, generatePassphrase, passphraseBits, passwordStrength } from '@vault/core'
+import { PASSPHRASE_MAX_WORDS, PASSPHRASE_MIN_WORDS, describeSeconds, generatePassphrase, generatePassword, passphraseBits, passwordStrength } from '@vault/core'
 import type { EntryType } from '@vault/crypto'
 
 import {
@@ -133,26 +133,7 @@ export function StrengthMeter({ password }: { password: string }) {
 
 // ── Generator ─────────────────────────────────────────────────────────────
 
-const SETS = {
-  lower: 'abcdefghijkmnopqrstuvwxyz',
-  upper: 'ABCDEFGHJKLMNPQRSTUVWXYZ',
-  digits: '23456789',
-  symbols: '!@#$%^&*()-_=+[]{};:,.?',
-}
-
-/** Uniform over the alphabet: bytes above the largest multiple of its length
- *  are rejected rather than folded, which would bias the low characters. */
-export function generatePassword(length: number, opts: { upper: boolean; digits: boolean; symbols: boolean }): string {
-  const alphabet = SETS.lower + (opts.upper ? SETS.upper : '') + (opts.digits ? SETS.digits : '') + (opts.symbols ? SETS.symbols : '')
-  const limit = 256 - (256 % alphabet.length)
-  let out = ''
-  while (out.length < length) {
-    for (const b of crypto.getRandomValues(new Uint8Array(length * 2))) {
-      if (b < limit && out.length < length) out += alphabet[b % alphabet.length]
-    }
-  }
-  return out
-}
+export { generatePassword }
 
 /** The EFF list is 60 KB; it loads the first time someone asks for a passphrase. */
 let wordsPromise: Promise<readonly string[]> | null = null

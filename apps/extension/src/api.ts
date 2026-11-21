@@ -79,5 +79,10 @@ export const api = (server: string) => ({
   /** Filling and copying a shared item are reported, as in the web app. */
   report: (token: string, org: string, action: 'copy' | 'fill', collectionId: string, itemId: string) =>
     request<{ ok: true }>(server, 'POST', `/api/orgs/${org}/events`, { token, body: { action, collectionId, itemId } }),
+  prefs: (token: string) => request<{ blob: string | null }>(server, 'GET', '/api/prefs', { token }),
+  /** Saving from a page (stage 3): a new login, or a new password with the
+   *  previous version kept in history. */
+  putEntry: (token: string, id: string, blob: string) => request<{ id: string }>(server, 'PUT', `/api/vault/entries/${encodeURIComponent(id)}`, { token, body: { blob } }),
+  addHistory: (token: string, id: string, blob: string) => request<{ at: string }>(server, 'POST', `/api/vault/history/${encodeURIComponent(id)}`, { token, body: { blob } }),
   vault: (token: string) => request<{ entries: { id: string; blob: string }[]; folders: { id: string; blob: string }[] }>(server, 'GET', '/api/vault', { token }),
 })

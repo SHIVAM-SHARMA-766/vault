@@ -5,7 +5,7 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
-import { type ItemSummary, type SecondFactorInput, type StateReply, ask } from '../messages.js'
+import { INLINE_ORIGINS, type ItemSummary, type SecondFactorInput, type StateReply, ask } from '../messages.js'
 
 type Tab = { id: number; url: string } | null
 
@@ -215,8 +215,36 @@ function Vault({ state, onLock }: { state: StateReply; onLock: () => void }) {
             : <p className="muted small pad-x">{q ? 'Nothing matches.' : 'Your vault is empty.'}</p>}
         </section>
       </>}
+      <InlineSetting on={state.inline} />
       <p className="foot muted small">Signed in as {state.email} · <a href={`${state.server}/app/`} target="_blank" rel="noreferrer">Open Vault</a></p>
     </div>
+  )
+}
+
+/** Inside pages (stage 3): an icon in login fields, generate in sign-up
+ *  forms, and save or update after signing in. It needs the optional
+ *  all-sites permission, asked for here, when the person turns it on. */
+function InlineSetting({ on: initial }: { on: boolean }) {
+  const [on, setOn] = useState(initial)
+  const [error, setError] = useState('')
+  async function toggle(next: boolean) {
+    setError('')
+    try {
+      if (next && !(await chrome.permissions.request({ origins: INLINE_ORIGINS }))) return setError('Without that permission it cannot work inside pages.')
+      const res = await ask({ type: 'setInline', on: next })
+      if (!res.ok) return setError(res.error)
+      setOn(next)
+    } catch (err) { setError(err instanceof Error ? err.message : 'Something went wrong.') }
+  }
+  return (
+    <section className="setting" aria-label="Inside pages">
+      <label className="check">
+        <input type="checkbox" checked={on} onChange={(e) => void toggle(e.target.checked)} />
+        <span>Show Vault in login fields and offer to save passwords</span>
+      </label>
+      <p className="muted small">{on ? 'Works on every site. Turning it off stops it; your browser\'s extension settings can also withdraw the permission.' : 'Asks your browser for access to the sites you visit. Off by default.'}</p>
+      {error ? <p className="alert" role="alert">{error}</p> : null}
+    </section>
   )
 }
 

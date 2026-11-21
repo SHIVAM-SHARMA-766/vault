@@ -6,7 +6,8 @@
 // decrypted items are cached in this worker's memory only and rebuilt from the
 // server when the worker restarts.
 
-import { matchSite, rankForPage } from '@vault/core'
+import { DEFAULT_PREFS, type GeneratorPrefs, effectiveLockMinutes, generateFromPrefs, matchSite, normalizePrefs, rankForPage } from '@vault/core'
+import { WORDS } from '@vault/core/words'
 import {
   type EntryContent,
   type KdfParams,
@@ -21,6 +22,10 @@ import {
   openOrgMeta,
   openSharedItem,
   parseSecretKey,
+  sealEntry,
+  sealHistory,
+  unsealJson,
+  utf8Encode,
   toBase64Url,
   unwrapIdentityPrivateKey,
   unwrapVaultKey,
@@ -31,7 +36,7 @@ import { checkGrant, openTrust, sealTrust, trustedSigners } from '../../web/src/
 import { forgetSecretKey, loadSecretKey, storeSecretKey } from '../../web/src/lib/secretkey.js'
 import { ApiError, api } from './api.js'
 import { fillLogin } from './fill.js'
-import type { ItemSummary, ItemsReply, Request, StateReply, UnlockReply, Wire } from './messages.js'
+import { INLINE_ORIGINS, type ItemSummary, type ItemsReply, type Request, type StateReply, type UnlockReply, type Wire } from './messages.js'
 
 interface Server { url: string; name: string }
 interface Unlocked {
@@ -43,6 +48,8 @@ interface Unlocked {
   kdf: KdfParams
   idleMinutes: number
   lastActive: number
+  /** The account's generator preferences (Settings → Preferences). */
+  generator?: GeneratorPrefs
 }
 interface Shared { orgId: string; collectionId: string; where: string; hidePasswords: boolean; sensitive: boolean }
 /** `key` is unique across the vault and shared collections; `id` is the
@@ -269,12 +276,20 @@ async function unlock(req: Extract<Request, { type: 'unlock' }>): Promise<Unlock
     }
     const vaultKey = await unwrapVaultKey(res.wrappedVaultKey, keys.kek, 'master')
     if (typed && !held) await storeSecretKey(email, typed).catch(() => {})
+    // The person's own auto-lock and generator choices (sealed preferences),
+    // shortened by the server's policy, as in the web app.
     let idleMinutes = DEFAULT_IDLE_MINUTES
-    try { idleMinutes = (await a.me(res.accessToken)).policy.maxIdleMinutes ?? DEFAULT_IDLE_MINUTES } catch { /* the default */ }
+    let generator: GeneratorPrefs = DEFAULT_PREFS.generator
+    try {
+      const [me, prefsBlob] = await Promise.all([a.me(res.accessToken), a.prefs(res.accessToken).catch(() => ({ blob: null }))])
+      const prefs = prefsBlob.blob ? normalizePrefs(await unsealJson(vaultKey, prefsBlob.blob, utf8Encode('vault.prefs.v1'))) : DEFAULT_PREFS
+      idleMinutes = effectiveLockMinutes(prefs, me.policy.maxIdleMinutes)
+      generator = prefs.generator
+    } catch { /* the defaults */ }
     cache = null
     await saveUnlocked({
       email, vaultKey: toBase64Url(vaultKey), accessToken: res.accessToken, refreshToken: res.refreshToken,
-      accessExpiresAt: Date.now() + res.expiresIn * 1000, kdf: res.kdf, idleMinutes, lastActive: Date.now(),
+      accessExpiresAt: Date.now() + res.expiresIn * 1000, kdf: res.kdf, idleMinutes, generator, lastActive: Date.now(),
     })
     wipe(vaultKey)
     await chrome.alarms.create('idle', { periodInMinutes: 1 })
@@ -352,7 +367,7 @@ async function handle(req: Request): Promise<unknown> {
     case 'state': {
       const server = await getServer()
       const u = await getUnlocked()
-      return { server: server?.url ?? null, serverName: server?.name ?? null, locked: !u, email: u?.email ?? null } satisfies StateReply
+      return { server: server?.url ?? null, serverName: server?.name ?? null, locked: !u, email: u?.email ?? null, inline: await inlineOn() } satisfies StateReply
     }
     case 'setServer': return setServer(req.url)
     case 'forgetServer': await lock(); await chrome.storage.local.remove('server'); return { ok: true }
@@ -363,19 +378,175 @@ async function handle(req: Request): Promise<unknown> {
     case 'fill': return fill(req.id, req.tabId)
     case 'sync': cache = null; await items(); return { ok: true }
     case 'lock': await lock(); return { ok: true }
+    case 'setInline': return setInline(req.on)
   }
 }
 
-// Only this extension's own pages may ask; it has no content scripts, and a
-// web page cannot message it at all (no externally_connectable).
-chrome.runtime.onMessage.addListener((message: Request, sender, sendResponse) => {
-  if (sender.id !== chrome.runtime.id || !sender.url?.startsWith(chrome.runtime.getURL(''))) return false
-  handle(message).then(
+// ── Inside pages (stage 3) ───────────────────────────────────────────────────
+
+const INLINE_ID = 'vault-inline'
+
+async function inlineOn(): Promise<boolean> { return ((await chrome.storage.local.get('inline'))['inline'] as boolean | undefined) ?? false }
+
+async function setInline(on: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const registered = (await chrome.scripting.getRegisteredContentScripts({ ids: [INLINE_ID] })).length > 0
+  if (on) {
+    if (!(await chrome.permissions.contains({ origins: INLINE_ORIGINS }))) return { ok: false, error: 'The extension needs permission to work inside pages.' }
+    if (!registered) await chrome.scripting.registerContentScripts([{ id: INLINE_ID, js: ['content.js'], matches: INLINE_ORIGINS, runAt: 'document_idle', allFrames: false }])
+  } else if (registered) {
+    await chrome.scripting.unregisterContentScripts({ ids: [INLINE_ID] })
+  }
+  await chrome.storage.local.set({ inline: on })
+  return { ok: true }
+}
+
+interface Pending { kind: 'save' | 'update'; key?: string; name?: string; url: string; host: string; username: string; password: string; at: number }
+const OFFER_MS = 3 * 60_000
+
+async function pendingFor(tabId: number): Promise<Pending | null> {
+  const all = ((await chrome.storage.session.get('offers'))['offers'] as Record<string, Pending> | undefined) ?? {}
+  const p = all[tabId]
+  return p && Date.now() - p.at < OFFER_MS ? p : null
+}
+async function setPending(tabId: number, p: Pending | null) {
+  const all = ((await chrome.storage.session.get('offers'))['offers'] as Record<string, Pending> | undefined) ?? {}
+  if (p) all[tabId] = p; else delete all[tabId]
+  await chrome.storage.session.set({ offers: all })
+}
+
+const hostLabel = (url: string) => hostOfUrl(url).replace(/^www\./, '')
+
+/** What to offer after a password was submitted on a page: nothing when the
+ *  vault already has it, an update when this site's login for the username
+ *  has another password, a new login otherwise. Shared items are not edited
+ *  from here. */
+async function offerFor(url: string, username: string, password: string): Promise<Pending | null> {
+  const all = await items()
+  const here = all.filter((e) => matchSite(e.url, url))
+  const same = (e: Item) => (e.username ?? '').toLowerCase() === username.toLowerCase()
+  const candidates = username ? here.filter(same) : here.length === 1 ? here : []
+  if (candidates.some((e) => e.password === password)) return null
+  const mine = candidates.find((e) => !e.shared)
+  if (candidates.length && !mine) return null
+  const base = { url, host: hostLabel(url), username: username || mine?.username || '', password, at: Date.now() }
+  return mine ? { ...base, kind: 'update', key: mine.key, name: mine.name } : { ...base, kind: 'save' }
+}
+
+/** Save a new login, or update one's password, keeping its previous version
+ *  in history as the web app does. */
+async function answer(p: Pending): Promise<void> {
+  const u = await getUnlocked()
+  const server = await getServer()
+  if (!u || !server) throw new Locked()
+  const a = api(server.url)
+  const key = fromBase64Url(u.vaultKey)
+  try {
+    const now = new Date().toISOString()
+    if (p.kind === 'update' && p.key) {
+      const prev = (await items()).find((e) => e.key === p.key && !e.shared)
+      if (!prev) return
+      const { id, key: _k, shared: _s, ...before } = prev
+      const after: EntryContent = { ...before, password: p.password, passwordChangedAt: now }
+      const t = await token()
+      await a.addHistory(t, id, await sealHistory(id, before, key))
+      await a.putEntry(t, id, await sealEntry(id, after, key))
+    } else {
+      const id = crypto.randomUUID()
+      let origin = p.url
+      try { origin = new URL(p.url).origin } catch { /* as given */ }
+      const entry: EntryContent = { name: p.host, type: 'login', username: p.username, password: p.password, url: origin, tags: [], customFields: [], favorite: false, passwordChangedAt: now }
+      await a.putEntry(await token(), id, await sealEntry(id, entry, key))
+    }
+    cache = null
+  } finally { wipe(key) }
+}
+
+type ContentRequest =
+  | { type: 'inline:hello' }
+  | { type: 'inline:list' }
+  | { type: 'inline:fill'; id: string }
+  | { type: 'inline:generate' }
+  | { type: 'inline:submitted'; username: string; password: string }
+  | { type: 'inline:offer' }
+  | { type: 'inline:answer'; save: boolean }
+  | { type: 'inline:unlock' }
+
+/** A content script's question. The page's URL and tab come from the browser
+ *  (the sender), never from the message. */
+async function handleContent(req: ContentRequest, tab: chrome.tabs.Tab): Promise<unknown> {
+  const url = tab.url ?? ''
+  const tabId = tab.id!
+  const server = await getServer()
+  // Never on the Vault server's own pages: the master password is typed there.
+  const ours = !!server && (() => { try { return new URL(url).origin === server.url } catch { return true } })()
+  if (req.type === 'inline:hello') return { active: !ours && (await inlineOn()) }
+  if (ours) return null
+  await lockIfIdle()
+  const unlocked = !!(await getUnlocked())
+  switch (req.type) {
+    case 'inline:list': {
+      if (!unlocked) return { locked: true }
+      await touch()
+      const { matches, items: list } = await listItems(url)
+      const byId = new Map(list.map((i) => [i.id, i]))
+      return { matches: matches.map((id) => byId.get(id)!).map((i) => ({ id: i.id, name: i.name, username: i.username })) }
+    }
+    case 'inline:fill': if (!unlocked) return { locked: true }; await touch(); return fill(req.id, tabId)
+    case 'inline:generate': {
+      const g = (await getUnlocked())?.generator ?? DEFAULT_PREFS.generator
+      return { password: generateFromPrefs(g, WORDS) }
+    }
+    case 'inline:submitted': {
+      // Locked: nothing is kept. Unlocked: an offer, held in session memory.
+      if (!unlocked || !req.password || req.password.length > 1024) return {}
+      const offer = await offerFor(url, req.username.slice(0, 512), req.password)
+      await setPending(tabId, offer)
+      return offer ? { offer: { kind: offer.kind, host: offer.host, username: offer.username, ...(offer.name ? { name: offer.name } : {}) } } : {}
+    }
+    case 'inline:offer': {
+      const p = await pendingFor(tabId)
+      // Only on the site it was captured on (or the same site's next page).
+      if (!p || !unlocked || !matchSite(p.url, url)) return {}
+      return { offer: { kind: p.kind, host: p.host, username: p.username, ...(p.name ? { name: p.name } : {}) } }
+    }
+    case 'inline:answer': {
+      const p = await pendingFor(tabId)
+      await setPending(tabId, null)
+      if (req.save && p && matchSite(p.url, url)) { await touch(); await answer(p) }
+      return { ok: true }
+    }
+    case 'inline:unlock': await chrome.action.openPopup().catch(() => {}); return { ok: true }
+  }
+}
+
+// This extension's own pages may ask anything; its inline content script,
+// in the top frame of a tab, only the inline questions. A web page cannot
+// message it at all (no externally_connectable).
+chrome.runtime.onMessage.addListener((message: Request | ContentRequest, sender, sendResponse) => {
+  if (sender.id !== chrome.runtime.id) return false
+  const reply = (p: Promise<unknown>) => p.then(
     (result) => sendResponse({ result } satisfies Wire<unknown>),
     (err: unknown) => sendResponse({ error: err instanceof Error ? err.message : 'Something went wrong.', locked: err instanceof Locked } satisfies Wire<unknown>),
   )
+  if (sender.tab?.id !== undefined && sender.frameId === 0 && message.type.startsWith('inline:') && !sender.url?.startsWith(chrome.runtime.getURL(''))) {
+    reply(handleContent(message as ContentRequest, sender.tab))
+    return true
+  }
+  if (!sender.url?.startsWith(chrome.runtime.getURL(''))) return false
+  reply(handle(message as Request))
   return true
 })
+
+// Keep the inline script's registration in step with the setting, and with
+// the permission, which the person can withdraw in the browser's settings.
+async function syncInline() {
+  const want = (await inlineOn()) && (await chrome.permissions.contains({ origins: INLINE_ORIGINS }))
+  await setInline(want).catch(() => {})
+}
+chrome.runtime.onStartup.addListener(() => void syncInline())
+chrome.runtime.onInstalled.addListener(() => void syncInline())
+chrome.permissions.onRemoved.addListener(() => void syncInline())
+
 
 // The fill shortcut: the best match for the page, if there is one.
 chrome.commands.onCommand.addListener((command, tab) => {

@@ -364,8 +364,8 @@ Design: [0029](../decisions/0029-browser-extension.md). Built in stages.
 - [x] Talks to the API directly; no page script is ever given the vault key. Fill on click
   and by shortcut; copy username, password and TOTP code.
 - [x] Shared collections, with the signed-grant checks; "hide passwords" fills but never copies; filling is reported to the organization (stage 2).
-- [ ] Optional all-sites permission: inline icon, save and update on form submit, generator
-  in the page (stage 3).
+- [x] Optional all-sites permission: inline icon, save and update on form submit, generator
+  in the page; follows the account's auto-lock and generator preferences (stage 3).
 - [ ] Store packages: Firefox Add-ons (free); Chrome Web Store needs a one-time developer fee,
   the operator's decision (stage 4).
 - [ ] Passkey storage and use, after autofill is solid (stage 5).

@@ -27,8 +27,8 @@ it has permission for.
 **No standing access to websites.** The base install asks for `activeTab` and `scripting`, not
 for "read and change all your data on all websites". It can only touch a page when the person
 clicks the toolbar button or presses the fill shortcut, and only that tab. Inline icons and
-save-on-submit need a content script on every page; they come later as an **optional**
-permission the person turns on.
+save-on-submit need a content script on every page; they are an **optional** permission the
+person turns on (stage 3, below).
 
 **Where the keys live.** The background holds the unlocked state in `chrome.storage.session`:
 kept in memory, never written to disk, cleared when the browser closes, and not readable by
@@ -71,7 +71,7 @@ No remote code, no `eval`, and no code from the server.
 1. Setup, unlock, search, copy, TOTP, fill on click and by shortcut, lock. *(built)*
 2. Shared collections, with the signed-grant checks of 0025. *(built)*
 3. Optional all-sites permission: an inline icon in login fields, save and update on submit,
-   the generator in the page.
+   the generator in the page. *(built)*
 4. Store packages: a signed Firefox add-on (AMO is free), and Chrome Web Store when the operator
    decides on its one-time developer fee. Until then, a release zip to load unpacked.
 5. Passkey storage, after autofill is solid (0022 (c)).
@@ -92,6 +92,50 @@ No remote code, no `eval`, and no code from the server.
 - **Idle:** the strictest limit among the person's organizations applies, as in the web app.
 - A problem loading shared collections never hides the person's own items.
 
+## Inside pages (stage 3)
+
+**Off by default.** The popup has a setting, *Show Vault in login fields and offer to save
+passwords*. Turning it on asks the browser for the optional all-sites permission at that moment,
+then registers the content script at run time (`chrome.scripting.registerContentScripts`). Nothing
+is declared in the manifest, so the build's manifest check still holds. Turning it off unregisters
+the script. The browser's own extension settings withdraw the permission, and the extension follows
+(`permissions.onRemoved`).
+
+**What the content script may do.** It runs in the top frame only, and never on the Vault
+server's own origin, where the master password is typed. The background answers its
+`inline:hello` with "inactive" there, and it then adds no listener and no UI. It never holds the
+vault. It asks the background questions, and the background takes the page's URL and tab from
+the browser (the message sender), never from the message:
+
+- **list:** the logins that match this page (`matchSite`), name and username only;
+- **fill:** the same checked fill as the popup's;
+- **generate:** a password from the account's own generator preferences;
+- **submitted:** a password that was just submitted, while unlocked only;
+- **offer / answer:** save or update.
+
+Its UI (the icon, the list, the save bar) sits in a **closed** shadow root, built with text nodes
+only, so the page's scripts cannot read the list. The icon is drawn as inline SVG, because an image
+file would need `web_accessible_resources`, which would also let every site detect the extension.
+The test build uses an open shadow root so the browser test can see into it. That, and
+loopback-only permissions, are the only differences, set at build time (`__VAULT_TEST__`).
+
+**Save and update.** On submit (a form submit, a submit-button click, or Enter in a password
+field), the last filled password field and its username are sent to the background:
+
+- **Locked:** the background keeps nothing.
+- **Unlocked:** it compares them with this site's logins:
+  - nothing is offered when the vault already has that password;
+  - an **update** is offered when a login of yours for this username has another password;
+  - a **new login** is offered otherwise.
+
+Shared items are never edited from a page. The pending offer is kept in session storage (memory)
+for three minutes, and only for the same site, so the next page after a sign-in can show the bar.
+**Update** keeps the previous version in history, as an edit in the web app does.
+
+**Preferences.** The extension now reads the account's sealed preferences at unlock. The idle
+lock is the person's own auto-lock, shortened by the server's and organizations' policies, as in
+the web app. The generator follows the same defaults.
+
 ## Tests
 
 - core: matching against the Public Suffix List, including look-alikes, ports, IPs and scheme
@@ -99,6 +143,10 @@ No remote code, no `eval`, and no code from the server.
 - e2e: the real extension loaded into Chromium against the dev stack. Set up, unlock, find the
   item, fill a login page; a look-alike origin and a different port get nothing; lock and idle
   lock
+- e2e (stage 3): off by default; once on, the icon in a login field lists only that site's login
+  and fills it; a sign-up form gets a generated password in both fields, and after submitting,
+  saving puts it in the vault with that password; a changed password is offered as an update and
+  kept; the same password again is not offered; nothing appears on the Vault server's own page
 - e2e: a shared item with passwords hidden is shown with its collection, fills, cannot be
   copied (also when asked directly), and appears in the owner's audit; a server that swaps the
   sealed key gets the collection refused
