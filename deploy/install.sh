@@ -99,6 +99,8 @@ else
   {
     say "# Written by deploy/install.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ). Every setting: docs/configuration.md"
     say "VAULT_HOSTNAME=$VAULT_HOSTNAME"
+    say "# personal: one account, yours. business: your company's server (decisions/0030)."
+    say "EDITION=$VAULT_PROFILE"
     say "# Encrypts the daily server backup. Keep a copy AWAY from this machine:"
     say "# a backup file plus this passphrase is a complete restore."
     say "BACKUP_PASSPHRASE=$PASSPHRASE"

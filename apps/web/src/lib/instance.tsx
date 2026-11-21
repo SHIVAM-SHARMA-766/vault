@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { type Instance, api } from './api.js'
+import { type Edition, type Features, type Instance, api } from './api.js'
 import { IconShield } from '../ui/icons.js'
 
 let cached: Promise<Instance | null> | null = null
@@ -29,6 +29,22 @@ export function BrandMark({ size = 20 }: { size?: number }) {
       {i?.name || 'Vault'}
     </>
   )
+}
+
+/** Everything on, for a server from before editions (decisions/0030). */
+const ALL: Features = { organizations: true, invitations: true, serviceDesk: true, website: true, staffRoles: true, emergencyAccess: true }
+
+/** This server's features, once known. Data loads that depend on a feature
+ *  wait for this, so a personal Vault never asks for organizations. */
+export async function features(): Promise<Features> { return (await fetchOnce())?.features ?? ALL }
+
+/** The edition and its features, for screens that show or hide things. Until
+ *  the instance has loaded, features that need a second person are hidden
+ *  rather than flashed. */
+export function useEdition(): { edition: Edition; features: Features; loaded: boolean } {
+  const i = useInstance()
+  if (!i) return { edition: 'hosted', features: { ...ALL, organizations: false, invitations: false, serviceDesk: false, website: false, staffRoles: false, emergencyAccess: false }, loaded: false }
+  return { edition: i.edition ?? 'hosted', features: i.features ?? ALL, loaded: true }
 }
 
 /** Forget the cached profile, after an admin changes it. */

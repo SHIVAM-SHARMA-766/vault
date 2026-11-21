@@ -238,5 +238,7 @@ void send<{ active: boolean }>({ type: 'inline:hello' }).then((r) => {
   if (!r?.active) return
   active = true
   document.documentElement.append(host)
-  void showOffer()
+  // The page that follows a sign-in: ask now, and once more shortly, in case
+  // the submission was still being saved when this page loaded.
+  void showOffer().then(() => setTimeout(() => { if (!bar) void showOffer() }, 1500))
 })

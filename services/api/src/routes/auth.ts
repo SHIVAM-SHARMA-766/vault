@@ -198,6 +198,11 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   const setup = usable && pending!['setup'] === true
   // A setup code only ever creates the first account.
   if (setup && (await listRegistry(app)).length > 0) throw forbidden()
+  // A personal Vault has one account (decisions/0030): once it exists, nobody
+  // else joins, whatever the registration setting says.
+  if (app.config.edition === 'personal' && (await listRegistry(app)).length > 0) {
+    throw new HttpError(403, 'forbidden', 'This is a personal Vault: it has one account, and no one else can join.')
+  }
   const open = !setup && (app.allowRegistration || mode === 'open')
   if (!open && !setup && mode !== 'invite') throw registrationRefused()
   if (!open && !usable) throw registrationRefused()

@@ -2,6 +2,7 @@
 // entry on the right. Data and its encryption live in model.ts; fields in
 // fields.tsx; the editor and detail in their own files.
 
+import { useEdition } from '../../lib/instance.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ISSUES, type ListSort, analyse, descendants, flattenTree, folderTree, folderPath, matches, subtitle, typeSpec } from '@vault/core'
@@ -35,6 +36,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const toast = useToast()
   const vault = useVault(state.vaultKey)
   const teams = useTeams(state.vaultKey)
+  // Sharing with a person needs a second account (decisions/0030).
+  const { features } = useEdition()
   const { folders } = vault
   // Personal entries and the shared items this account can open, together.
   const entries: (Decrypted | SharedEntry)[] = useMemo(() => [...vault.entries, ...teams.shared].sort((a, b) => a.name.localeCompare(b.name)), [vault.entries, teams.shared])
@@ -484,7 +487,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          } : null })()}
                          shareTargets={sharedOf(selected) ? [] : openCollections.filter((c) => canEdit(c.permission)).map((c) => ({ id: c.id, label: (c.direct ? c.name : `${c.orgName} / ${c.name}`) }))}
                          onShare={(collectionId) => void moveToCollection(selected, collectionId)}
-                         onShareWithPerson={sharedOf(selected) ? undefined : async (email) => {
+                         onShareWithPerson={sharedOf(selected) || !features.organizations ? undefined : async (email) => {
                            if (selected.attachments?.length) { toast('Remove its attachments first: attached files stay in your own vault and cannot be shared yet.', 'error'); return }
                            try {
                              const r = await teams.shareWithPerson(email, contentOf(selected))

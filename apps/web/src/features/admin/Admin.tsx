@@ -11,6 +11,7 @@ import { type ReactElement, useEffect, useState } from 'react'
 import {
   type AdminAudit,
   type AdminInvite,
+  type Features,
   type AdminOverview,
   type AdminUser,
   type InstanceProfile,
@@ -28,7 +29,7 @@ import { Website } from './Website.js'
 import { System } from './System.js'
 import { download } from '../../lib/download.js'
 import { SetupWizard, wizardDone } from './SetupWizard.js'
-import { applyBranding, refresh as refreshInstance } from '../../lib/instance.js'
+import { applyBranding, refresh as refreshInstance, useEdition } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
@@ -40,13 +41,15 @@ import { Link, href, navigate } from '../../lib/router.js'
 
 type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit' | 'system'
 
-const TABS: { id: Tab; label: string; needs: Permission; Icon: (p: { size?: number }) => ReactElement }[] = [
+/** `feature`: the edition feature a tab needs (decisions/0030). A personal
+ *  Vault has one account, so no users list, invitations or organizations. */
+const TABS: { id: Tab; label: string; needs: Permission; feature?: keyof Features; Icon: (p: { size?: number }) => ReactElement }[] = [
   { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
-  { id: 'desk', label: 'Service desk', needs: 'desk.read', Icon: IconInbox },
-  { id: 'website', label: 'Website', needs: 'site.read', Icon: IconGlobe },
-  { id: 'users', label: 'Users', needs: 'users.read', Icon: IconUser },
-  { id: 'orgs', label: 'Organizations', needs: 'users.read', Icon: IconGrid },
-  { id: 'invites', label: 'Invitations', needs: 'invites.read', Icon: IconKey },
+  { id: 'desk', label: 'Service desk', needs: 'desk.read', feature: 'serviceDesk', Icon: IconInbox },
+  { id: 'website', label: 'Website', needs: 'site.read', feature: 'website', Icon: IconGlobe },
+  { id: 'users', label: 'Users', needs: 'users.read', feature: 'invitations', Icon: IconUser },
+  { id: 'orgs', label: 'Organizations', needs: 'users.read', feature: 'organizations', Icon: IconGrid },
+  { id: 'invites', label: 'Invitations', needs: 'invites.read', feature: 'invitations', Icon: IconKey },
   { id: 'audit', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
   { id: 'system', label: 'System', needs: 'overview.read', Icon: IconSliders },
 ]
@@ -65,7 +68,8 @@ const ROLE_HELP: Record<Role, string> = {
 
 export function Admin({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
   const perms = new Set<Permission>(state.permissions ?? [])
-  const tabs = TABS.filter((t) => perms.has(t.needs))
+  const { features } = useEdition()
+  const tabs = TABS.filter((t) => perms.has(t.needs) && (!t.feature || features[t.feature]))
   // The tab is part of the address (/app/admin/users), so reload and back work.
   const tab: Tab = tabs.find((t) => t.id === requested)?.id ?? tabs[0]?.id ?? 'overview'
   const setTab = (t: Tab) => navigate(href({ name: 'admin', tab: t }))
@@ -122,6 +126,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
   const [epoch, setEpoch] = useState(0)
   useEffect(() => { if (data && canWrite && data.users <= 1 && !wizardDone()) setWizard(true) }, [data?.users])
 
+  const { features } = useEdition()
   const backupAgeHours = data?.lastBackup?.at ? (Date.now() - Date.parse(data.lastBackup.at)) / 3_600_000 : null
   const backupStale = backupAgeHours === null || backupAgeHours > 36
 
@@ -138,11 +143,11 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
           <SetupChecklist data={data} onGo={onGo} onWizard={canWrite ? () => setWizard(true) : undefined} />
           {wizard ? <SetupWizard data={data} onClose={() => { setWizard(false); setEpoch((n) => n + 1); void reload() }} onInvite={() => onGo('invites')} /> : null}
           <div className="stats">
-            <Stat label="Accounts" value={data.users} note={data.disabledUsers ? `${data.disabledUsers} disabled` : 'all active'} onClick={() => onGo('users')} />
+            {features.invitations ? <Stat label="Accounts" value={data.users} note={data.disabledUsers ? `${data.disabledUsers} disabled` : 'all active'} onClick={() => onGo('users')} /> : null}
             <Stat label="Encrypted items" value={data.entries} note="across every vault" />
             <Stat label="Active sessions" value={data.activeSessions} note="signed-in devices" />
-            <Stat label="Open invitations" value={data.activeInvites} note="unused and unexpired" onClick={() => onGo('invites')} />
-            <Stat label="Open tickets" value={data.openTickets} note="in the service desk" onClick={() => onGo('desk')} />
+            {features.invitations ? <Stat label="Open invitations" value={data.activeInvites} note="unused and unexpired" onClick={() => onGo('invites')} /> : null}
+            {features.serviceDesk ? <Stat label="Open tickets" value={data.openTickets} note="in the service desk" onClick={() => onGo('desk')} /> : null}
           </div>
 
           <div className="admin-cards">
@@ -162,7 +167,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
               ) : <p className="muted small">The daily export is the only backup. It runs once a day.</p>}
             </div>
 
-            <div className="admin-card">
+            {features.invitations ? <div className="admin-card">
               <div className="admin-card-head">
                 <span className={`dot ${data.registration === 'open' || data.registrationForcedOpen ? 'dot-warn' : 'dot-ok'}`} />
                 <h2 id="reg-title">Registration</h2>
@@ -183,7 +188,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
               {data.registrationForcedOpen ? (
                 <p className="alert alert-warn"><IconAlert size={16} /><span>Registration is forced open on the host (<code>ALLOW_REGISTRATION</code>). Close it with <code>scripts/registration.sh close</code>.</span></p>
               ) : null}
-            </div>
+            </div> : null}
 
             <MailCard on={data.mail} canWrite={canWrite} />
             <ProfileCard key={`p${epoch}`} canWrite={canWrite} />
@@ -207,6 +212,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
  *  everything is done. */
 function SetupChecklist({ data, onGo, onWizard }: { data: AdminOverview; onGo: (t: Tab) => void; onWizard?: (() => void) | undefined }) {
   const [extra, setExtra] = useState<{ profile: boolean; twoFactor: boolean } | null>(null)
+  const { features } = useEdition()
   useEffect(() => {
     void (async () => {
       try {
@@ -221,10 +227,13 @@ function SetupChecklist({ data, onGo, onWizard }: { data: AdminOverview; onGo: (
   const steps = [
     { done: extra.twoFactor, text: 'Turn on two-factor sign-in for your own account', go: <Link to={href({ name: 'settings', tab: 'security' })} className="link">Security settings</Link> },
     { done: extra.profile, text: 'Give the server a name and a support address', go: <a className="link" href="#profile-title">Name and support ↓</a> },
-    { done: data.mail, text: 'Set up mail, so invitations and sign-in notices are emailed', go: <span className="muted">SMTP_HOST in .env — docs/configuration.md</span> },
+    { done: data.mail, text: features.invitations ? 'Set up mail, so invitations and sign-in notices are emailed' : 'Set up mail, so sign-in notices and backup alerts reach you', go: <span className="muted">SMTP_HOST in .env — docs/configuration.md</span> },
     { done: backupOk, text: 'Have a server backup in the last day, and keep the passphrase off the server', go: <span className="muted">BACKUP_PASSPHRASE — docs/INSTALL.md</span> },
-    { done: data.registration !== 'open' && !data.registrationForcedOpen, text: 'Keep registration closed or invite-only', go: <a className="link" href="#reg-title">Registration ↓</a> },
-    { done: data.users > 1, text: 'Invite your first people', go: <button className="link" onClick={() => onGo('invites')}>Invitations</button> },
+    // A personal Vault has no one to invite (decisions/0030).
+    ...(features.invitations ? [
+      { done: data.registration !== 'open' && !data.registrationForcedOpen, text: 'Keep registration closed or invite-only', go: <a className="link" href="#reg-title">Registration ↓</a> },
+      { done: data.users > 1, text: 'Invite your first people', go: <button className="link" onClick={() => onGo('invites')}>Invitations</button> },
+    ] : []),
   ]
   const left = steps.filter((x) => !x.done).length
   if (left === 0) return null

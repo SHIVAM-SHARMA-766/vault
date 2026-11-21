@@ -11,6 +11,7 @@ image:
 hostname: vault.example.com
 
 # Settings passed as environment variables (docs/configuration.md), e.g.
+#   EDITION: business      # or personal; unset means every feature (decisions/0030)
 #   SMTP_HOST: smtp.example.com
 #   MAIL_FROM: "Vault <vault@example.com>"
 #   BACKUP_DIR: /data/backups

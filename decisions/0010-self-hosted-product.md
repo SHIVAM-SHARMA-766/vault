@@ -1,6 +1,6 @@
 # 0010 — Vault is a product customers run on their own servers
 
-Status: Accepted
+Status: Accepted; amended by [0030](0030-editions.md) (three editions instead of "no separate editions")
 Date: 2026-11-06
 
 ## Context

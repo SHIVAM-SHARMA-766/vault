@@ -2,6 +2,8 @@
 //
 //   node index.mjs backup                     take a backup now
 //   node index.mjs restore <file> [--force]   restore a backup into this server's database
+//   node index.mjs reset-two-factor <email>   turn off an account's two-factor sign-in
+//                                             (the only admin of a personal Vault has nobody else to ask)
 //
 // In a container:  docker compose run --rm vault node index.mjs backup
 // Restore with the server stopped (docker compose stop vault), then start it.
@@ -20,6 +22,21 @@ export async function backupCommand(): Promise<void> {
     await store.migrate()
     const r = await runBackup(store, config)
     console.log(`backup written: ${r.name} (${r.rows} rows, ${r.bytes} bytes)${config.backup.dir ? ` to ${config.backup.dir}` : ''}${config.backup.s3 ? ` and s3://${config.backup.s3.bucket}/${config.backup.s3.prefix}` : ''}`)
+  } finally {
+    await store.close()
+  }
+}
+
+export async function resetTwoFactorCommand(args: string[]): Promise<void> {
+  const email = args[0]
+  if (!email) throw new Error('usage: reset-two-factor <email>')
+  const { buildApp } = await import('./server.js')
+  const { resetTwoFactorFromHost } = await import('./routes/admin.js')
+  const { app, store } = await buildApp()
+  try {
+    await store.migrate()
+    await resetTwoFactorFromHost(app, email)
+    console.log(`two-factor sign-in is off for ${email}. Sign in with the master password, then turn it on again under Settings → Security.`)
   } finally {
     await store.close()
   }

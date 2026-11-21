@@ -4,6 +4,7 @@
 // hold on itself asks for the current master password again, and the server
 // checks that proof (services/api/src/routes/auth.ts).
 
+import { useEdition } from '../../lib/instance.js'
 import { useEffect, useState } from 'react'
 
 import { belowMinimum, passwordStrength } from '@vault/core'
@@ -44,7 +45,10 @@ type Tab = (typeof TABS)[number]['id']
 export function Settings({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
   const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus; policy: { minPasswordScore: number }; policyGap: string | null } | null>(null)
   const [version, setVersion] = useState(0)
-  const tab: Tab = TABS.find((t) => t.id === requested)?.id ?? 'account'
+  // Emergency access needs a second account (decisions/0030).
+  const { features } = useEdition()
+  const tabs = TABS.filter((t) => t.id !== 'emergency' || features.emergencyAccess)
+  const tab: Tab = tabs.find((t) => t.id === requested)?.id ?? 'account'
   const info = TABS.find((t) => t.id === tab)!
   const go = (t: Tab) => navigate(href({ name: 'settings', tab: t === 'account' ? null : t }))
 
@@ -65,7 +69,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
     <Shell state={state}>
       <div className="admin-layout">
         <nav className="sidebar" aria-label="Settings sections">
-          {TABS.map(({ id, label, Icon }) => (
+          {tabs.map(({ id, label, Icon }) => (
             <button key={id} className={`side-item ${tab === id ? 'side-active' : ''}`} onClick={() => go(id)} aria-current={tab === id ? 'page' : undefined}>
               <Icon size={16} /><span>{t(label)}</span>
             </button>
@@ -76,7 +80,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
         </nav>
 
         <div className="filter-chips admin-chips">
-          {TABS.map(({ id, label }) => (
+          {tabs.map(({ id, label }) => (
             <button key={id} className={`chip ${tab === id ? 'chip-active' : ''}`} onClick={() => go(id)}>{t(label)}</button>
           ))}
         </div>

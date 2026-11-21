@@ -12,10 +12,17 @@
 // the host can read, nor through Terraform, whose state file ends up in
 // plaintext on laptops and CI runners. See docs/runbook.md.
 
+import { EDITIONS, type Edition } from './edition.js'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+function edition(value: string): Edition {
+  if (!value) return 'hosted'
+  if (!(EDITIONS as readonly string[]).includes(value)) throw new Error(`EDITION must be one of ${EDITIONS.join(', ')}`)
+  return value as Edition
+}
 
 export interface Config {
   port: number
@@ -46,6 +53,8 @@ export interface Config {
   pepper: string
   /** HMAC key for access and refresh tokens. */
   tokenKey: string
+  /** Which features this server has (decisions/0030). */
+  edition: Edition
   /** Closed unless explicitly opened. */
   allowRegistration: boolean
   /** Addresses that hold the owner role. Turned into digests by the server;
@@ -101,6 +110,7 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'SECRETS_FILE', required: false, description: 'A file holding SERVER_PEPPER and TOKEN_SIGNING_KEY. If it does not exist, both are generated and written there (mode 0600) on first start. The container image sets /data/secrets.env. Back it up with the database: without the pepper nobody can sign in.' },
   { name: 'SERVER_PEPPER', required: true, secret: true, description: 'At least 32 characters (openssl rand -base64 32). Keys the address digests. Changing it locks every account out.' },
   { name: 'TOKEN_SIGNING_KEY', required: true, secret: true, description: 'At least 32 characters. Signs session tokens. Changing it signs everyone out.' },
+  { name: 'EDITION', required: false, default: 'hosted', description: 'personal (one account, no organizations or invitations), business (the company\'s server) or hosted (everything). The install profiles set it. See decisions/0030.' },
   { name: 'ALLOW_REGISTRATION', required: false, default: 'false', description: '"true" forces registration open, overriding the admin panel. For creating the first account only.' },
   { name: 'ADMIN_EMAILS', required: false, default: '', description: 'Comma-separated addresses that are owners. The first account is usually the only one.' },
   { name: 'SITE_SOURCE', required: false, description: 'Website templates and content. Defaults to the site/ directory shipped beside the server.' },
@@ -188,6 +198,7 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     },
     pepper: secret('SERVER_PEPPER'),
     tokenKey: secret('TOKEN_SIGNING_KEY'),
+    edition: edition(get('EDITION')),
     allowRegistration: get('ALLOW_REGISTRATION') === 'true',
     adminEmails: get('ADMIN_EMAILS').split(',').map((e) => e.trim()).filter(Boolean),
     site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },

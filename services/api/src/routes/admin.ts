@@ -8,6 +8,8 @@
 // the permission it needs; roles.ts maps roles to permissions. See
 // decisions/0006-admin-panel.md and 0007-roles-and-site-editing.md.
 
+import { emailDigest } from '../identity.js'
+import { featuresOf } from '../edition.js'
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { type TemplateKind, TEMPLATE_KINDS, applyTemplate, inviteMessage, notify, signInNotice } from '../mail.js'
@@ -278,6 +280,20 @@ export async function resetTwoFactor(app: App, actor: string, actorRole: Role, i
   return json(200, { ok: true })
 }
 
+/** The same, from the server's own host, by address: for the only admin of a
+ *  personal Vault (decisions/0030), who has nobody to ask. Access to the host
+ *  is the proof of ownership. Audited as done from the host. */
+export async function resetTwoFactorFromHost(app: App, email: string): Promise<string> {
+  const pointer = await app.store.get(emailPk(emailDigest(email, app.config.pepper)), EMAIL_SK)
+  const userId = typeof pointer?.['userId'] === 'string' ? pointer['userId'] : null
+  const profile = userId ? await app.store.get(userPk(userId), PROFILE_SK) : null
+  if (!userId || !profile) throw new Error(`no account for ${email}`)
+  await audit(app, 'host', 'user.reset-2fa', userId, 'from the server host')
+  const { totp: _t, recoveryCodes: _r, pendingTotp: _p, webauthn: _w, pendingWebauthn: _pw, webauthnLogin: _wl, ...rest } = profile
+  await app.store.put(rest as typeof profile)
+  return userId
+}
+
 /** Removes an account and everything in it. There is no undo: the entries
  *  were readable only by their owner, and the daily export is the only copy. */
 export async function deleteUser(app: App, actor: string, actorRole: Role, event: LambdaEvent, id: string): Promise<LambdaResponse> {
@@ -316,6 +332,7 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
   const current = await getSettings(app)
   let registration = current.registration
   if (body.registration !== undefined) {
+    if (!featuresOf(app.config.edition).invitations) throw badRequest('A personal Vault has one account; there is no registration to change.')
     if (!REGISTRATION_MODES.includes(body.registration as RegistrationMode)) {
       throw badRequest(`registration must be one of: ${REGISTRATION_MODES.join(', ')}.`)
     }
@@ -412,20 +429,25 @@ export async function updateRoute(app: App, event: LambdaEvent): Promise<LambdaR
 /** What anyone may know about this server before signing in. */
 export async function instanceRoute(app: App): Promise<LambdaResponse> {
   const { registration, profile, policy } = await getSettings(app)
+  const firstRun = (await listRegistry(app)).length === 0
   return json(200, {
     name: profile.name || 'Vault',
     supportEmail: profile.supportEmail,
     supportUrl: profile.supportUrl,
     accent: profile.accent,
     logo: profile.logo,
-    registration: app.allowRegistration ? 'open' : registration,
+    // A personal Vault takes no registrations once its owner exists (decisions/0030).
+    registration: !featuresOf(app.config.edition).invitations && !firstRun ? 'closed' : app.allowRegistration ? 'open' : registration,
+    // What this server includes (decisions/0030); the clients shape themselves from it.
+    edition: app.config.edition,
+    features: featuresOf(app.config.edition),
     mail: Boolean(app.mailer),
     breachCheck: app.config.breachCheck.enabled,
     // The weakest master password this server accepts (0–4), so the sign-up
     // form can say so before anyone types one.
     minPasswordScore: policy.minPasswordScore,
     // A new server waiting for its owner: the sign-in screen offers the setup code.
-    firstRun: (await listRegistry(app)).length === 0,
+    firstRun,
   })
 }
 

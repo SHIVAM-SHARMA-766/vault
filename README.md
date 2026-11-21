@@ -222,9 +222,13 @@ curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy
 
 | | Personal | Business |
 |---|---|---|
-| For | You, your family, a small team | A company |
+| For | You alone: one account, and you are its admin | A company: your people, groups and policies |
+| Includes | The vault, extension, share links, backups, two-factor | All of that, plus invitations, organizations, collections, a service desk |
 | Runs | Vault + SQLite + Caddy | Vault + PostgreSQL + Caddy |
 | Hardware | 1 GB RAM, amd64 or arm64 | Your choice |
+
+Two editions of one codebase ([decisions/0030](decisions/0030-editions.md)): each shows only what
+its people need, and a personal Vault can become a business one later.
 
 Everything is in the [install guide](docs/INSTALL.md): backups and restore, mail, upgrades,
 verifying signed images, running behind your own proxy.

@@ -105,7 +105,10 @@ export interface UpdateStatus {
   publishedAt: string | null; notes: string | null; checkedAt: string | null; error: string | null
 }
 export interface InstanceProfile { name: string; supportEmail: string; supportUrl: string; accent: string; logo: string }
-export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean }
+/** Editions (decisions/0030): which features this server includes. */
+export type Edition = 'personal' | 'business' | 'hosted'
+export interface Features { organizations: boolean; invitations: boolean; serviceDesk: boolean; website: boolean; staffRoles: boolean; emergencyAccess: boolean }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean; edition?: Edition; features?: Features }
 /** Server-wide rules set by an administrator (G1, G3, G7). */
 export interface ShareRow {
   id: string

@@ -56,10 +56,11 @@ the customer never depends on us to keep running.
 This project's own deployment on OCI is the reference instance and demo, run with the same
 package customers get.
 
-**One product, every size.** Personal and business are not separate editions: the same
-package runs a single person's vault on a Raspberry Pi and a company's on a cluster. Every
-member of a team keeps their own private vault, a single person never has to create an
-organization, and features scale up rather than branch.
+**Three editions, one codebase** ([0030](../decisions/0030-editions.md), 2026-11-21): *personal*
+(one account, self-hosted), *business* (the company's server, self-hosted) and *hosted* (the
+operator's own service, with business tenants). It replaces 0010's "no separate editions".
+Each edition shows only what its people need. The crypto, storage, upgrades and tests stay
+shared.
 
 The first client after the web app is a **browser extension**, because that is where a
 password manager is actually used — and because code installed from a package is not served
@@ -348,6 +349,23 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **G. Administrator settings**
 - ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ✅ G2 IP allow-list (sign-in, recovery and refresh; owners exempt) · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ✅ G4 Sharing policy (share links on/off and longest life)
 - ✅ G5 Rate limits in the UI (read-only, in words) · ✅ G6 Editable email templates (subject and a message; security text fixed) · ✅ G7 Data retention (activity, audit and organization logs; shortening applies at once)
+
+### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
+
+Started 2026-11-21, after the operator chose three editions. Each stage makes one edition fit its
+people.
+
+- [x] **Stage 1, the personal edition:**
+  - the `EDITION` setting, with gating enforced by the server (404 `not_in_edition`) and reported by `/api/instance`;
+  - the web app and the extension shaped by it, and a server panel and setup wizard for one person;
+  - `reset-two-factor` from the host, the personal install guide and runbook;
+  - the installer writes the edition.
+- [ ] **Stage 2, the business edition:**
+  - one company per server, created at setup;
+  - one admin console for users, groups, collections, permission sets and policies;
+  - a Zoho Vault / 1Password Business comparison, item by item.
+- [ ] **Stage 3, the hosted edition:** business tenants, the operator console, tenant-scoped admin
+  consoles, and the operator's responsibilities (uptime, abuse, terms).
 
 ### Phase 4 — Browser extension
 
