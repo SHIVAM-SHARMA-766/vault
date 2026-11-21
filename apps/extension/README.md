@@ -31,6 +31,7 @@ Content-Security-Policy. Changing any of these means changing that check on purp
 | File | Role |
 |---|---|
 | `src/background.ts` | Holds the unlocked state (in `chrome.storage.session`), talks to the API, decrypts, matches, fills, locks |
+| `src/content.ts` | The optional inline script (stage 3): icon in login fields, generate, save and update. Registered at run time, top frame only, UI in a closed shadow root |
 | `src/fill.ts` | The one function that runs in a web page, injected on demand. Checks the origin again before it writes |
 | `src/popup/` | The toolbar popup (React): connect, unlock, list, fill, copy |
 | `src/messages.ts` | What the popup may ask the background |

@@ -59,3 +59,15 @@ test('strength in bits', () => {
   assert.equal(Math.round(passphraseBits({ words: 6, digit: false })), 78)
   assert.ok(passphraseBits({ words: 6, digit: true }) > passphraseBits({ words: 6, digit: false }))
 })
+
+test('passwords follow the chosen sets and length, and preferences pick the kind', async () => {
+  const { generatePassword, generateFromPrefs, DEFAULT_PREFS } = await import('../src/index.js')
+  const p = generatePassword(32, { upper: false, digits: true, symbols: false })
+  assert.equal(p.length, 32)
+  assert.match(p, /^[a-z2-9]+$/)
+  assert.match(generatePassword(64, { upper: true, digits: true, symbols: true }), /[A-Z]/)
+  assert.equal(generateFromPrefs({ ...DEFAULT_PREFS.generator, length: 24 }).length, 24)
+  const phrase = generateFromPrefs({ ...DEFAULT_PREFS.generator, mode: 'passphrase', words: 5, separator: '.' }, WORDS)
+  assert.equal(phrase.split('.').length, 5)
+  assert.equal(generateFromPrefs({ ...DEFAULT_PREFS.generator, mode: 'passphrase', length: 20 }).length, 20, 'no word list: a password')
+})

@@ -106,7 +106,8 @@ S3-compatible store. Tested in CI on every change.
 
 ### 🧩 Browser extension
 Chrome and Firefox, pointed at your own server. Fills on a click or Ctrl+Shift+L, only where the
-site truly matches, so a look-alike page gets nothing. No standing access to the pages you visit.
+site truly matches, so a look-alike page gets nothing. Optionally an icon in login fields, a
+generator in sign-up forms, and an offer to save what you sign in with.
 
 </td>
 <td width="50%" valign="top">

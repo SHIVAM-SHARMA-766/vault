@@ -51,3 +51,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .foot { padding: 10px 14px; margin: 0; }
 .warn { color: var(--text); background: color-mix(in srgb, #d97706 14%, transparent); border-radius: var(--radius-sm); padding: 8px 10px; margin: 10px 14px 0; font-size: 12.5px; }
 .where { align-self: flex-start; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 0 7px; max-width: 100%; }
+.setting { padding: 10px 14px 0; border-top: 1px solid var(--line); margin-top: 10px; }
+.setting .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; margin: 0; }
+.setting .check input { width: auto; margin-top: 3px; }
+.setting .alert { margin: 8px 0 0; }

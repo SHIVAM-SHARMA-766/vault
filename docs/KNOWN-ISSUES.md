@@ -89,13 +89,13 @@ criterion asks for real files from three managers.
 </details>
 
 <details>
-<summary>🟠 <b>The browser extension is at its first stage</b></summary>
+<summary>🟠 <b>The browser extension is not finished</b></summary>
 
 [0029](../decisions/0029-browser-extension.md) is built in stages. What is missing now:
 
 - It is not yet in the Chrome or Firefox store, so it is loaded unpacked from a release zip.
-- It fills only when you click or press the shortcut. There is no icon inside login fields, and
-  it does not offer to save a new password after you sign in.
+- With the vault locked, a password you submit on a site is not offered for saving; unlock
+  first.
 - It fills the top frame only, so a login form inside a same-site frame is not filled yet.
 - A copied password is not cleared from the clipboard later, as the web app does.
 - An account whose only second factor is a security key signs in with a recovery code.

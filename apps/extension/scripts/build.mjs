@@ -64,23 +64,26 @@ for (const [name, m] of Object.entries(manifests)) {
 }
 
 rmSync(dist, { recursive: true, force: true })
-const out = `${dist}/.bundle`
-await build({
-  entryPoints: { background: `${root}src/background.ts`, popup: `${root}src/popup/popup.tsx` },
-  outdir: out,
-  bundle: true,
-  format: 'esm',
-  target: 'es2022',
-  platform: 'browser',
-  minify: true,
-  legalComments: 'none',
-  define: { 'process.env.NODE_ENV': '"production"' },
-})
+
+/** The background and popup are modules; the inline content script is a
+ *  classic script, because the browser injects it into pages as one. The test
+ *  build compiles with __VAULT_TEST__ (loopback-only inline permission, an open
+ *  shadow root the browser test can see into); what ships has it false. */
+async function bundle(out, test) {
+  const common = {
+    bundle: true, target: 'es2022', platform: 'browser', minify: true, legalComments: 'none',
+    define: { 'process.env.NODE_ENV': '"production"', __VAULT_TEST__: String(test) },
+  }
+  await build({ ...common, entryPoints: { background: `${root}src/background.ts`, popup: `${root}src/popup/popup.tsx` }, outdir: out, format: 'esm' })
+  await build({ ...common, entryPoints: { content: `${root}src/content.ts` }, outdir: out, format: 'iife' })
+}
+await bundle(`${dist}/.bundle`, false)
+if (test) await bundle(`${dist}/.bundle-test`, true)
 
 for (const [name, manifest] of Object.entries(manifests)) {
   const dir = `${dist}/${name}`
   mkdirSync(`${dir}/icons`, { recursive: true })
-  cpSync(out, dir, { recursive: true })
+  cpSync(name === 'chrome-test' ? `${dist}/.bundle-test` : `${dist}/.bundle`, dir, { recursive: true })
   cpSync(`${root}icons`, `${dir}/icons`, { recursive: true, filter: (p) => !p.endsWith('.svg') })
   cpSync(`${root}src/popup/popup.html`, `${dir}/popup.html`)
   cpSync(`${root}src/popup/popup.css`, `${dir}/popup.css`)
@@ -90,5 +93,6 @@ for (const [name, manifest] of Object.entries(manifests)) {
     catch { /* zip is optional locally; the release job has it */ }
   }
 }
-rmSync(out, { recursive: true, force: true })
+rmSync(`${dist}/.bundle`, { recursive: true, force: true })
+rmSync(`${dist}/.bundle-test`, { recursive: true, force: true })
 console.log(`extension ${version}: ${Object.keys(manifests).map((n) => `dist/${n}`).join(', ')}`)

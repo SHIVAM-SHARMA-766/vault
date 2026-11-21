@@ -24,15 +24,24 @@ const EMAIL = 'ext@example.test'
 const SITE_PASSWORD = 'Hx9!fill-me-Correctly-42'
 
 const LOGIN_PAGE = `<!doctype html><title>Example sign-in</title>
-<form id="f" action="/done" method="post">
+<form id="f" action="/welcome" method="post">
   <label>Search <input type="search" name="q"></label>
   <label>Email <input id="user" name="email" type="email" autocomplete="username"></label>
   <label>Password <input id="pass" name="password" type="password" autocomplete="current-password"></label>
   <button>Sign in</button>
 </form>`
 
+const SIGNUP_PAGE = `<!doctype html><title>Example sign-up</title>
+<form action="/welcome" method="post">
+  <label>Username <input id="nu" name="username" autocomplete="username"></label>
+  <label>Password <input id="np" name="password" type="password" autocomplete="new-password"></label>
+  <label>Again <input id="nc" name="confirm" type="password" autocomplete="new-password"></label>
+  <button id="go">Create account</button>
+</form>`
+const PAGES = { '/signup': SIGNUP_PAGE, '/welcome': '<!doctype html><title>Welcome</title><p>Signed in.</p>' }
+
 function site() {
-  const server = createServer((req, res) => { res.setHeader('content-type', 'text/html'); res.end(LOGIN_PAGE) })
+  const server = createServer((req, res) => { res.setHeader('content-type', 'text/html'); res.end(PAGES[new URL(req.url, 'http://x').pathname] ?? LOGIN_PAGE) })
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port })))
 }
 
@@ -258,6 +267,114 @@ test('shared collections: signed keys only, filled not copied when passwords are
   } finally {
     await ctx?.close()
     good.server.close()
+    await s.stop()
+  }
+})
+
+test('inside pages: an icon that fills, generate in a sign-up form, save and update after submit', async () => {
+  execFileSync('node', [`${ROOT}apps/extension/scripts/build.mjs`, '--test'], { stdio: 'ignore' })
+  const email = 'inline@example.test'
+  const s = await start({ owner: email })
+  const a = await site(), b = await site()
+  const LOGIN = `http://127.0.0.1:${a.port}/login`
+  const SIGNUP = `http://127.0.0.1:${b.port}/signup`
+  let ctx
+  try {
+    const web = await s.person()
+    await s.register(web, email)
+    await web.click('.topbar .btn-primary')
+    await web.fill('#f-name', 'Example')
+    await web.fill('#f-username', 'me@example.test')
+    await web.fill('#f-password', SITE_PASSWORD)
+    await web.fill('#f-url', LOGIN)
+    await web.click('.editor-foot .btn-primary')
+    await web.waitForSelector('.detail h2:has-text("Example")')
+
+    let id
+    ;({ ctx, id } = await launch())
+    const popup = await ctx.newPage()
+    await popup.goto(`chrome-extension://${id}/popup.html`)
+    await connect(popup, s, email)
+    await popup.waitForSelector('section[aria-label="All items"] .row', { timeout: 60_000 })
+    // Off until the person turns it on.
+    const blank = await ctx.newPage()
+    await blank.goto(LOGIN)
+    await blank.click('#user')
+    await blank.waitForTimeout(500)
+    assert.equal(await blank.locator('vault-inline').count(), 0, 'nothing inside pages by default')
+    await blank.close()
+    // Ticked once the permission is granted and the script registered.
+    await popup.getByLabel('Show Vault in login fields and offer to save passwords').click()
+    await popup.waitForSelector('text=Works on every site')
+    const items = () => popup.evaluate(async () => (await chrome.runtime.sendMessage({ type: 'items' })).result.items)
+    const passwordOf = (k) => popup.evaluate(async (key) => (await chrome.runtime.sendMessage({ type: 'reveal', id: key, field: 'password' })).result.value, k)
+
+    // The icon in the username field lists this site's login, and fills it.
+    const login = await ctx.newPage()
+    await login.goto(LOGIN)
+    await login.click('#user')
+    await login.locator('vault-inline button.icon').click()
+    await login.getByRole('menuitem', { name: /Example/ }).click()
+    await login.waitForFunction(() => document.querySelector('#pass').value !== '')
+    assert.equal(await login.inputValue('#user'), 'me@example.test')
+    assert.equal(await login.inputValue('#pass'), SITE_PASSWORD)
+
+    // A sign-up form on another site: generate, then save after submitting.
+    const signup = await ctx.newPage()
+    await signup.goto(SIGNUP)
+    await signup.locator('vault-inline').waitFor({ state: 'attached' })
+    await signup.click('#np')
+    await signup.locator('vault-inline button.icon').click()
+    assert.equal(await signup.getByRole('menuitem', { name: /Example/ }).count(), 0, 'another site\'s login is not offered')
+    await signup.getByRole('menuitem', { name: /Generate a strong password/ }).click()
+    const generated = await signup.inputValue('#np')
+    assert.ok(generated.length >= 20, generated)
+    assert.equal(await signup.inputValue('#nc'), generated, 'both password fields')
+    await signup.fill('#nu', 'new@example.test')
+    await signup.click('#go')
+    await signup.waitForURL(/\/welcome$/)
+    await signup.getByRole('dialog', { name: 'Vault' }).getByText('Save this login to Vault?').waitFor()
+    await signup.getByRole('button', { name: 'Save', exact: true }).click()
+    await signup.getByRole('dialog', { name: 'Vault' }).waitFor({ state: 'detached' })
+    let saved
+    for (let i = 0; i < 40 && !saved; i++) { saved = (await items()).find((it) => it.username === 'new@example.test'); if (!saved) await popup.waitForTimeout(250) }
+    assert.ok(saved, 'the new login is in the vault')
+    assert.equal(saved.host, '127.0.0.1')
+    assert.equal(await passwordOf(saved.id), generated)
+
+    // A changed password on the first site: offered as an update, kept.
+    await login.goto(LOGIN)
+    await login.fill('#user', 'me@example.test')
+    await login.fill('#pass', 'Changed-Password-99!')
+    await login.getByRole('button', { name: 'Sign in' }).click()
+    await login.waitForURL(/\/welcome$/)
+    await login.getByText('Update the password for Example?').waitFor()
+    await login.getByRole('button', { name: 'Update', exact: true }).click()
+    await login.getByRole('dialog', { name: 'Vault' }).waitFor({ state: 'detached' })
+    const example = (await items()).find((it) => it.name === 'Example')
+    let now = ''
+    for (let i = 0; i < 40 && now !== 'Changed-Password-99!'; i++) { now = await passwordOf(example.id); if (now !== 'Changed-Password-99!') await popup.waitForTimeout(250) }
+    assert.equal(now, 'Changed-Password-99!')
+
+    // The same password again is not offered.
+    await login.goto(LOGIN)
+    await login.fill('#user', 'me@example.test')
+    await login.fill('#pass', 'Changed-Password-99!')
+    await login.getByRole('button', { name: 'Sign in' }).click()
+    await login.waitForURL(/\/welcome$/)
+    await login.waitForTimeout(1500)
+    assert.equal(await login.getByRole('dialog', { name: 'Vault' }).count(), 0)
+
+    // Never on the Vault server's own pages, where the master password is typed.
+    const own = await ctx.newPage()
+    await own.goto(`${s.base}/app/`)
+    await own.click('#email')
+    await own.waitForTimeout(500)
+    assert.equal(await own.locator('vault-inline').count(), 0)
+    assert.deepEqual(s.errors, [])
+  } finally {
+    await ctx?.close()
+    a.server.close(); b.server.close()
     await s.stop()
   }
 })

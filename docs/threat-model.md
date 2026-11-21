@@ -337,6 +337,19 @@ it. Its build refuses a manifest that adds any of these. The vault key and token
 `chrome.storage.session`, which is memory only and closed to content scripts. It reaches only
 the server origin the person approved.
 
+**Inside pages** (stage 3) is off by default. Once the person turns it on, a content script runs
+in the top frame of every site, except the Vault server's own origin, where the master password
+is typed. It holds no keys.
+
+- **What a page can learn:** it asks the background for this page's matching logins only, and
+  shows them in a closed shadow root, built with text only, so the page's scripts cannot read
+  the list.
+- **Submitted passwords:** a password submitted on a page goes to the background only to offer
+  saving it. It is kept in session memory for three minutes, for that site only, and it is not
+  kept at all while the vault is locked.
+- **What a hostile page can do:** offer itself a "save" for its own origin. That stores a login
+  for that origin, never another site's password.
+
 Shared collections in the extension get the same A15 protection as in the web app. It runs the
 same grant checks (`grants.ts`), so a collection key the server swapped or signed itself is
 refused, and the popup says so.
