@@ -5,7 +5,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import * as session from '../lib/session.js'
-import { Link, navigate } from '../lib/router.js'
+import { Link, navigate, useRoute } from '../lib/router.js'
+import { useScopes } from '../lib/workspace.js'
 import { IconGrid, IconKey, IconLock, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
 import { BrandMark, useEdition } from '../lib/instance.js'
 import { NotificationBell } from './Notifications.js'
@@ -28,6 +29,7 @@ export function Shell({ state, tag, center, actions, children }: {
           <BrandMark size={18} />
           {tag ? <span className="admin-tag">{tag}</span> : null}
         </Link>
+        <WorkspaceSwitch state={state} />
         {center}
         <div className="topbar-actions">
           {actions}
@@ -43,9 +45,27 @@ export function Shell({ state, tag, center, actions, children }: {
   )
 }
 
+/** "My vault" and "Admin console" (decisions/0031), for whoever administers
+ *  something: the server, or an organization as its owner or admin. Everyone
+ *  else never sees the console at all. */
+function WorkspaceSwitch({ state }: { state: session.Unlocked }) {
+  const { scopes } = useScopes(state)
+  const { features } = useEdition()
+  const route = useRoute()
+  if (!scopes.length) return null
+  const inConsole = route.name === 'console'
+  return (
+    <nav className="workspace-switch" aria-label="Workspace">
+      <Link to="/app/" className={inConsole ? '' : 'is-active'} aria-current={inConsole ? undefined : 'page'}><IconKey size={14} /><span>{t('My vault')}</span></Link>
+      <Link to="/app/console" className={inConsole ? 'is-active' : ''} aria-current={inConsole ? 'page' : undefined}><IconGrid size={14} /><span>{features.invitations ? t('Admin console') : t('Server settings')}</span></Link>
+    </nav>
+  )
+}
+
 function AccountMenu({ state }: { state: session.Unlocked }) {
   const [open, setOpen] = useState(false)
   const { features } = useEdition()
+  const { scopes } = useScopes(state)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -79,11 +99,11 @@ function AccountMenu({ state }: { state: session.Unlocked }) {
           </div>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/')}><IconKey size={15} />{t('Vault')}</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/settings')}><IconUser size={15} />Account settings</button>
-          {features.organizations ? <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />{t('Organizations')}</button> : null}
+          {features.organizations ? <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />{t('My organizations')}</button> : null}
           <button role="menuitem" className="menu-item" onClick={() => go('/app/import-export')}><IconSwap size={15} />Import &amp; export</button>
           {features.serviceDesk ? <button role="menuitem" className="menu-item" onClick={() => go('/app/support')}><IconHelp size={15} />Help &amp; support</button> : null}
-          {state.isAdmin ? (
-            <button role="menuitem" className="menu-item" onClick={() => go('/app/admin')}><IconGrid size={15} />{features.invitations ? t('Admin panel') : t('Server settings')}</button>
+          {scopes.length ? (
+            <button role="menuitem" className="menu-item" onClick={() => go('/app/console')}><IconGrid size={15} />{features.invitations ? t('Admin console') : t('Server settings')}</button>
           ) : null}
           <div className="menu-sep" />
           <button role="menuitem" className="menu-item" onClick={session.lock}><IconLock size={15} />Lock now</button>

@@ -15,15 +15,17 @@ import { t } from '../lib/i18n.js'
 export function describeNote(n: Note): { text: string; to: string } {
   const d = n.data
   const who = typeof d['who'] === 'string' ? d['who'] : 'Someone'
+  // What an admin must act on opens in the admin console (decisions/0031).
+  const console = (section: string) => (typeof d['orgId'] === 'string' ? `/app/console/org/${d['orgId']}/${section}` : '/app/console')
   switch (n.kind) {
     case 'share-opened': return { text: `One of your share links was opened${d['ip'] ? ` from ${d['ip']}` : ''}${typeof d['viewsLeft'] === 'number' ? `; ${d['viewsLeft']} ${d['viewsLeft'] === 1 ? 'view' : 'views'} left` : ''}.`, to: '/app/settings/security' }
-    case 'access-request': return { text: `${who} asked for access to a collection${d['reason'] ? `: “${d['reason']}”` : ''}.`, to: '/app/orgs' }
+    case 'access-request': return { text: `${who} asked for access to a collection${d['reason'] ? `: “${d['reason']}”` : ''}.`, to: console('collections') }
     case 'access-granted': return { text: `Your access request was approved${d['until'] ? `, until ${when(String(d['until']))}` : ''}.`, to: '/app/' }
     case 'access-denied': return { text: 'Your access request was turned down.', to: '/app/orgs' }
     case 'access-ended': return { text: 'A collection you checked out has closed again.', to: '/app/orgs' }
-    case 'sensitive-opened': return { text: `${who} ${d['action'] === 'reveal' ? 'revealed a password in' : d['action'] === 'copy' ? 'copied from' : d['action'] === 'fill' ? 'filled a page from' : 'opened'} a sensitive item.`, to: '/app/orgs' }
+    case 'sensitive-opened': return { text: `${who} ${d['action'] === 'reveal' ? 'revealed a password in' : d['action'] === 'copy' ? 'copied from' : d['action'] === 'fill' ? 'filled a page from' : 'opened'} a sensitive item.`, to: console('activity') }
     case 'org-invite': return { text: `You are invited to join ${d['hint'] || 'an organization'}.`, to: '/app/orgs' }
-    case 'member-accepted': return { text: `${who} accepted your invitation. Confirm their fingerprint to share with them.`, to: '/app/orgs' }
+    case 'member-accepted': return { text: `${who} accepted your invitation. Confirm their fingerprint to share with them.`, to: console('members') }
     case 'backup-failed': return { text: `Your scheduled backup failed${d['error'] ? `: ${d['error']}` : ''}.`, to: '/app/settings/backups' }
     case 'emergency-request': return { text: 'Your trusted contact asked for emergency access.', to: '/app/settings/emergency' }
     default: return { text: 'Something happened.', to: '/app/' }

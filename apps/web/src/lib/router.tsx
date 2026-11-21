@@ -16,7 +16,9 @@ export type Route =
   | { name: 'transfer' }
   | { name: 'support' }
   | { name: 'orgs' }
-  | { name: 'admin'; tab: string | null }
+  /** The admin console (two workspaces): the server's administration, or one
+   *  organization's, by scope. /app/admin/<tab> is the server scope. */
+  | { name: 'console'; scope: 'server' | 'org' | null; org?: string | null; section: string | null }
 
 export function parse(pathname: string): Route {
   const parts = pathname.replace(/^\/app\/?/, '').split('/').filter(Boolean)
@@ -24,7 +26,12 @@ export function parse(pathname: string): Route {
   if (parts[0] === 'import-export') return { name: 'transfer' }
   if (parts[0] === 'support') return { name: 'support' }
   if (parts[0] === 'orgs') return { name: 'orgs' }
-  if (parts[0] === 'admin') return { name: 'admin', tab: parts[1] ?? null }
+  if (parts[0] === 'admin') return { name: 'console', scope: 'server', section: parts[1] ?? null }
+  if (parts[0] === 'console') {
+    if (parts[1] === 'server') return { name: 'console', scope: 'server', section: parts[2] ?? null }
+    if (parts[1] === 'org' && parts[2]) return { name: 'console', scope: 'org', org: parts[2], section: parts[3] ?? null }
+    return { name: 'console', scope: null, section: null }
+  }
   return { name: 'vault' }
 }
 
@@ -35,7 +42,10 @@ export function href(route: Route): string {
     case 'transfer': return '/app/import-export'
     case 'support': return '/app/support'
     case 'orgs': return '/app/orgs'
-    case 'admin': return route.tab ? `/app/admin/${route.tab}` : '/app/admin'
+    case 'console':
+      if (route.scope === 'server') return route.section ? `/app/console/server/${route.section}` : '/app/console/server'
+      if (route.scope === 'org' && route.org) return `/app/console/org/${route.org}${route.section ? `/${route.section}` : ''}`
+      return '/app/console'
   }
 }
 

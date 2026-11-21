@@ -36,8 +36,7 @@ import {
   IconDownload, IconPlus, IconRefresh, IconShield, IconSliders, IconTrash, IconUser, IconX,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
-import { Shell } from '../../ui/Shell.js'
-import { Link, href, navigate } from '../../lib/router.js'
+import { Link, href } from '../../lib/router.js'
 
 type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit' | 'system'
 
@@ -66,48 +65,29 @@ const ROLE_HELP: Record<Role, string> = {
   user: 'No admin access.',
 }
 
-export function Admin({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
+export type ServerTab = Tab
+export const SERVER_TABS = TABS
+
+/** The server sections this account may open, in this edition. */
+export function serverTabs(state: session.Unlocked, features: Features): typeof TABS {
   const perms = new Set<Permission>(state.permissions ?? [])
-  const { features } = useEdition()
-  const tabs = TABS.filter((t) => perms.has(t.needs) && (!t.feature || features[t.feature]))
-  // The tab is part of the address (/app/admin/users), so reload and back work.
-  const tab: Tab = tabs.find((t) => t.id === requested)?.id ?? tabs[0]?.id ?? 'overview'
-  const setTab = (t: Tab) => navigate(href({ name: 'admin', tab: t }))
-  const role: Role = state.role ?? 'user'
+  return TABS.filter((t) => perms.has(t.needs) && (!t.feature || features[t.feature]))
+}
 
+/** One server section, inside the admin console (decisions/0031). */
+export function ServerSection({ state, tab, onGo }: { state: session.Unlocked; tab: Tab; onGo: (t: Tab) => void }) {
+  const perms = new Set<Permission>(state.permissions ?? [])
   return (
-    <Shell state={state} tag={ROLE_LABELS[role]}>
-
-      <div className="admin-layout">
-        <nav className="sidebar" aria-label="Admin sections">
-          {tabs.map(({ id, label, Icon }) => (
-            <button key={id} className={`side-item ${tab === id ? 'side-active' : ''}`} onClick={() => setTab(id)} aria-current={tab === id}>
-              <Icon size={16} /><span>{label}</span>
-            </button>
-          ))}
-          <div className="sidebar-foot">
-            <IconShield size={14} /> You can manage accounts here, but not read them. Vault contents and addresses never reach the server in readable form.
-          </div>
-        </nav>
-
-        <div className="filter-chips admin-chips">
-          {tabs.map(({ id, label }) => (
-            <button key={id} className={`chip ${tab === id ? 'chip-active' : ''}`} onClick={() => setTab(id)}>{label}</button>
-          ))}
-        </div>
-
-        <main className="admin-main">
-          {tab === 'overview' && perms.has('overview.read') ? <Overview onGo={setTab} canWrite={perms.has('settings.write')} /> : null}
-          {tab === 'desk' && perms.has('desk.read') ? <Desk selfId={state.userId} canWrite={perms.has('desk.write')} canApprove={perms.has('invites.write')} canReset={perms.has('users.write')} /> : null}
-          {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
-          {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
-          {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} /> : null}
-          {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
-          {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
-          {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
-        </main>
-      </div>
-    </Shell>
+    <>
+      {tab === 'overview' && perms.has('overview.read') ? <Overview onGo={onGo} canWrite={perms.has('settings.write')} /> : null}
+      {tab === 'desk' && perms.has('desk.read') ? <Desk selfId={state.userId} canWrite={perms.has('desk.write')} canApprove={perms.has('invites.write')} canReset={perms.has('users.write')} /> : null}
+      {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
+      {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
+      {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} /> : null}
+      {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
+      {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
+      {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
+    </>
   )
 }
 

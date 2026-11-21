@@ -1056,3 +1056,24 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
   body:has(.emergency-kit) .emergency-kit { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; color: #000; }
   .no-print { display: none !important; }
 }
+
+/* ── Two workspaces (decisions/0031) ───────────────────────────────────── */
+.workspace-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); margin-left: 4px; flex-shrink: 0; }
+.workspace-switch a { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--text-2); text-decoration: none; white-space: nowrap; }
+.workspace-switch a:hover { color: var(--text); }
+.workspace-switch a.is-active { background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+@media (max-width: 760px) { .workspace-switch span { display: none; } .workspace-switch a { padding: 6px 9px; } }
+.console-layout .sidebar { border-top: 3px solid var(--accent); }
+.scope-picker { padding: 4px 4px 14px; margin-bottom: 8px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
+.scope-picker select { width: 100%; font-weight: 600; }
+.scope-name { margin: 0; font-weight: 700; font-size: 15px; }
+.console-chips { display: none; }
+@media (max-width: 900px) { .console-chips { display: flex; } }
+.console-org .settings-head { margin-bottom: 16px; }
+.console-sub { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.org-manage { margin: 4px 0 8px; }
+.org-more { margin-top: 14px; }
+.org-more summary { cursor: pointer; color: var(--text-2); }
+.org-invite { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.invite-groups { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 8px; border: 0; padding: 0; }
+.invite-groups .check { margin: 0; }
