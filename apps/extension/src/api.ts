@@ -5,11 +5,27 @@
 import { friendlyError } from '@vault/core'
 import type { KdfParams } from '@vault/crypto'
 
+import type { MemberKeys } from '../../web/src/features/orgs/grants.js'
+
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly details?: unknown) {
     super(message)
     this.name = 'ApiError'
   }
+}
+
+export interface Me {
+  userId: string
+  policy: { maxIdleMinutes: number | null }
+  identity: { publicKey: string; wrappedPrivateKey: string; signingPublicKey?: string } | null
+}
+export interface OrgRow {
+  id: string; nameBlob: string; kind?: 'team' | 'direct'; status: 'accepted' | 'confirmed'
+  orgKeyBlob?: string; policies: { maxIdleMinutes: number | null }; policyGap: string | null
+}
+export interface CollectionRow {
+  id: string; nameBlob: string; keyVersion: number
+  access: { keyBlob: string; keyVersion: number; permission: string; hidePasswords: boolean; signature?: string; signedBy?: string } | null
 }
 
 export interface Session { accessToken: string; refreshToken: string; expiresIn: number }
@@ -51,6 +67,17 @@ export const api = (server: string) => ({
     request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(server, 'POST', '/api/auth/login', { body: { email, authKey, ...second } }),
   refresh: (refreshToken: string) => request<Session>(server, 'POST', '/api/auth/refresh', { body: { refreshToken } }),
   logout: (token: string) => request<{ ok: true }>(server, 'POST', '/api/auth/logout', { token, body: {} }),
-  me: (token: string) => request<{ userId: string; policy: { maxIdleMinutes: number | null } }>(server, 'GET', '/api/auth/me', { token }),
+  me: (token: string) => request<Me>(server, 'GET', '/api/auth/me', { token }),
+  // Shared collections (decisions/0015, 0025): read only.
+  orgs: (token: string) => request<{ orgs: OrgRow[] }>(server, 'GET', '/api/orgs', { token }),
+  members: (token: string, org: string) => request<{ members: MemberKeys[] }>(server, 'GET', `/api/orgs/${org}/members`, { token }),
+  getTrust: (token: string, org: string) => request<{ blob: string | null }>(server, 'GET', `/api/orgs/${org}/trust`, { token }),
+  putTrust: (token: string, org: string, blob: string) => request<{ ok: true }>(server, 'PUT', `/api/orgs/${org}/trust`, { token, body: { blob } }),
+  collections: (token: string, org: string) => request<{ collections: CollectionRow[] }>(server, 'GET', `/api/orgs/${org}/collections`, { token }),
+  items: (token: string, org: string, coll: string) =>
+    request<{ items: { id: string; blob: string; keyVersion: number; sensitive?: boolean }[] }>(server, 'GET', `/api/orgs/${org}/collections/${coll}/items`, { token }),
+  /** Filling and copying a shared item are reported, as in the web app. */
+  report: (token: string, org: string, action: 'copy' | 'fill', collectionId: string, itemId: string) =>
+    request<{ ok: true }>(server, 'POST', `/api/orgs/${org}/events`, { token, body: { action, collectionId, itemId } }),
   vault: (token: string) => request<{ entries: { id: string; blob: string }[]; folders: { id: string; blob: string }[] }>(server, 'GET', '/api/vault', { token }),
 })

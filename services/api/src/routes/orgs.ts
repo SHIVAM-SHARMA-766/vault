@@ -251,7 +251,8 @@ export async function migrateItemPartitions(app: App): Promise<number> {
 // member's app, which reports them (and a modified app could stay silent —
 // the log says so). Kept as long as the server policy's audit retention.
 
-export const CLIENT_EVENTS = ['view', 'reveal', 'copy'] as const
+/** What a member's app reports. 'fill' comes from the browser extension (decisions/0029). */
+export const CLIENT_EVENTS = ['view', 'reveal', 'copy', 'fill'] as const
 
 export async function orgEvent(app: App, orgId: string, actor: string, action: string, extra: { collectionId?: string; itemId?: string; target?: string; reported?: boolean } = {}): Promise<void> {
   const at = new Date(app.now()).toISOString()
@@ -266,7 +267,7 @@ export async function orgEvent(app: App, orgId: string, actor: string, action: s
 export async function reportEvent(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
   const b = body(event)
   const action = b['action']
-  if (!(CLIENT_EVENTS as readonly unknown[]).includes(action)) throw badRequest('action must be view, reveal or copy.')
+  if (!(CLIENT_EVENTS as readonly unknown[]).includes(action)) throw badRequest('action must be view, reveal, copy or fill.')
   const collectionId = String(b['collectionId'] ?? '')
   const itemId = id(b['itemId'], 'itemId')
   const { m } = await requireAccess(app, orgId, collectionId, userId, 'view')

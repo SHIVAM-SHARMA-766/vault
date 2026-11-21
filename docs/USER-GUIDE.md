@@ -457,6 +457,9 @@ or press **Ctrl+Shift+L** (⌘⇧L on a Mac) to fill the best match without open
   site over https (`accounts.example.com` for `www.example.com`). A look-alike address gets
   nothing.
 - It cannot read or change any page until you click it or press the shortcut.
+- Items shared with you through an organization appear too, labelled with their collection
+  (*Acme / Finance*). If the organization hides passwords, you can fill them but not copy them.
+  Filling or copying a shared item shows in the organization's activity.
 - It locks after your account's idle limit (15 minutes unless your organization sets one), when
   you click **Lock**, and when the browser closes.
 

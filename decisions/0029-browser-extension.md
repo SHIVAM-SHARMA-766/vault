@@ -68,13 +68,29 @@ No remote code, no `eval`, and no code from the server.
 
 ## Stages
 
-1. Setup, unlock, search, copy, TOTP, fill on click and by shortcut, lock. *(this PR)*
-2. Shared collections, with the signed-grant checks of 0025.
+1. Setup, unlock, search, copy, TOTP, fill on click and by shortcut, lock. *(built)*
+2. Shared collections, with the signed-grant checks of 0025. *(built)*
 3. Optional all-sites permission: an inline icon in login fields, save and update on submit,
    the generator in the page.
 4. Store packages: a signed Firefox add-on (AMO is free), and Chrome Web Store when the operator
    decides on its one-time developer fee. Until then, a release zip to load unpacked.
 5. Passkey storage, after autofill is solid (0022 (c)).
+
+## Shared collections (stage 2)
+
+- The extension opens every collection this account may open, read only, and checks each grant
+  with the same code as the web app (`apps/web/src/features/orgs/grants.ts`): a key whose
+  signature fails against a trusted admin is not used, and the popup says how many collections
+  were refused. It pins the owner on first sight, as the web app does. It does not upgrade the
+  trust store to "signed only" and does no upkeep; the web app keeps doing both.
+- **Hide passwords** (0015) is a policy the app keeps: such an item can be **filled** but not
+  copied, and the background refuses to reveal it even when asked directly. The password still
+  reaches the page that is filled. That is the point of filling, and it is policy, not
+  encryption, as 0015 says.
+- **Reporting:** filling a shared item is reported as `item.fill`, and copying as `item.copy`,
+  in the organization's audit. A sensitive item (D12) notifies its admins.
+- **Idle:** the strictest limit among the person's organizations applies, as in the web app.
+- A problem loading shared collections never hides the person's own items.
 
 ## Tests
 
@@ -83,3 +99,6 @@ No remote code, no `eval`, and no code from the server.
 - e2e: the real extension loaded into Chromium against the dev stack. Set up, unlock, find the
   item, fill a login page; a look-alike origin and a different port get nothing; lock and idle
   lock
+- e2e: a shared item with passwords hidden is shown with its collection, fills, cannot be
+  copied (also when asked directly), and appears in the owner's audit; a server that swaps the
+  sealed key gets the collection refused

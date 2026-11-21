@@ -337,6 +337,10 @@ it. Its build refuses a manifest that adds any of these. The vault key and token
 `chrome.storage.session`, which is memory only and closed to content scripts. It reaches only
 the server origin the person approved.
 
+Shared collections in the extension get the same A15 protection as in the web app. It runs the
+same grant checks (`grants.ts`), so a collection key the server swapped or signed itself is
+refused, and the popup says so.
+
 The extension's code is also part of A3. Loaded from a release zip or a store, it is fixed
 when installed rather than served by the hostname on every visit. That narrows A3 for people who
 use it, but only once it is distributed through a store (decision 0029, stage 4).

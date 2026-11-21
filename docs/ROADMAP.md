@@ -363,7 +363,7 @@ Design: [0029](../decisions/0029-browser-extension.md). Built in stages.
   session storage with the account's idle rule; the extension's own Content-Security-Policy.
 - [x] Talks to the API directly; no page script is ever given the vault key. Fill on click
   and by shortcut; copy username, password and TOTP code.
-- [ ] Shared collections, with the signed-grant checks (stage 2).
+- [x] Shared collections, with the signed-grant checks; "hide passwords" fills but never copies; filling is reported to the organization (stage 2).
 - [ ] Optional all-sites permission: inline icon, save and update on form submit, generator
   in the page (stage 3).
 - [ ] Store packages: Firefox Add-ons (free); Chrome Web Store needs a one-time developer fee,

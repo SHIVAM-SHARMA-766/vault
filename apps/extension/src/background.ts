@@ -14,13 +14,20 @@ import {
   deriveLoginKeys,
   fromBase64Url,
   generateTotp,
+  openCollectionKey,
+  openCollectionMeta,
   openEntry,
+  openOrgKey,
+  openOrgMeta,
+  openSharedItem,
   parseSecretKey,
   toBase64Url,
+  unwrapIdentityPrivateKey,
   unwrapVaultKey,
   wipe,
 } from '@vault/crypto'
 
+import { checkGrant, openTrust, sealTrust, trustedSigners } from '../../web/src/features/orgs/grants.js'
 import { forgetSecretKey, loadSecretKey, storeSecretKey } from '../../web/src/lib/secretkey.js'
 import { ApiError, api } from './api.js'
 import { fillLogin } from './fill.js'
@@ -37,7 +44,10 @@ interface Unlocked {
   idleMinutes: number
   lastActive: number
 }
-type Item = EntryContent & { id: string }
+interface Shared { orgId: string; collectionId: string; where: string; hidePasswords: boolean; sensitive: boolean }
+/** `key` is unique across the vault and shared collections; `id` is the
+ *  item's own id where it lives. */
+type Item = EntryContent & { id: string; key: string; shared?: Shared }
 
 const DEFAULT_IDLE_MINUTES = 15
 
@@ -50,6 +60,7 @@ const getUnlocked = async (): Promise<Unlocked | null> => ((await chrome.storage
 const saveUnlocked = (u: Unlocked) => chrome.storage.session.set({ unlocked: u })
 
 let cache: Item[] | null = null
+let notice: string | undefined
 let used: Record<string, number> | null = null
 
 async function usedAt(): Promise<Record<string, number>> {
@@ -67,6 +78,7 @@ async function lock(): Promise<void> {
   const server = await getServer()
   cache = null
   used = null
+  notice = undefined
   await chrome.storage.session.clear()
   // End this device's session on the server too, so locked browsers do not
   // pile up in Settings → Devices. Best effort: locking never waits on it.
@@ -105,15 +117,92 @@ async function items(): Promise<Item[]> {
   const u = await getUnlocked()
   const server = await getServer()
   if (!u || !server) throw new Locked()
-  const vault = await api(server.url).vault(await token())
+  const a = api(server.url)
+  const token1 = await token()
   const key = fromBase64Url(u.vaultKey)
   try {
-    const opened = await Promise.all(vault.entries.map(async (e) => {
-      try { return { ...(await openEntry(e.id, e.blob, key)), id: e.id } } catch { return null }
-    }))
-    cache = opened.filter((x): x is Item => x !== null && !x.archived).sort((a, b) => a.name.localeCompare(b.name))
+    const vault = await a.vault(token1)
+    const own = (await Promise.all(vault.entries.map(async (e) => {
+      try { return { ...(await openEntry(e.id, e.blob, key)), id: e.id, key: e.id } } catch { return null }
+    }))).filter((x): x is Item => x !== null && !x.archived)
+    // Shared collections are best effort: a problem there must not hide the
+    // person's own vault.
+    let shared: Item[] = []
+    notice = undefined
+    try {
+      const res = await loadShared(server.url, token1, key)
+      shared = res.items
+      if (res.refused) notice = `${res.refused} shared collection${res.refused === 1 ? ' was' : 's were'} not opened: the key was not signed by an admin you trust. Open Vault to check.`
+      // The strictest idle limit among organizations sets the lock, as in the web app.
+      if (res.idle.length) {
+        const limit = Math.min(u.idleMinutes, ...res.idle)
+        const now = await getUnlocked()
+        if (now && limit < now.idleMinutes) await saveUnlocked({ ...now, idleMinutes: limit })
+      }
+    } catch {
+      notice = 'Shared collections could not be loaded. Your own items are shown.'
+    }
+    cache = [...own, ...shared].sort((x, y) => x.name.localeCompare(y.name))
   } finally { wipe(key) }
   return cache
+}
+
+/** Every shared collection this account may open, decrypted (decisions/0015).
+ *  Each grant is checked as the web app checks it (0025, grants.ts): a key
+ *  whose signature fails against a trusted admin is not used. Nothing is
+ *  written here except pinning the owner on first sight, as the web app does. */
+async function loadShared(server: string, token1: string, vaultKey: Uint8Array): Promise<{ items: Item[]; refused: number; idle: number[] }> {
+  const a = api(server)
+  const me = await a.me(token1)
+  const out: Item[] = []
+  const idle: number[] = []
+  let refused = 0
+  if (!me.identity) return { items: out, refused, idle }
+  const publicKey = fromBase64Url(me.identity.publicKey)
+  const privateKey = await unwrapIdentityPrivateKey(me.identity.wrappedPrivateKey, vaultKey)
+  try {
+    for (const row of (await a.orgs(token1)).orgs) {
+      if (row.status !== 'confirmed' || !row.orgKeyBlob) continue
+      if (row.policies.maxIdleMinutes) idle.push(row.policies.maxIdleMinutes)
+      if (row.policyGap) continue
+      const orgKey = await openOrgKey(privateKey, publicKey, row.orgKeyBlob, row.id)
+      try {
+        const orgName = (await openOrgMeta(row.id, row.nameBlob, orgKey)).name
+        const members = (await a.members(token1, row.id).catch(() => ({ members: [] }))).members
+        const trust = await openTrust(row.id, vaultKey, (await a.getTrust(token1, row.id).catch(() => ({ blob: null }))).blob)
+        const ts = await trustedSigners(row.id, members, trust, async (t) => { await a.putTrust(token1, row.id, await sealTrust(row.id, vaultKey, t)).catch(() => {}) })
+        for (const c of (await a.collections(token1, row.id)).collections) {
+          if (!c.access || c.access.keyVersion !== c.keyVersion) continue
+          const status = await checkGrant(row.id, c.id, c.keyVersion, c.access,
+            { publicKey: me.identity.publicKey, signingKey: me.identity.signingPublicKey ?? null, userId: me.userId }, ts.signers, ts.trust)
+          if (status === 'bad') { refused++; continue }
+          const collKey = await openCollectionKey(privateKey, publicKey, c.access.keyBlob, c.id, c.keyVersion)
+          try {
+            const name = (await openCollectionMeta(row.id, c.id, c.nameBlob, orgKey).catch(() => ({ name: 'Collection' }))).name
+            const where = row.kind === 'direct' ? name : `${orgName} / ${name}`
+            for (const it of (await a.items(token1, row.id, c.id)).items) {
+              try {
+                // `exposed` and `sensitive` are the server's word, never the blob's.
+                const { exposed: _x, sensitive: _s, ...content } = (await openSharedItem(c.id, it.id, it.keyVersion, it.blob, collKey)) as EntryContent & { exposed?: unknown; sensitive?: unknown }
+                if (content.archived) continue
+                out.push({ ...content, id: it.id, key: `${c.id}/${it.id}`, shared: { orgId: row.id, collectionId: c.id, where, hidePasswords: c.access.hidePasswords, sensitive: !!it.sensitive } })
+              } catch { /* an item under an older key; rotation re-seals it */ }
+            }
+          } finally { wipe(collKey) }
+        }
+      } finally { wipe(orgKey) }
+    }
+  } finally { wipe(privateKey) }
+  return { items: out, refused, idle }
+}
+
+/** Tell the organization a shared item was filled or copied (its audit, and
+ *  its admins when the item is sensitive). Best effort. */
+async function report(item: Item, action: 'copy' | 'fill') {
+  if (!item.shared) return
+  const server = await getServer()
+  if (!server) return
+  try { await api(server.url).report(await token(), item.shared.orgId, action, item.shared.collectionId, item.id) } catch { /* the action still happened */ }
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -197,8 +286,9 @@ async function unlock(req: Extract<Request, { type: 'unlock' }>): Promise<Unlock
 }
 
 const summary = (e: Item): ItemSummary => ({
-  id: e.id, name: e.name, username: e.username ?? '', host: e.url ? hostOfUrl(e.url) : '',
+  id: e.key, name: e.name, username: e.username ?? '', host: e.url ? hostOfUrl(e.url) : '',
   hasPassword: !!e.password, hasTotp: !!e.totpSecret, favorite: e.favorite,
+  ...(e.shared ? { where: e.shared.where, ...(e.shared.hidePasswords ? { passwordHidden: true } : {}) } : {}),
 })
 function hostOfUrl(url: string): string {
   try { return new URL(url.includes('://') ? url : `https://${url}`).hostname } catch { return url }
@@ -207,12 +297,12 @@ function hostOfUrl(url: string): string {
 async function listItems(pageUrl?: string): Promise<ItemsReply> {
   const all = await items()
   const u = await usedAt()
-  const matches = pageUrl ? rankForPage(all, pageUrl, (e) => e.url, (e) => u[e.id] ?? 0).map((e) => e.id) : []
-  return { items: all.map(summary), matches }
+  const matches = pageUrl ? rankForPage(all, pageUrl, (e) => e.url, (e) => u[e.key] ?? 0).map((e) => e.key) : []
+  return { items: all.map(summary), matches, ...(notice ? { notice } : {}) }
 }
 
 async function find(id: string): Promise<Item> {
-  const item = (await items()).find((e) => e.id === id)
+  const item = (await items()).find((e) => e.key === id)
   if (!item) throw new Error('That item is no longer in your vault.')
   return item
 }
@@ -230,13 +320,16 @@ async function fill(id: string, tabId: number): Promise<{ filled: number; error?
     args: [item.username ?? '', item.password ?? '', origin],
   })
   const filled = (result?.result as { filled: number } | undefined)?.filled ?? 0
-  if (filled) await markUsed(id)
+  if (filled) { await markUsed(id); void report(item, 'fill') }
   return filled ? { filled } : { filled: 0, error: 'No login form was found on this page.' }
 }
 
 async function reveal(id: string, field: 'username' | 'password' | 'totp'): Promise<{ value: string | null; expiresIn?: number }> {
   const item = await find(id)
+  // "Hide passwords" is the organization's policy, kept by the app (0015).
+  if (field === 'password' && item.shared?.hidePasswords) throw new Error('Your organization hides this password. It can be filled, not copied.')
   await markUsed(id)
+  void report(item, 'copy')
   if (field === 'totp') {
     if (!item.totpSecret) return { value: null }
     const code = await generateTotp(item.totpSecret.replace(/\s+/g, ''))

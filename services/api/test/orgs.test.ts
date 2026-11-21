@@ -257,12 +257,14 @@ test('the access audit records writes and grants itself, and the opens and copie
   const itemId = uuid()
   await h.request('PUT', `/api/orgs/${orgId}/collections/${collId}/items/${itemId}`, { token: alice.token, body: { blob: await sealSharedItem(collId, itemId, 1, entry, collKey), keyVersion: 1 } })
   assert.equal((await h.request('POST', `/api/orgs/${orgId}/events`, { token: bob.token, body: { action: 'copy', collectionId: collId, itemId } })).status, 201)
-  assert.equal((await h.request('POST', `/api/orgs/${orgId}/events`, { token: bob.token, body: { action: 'delete', collectionId: collId, itemId } })).status, 400, 'only view, reveal, copy are reported')
+  // The browser extension reports filling a page (decisions/0029).
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/events`, { token: bob.token, body: { action: 'fill', collectionId: collId, itemId } })).status, 201)
+  assert.equal((await h.request('POST', `/api/orgs/${orgId}/events`, { token: bob.token, body: { action: 'delete', collectionId: collId, itemId } })).status, 400, 'only view, reveal, copy and fill are reported')
   assert.equal((await h.request('GET', `/api/orgs/${orgId}/events`, { token: bob.token })).status, 403, 'members cannot read the audit')
 
   const log = (await h.request('GET', `/api/orgs/${orgId}/events`, { token: alice.token })).body['events'] as { action: string; actor: string; reported: boolean }[]
   const actions = log.map((e) => e.action)
-  for (const a of ['collection.create', 'member.invite', 'member.confirm', 'access.grant', 'item.create', 'item.copy']) assert.ok(actions.includes(a), a)
+  for (const a of ['collection.create', 'member.invite', 'member.confirm', 'access.grant', 'item.create', 'item.copy', 'item.fill']) assert.ok(actions.includes(a), a)
   const copy = log.find((e) => e.action === 'item.copy')!
   assert.equal(copy.actor, bob.userId)
   assert.equal(copy.reported, true)
