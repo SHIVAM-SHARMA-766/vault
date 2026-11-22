@@ -64,17 +64,10 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
   }
 
   return (
-    <Shell state={state} tag="Admin console">
+    <Shell state={state}>
       <div className="admin-layout console-layout">
         <nav className="sidebar" aria-label="Admin console">
-          <div className="scope-picker">
-            <label htmlFor="scope" className="small muted">Managing</label>
-            {scopes.length > 1 ? (
-              <select id="scope" value={scopeKey(current)} onChange={(e) => choose(e.target.value)}>
-                {scopes.map((s) => <option key={scopeKey(s)} value={scopeKey(s)}>{s.kind === 'server' ? `${serverName} (server)` : s.name}</option>)}
-              </select>
-            ) : <p id="scope" className="scope-name">{current.kind === 'server' ? serverName : current.name}</p>}
-          </div>
+          <ScopePicker id="scope" scopes={scopes} current={current} serverName={serverName} onChoose={choose} />
           {current.kind === 'server'
             ? <ServerNav state={state} features={features} section={route.section} />
             : <OrgNav orgId={current.id} section={route.section} />}
@@ -84,6 +77,13 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
               : 'You hold this organization’s keys in this browser only. Confirm people by fingerprint, never by email or chat.'}
           </div>
         </nav>
+        {/* Below the width where the sidebar shows: the same picker, and the sections as chips. */}
+        <div className="console-mobile">
+          <ScopePicker id="scope-m" scopes={scopes} current={current} serverName={serverName} onChoose={choose} />
+          {current.kind === 'server'
+            ? <Chips items={serverTabs(state, features)} active={serverTabs(state, features).find((t) => t.id === route.section)?.id ?? serverTabs(state, features)[0]?.id ?? 'overview'} onGo={(id) => navigate(href({ name: 'console', scope: 'server', section: id }))} />
+            : <Chips items={[...ORG_SECTIONS]} active={ORG_SECTIONS.find((t) => t.id === route.section)?.id ?? 'members'} onGo={(id) => navigate(href({ name: 'console', scope: 'org', org: current.id, section: id }))} />}
+        </div>
         <main className="admin-main">
           {current.kind === 'server'
             ? <ServerScope state={state} features={features} section={route.section} />
@@ -91,6 +91,19 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
         </main>
       </div>
     </Shell>
+  )
+}
+
+function ScopePicker({ id, scopes, current, serverName, onChoose }: { id: string; scopes: Scope[]; current: Scope; serverName: string; onChoose: (key: string) => void }) {
+  return (
+    <div className="scope-picker">
+      <label htmlFor={id} className="small muted">Managing</label>
+      {scopes.length > 1 ? (
+        <select id={id} value={scopeKey(current)} onChange={(e) => onChoose(e.target.value)}>
+          {scopes.map((s) => <option key={scopeKey(s)} value={scopeKey(s)}>{s.kind === 'server' ? `${serverName} (server)` : s.name}</option>)}
+        </select>
+      ) : <p id={id} className="scope-name">{current.kind === 'server' ? serverName : current.name}</p>}
+    </div>
   )
 }
 
@@ -110,7 +123,7 @@ function ServerNav({ state, features, section }: { state: session.Unlocked; feat
   const tabs = serverTabs(state, features)
   const active = tabs.find((t) => t.id === section)?.id ?? tabs[0]?.id ?? 'overview'
   const go = (id: string) => navigate(href({ name: 'console', scope: 'server', section: id }))
-  return <><NavList items={tabs} active={active} onGo={go} /><Chips items={tabs} active={active} onGo={go} /></>
+  return <NavList items={tabs} active={active} onGo={go} />
 }
 
 function ServerScope({ state, features, section }: { state: session.Unlocked; features: Features; section: string | null }) {
@@ -122,13 +135,13 @@ function ServerScope({ state, features, section }: { state: session.Unlocked; fe
 function OrgNav({ orgId, section }: { orgId: string; section: string | null }) {
   const active = ORG_SECTIONS.find((t) => t.id === section)?.id ?? 'members'
   const go = (id: string) => navigate(href({ name: 'console', scope: 'org', org: orgId, section: id }))
-  return <><NavList items={[...ORG_SECTIONS]} active={active} onGo={go} /><Chips items={[...ORG_SECTIONS]} active={active} onGo={go} /></>
+  return <NavList items={[...ORG_SECTIONS]} active={active} onGo={go} />
 }
 
 /** The sections as chips, for a phone, where the sidebar is hidden. */
 function Chips({ items, active, onGo }: { items: { id: string; label: string }[]; active: string; onGo: (id: string) => void }) {
   return (
-    <div className="filter-chips admin-chips console-chips">
+    <div className="filter-chips console-chips">
       {items.map(({ id, label }) => <button key={id} className={`chip ${active === id ? 'chip-active' : ''}`} onClick={() => onGo(id)}>{label}</button>)}
     </div>
   )
@@ -142,7 +155,7 @@ function OrgScope({ state, orgId, fallbackName, section }: { state: session.Unlo
   const info = ORG_SECTIONS.find((t) => t.id === tab)!
 
   return (
-    <div className="console-org">
+    <div className="admin-section console-org">
       <div className="settings-head">
         <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
           <li>Admin console</li>

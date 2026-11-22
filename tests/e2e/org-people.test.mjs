@@ -10,7 +10,7 @@ import { start } from './helpers.mjs'
 
 async function orgsPage(s, page) {
   await s.menu(page, 'Organizations')
-  await page.waitForSelector('h1:has-text("Organizations")')
+  await page.waitForSelector('h1:has-text("My organizations")')
 }
 
 test('group on invite, then removal lists the passwords to change until they are changed', async () => {
@@ -30,14 +30,19 @@ test('group on invite, then removal lists the passwords to change until they are
     await alice.getByLabel('I have stored it somewhere safe').check()
     await alice.getByRole('button', { name: 'Done' }).click()
     await alice.waitForSelector('.org-card h2:has-text("Acme")')
+    // Managed from the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()
     await alice.waitForSelector('.collection-row:has-text("Finance")')
+    await s.manage(alice, 'Acme', 'Groups')
     await alice.fill('input[aria-label="New group name"]', 'Engineering')
     await alice.getByRole('button', { name: 'Add group' }).click()
-    await alice.waitForSelector('.invite-groups')
+    await alice.waitForSelector('.group-row:has-text("Engineering")')
 
     // Invite Bob into Engineering.
+    await s.manage(alice, 'Acme', 'Members')
+    await alice.waitForSelector('.invite-groups')
     await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
     await alice.fill('input[aria-label="Name for this member"]', 'Bob')
     await alice.locator('.invite-groups').getByLabel('Engineering').check()
@@ -49,12 +54,13 @@ test('group on invite, then removal lists the passwords to change until they are
     await bob.waitForSelector('text=An admin must confirm you')
 
     await alice.reload(); await s.unlock(alice, 'alice@example.test')
-    await orgsPage(s, alice)
+    await s.manage(alice, 'Acme', 'Members')
     await alice.locator('.device-row', { hasText: 'Bob' }).getByRole('button', { name: 'Confirm…' }).click()
     await alice.getByRole('button', { name: 'It matches — confirm' }).click()
     await alice.waitForSelector('text=Bob confirmed and added to 1 group', { state: 'attached' })
 
     // Give Bob Finance and put a password in it.
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.locator('.collection-row', { hasText: 'Finance' }).getByRole('button', { name: 'Access' }).click()
     await alice.selectOption('select[aria-label="Member"]', { label: 'Bob' })
     await alice.getByRole('button', { name: 'Share', exact: true }).click()
@@ -71,10 +77,9 @@ test('group on invite, then removal lists the passwords to change until they are
     await alice.waitForSelector('.badge-shared:has-text("Acme / Finance")')
 
     // Remove Bob: the password he could see is listed to change.
-    await orgsPage(s, alice)
+    await s.manage(alice, 'Acme', 'Members')
     alice.once('dialog', (d) => d.accept())
-    // The first "Remove Bob" is in Members; the group lists him too.
-    await alice.getByRole('button', { name: 'Remove Bob' }).first().click()
+    await alice.getByRole('button', { name: 'Remove Bob' }).click()
     await alice.waitForSelector('text=1 password they could see is listed in Password health', { state: 'attached' })
     await s.menu(alice, 'Vault')
     await alice.getByRole('button', { name: /^Password health/ }).click()

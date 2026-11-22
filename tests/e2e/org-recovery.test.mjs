@@ -25,12 +25,18 @@ test('a member recovers an organization with its recovery key and opens what it 
     assert.equal(await alice.getByRole('button', { name: 'Done' }).isDisabled(), true, 'only once it is stored')
     await alice.getByLabel('I have stored it somewhere safe').check()
     await alice.getByRole('button', { name: 'Done' }).click()
+    // Managed from the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Recovery & backup')
     await alice.waitForSelector('text=Recovery key created')
 
     // A collection made after the key is covered by it.
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()
+    await alice.waitForSelector('.collection-row:has-text("Finance")')
+    await s.manage(alice, 'Acme', 'Recovery & backup')
     await alice.waitForSelector('text=covers 1 of 1 collection')
+    await s.manage(alice, 'Acme', 'Members')
     await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
     await alice.fill('input[aria-label="Name for this member"]', 'Bob')
     await alice.getByRole('button', { name: 'Invite', exact: true }).click()

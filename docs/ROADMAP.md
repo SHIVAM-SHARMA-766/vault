@@ -360,6 +360,11 @@ people.
   - the web app and the extension shaped by it, and a server panel and setup wizard for one person;
   - `reset-two-factor` from the host, the personal install guide and runbook;
   - the installer writes the edition.
+- [x] **Two workspaces** ([0031](../decisions/0031-two-workspaces.md)), for every edition:
+  - *My vault* | *Admin console*, with a scope picker (the server, or each organization you run);
+  - organization sections Members, Groups, Collections, Policies, Activity and Recovery & backup;
+  - members get *My organizations* with no admin controls;
+  - demo people for every role on the reference instance (`scripts/demo-seed.mjs`).
 - [ ] **Stage 2, the business edition:**
   - one company per server, created at setup;
   - one admin console for users, groups, collections, permission sets and policies;

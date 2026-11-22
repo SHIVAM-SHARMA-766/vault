@@ -107,7 +107,8 @@ test('joining an organization: told what to do while waiting, welcomed once conf
     assert.ok(await bob.locator('.onboarding-fp').count())
 
     await alice.reload(); await s.unlock(alice, 'alice@example.test')
-    await s.menu(alice, 'Organizations')
+    // Confirming is done in the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Members')
     await alice.locator('.device-row', { hasText: 'bob' }).getByRole('button', { name: 'Confirm…' }).click()
     await alice.getByRole('button', { name: 'It matches — confirm' }).click()
     await alice.waitForSelector('text=confirmed', { state: 'attached' })

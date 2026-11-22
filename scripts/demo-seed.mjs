@@ -108,6 +108,7 @@ async function rateLimited(page) {
 }
 
 async function unlock(page, email, password) {
+  signIns.set(page, { email, password })
   for (;;) {
     await go(page, `${BASE}/app/`)
     await page.fill('#email', email)
@@ -122,7 +123,16 @@ async function unlock(page, email, password) {
   }
 }
 
+/** Who each page is signed in as, to unlock it again after the idle lock:
+ *  the rate-limit waits are longer than the 15-minute idle limit. */
+const signIns = new Map()
+
 async function menu(page, item) {
+  if (!(await page.locator('.topbar').count()) && signIns.has(page)) {
+    const { email, password } = signIns.get(page)
+    log(`${email}: locked while idle; unlocking`)
+    await unlock(page, email, password)
+  }
   await page.getByRole('button', { name: 'Account menu' }).click()
   // Names changed with the admin console (decisions/0031); accept both.
   const name = item === 'Admin' ? /^(Admin panel|Admin console)$/ : item === 'Organizations' ? /^(My organizations|Organizations)$/ : item
@@ -204,8 +214,17 @@ async function moveTo(page, itemName, where) {
   await page.locator('.row-item', { hasText: itemName }).first().click()
   await page.locator('.detail-actions').getByRole('button', { name: 'Share', exact: true }).click()
   await page.selectOption('select[aria-label="Collection"]', { label: where })
+  // Done when the collection's count in the sidebar goes up.
+  const collection = where.split(' / ').pop()
+  const countOf = async () => {
+    const side = page.locator('.sidebar .side-item', { hasText: collection })
+    if (!(await side.count())) return 0
+    return Number((await side.first().innerText()).match(/(\d+)\s*$/)?.[1] ?? 0)
+  }
+  const before = await countOf()
   await page.getByRole('button', { name: 'Move to collection' }).click()
-  await page.waitForSelector(`.badge-shared:has-text("${where}")`)
+  for (let i = 0; i < 60 && (await countOf()) <= before; i++) await page.waitForTimeout(500)
+  if ((await countOf()) <= before) throw new Error(`${itemName} was not moved to ${where}`)
 }
 
 /** Opens Organizations afresh: by way of the vault, so the page mounts again
@@ -235,7 +254,7 @@ async function manage(page, org, section) {
     await menu(page, 'Organizations')
     await page.waitForSelector('h1:has-text("Organizations")')
   }
-  const card = page.locator('.admin-main .org-card, main .org-card').filter({ hasText: org }).first()
+  const card = page.locator(`.admin-main .org-card[aria-label="${org}"], main .org-card[aria-label="${org}"]`).first()
   await card.waitFor({ timeout: 30_000 })
   return card
 }

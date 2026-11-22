@@ -78,12 +78,12 @@ test('roles see what they should, and a marketing edit goes live escaped', async
   }
 })
 
-test('signing in at /app/admin says where it leads, and the breadcrumb keeps the vault unlocked', async () => {
+test('signing in at /app/admin says where it leads, and switching back to the vault keeps it unlocked', async () => {
   const s = await start()
   try {
     const page = await s.person()
     await page.goto(`${s.base}/app/admin`)
-    assert.equal(await page.textContent('.auth-title'), 'Sign in to the admin panel')
+    assert.equal(await page.textContent('.auth-title'), 'Sign in to the admin console')
     assert.equal(await page.getAttribute('.auth-home', 'href'), '/')
     await page.getByRole('button', { name: 'Create an account' }).click()
     await page.fill('#r-email', 'owner@example.test')
@@ -95,7 +95,8 @@ test('signing in at /app/admin says where it leads, and the breadcrumb keeps the
     await page.getByRole('button', { name: 'Continue to sign in' }).click()
     await s.unlock(page, 'owner@example.test').catch(() => {})
     await page.waitForSelector('.stats', { timeout: 60_000 })
-    await page.click('.crumbs-admin a')
+    // The two workspaces (decisions/0031): back to the vault without a reload.
+    await page.locator('.workspace-switch a', { hasText: 'My vault' }).click()
     await page.waitForSelector('.list-head')
     assert.ok(page.url().endsWith('/app/'))
   } finally {

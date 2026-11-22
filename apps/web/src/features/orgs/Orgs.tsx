@@ -23,6 +23,29 @@ export function Orgs({ state }: { state: session.Unlocked }) {
   const teams = useTeams(state.vaultKey)
   const [name, setName] = useState('')
   const [showKey, setShowKey] = useState<{ org: string; key: string; id: string } | null>(null)
+  const newcomer = teams.orgs.length === 0 && teams.invitations.length === 0
+  const fingerprint = (
+        <section className="settings-card" aria-labelledby="o-fp">
+          <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
+          <p className="muted small">When you join an organization, an admin confirms you by checking this matches what they see. Read it to them on a call or in person — not by email or chat.</p>
+          <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
+        </section>
+  )
+  const newOrg = (
+        <form className="settings-card" aria-labelledby="o-new" onSubmit={async (e) => {
+          e.preventDefault()
+          try {
+            const made = await teams.createOrg(name.trim(), state.email.split('@')[0]!)
+            refreshScopes()
+            setShowKey({ org: name.trim(), key: made.recoveryKey, id: made.id }); setName(''); toast('Organization created')
+          } catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
+        }}>
+          <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">New organization</h2></div>
+          <div className="field"><label htmlFor="o-name">Name</label><input id="o-name" required maxLength={80} placeholder="e.g. Acme Finance" value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <p className="hint">You become its owner and manage it from the <strong>Admin console</strong>. The name is encrypted for members; people you invite see it in their invitation.</p>
+          <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={!name.trim()}>Create</button></div>
+        </form>
+  )
 
   return (
     <Shell state={state}>
@@ -57,25 +80,9 @@ export function Orgs({ state }: { state: session.Unlocked }) {
 
         {teams.orgs.map((o) => <MemberCard key={o.id} org={o} teams={teams} />)}
 
-        <section className="settings-card" aria-labelledby="o-fp">
-          <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
-          <p className="muted small">When you join an organization, an admin confirms you by checking this matches what they see. Read it to them on a call or in person — not by email or chat.</p>
-          <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
-        </section>
-
-        <form className="settings-card" aria-labelledby="o-new" onSubmit={async (e) => {
-          e.preventDefault()
-          try {
-            const made = await teams.createOrg(name.trim(), state.email.split('@')[0]!)
-            refreshScopes()
-            setShowKey({ org: name.trim(), key: made.recoveryKey, id: made.id }); setName(''); toast('Organization created')
-          } catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
-        }}>
-          <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">New organization</h2></div>
-          <div className="field"><label htmlFor="o-name">Name</label><input id="o-name" required maxLength={80} placeholder="e.g. Acme Finance" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <p className="hint">You become its owner and manage it from the <strong>Admin console</strong>. The name is encrypted for members; people you invite see it in their invitation.</p>
-          <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={!name.trim()}>Create</button></div>
-        </form>
+        {/* Someone in no organization yet sees how to start one first; someone in
+            one needs their fingerprint first, for the admins who confirm them. */}
+        {newcomer ? <>{newOrg}{fingerprint}</> : <>{fingerprint}{newOrg}</>}
       </main>
       {showKey ? <RecoveryKeyShown org={showKey.org} recoveryKey={showKey.key} onDone={() => { const id = showKey.id; setShowKey(null); navigate(href({ name: 'console', scope: 'org', org: id, section: 'members' })) }} /> : null}
     </Shell>
@@ -99,6 +106,9 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
       </section>
     )
   }
+  // A direct share (D11) made by this account: confirming the other person
+  // happens here, not in the admin console, which is for organizations.
+  if (org.kind === 'direct' && org.role !== 'member') return <DirectShare org={org} teams={teams} />
   return (
     <section className="settings-card org-card" aria-label={org.name}>
       <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>
@@ -123,6 +133,11 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
       {!admin ? <details className="org-more"><summary className="small">If every owner is locked out</summary><OrgRecovery org={org} teams={teams} /></details> : null}
     </section>
   )
+}
+
+function DirectShare({ org, teams }: { org: OrgView; teams: Teams }) {
+  const people = useOrgPeople(org, teams)
+  return <OrgMembers org={org} teams={teams} selfId={session.get()?.userId ?? ''} people={people} direct />
 }
 
 function OwnerChanged({ org, teams }: { org: OrgView; teams: Teams }) {
@@ -154,7 +169,7 @@ export type OrgPeople = ReturnType<typeof useOrgPeople>
 
 /** The admin's members section: confirming by fingerprint, re-confirming
  *  after a key change, removing, and inviting. */
-export function OrgMembers({ org, teams, selfId, people }: { org: OrgView; teams: Teams; selfId: string; people: OrgPeople }) {
+export function OrgMembers({ org, teams, selfId, people, direct = false }: { org: OrgView; teams: Teams; selfId: string; people: OrgPeople; direct?: boolean }) {
   const toast = useToast()
   const { members, pending, groups } = people
   const [confirming, setConfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
@@ -163,15 +178,20 @@ export function OrgMembers({ org, teams, selfId, people }: { org: OrgView; teams
   const [label, setLabel] = useState('')
   const [inviteGroups, setInviteGroups] = useState<string[]>([])
   const waiting = members.filter((m) => m.status === 'accepted')
+  // Waiting for confirmation first, then owners and admins, then by name.
+  const rank = (m: OrgMember) => (m.status === 'accepted' ? 0 : m.role === 'owner' ? 1 : m.role === 'admin' ? 2 : 3)
+  const sorted = [...members].sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
 
   return (
     <section className="settings-card org-card" aria-label={org.name}>
-      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="muted small">{members.length} member{members.length === 1 ? '' : 's'}{pending.length ? ` · ${pending.length} invited` : ''}</span></div>
+      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>{direct
+        ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span>
+        : <span className="muted small">{members.length} member{members.length === 1 ? '' : 's'}{pending.length ? ` · ${pending.length} invited` : ''}</span>}</div>
       {waiting.length ? <p className="alert alert-info"><IconAlert size={16} /><span>{waiting.length === 1 ? `${waiting[0]!.label} is` : `${waiting.length} people are`} waiting for you to confirm them. Ask them to read you their fingerprint first.</span></p> : null}
       {org.ownerChanged ? <OwnerChanged org={org} teams={teams} /> : null}
 
       <ul className="device-list">
-        {members.map((m) => (
+        {sorted.map((m) => (
           <li key={m.userId} className="device-row">
             <div className="device-text">
               <span className="device-name">{m.label}{m.userId === selfId ? <span className="pill">You</span> : null}</span>
@@ -251,7 +271,7 @@ export function OrgMembers({ org, teams, selfId, people }: { org: OrgView; teams
         </div>
       ) : null}
 
-      <form className="org-invite" onSubmit={async (e) => {
+      {direct ? null : <form className="org-invite" onSubmit={async (e) => {
         e.preventDefault()
         await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups)
         toast('Invited. They will see it when they sign in.'); setEmail(''); setLabel(''); setInviteGroups([]); await people.reload()
@@ -272,7 +292,7 @@ export function OrgMembers({ org, teams, selfId, people }: { org: OrgView; teams
           </div>
         ) : null}
         <p className="hint">They need an account on this server. They accept under My organizations, then you confirm them here by fingerprint.</p>
-      </form>
+      </form>}
     </section>
   )
 }
