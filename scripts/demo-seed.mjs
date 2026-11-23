@@ -100,6 +100,8 @@ async function rateLimited(page) {
   if (!(await alert.count())) return false
   const text = await alert.first().innerText()
   const m = /Try again in (\d+) minute/.exec(text)
+  // A passing network failure: wait a little and try again.
+  if (/Could not reach the server/.test(text)) { log('network trouble; retrying in 20 s'); await sleep(20_000); return true }
   if (!/Too many attempts/.test(text)) throw new Error(text)
   const minutes = m ? Number(m[1]) : 15
   log(`rate limited; waiting ${minutes} min`)
@@ -315,16 +317,17 @@ try {
     // Members: invited, accepted, confirmed by fingerprint.
     card = await manage(admin, t.org, 'Members')
     for (const m of t.members) {
-      if (await card.locator('.device-row', { hasText: m.name }).count()) continue
+      if (await card.locator('.device-row:not(.group-row)', { hasText: m.name }).count()) continue
       await card.locator('input[aria-label="Email to invite"]').fill(m.email)
       await card.locator('input[aria-label="Name for this member"]').fill(m.name)
       await card.getByRole('button', { name: 'Invite', exact: true }).click()
-      await card.locator('.device-row', { hasText: m.name }).waitFor()
+      await card.locator('.device-row:not(.group-row)', { hasText: m.name }).waitFor()
     }
     for (const m of t.members) {
       const page = pages.get(m.email)
       await orgsPage(page)
-      const accept = page.getByRole('button', { name: 'Accept' })
+      // Only the invitations card's button: nothing else on the page is "Accept".
+      const accept = page.locator('section:has(#o-inv)').getByRole('button', { name: 'Accept', exact: true })
       const joined = page.locator('.org-card', { hasText: t.org })
       await appear(page, accept.or(joined), `${m.email}: the invitation to ${t.org}`)
       if (await accept.count()) { await accept.first().click(); await page.waitForSelector('text=An admin must confirm you') }
@@ -332,7 +335,7 @@ try {
     const members = () => manage(admin, t.org, 'Members')
     card = await members()
     for (const m of t.members) {
-      const row = card.locator('.device-row', { hasText: m.name })
+      const row = card.locator('.device-row:not(.group-row)', { hasText: m.name })
       const confirm = row.getByRole('button', { name: 'Confirm…' })
       const pending = row.locator('text=has not joined yet')
       await appear(admin, row, `${m.name} in ${t.org}`, members)
