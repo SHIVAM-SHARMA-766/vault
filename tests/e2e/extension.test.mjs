@@ -330,6 +330,8 @@ test('inside pages: an icon that fills, generate in a sign-up form, save and upd
     await signup.locator('vault-inline button.icon').click()
     assert.equal(await signup.getByRole('menuitem', { name: /Example/ }).count(), 0, 'another site\'s login is not offered')
     await signup.getByRole('menuitem', { name: /Generate a strong password/ }).click()
+    // The background generates it and the page fills it a moment later.
+    await signup.waitForFunction(() => document.querySelector('#np').value.length > 0)
     const generated = await signup.inputValue('#np')
     assert.ok(generated.length >= 20, generated)
     assert.equal(await signup.inputValue('#nc'), generated, 'both password fields')
