@@ -27,7 +27,9 @@ import {
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
 import { requireEmail, requireSealed, requireSharedKey } from '../validate.js'
-import { getSettings } from '../system.js'
+import { audit, createInvite, getRegistry, getSettings } from '../system.js'
+import { inviteMessage, notify } from '../mail.js'
+import { requirePermission } from '../roles.js'
 import { addNote, addNotes } from '../inbox.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import { streamAudit } from '../audit-stream.js'
@@ -298,6 +300,14 @@ export async function createOrg(app: App, userId: string, event: LambdaEvent): P
   // person". The same keys, confirmation and audit as any organization; only
   // the size is fixed and the app presents it as a person, not a team.
   const kind = b['kind'] === 'direct' ? 'direct' : 'team'
+  // A business Vault is one company (decisions/0032). Direct shares between
+  // two people are still allowed.
+  if (kind === 'team' && app.config.edition === 'business') {
+    for (const ix of await app.store.query(SYSTEM_PK, SYSTEM_ORG_PREFIX)) {
+      const other = await app.store.get(orgPk(String(ix['orgId'])), ORG_META_SK)
+      if (other && other['kind'] !== 'direct') throw conflict('This business Vault has one company. Ask its owner or an admin to invite you.')
+    }
+  }
   const publicKey = await publicKeyOf(app, userId)
   const at = now(app)
   try {
@@ -407,11 +417,26 @@ export async function compliance(app: App, userId: string, orgId: string): Promi
 export async function invite(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
   const me = await requireMember(app, orgId, userId, { admin: true })
   const b = body(event)
-  const email = requireEmail(b['email'])
+  // "Add to company" (decisions/0032): an existing account, by its id, for an
+  // admin who already sees the server's account list. Otherwise an address.
+  let email = ''
+  let digest: string
+  let fallbackLabel: string
+  if (typeof b['userId'] === 'string') {
+    await requirePermission(app, userId, 'users.read')
+    if (!isValidId(b['userId'])) throw notFound()
+    const reg = await getRegistry(app, b['userId'])
+    if (!reg) throw notFound()
+    digest = reg.emailDigest
+    fallbackLabel = reg.label || 'Member'
+  } else {
+    email = requireEmail(b['email'])
+    digest = emailDigest(email, app.config.pepper)
+    fallbackLabel = email.split('@')[0]!
+  }
   const role: OrgRole = b['role'] === 'admin' ? 'admin' : 'member'
   if (role === 'admin' && me.role !== 'owner') throw forbidden()
-  const memberLabel = label(b['label']) || email.split('@')[0]!
-  const digest = emailDigest(email, app.config.pepper)
+  const memberLabel = label(b['label']) || fallbackLabel
   const meta0 = await app.store.get(orgPk(orgId), ORG_META_SK)
   if (meta0?.['kind'] === 'direct') {
     const rows = await app.store.query(orgPk(orgId))
@@ -434,6 +459,19 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
   // If they already have an account, it shows in their notifications too.
   const pointer = await app.store.get(emailPk(digest), EMAIL_SK)
   if (pointer?.['userId']) await addNote(app, String(pointer['userId']), 'org-invite', { orgId, hint: String(meta?.['hint'] ?? '') })
+  // One invitation (decisions/0032): in a business Vault, an address with no
+  // account also gets a sign-up code. Only there: elsewhere it would tell an
+  // organization's admin whether an address has an account on the server.
+  if (b['withSignup'] === true && email && !pointer && app.config.edition === 'business') {
+    await audit(app, userId, 'invite.create', undefined, memberLabel)
+    const { code, invite: signup } = await createInvite(app, userId, memberLabel, 7, 'user')
+    const emailed = app.mailer ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, memberLabel, signup.expiresAt) }) : false
+    const { registration } = await getSettings(app)
+    return json(201, {
+      ok: true, signup: { code, emailed, expiresAt: signup.expiresAt },
+      ...(registration === 'closed' && !app.allowRegistration ? { warning: 'Registration is closed, so the sign-up code will not work until you set it to Invite only (Server → Overview → Registration).' } : {}),
+    })
+  }
   return json(201, { ok: true })
 }
 

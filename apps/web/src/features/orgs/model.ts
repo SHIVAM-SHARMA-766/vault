@@ -125,11 +125,14 @@ export function useTeams(vaultKey: Uint8Array) {
   const [invitations, setInvitations] = useState<OrgInvitation[]>([])
   const [identity, setIdentity] = useState<Identity | null>(null)
   const [error, setError] = useState('')
+  /** True once the first load has finished, so screens do not flash what
+   *  depends on it (an offer to create an organization, for one). */
+  const [loaded, setLoaded] = useState(false)
 
   const load = useCallback(async () => {
     try {
       // A personal Vault has no organizations (decisions/0030).
-      if (!(await features()).organizations) { setOrgs([]); setCollections([]); setShared([]); setInvitations([]); setError(''); return }
+      if (!(await features()).organizations) { setOrgs([]); setCollections([]); setShared([]); setInvitations([]); setError(''); setLoaded(true); return }
       const me = await myIdentity(vaultKey)
       setIdentity(me)
       const token = await session.token()
@@ -193,7 +196,7 @@ export function useTeams(vaultKey: Uint8Array) {
       // The strictest idle policy among confirmed organizations sets the lock.
       const idle = rows.map((r) => (r.status === 'confirmed' ? r.policies.maxIdleMinutes : null)).filter((m): m is number => !!m)
       session.setIdleLimit(idle.length ? Math.min(...idle) : null)
-      setOrgs(views); setCollections(colls); setShared(entries); setError('')
+      setOrgs(views); setCollections(colls); setShared(entries); setError(''); setLoaded(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load organizations.')
     }
@@ -479,7 +482,7 @@ export function useTeams(vaultKey: Uint8Array) {
     await load()
   }
 
-  return { orgs, collections, shared, invitations, identity, error, load, shareWithPerson, grantDirect, createOrg, makeRecoveryKey, recoverWithKey, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
+  return { loaded, orgs, collections, shared, invitations, identity, error, load, shareWithPerson, grantDirect, createOrg, makeRecoveryKey, recoverWithKey, createCollection, confirm, grant, rotate, saveShared, deleteShared, createGroup, groupName, grantGroup, addToGroup }
 }
 
 export type Teams = ReturnType<typeof useTeams>

@@ -365,10 +365,14 @@ people.
   - organization sections Members, Groups, Collections, Policies, Activity and Recovery & backup;
   - members get *My organizations* with no admin controls;
   - demo people for every role on the reference instance (`scripts/demo-seed.mjs`).
-- [ ] **Stage 2, the business edition:**
-  - one company per server, created at setup;
-  - one admin console for users, groups, collections, permission sets and policies;
-  - a Zoho Vault / 1Password Business comparison, item by item.
+- [ ] **Stage 2, the business edition** ([0032](../decisions/0032-business-edition.md), with the
+  Zoho Vault / 1Password Business comparison):
+  - [x] 2a: one company per server; **People** replaces Members (account facts and actions for
+    admins who manage accounts, *Add to company*); one invitation with a sign-up code for
+    newcomers.
+  - [ ] 2b: permission sets (*Use only*, Viewer, Editor, Manager, custom).
+  - [ ] 2c: team password health across the collections an admin manages.
+  - [ ] 2d: guests limited to the collections they are given.
 - [ ] **Stage 3, the hosted edition:** business tenants, the operator console, tenant-scoped admin
   consoles, and the operator's responsibilities (uptime, abuse, terms).
 

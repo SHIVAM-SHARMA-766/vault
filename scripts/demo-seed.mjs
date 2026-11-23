@@ -246,6 +246,7 @@ async function manage(page, org, section) {
   await menu(page, 'Vault')
   await page.waitForSelector('.topbar')
   if (await page.locator('.workspace-switch').count()) {
+    if (section === 'Members') section = 'People'
     await page.locator('.workspace-switch a', { hasText: 'Admin console' }).click()
     await page.waitForSelector('.console-layout')
     const picker = page.locator('select#scope')

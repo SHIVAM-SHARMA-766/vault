@@ -11,6 +11,7 @@ import { type ReactElement, useEffect, useState } from 'react'
 import {
   type AdminAudit,
   type AdminInvite,
+  type Edition,
   type Features,
   type AdminOverview,
   type AdminUser,
@@ -69,9 +70,11 @@ export type ServerTab = Tab
 export const SERVER_TABS = TABS
 
 /** The server sections this account may open, in this edition. */
-export function serverTabs(state: session.Unlocked, features: Features): typeof TABS {
+export function serverTabs(state: session.Unlocked, features: Features, edition: Edition = 'hosted'): typeof TABS {
   const perms = new Set<Permission>(state.permissions ?? [])
-  return TABS.filter((t) => perms.has(t.needs) && (!t.feature || features[t.feature]))
+  // A business Vault's people are managed under the company (decisions/0032).
+  const company = edition === 'business' ? new Set<Tab>(['users', 'invites', 'orgs']) : new Set<Tab>()
+  return TABS.filter((t) => perms.has(t.needs) && (!t.feature || features[t.feature]) && !company.has(t.id))
 }
 
 /** One server section, inside the admin console (decisions/0031). */
