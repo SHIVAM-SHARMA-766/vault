@@ -1,6 +1,6 @@
 # 0032: The business edition
 
-Status: Accepted by the operator on 2026-11-23; 2a–2c built, 2d to come
+Status: Accepted by the operator on 2026-11-23; built (2a–2d)
 Date: 2026-11-23
 Implements: [0030](0030-editions.md) stage 2. Builds on [0031](0031-two-workspaces.md).
 
@@ -104,11 +104,25 @@ The report shows:
 Reuse is counted within the organization's items only. The server never sees a password or a
 score, no password is displayed, and the report lists items, not people.
 
-### 2d — Guests (planned)
+### 2d — Guests (built)
 
-An account limited to the collections it is given. It has no personal vault features beyond what
-it needs (no emergency access, no organizations of its own), and an optional end date. A guest
-counts as a member for keys and audit, and is marked as a guest everywhere admins see people.
+**Guest** is an organization role, beside owner, admin and member. An admin invites someone
+*as a guest*, optionally **until** a date up to a year ahead. Confirming by fingerprint, keys and
+audit work as for any member, and admins see "guest · until …" in People.
+
+What a guest is limited to, enforced by the server:
+- **Collections:** a guest sees only the collections given to them, not the others' names.
+- **People and groups:** they see the owner, the admins and themselves, never the other members
+  or the groups.
+- **Asking:** a guest cannot ask for access to other collections.
+- **End date:** once it passes, the organization refuses them ("Your guest access … has
+  ended"), their organization key is no longer sent, and admins see the guest as ended.
+  Removing them then retires their keys, as for anyone who leaves.
+
+**As built, narrower than first planned:** a guest is still an ordinary account on the server,
+with their own personal vault. Taking personal features away from an account belongs to a
+self-hosted server's own policy, not to one organization, so it was left out. On the hosted
+edition, a tenant's guests are its own (stage 3).
 
 ## Tests
 

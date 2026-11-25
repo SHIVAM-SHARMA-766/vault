@@ -31,7 +31,7 @@ async function adminOrgs(userId: string): Promise<Extract<Scope, { kind: 'org' }
     // The hint is the name the owner typed at creation, kept in the clear for
     // invitations; the console shows the decrypted name once it has the key.
     return rows
-      .filter((r) => r.status === 'confirmed' && r.role !== 'member' && r.kind !== 'direct')
+      .filter((r) => r.status === 'confirmed' && (r.role === 'owner' || r.role === 'admin') && r.kind !== 'direct')
       .map((r) => ({ kind: 'org' as const, id: r.id, name: r.hint || 'Organization', role: r.role }))
   })().catch(() => [])
   cache = { userId, orgs }

@@ -374,7 +374,8 @@ people.
     rights: items level, see and copy passwords, fill, backups).
   - [x] 2c: team password health across the collections an admin manages (score, per
     collection, items to fix, breach check), in the admin's browser.
-  - [ ] 2d: guests limited to the collections they are given.
+  - [x] 2d: guests: only the collections given, never the other members or groups, cannot
+    ask for more, optional end date enforced by the server.
 - [ ] **Stage 3, the hosted edition:** business tenants, the operator console, tenant-scoped admin
   consoles, and the operator's responsibilities (uptime, abuse, terms).
 

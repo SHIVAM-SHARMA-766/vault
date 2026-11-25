@@ -392,6 +392,9 @@ managed:
   them by fingerprint.
 - **Add to company.** Accounts already on the server but not in the company are listed under
   *On this server, not in …*, with **Add to company**.
+- **Guests.** Invite someone *as a guest* (Invite as → Guest), with an optional end date. A
+  guest sees only the collections you give them, not the other members or groups, and cannot ask
+  for more. When the date passes, their access ends by itself.
 - **Each person's account.** An admin who also manages accounts sees each person's last sign-in
   and two-factor status, with **Account** actions: disable sign-in, reset two-factor, offboard.
 

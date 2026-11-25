@@ -97,12 +97,22 @@ export function Orgs({ state }: { state: session.Unlocked }) {
 /** One organization, as a member sees it: what it requires, the collections it
  *  shares with you and asking for more. Admins manage it in the console. */
 function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
-  const admin = org.status === 'confirmed' && org.role !== 'member' && org.kind !== 'direct'
+  const admin = org.status === 'confirmed' && (org.role === 'owner' || org.role === 'admin') && org.kind !== 'direct'
+  const guest = org.role === 'guest'
   const colls = teams.collections.filter((c) => c.orgId === org.id)
   const mine = colls.filter((c) => c.permission)
   const others = colls.filter((c) => !c.permission)
   const { sets } = usePermissionSets(org.status === 'confirmed' ? org.id : undefined)
 
+  // A guest whose time is up (2d).
+  if (org.ended) {
+    return (
+      <section className="settings-card org-card" aria-label={org.name}>
+        <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill">Guest · ended</span></div>
+        <p className="muted small">Your guest access ended{org.until ? ` on ${when(org.until)}` : ''}. Ask one of its admins if you still need it.</p>
+      </section>
+    )
+  }
   if (org.status !== 'confirmed') {
     return (
       <section className="settings-card org-card" aria-label={org.name}>
@@ -114,11 +124,13 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
   }
   // A direct share (D11) made by this account: confirming the other person
   // happens here, not in the admin console, which is for organizations.
-  if (org.kind === 'direct' && org.role !== 'member') return <DirectShare org={org} teams={teams} />
+  if (org.kind === 'direct' && (org.role === 'owner' || org.role === 'admin')) return <DirectShare org={org} teams={teams} />
   return (
     <section className="settings-card org-card" aria-label={org.name}>
       <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>
-        {org.kind === 'direct' ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span> : <span className="pill pill-accent">{org.role}</span>}
+        {org.kind === 'direct' ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span>
+          : guest ? <span className="pill pill-accent">Guest{org.until ? ` until ${when(org.until)}` : ''}</span>
+          : <span className="pill pill-accent">{org.role}</span>}
       </div>
       {org.policyGap ? <p className="alert alert-warn"><IconAlert size={16} />{org.policyGap} Until then, its collections stay closed to you.</p> : <PolicySummary org={org} />}
       {org.ownerChanged ? <OwnerChanged org={org} teams={teams} /> : null}
@@ -127,7 +139,7 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
       ) : null}
 
       <h3 className="small-head">Shared with you</h3>
-      {mine.length === 0 ? <p className="muted small">Nothing yet. An admin gives you collections; ask for one below.</p> : (
+      {mine.length === 0 ? <p className="muted small">{guest ? 'Nothing yet. An admin gives you the collections you need.' : 'Nothing yet. An admin gives you collections; ask for one below.'}</p> : (
         <ul className="device-list">{mine.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} sets={sets} />)}</ul>
       )}
       {others.length ? (
@@ -136,7 +148,7 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
           <ul className="device-list">{others.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} sets={sets} />)}</ul>
         </>
       ) : null}
-      {!admin ? <details className="org-more"><summary className="small">If every owner is locked out</summary><OrgRecovery org={org} teams={teams} /></details> : null}
+      {!admin && !guest ? <details className="org-more"><summary className="small">If every owner is locked out</summary><OrgRecovery org={org} teams={teams} /></details> : null}
     </section>
   )
 }
@@ -193,6 +205,9 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
   const [email, setEmail] = useState('')
   const [label, setLabel] = useState('')
   const [inviteGroups, setInviteGroups] = useState<string[]>([])
+  // A guest (2d): only the collections given to them, optionally until a date.
+  const [inviteRole, setInviteRole] = useState<'member' | 'guest'>('member')
+  const [guestUntil, setGuestUntil] = useState('')
   const waiting = members.filter((m) => m.status === 'accepted')
   // People (decisions/0032): with the server's account facts and actions for
   // an admin who also holds those permissions, and in a business Vault, the
@@ -228,7 +243,7 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
           <li key={m.userId} className="device-row">
             <div className="device-text">
               <span className="device-name">{m.label}{m.userId === selfId ? <span className="pill">You</span> : null}{accountOf(m.userId)?.disabled ? <span className="pill pill-danger">Disabled</span> : null}</span>
-              <span className="muted small">{m.role} · {m.status === 'confirmed' ? 'confirmed' : 'waiting for confirmation'}</span>
+              <span className="muted small">{m.role === 'guest' ? `guest${m.until ? (m.ended ? ` · ended ${when(m.until)}` : ` · until ${when(m.until)}`) : ''}` : m.role} · {m.status === 'confirmed' ? 'confirmed' : 'waiting for confirmation'}</span>
               {accountOf(m.userId) ? <AccountFacts a={accountOf(m.userId)!} /> : null}
             </div>
             <div className="device-actions">
@@ -341,19 +356,31 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
         e.preventDefault()
         try {
           // A business Vault sends someone without an account a sign-up code too (0032).
-          const res = await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups, edition === 'business')
+          const until = inviteRole === 'guest' && guestUntil ? new Date(`${guestUntil}T23:59:59`).toISOString() : undefined
+          const res = await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), inviteRole, inviteGroups, edition === 'business', until)
           const who = label.trim() || email.trim().split('@')[0]!
           if (res.signup) setSignup({ label: who, ...res.signup, ...(res.warning ? { warning: res.warning } : {}) })
           else toast('Invited. They will see it when they sign in.')
-          setEmail(''); setLabel(''); setInviteGroups([]); await people.reload()
+          setEmail(''); setLabel(''); setInviteGroups([]); setInviteRole('member'); setGuestUntil(''); await people.reload()
         } catch (err) { toast(err instanceof Error ? err.message : 'Could not invite.', 'error') }
       }}>
         <h3 className="small-head">Invite someone</h3>
         <div className="inline-form">
           <input type="email" required placeholder="Email to invite" aria-label="Email to invite" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Name (for you)" aria-label="Name for this member" maxLength={80} value={label} onChange={(e) => setLabel(e.target.value)} />
+          <select aria-label="Invite as" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'member' | 'guest')}>
+            <option value="member">Member</option>
+            <option value="guest">Guest</option>
+          </select>
           <button className="btn btn-secondary btn-sm" type="submit">Invite</button>
         </div>
+        {inviteRole === 'guest' ? (
+          <div className="guest-until">
+            <label htmlFor="guest-until" className="small">Guest until <span className="muted">(optional)</span></label>
+            <input id="guest-until" type="date" value={guestUntil} min={new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)} max={new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10)} onChange={(e) => setGuestUntil(e.target.value)} />
+            <p className="hint">A guest sees only the collections you give them, not the other members or groups, and cannot ask for more. Their access ends on this date.</p>
+          </div>
+        ) : null}
         {groups.length ? (
           <div className="invite-groups" role="group" aria-label="Add to groups once confirmed">
             <span className="small muted">Add to groups once confirmed:</span>
