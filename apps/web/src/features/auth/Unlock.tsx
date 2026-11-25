@@ -18,6 +18,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
 }) {
   const instance = useInstance()
   const mode = instance?.registration
+  const deskOn = instance?.features?.serviceDesk ?? true
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -207,15 +208,16 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
 
       <p className="auth-forgot">
         <button type="button" className="link" onClick={onRecover}>{t('Forgot your master password? Use your recovery key')}</button>
-        <br />
-        <button type="button" className="link" onClick={onSigninHelp}>{t('Lost your authenticator, or can\'t sign in? Ask for help')}</button>
+        {/* Help comes from the service desk; a personal Vault has nobody to ask (decisions/0030). */}
+        {deskOn ? <><br />
+        <button type="button" className="link" onClick={onSigninHelp}>{t('Lost your authenticator, or can\'t sign in? Ask for help')}</button></> : null}
       </p>
 
       {/* Only the ways in this server actually offers (GET /api/instance). */}
       <p className="auth-switch">
         {mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
           : mode === 'closed' && instance?.firstRun ? <>New server? <button type="button" className="link" onClick={onRegister}>Create the owner account</button> with the setup code from its log</>
-          : mode === 'closed' ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></>
+          : mode === 'closed' ? (deskOn ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></> : null)
           : <>{mode === 'invite' ? 'Have an invitation?' : 'New here?'} <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button>
             {' · '}<button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></>}
       </p>

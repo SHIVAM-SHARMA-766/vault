@@ -7,12 +7,13 @@ and keeping it healthy. Every setting is listed in [configuration.md](configurat
 <details>
 <summary><b>Contents</b></summary>
 
-- [Choose a profile](#choose-a-profile)
+- [Choose an edition](#choose-an-edition)
 - [Requirements](#requirements)
 - [Quick install](#quick-install)
 - [Install: personal](#install-personal)
 - [Install: business](#install-business)
 - [The first account](#the-first-account)
+- [Running a personal Vault](#running-a-personal-vault)
 - [Inviting people](#inviting-people)
 - [Backups and restore](#backups-and-restore)
 - [Mail](#mail)
@@ -25,18 +26,30 @@ and keeping it healthy. Every setting is listed in [configuration.md](configurat
 
 </details>
 
-## Choose a profile
+## Choose an edition
 
 ```mermaid
 flowchart LR
-  q{"Who will use it?"} -- "me, my family,<br/>a small team" --> p["<b>Personal</b><br/>Vault + SQLite + Caddy<br/>one data volume"]
-  q -- "a company" --> b["<b>Business</b><br/>Vault + PostgreSQL + Caddy<br/>a database your team runs"]
+  q{"Who will use it?"} -- "just me" --> p["<b>Personal</b><br/>one account, yours<br/>Vault + SQLite + Caddy"]
+  q -- "a company" --> b["<b>Business</b><br/>your people, groups, policies<br/>Vault + PostgreSQL + Caddy"]
 ```
 
-Both are the same Vault — every feature works in both. The difference is the database: a
-single file (SQLite) that needs no administration, or PostgreSQL, which your team can back
-up, monitor, replicate and put on separate storage. You can move from one to the other later
-with a backup and a restore.
+An edition decides what the server includes ([decisions/0030](../decisions/0030-editions.md)).
+The installer writes it to `.env` as `EDITION`.
+
+- **Personal:** one account, yours, and you are its admin. There are no invitations,
+  organizations, service desk or staff roles. Everything else is there: the vault, the browser
+  extension, share links, import, password health, backups and two-factor sign-in.
+- **Business:** your company's server. People join by invitation, and admins manage
+  organizations, collections, groups and policies, with a service desk for IT help.
+
+The profile picks the database to match: a single file (SQLite) that needs no administration,
+or PostgreSQL, which your team can back up, monitor and replicate. Moving up from personal to
+business is a change of `EDITION` (and, if you like, a backup and restore onto PostgreSQL).
+Moving down is refused while the server holds more than one account or an organization.
+
+An install from before editions has no `EDITION` in its `.env` and keeps every feature, exactly
+as it was.
 
 ## Requirements
 
@@ -126,7 +139,8 @@ docker compose logs vault | grep -A6 "First-run setup"
   └───────────────────────────────────────────────────────────────
 ```
 
-Open it and create your account; it becomes the **owner**, with the admin panel. **Save the
+Open it and create your account; it becomes the **owner**, with the admin panel (called
+**Server settings** in a personal Vault). **Save the
 recovery key it shows** — nobody, including you as the server's operator, can reset a
 forgotten master password.
 
@@ -135,7 +149,24 @@ address. Both are shown on the sign-in screen and the help page, and the support
 the Reply-To of every email Vault sends — so people who reply to an invitation or a sign-in
 notice reach you, not the no-reply sender.
 
+## Running a personal Vault
+
+A personal Vault looks after itself. These are the few things worth doing, and what to do
+when something goes wrong.
+
+| When | What |
+|---|---|
+| Once, after installing | Save the recovery key somewhere off this machine. Copy `BACKUP_PASSPHRASE` from `.env` to the same place. Turn on two-factor sign-in (Settings → Security) and keep its recovery codes with the recovery key |
+| Now and then | Open **Server settings → Overview**: the checklist and the backup card say if anything needs you. Keep an export of your vault elsewhere too (Import & export → Export) |
+| A new version is out | `docker compose pull && docker compose up -d` in `deploy/personal`, after a backup ([Upgrading](#upgrading)) |
+| You forgot the master password | Sign-in screen → *Use your recovery key*, then set a new password |
+| You lost your phone and your recovery codes | On the server: `docker compose exec vault node index.mjs reset-two-factor you@example.com`. Sign in with the master password, then turn two-factor on again. Being able to run commands on the server is the proof that it is yours |
+| The machine died | A new machine, the same install, then [restore](#backups-and-restore) the latest backup with its passphrase |
+| More people need it | Set `EDITION=business` in `.env` and restart: invitations, organizations and the rest appear. Nothing already stored changes |
+
 ## Inviting people
+
+*Business and hosted editions.*
 
 The admin panel's Overview starts with **Finish setting up**: two-factor for you, a name and
 support address, mail, a recent backup, registration not open, and your first invitations. Each

@@ -8,6 +8,7 @@
 // returns a response. This translates Node's request and response objects into
 // that shape and back.
 
+import { checkEditionFits } from './edition.js'
 import { createServer } from 'node:http'
 
 import { buildRouter, handleRequest } from './app.js'
@@ -35,7 +36,7 @@ const HOST = 'localhost'
  *  the memory of a 1 GB host. */
 const MAX_BODY_BYTES = 4 * 1024 * 1024
 
-async function buildApp(): Promise<{ app: App; store: ManagedStore }> {
+export async function buildApp(): Promise<{ app: App; store: ManagedStore }> {
   const config = loadConfig()
   const store = await openStore(config)
   const mailer = await createMailer(config)
@@ -78,6 +79,10 @@ export async function start(): Promise<void> {
   }
 
   console.log(app.mailer ? `mail: via ${app.config.mail.host}:${app.config.mail.port}` : 'mail: off (set SMTP_HOST and MAIL_FROM to send invitations and security notices)')
+
+  // An edition smaller than what the server holds is refused (decisions/0030).
+  await checkEditionFits(app)
+  console.log(`edition: ${app.config.edition}`)
 
   const movedItems = await migrateItemPartitions(app)
   if (movedItems) console.log(`moved ${movedItems} shared item(s) into organization-scoped storage`)

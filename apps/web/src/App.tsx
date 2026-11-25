@@ -2,6 +2,7 @@
 // screens once unlocked. Routing lives in lib/router.tsx; every screen draws
 // its own content inside ui/Shell.tsx.
 
+import { useEdition } from './lib/instance.js'
 import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { api } from './lib/api.js'
@@ -83,10 +84,13 @@ function useAccount(state: session.Unlocked) {
 function Signed({ state }: { state: session.Unlocked }) {
   useAccount(state)
   const route = useRoute()
+  // A link to a feature this edition does not have opens the vault (decisions/0030).
+  const { features, loaded } = useEdition()
+  if ((route.name === 'support' || route.name === 'orgs') && !loaded) return <Loading />
   if (route.name === 'settings') return <Suspense fallback={<Loading />}><Settings state={state} tab={route.tab ?? null} /></Suspense>
   if (route.name === 'transfer') return <Suspense fallback={<Loading />}><Transfer state={state} /></Suspense>
-  if (route.name === 'support') return <Suspense fallback={<Loading />}><Support state={state} /></Suspense>
-  if (route.name === 'orgs') return <Suspense fallback={<Loading />}><Orgs state={state} /></Suspense>
+  if (route.name === 'support' && features.serviceDesk) return <Suspense fallback={<Loading />}><Support state={state} /></Suspense>
+  if (route.name === 'orgs' && features.organizations) return <Suspense fallback={<Loading />}><Orgs state={state} /></Suspense>
   if (route.name === 'admin') {
     // The role arrives a moment after unlock; until it does, say so rather
     // than flash the vault or a refusal.

@@ -61,7 +61,7 @@ async function request<T>(server: string, method: string, path: string, options:
 }
 
 export const api = (server: string) => ({
-  instance: () => request<{ name: string; registration: string }>(server, 'GET', '/api/instance'),
+  instance: () => request<{ name: string; registration: string; edition?: string; features?: { organizations: boolean } }>(server, 'GET', '/api/instance'),
   prelogin: (email: string) => request<{ kdf: KdfParams }>(server, 'POST', '/api/auth/prelogin', { body: { email } }),
   login: (email: string, authKey: string, second?: Record<string, string>) =>
     request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(server, 'POST', '/api/auth/login', { body: { email, authKey, ...second } }),

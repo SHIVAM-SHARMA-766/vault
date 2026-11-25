@@ -15,6 +15,7 @@ import {
 import { type OrgInvitation, type OrgMember, type OrgPolicies, type OrgRole, type SharePermission, api } from '../../lib/api.js'
 import { checkGrant, fingerprintOf, loadTrust, saveTrust, trustedSigners } from './trust.js'
 import * as session from '../../lib/session.js'
+import { features } from '../../lib/instance.js'
 import type { Decrypted } from '../vault/model.js'
 
 export interface Identity {
@@ -127,6 +128,8 @@ export function useTeams(vaultKey: Uint8Array) {
 
   const load = useCallback(async () => {
     try {
+      // A personal Vault has no organizations (decisions/0030).
+      if (!(await features()).organizations) { setOrgs([]); setCollections([]); setShared([]); setInvitations([]); setError(''); return }
       const me = await myIdentity(vaultKey)
       setIdentity(me)
       const token = await session.token()

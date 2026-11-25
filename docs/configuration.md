@@ -30,6 +30,7 @@ address.
 | `SECRETS_FILE` | | — | yes | A file holding `SERVER_PEPPER` and `TOKEN_SIGNING_KEY`. Created with fresh secrets (mode 0600) on first start if missing; values in the environment win. The container image uses `/data/secrets.env`. **Back it up with the database** |
 | `SERVER_PEPPER` | yes | — | yes | ≥ 32 characters (`openssl rand -base64 32`). Keys address digests; **changing it locks every account out** |
 | `TOKEN_SIGNING_KEY` | yes | — | yes | ≥ 32 characters. Signs session tokens; changing it signs everyone out |
+| `EDITION` | | `hosted` | | `personal` (one account; no organizations, invitations, service desk, website or emergency access), `business` (the company's server: everything but the website editor) or `hosted` (everything). The install profiles set it. Moving down is refused while the server holds a second account or an organization ([0030](../decisions/0030-editions.md)) |
 | `ALLOW_REGISTRATION` | | `false` | | `true` forces registration open over the admin panel's setting. For the first account only |
 | `ADMIN_EMAILS` | | empty | | Comma-separated owner addresses. Kept only as digests |
 | `SITE_SOURCE` | | `site/` beside the server | | Website templates and content |

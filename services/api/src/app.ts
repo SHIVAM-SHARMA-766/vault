@@ -1,6 +1,7 @@
 // Routing table. Kept separate from the Lambda entry point so that tests can
 // drive the same routes against an in-memory store, with no AWS involved.
 
+import { refuseIfGated } from './edition.js'
 import { randomUUID } from 'node:crypto'
 
 import type { App } from './context.js'
@@ -30,6 +31,10 @@ import * as vault from './routes/vault.js'
 
 export function buildRouter(app: App): Router {
   const router = new Router()
+  // Features this edition does not have are refused before any route runs
+  // (decisions/0030).
+  const handle = router.handle.bind(router)
+  router.handle = async (event) => { refuseIfGated(app.config.edition, event.rawPath); return handle(event) }
 
   router.get('/api/instance', () => admin.instanceRoute(app), 'This server\'s name, support contact and registration mode')
   router.get('/api/health', async () => json(200, { status: 'ok' }), 'Liveness check')

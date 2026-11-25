@@ -40,7 +40,7 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string; metricsToken?: string; auditWebhook?: string; auditSecret?: string } = {}): Harness {
+export function harness(options: { edition?: 'personal' | 'business' | 'hosted'; allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string; metricsToken?: string; auditWebhook?: string; auditSecret?: string } = {}): Harness {
   const store = new MemoryStore()
   const outbox: Message[] = []
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
@@ -54,6 +54,7 @@ export function harness(options: { allowRegistration?: boolean; adminEmails?: st
       serveStatic: false,
       webRoot: '',
       origin: 'https://vault.test',
+      edition: options.edition ?? 'hosted',
       allowRegistration: false,
       adminEmails: [],
       site: { sourceDir: '', outputDir: '' },

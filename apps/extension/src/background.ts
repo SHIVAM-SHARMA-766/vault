@@ -137,7 +137,9 @@ async function items(): Promise<Item[]> {
     let shared: Item[] = []
     notice = undefined
     try {
-      const res = await loadShared(server.url, token1, key)
+      // A personal Vault has no organizations (decisions/0030).
+      const orgsOn = (await a.instance().catch(() => null))?.features?.organizations ?? true
+      const res = orgsOn ? await loadShared(server.url, token1, key) : { items: [], refused: 0, idle: [] }
       shared = res.items
       if (res.refused) notice = `${res.refused} shared collection${res.refused === 1 ? ' was' : 's were'} not opened: the key was not signed by an admin you trust. Open Vault to check.`
       // The strictest idle limit among organizations sets the lock, as in the web app.
@@ -400,6 +402,10 @@ async function setInline(on: boolean): Promise<{ ok: true } | { ok: false; error
   return { ok: true }
 }
 
+/** A submission still being compared with the vault, per tab. The next page
+ *  often asks for its offer before that finishes; it waits for it. */
+const submitting = new Map<number, Promise<unknown>>()
+
 interface Pending { kind: 'save' | 'update'; key?: string; name?: string; url: string; host: string; username: string; password: string; at: number }
 const OFFER_MS = 3 * 60_000
 
@@ -499,11 +505,17 @@ async function handleContent(req: ContentRequest, tab: chrome.tabs.Tab): Promise
     case 'inline:submitted': {
       // Locked: nothing is kept. Unlocked: an offer, held in session memory.
       if (!unlocked || !req.password || req.password.length > 1024) return {}
-      const offer = await offerFor(url, req.username.slice(0, 512), req.password)
-      await setPending(tabId, offer)
+      const work = (async () => {
+        const o = await offerFor(url, req.username.slice(0, 512), req.password)
+        await setPending(tabId, o)
+        return o
+      })()
+      submitting.set(tabId, work)
+      const offer = await work.finally(() => { if (submitting.get(tabId) === work) submitting.delete(tabId) })
       return offer ? { offer: { kind: offer.kind, host: offer.host, username: offer.username, ...(offer.name ? { name: offer.name } : {}) } } : {}
     }
     case 'inline:offer': {
+      await submitting.get(tabId)?.catch(() => {})
       const p = await pendingFor(tabId)
       // Only on the site it was captured on (or the same site's next page).
       if (!p || !unlocked || !matchSite(p.url, url)) return {}

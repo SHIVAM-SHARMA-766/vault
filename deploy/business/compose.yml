@@ -23,6 +23,9 @@ services:
         condition: service_healthy
     environment:
       VAULT_HOSTNAME: ${VAULT_HOSTNAME:?set VAULT_HOSTNAME in .env}
+      # The installer writes EDITION to .env (decisions/0030). Unset keeps an
+      # existing install exactly as it was (every feature on).
+      EDITION: ${EDITION:-}
       # Only when HTTPS is not on 443, e.g. https://vault.example.com:8443
       SITE_ORIGIN: ${SITE_ORIGIN:-}
       DB_DRIVER: postgres

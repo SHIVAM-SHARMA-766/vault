@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import * as session from '../lib/session.js'
 import { Link, navigate } from '../lib/router.js'
 import { IconGrid, IconKey, IconLock, IconHelp, IconSwap, IconUser, IconUsers } from './icons.js'
-import { BrandMark } from '../lib/instance.js'
+import { BrandMark, useEdition } from '../lib/instance.js'
 import { NotificationBell } from './Notifications.js'
 import { t } from '../lib/i18n.js'
 
@@ -45,6 +45,7 @@ export function Shell({ state, tag, center, actions, children }: {
 
 function AccountMenu({ state }: { state: session.Unlocked }) {
   const [open, setOpen] = useState(false)
+  const { features } = useEdition()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -78,11 +79,11 @@ function AccountMenu({ state }: { state: session.Unlocked }) {
           </div>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/')}><IconKey size={15} />{t('Vault')}</button>
           <button role="menuitem" className="menu-item" onClick={() => go('/app/settings')}><IconUser size={15} />Account settings</button>
-          <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />{t('Organizations')}</button>
+          {features.organizations ? <button role="menuitem" className="menu-item" onClick={() => go('/app/orgs')}><IconUsers size={15} />{t('Organizations')}</button> : null}
           <button role="menuitem" className="menu-item" onClick={() => go('/app/import-export')}><IconSwap size={15} />Import &amp; export</button>
-          <button role="menuitem" className="menu-item" onClick={() => go('/app/support')}><IconHelp size={15} />Help &amp; support</button>
+          {features.serviceDesk ? <button role="menuitem" className="menu-item" onClick={() => go('/app/support')}><IconHelp size={15} />Help &amp; support</button> : null}
           {state.isAdmin ? (
-            <button role="menuitem" className="menu-item" onClick={() => go('/app/admin')}><IconGrid size={15} />{t('Admin panel')}</button>
+            <button role="menuitem" className="menu-item" onClick={() => go('/app/admin')}><IconGrid size={15} />{features.invitations ? t('Admin panel') : t('Server settings')}</button>
           ) : null}
           <div className="menu-sep" />
           <button role="menuitem" className="menu-item" onClick={session.lock}><IconLock size={15} />Lock now</button>

@@ -1,13 +1,14 @@
 // Entry point. With no arguments it starts the server; `backup` and `restore`
 // are the operator commands in cli.ts.
-import { backupCommand, restoreCommand } from './cli.js'
+import { backupCommand, resetTwoFactorCommand, restoreCommand } from './cli.js'
 import { start } from './server.js'
 
 const [command, ...args] = process.argv.slice(2)
 
 const run = command === 'backup' ? backupCommand()
   : command === 'restore' ? restoreCommand(args)
-  : command ? Promise.reject(new Error(`unknown command "${command}"; use backup or restore`))
+  : command === 'reset-two-factor' ? resetTwoFactorCommand(args)
+  : command ? Promise.reject(new Error(`unknown command "${command}"; use backup, restore or reset-two-factor`))
   : start()
 
 run.catch((err: unknown) => {

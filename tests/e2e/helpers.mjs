@@ -24,11 +24,12 @@ const freePort = () => new Promise((resolve) => {
 })
 
 /** Starts a dev stack and a browser. Returns helpers and a stop(). */
-export async function start({ owner = 'owner@example.test' } = {}) {
+/** `edition`: personal, business or hosted (decisions/0030); hosted by default. */
+export async function start({ owner = 'owner@example.test', edition = 'hosted' } = {}) {
   const port = await freePort()
   const base = `http://localhost:${port}`
   const stack = spawn(process.execPath, [`${ROOT}scripts/dev-stack.mjs`], {
-    env: { ...process.env, PORT: String(port), OWNER_EMAIL: owner }, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PORT: String(port), OWNER_EMAIL: owner, EDITION: edition }, stdio: ['ignore', 'pipe', 'pipe'],
   })
   let log = ''
   stack.stdout.on('data', (d) => { log += d })

@@ -43,6 +43,7 @@ export const ERROR_CODES = {
   too_large: 'The body or a stored item exceeds its size limit.',
   rate_limited: 'Too many requests; wait `retry-after` seconds.',
   unavailable: 'The feature is not configured on this server.',
+  not_in_edition: 'This server\'s edition (personal, business, hosted) does not include the feature (decisions/0030).',
   policy_required: 'An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.',
   internal: 'An unexpected error. Quote `requestId` when reporting it.',
 } as const

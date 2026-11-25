@@ -342,6 +342,8 @@ times it can be opened (once, 2, 5, 10, or no limit), then **Create link** and c
 
 ## Sharing with an organization
 
+*Business and hosted editions. A personal Vault has one account, so it has no one to share with ([0030](../decisions/0030-editions.md)).*
+
 Account menu → **Organizations**.
 
 <img src="images/organizations.png" alt="Organizations: your fingerprint, an organization's members and collections" width="820">
@@ -425,6 +427,8 @@ opens in **Import & export**, on this server or another.
 
 ### Emergency access
 
+*Business and hosted editions. A personal Vault has one account, so it has no one to share with ([0030](../decisions/0030-editions.md)).*
+
 Settings → **Emergency access**: choose someone you trust and a waiting period. After they
 accept, confirm their fingerprint (they see their own fingerprint on the same page, ready to read
 out to you). If they ever request access, you will see it in this section —
@@ -506,6 +510,8 @@ one in Settings → Preferences; on a phone, the settings sections are the chips
 <img src="images/vault-dark.png" alt="The vault in dark mode" width="820">
 
 ## For owners: the admin panel
+
+*In a personal Vault this is **Server settings**, with only what one person needs: Overview (backups, mail, name, sign-in rules), the audit log and System.*
 
 Staff with a role see **Admin panel** in the account menu. What each role can do:
 
@@ -628,6 +634,8 @@ else.
 Nobody in the admin panel — the owner included — can read anyone's vault.
 
 ## For staff: the service desk
+
+*Business and hosted editions.*
 
 <img src="images/desk.png" alt="The service desk queue: an access request and a support ticket, with filters" width="820">
 

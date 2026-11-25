@@ -6,12 +6,13 @@
 import { useEffect, useState } from 'react'
 
 import { type AdminOverview, type BackupStatus, type InstanceProfile, type RegistrationMode, type ServerPolicy, api } from '../../lib/api.js'
-import { refresh as refreshInstance } from '../../lib/instance.js'
+import { refresh as refreshInstance, useEdition } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
 
 const STEPS = ['Name', 'Who can join', 'Sign-in rules', 'Mail and backups', 'People'] as const
+type Step = (typeof STEPS)[number]
 
 export const WIZARD_KEY = 'vault.setup-wizard.done'
 export const wizardDone = (): boolean => { try { return localStorage.getItem(WIZARD_KEY) === '1' } catch { return false } }
@@ -19,7 +20,20 @@ const markDone = () => { try { localStorage.setItem(WIZARD_KEY, '1') } catch { /
 
 export function SetupWizard({ data, onClose, onInvite }: { data: AdminOverview; onClose: () => void; onInvite: () => void }) {
   const toast = useToast()
-  const [step, setStep] = useState(0)
+  // A personal Vault has nobody to let in or invite (decisions/0030).
+  const { features } = useEdition()
+  const steps: Step[] = STEPS.filter((s) => features.invitations || (s !== 'Who can join' && s !== 'People'))
+  const [at, setAt] = useState(0)
+  const step = STEPS.indexOf(steps[Math.min(at, steps.length - 1)]!)
+  const setStep = (next: number | ((s: number) => number)) => {
+    const target = typeof next === 'function' ? next(step) : next
+    // Move to the next step this edition has, in the direction asked.
+    const forward = target >= step
+    let i = target
+    while (i >= 0 && i < STEPS.length && !steps.includes(STEPS[i]!)) i += forward ? 1 : -1
+    if (i >= STEPS.length) { finish(); return }
+    setAt(Math.max(0, steps.indexOf(STEPS[Math.max(0, i)]!)))
+  }
   const [profile, setProfile] = useState<InstanceProfile | null>(null)
   const [policy, setPolicy] = useState<ServerPolicy | null>(null)
   const [mode, setMode] = useState<RegistrationMode>(data.registration)
@@ -47,9 +61,9 @@ export function SetupWizard({ data, onClose, onInvite }: { data: AdminOverview; 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="wiz-title" onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}>
       <div className="modal wizard">
-        <p className="muted small">Set up this server · step {step + 1} of {STEPS.length}</p>
+        <p className="muted small">Set up this server · step {at + 1} of {steps.length}</p>
         <ol className="wizard-steps" aria-label="Steps">
-          {STEPS.map((s, i) => <li key={s} className={i === step ? 'is-current' : i < step ? 'is-done' : ''} aria-current={i === step ? 'step' : undefined}>{i < step ? <IconCheck size={12} /> : null}{s}</li>)}
+          {steps.map((s, i) => <li key={s} className={i === at ? 'is-current' : i < at ? 'is-done' : ''} aria-current={i === at ? 'step' : undefined}>{i < at ? <IconCheck size={12} /> : null}{s}</li>)}
         </ol>
 
         {step === 0 ? (
@@ -110,7 +124,7 @@ export function SetupWizard({ data, onClose, onInvite }: { data: AdminOverview; 
             </ul>
             <div className="modal-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setStep(2)}>Back</button>
-              <button type="button" className="btn btn-primary" onClick={() => setStep(4)}>Next</button>
+              <button type="button" className="btn btn-primary" onClick={() => setStep(4)}>{features.invitations ? 'Next' : 'Done'}</button>
             </div>
           </div>
         ) : null}
@@ -126,7 +140,7 @@ export function SetupWizard({ data, onClose, onInvite }: { data: AdminOverview; 
           </div>
         ) : null}
 
-        {step < 4 ? <button type="button" className="link small wizard-later" onClick={finish}>Finish later — the checklist on Overview keeps track</button> : null}
+        {at < steps.length - 1 ? <button type="button" className="link small wizard-later" onClick={finish}>Finish later — the checklist on Overview keeps track</button> : null}
       </div>
     </div>
   )
