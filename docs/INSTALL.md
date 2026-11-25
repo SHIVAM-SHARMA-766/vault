@@ -191,6 +191,34 @@ issues an invitation in one click; resetting two-factor sign-in is for admins on
 have confirmed who is asking through another channel. Give someone the **Support** role to
 work the queue without access to accounts.
 
+## Google Drive and OneDrive for personal backups
+
+People can send their own backups to Google Drive or OneDrive once you register Vault with
+Google and Microsoft. Both registrations are free ([decision 0024](../decisions/0024-cloud-drive-backups.md)).
+Leave these unset and the options do not appear.
+
+- **Google:** in the Google Cloud console:
+  1. Create a project and enable the **Google Drive API**.
+  2. Configure the OAuth consent screen with the scope `.../auth/drive.file`.
+  3. Create an **OAuth client ID** (Web application) with the redirect URI
+     `https://vault.example.com/api/backups/oauth/callback`.
+  4. Set `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
+
+  Until Google verifies the app (needed past 100 users), people click through an "unverified
+  app" screen.
+- **Microsoft:** in Entra ID → App registrations:
+  1. Create a **new registration** for "accounts in any organizational directory and personal
+     Microsoft accounts".
+  2. Add a **Web** redirect URI with the same address.
+  3. Under API permissions, add the delegated **Files.ReadWrite.AppFolder** and
+     **offline_access**.
+  4. Create a client secret.
+  5. Set `MS_OAUTH_CLIENT_ID` and `MS_OAUTH_CLIENT_SECRET`.
+
+Each person's access is stored encrypted, and the server talks only to `googleapis.com` and
+`graph.microsoft.com` for it. `PERSONAL_BACKUP_REMOTE=false` turns these off with the other
+remote destinations.
+
 ## Backups and restore
 
 **Turn backups on by setting `BACKUP_PASSPHRASE`** (16+ characters). Vault then writes one

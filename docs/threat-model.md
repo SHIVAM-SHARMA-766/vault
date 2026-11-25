@@ -250,8 +250,16 @@ addresses are refused, including IPv4-mapped IPv6 spellings; redirects are not f
 responses are size-capped; runs and test fetches are rate-limited. An operator can turn remote
 destinations off (`PERSONAL_BACKUP_REMOTE=false`) or deliberately allow LAN destinations
 (`PERSONAL_BACKUP_ALLOW_PRIVATE=true`). The backup file itself carries only ciphertext and the
-wrapped vault key: an attacker with a copy faces the same offline PBKDF2 guessing as with the
-database (A2).
+wrapped vault key: an attacker with a copy faces the same offline guessing (Argon2id, or PBKDF2
+for accounts not yet upgraded) as with the database (A2).
+
+**Google Drive and OneDrive** ([0024](../decisions/0024-cloud-drive-backups.md)):
+- The secret held is an OAuth refresh token, sealed the same way. It was granted for the
+  narrowest scope each provider offers: files Vault created, or Vault's app folder. Its holder
+  can reach nothing else in the person's drive, and the person can revoke it at the provider.
+- Connecting uses PKCE and a single-use state bound to the account, so a callback cannot attach
+  someone else's drive.
+- These requests go only to the providers' fixed hosts, never to an address a person typed.
 
 ### A17 — Share links: a link that leaks, or a server that ignores its limits
 

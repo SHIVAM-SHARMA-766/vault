@@ -149,10 +149,14 @@ export type BackupDestination =
   | { type: 'server' }
   | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; hasSecret: true }
   | { type: 'webdav'; url: string; username: string; hasSecret: true }
+  | { type: CloudDrive; account: string; hasSecret: true }
+/** Google Drive and OneDrive (decisions/0024). */
+export type CloudDrive = 'gdrive' | 'onedrive'
 export type BackupDestinationInput =
   | { type: 'server' }
   | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; secretKey?: string }
   | { type: 'webdav'; url: string; username: string; password?: string }
+  | { type: CloudDrive }
 export interface BackupRun { id: string; at: string; ok: boolean; destination: string; name: string; bytes: number; entries: number; reason: 'scheduled' | 'manual'; error?: string }
 export interface BackupState {
   schedule: BackupSchedule
@@ -162,6 +166,8 @@ export interface BackupState {
   copies: { id: string; name: string; at: string; bytes: number }[]
   remoteAllowed: boolean
   serverKeepMax: number
+  /** Which cloud drives the operator registered (decisions/0024). */
+  cloud?: Record<CloudDrive, boolean>
 }
 
 export const api = {
@@ -440,6 +446,8 @@ export const api = {
     save: (token: string, body: { schedule: BackupSchedule; destination: BackupDestinationInput }) =>
       request<{ nextRunAt: string | null }>('PUT', '/api/backups/config', { token, body }),
     run: (token: string) => request<{ run: BackupRun }>('POST', '/api/backups/run', { token }),
+    /** The provider's consent page, to send the browser to. */
+    connect: (token: string, provider: CloudDrive) => request<{ url: string }>('POST', `/api/backups/connect/${provider}`, { token }),
     latest: (token: string) => request<{ name: string; body: string }>('GET', '/api/backups/latest', { token }),
     copy: (token: string, id: string) => request<{ name: string; body: string }>('GET', `/api/backups/copies/${encodeURIComponent(id)}`, { token }),
     deleteCopy: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/backups/copies/${encodeURIComponent(id)}`, { token }),

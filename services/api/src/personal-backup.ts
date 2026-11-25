@@ -16,6 +16,7 @@ import { EgressRefused, checkDestinationUrl, guardedRequest } from './egress.js'
 import { ATTACHMENT_PREFIX, ENTRY_PREFIX, FOLDER_PREFIX, PREFS_SK, PROFILE_SK, SYSTEM_PK, userPk } from './keys.js'
 import { type S3Target, type Transport, s3Object } from './s3.js'
 import { addNote } from './inbox.js'
+import { type CloudProvider, type Connected, accessToken, download as cloudDownload, remove as cloudRemove, upload as cloudUpload } from './cloud-drive.js'
 
 export const BKCFG_SK = 'BKCFG'
 export const BKRUN_PREFIX = 'BKRUN#'
@@ -50,12 +51,17 @@ export type Destination =
   | { type: 'server' }
   | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; secretKey: string }
   | { type: 'webdav'; url: string; username: string; password: string }
+  /** Kept as connected (decisions/0024); connecting happens through OAuth. */
+  | { type: CloudProvider }
 
 /** As stored: secrets sealed under a server key. */
 type StoredDestination =
   | { type: 'server' }
   | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; secretKeySealed: string }
   | { type: 'webdav'; url: string; username: string; passwordSealed: string }
+  | { type: CloudProvider; account: string; refreshTokenSealed: string; folderId?: string }
+
+const isCloud = (d: StoredDestination): d is StoredDestination & { type: CloudProvider } => d.type === 'gdrive' || d.type === 'onedrive'
 
 export const DEFAULT_SCHEDULE: Schedule = { frequency: 'off', hour: 2, weekday: 0, tzOffsetMinutes: 0, keep: 7 }
 
@@ -131,7 +137,18 @@ export async function getConfig(app: App, userId: string): Promise<BackupConfig>
 export function publicDestination(d: StoredDestination) {
   if (d.type === 's3') { const { secretKeySealed: _s, ...rest } = d; return { ...rest, hasSecret: true } }
   if (d.type === 'webdav') { const { passwordSealed: _p, ...rest } = d; return { ...rest, hasSecret: true } }
+  if (isCloud(d)) return { type: d.type, account: d.account, hasSecret: true }
   return d
+}
+
+/** After the person approves Vault at Google or Microsoft: that drive becomes
+ *  their destination, with their schedule unchanged. */
+export async function connectCloud(app: App, c: Connected): Promise<BackupConfig> {
+  const before = await getConfig(app, c.userId)
+  const stored: StoredDestination = { type: c.provider, account: c.account, refreshTokenSealed: sealSecret(app.config.pepper, c.userId, c.refreshToken), ...(c.folderId ? { folderId: c.folderId } : {}) }
+  const updatedAt = new Date(app.now()).toISOString()
+  await app.store.put({ pk: userPk(c.userId), sk: BKCFG_SK, schedule: before.schedule, destination: stored, nextRunAt: before.nextRunAt, updatedAt })
+  return { ...before, destination: stored, updatedAt }
 }
 
 /** Saves a schedule and destination. A destination of the same type sent
@@ -149,6 +166,9 @@ export async function saveConfig(app: App, userId: string, schedule: Schedule, d
     const sealed = dest.password ? sealSecret(app.config.pepper, userId, dest.password) : keep
     if (!sealed) throw new EgressRefused('Enter the password.')
     stored = { type: 'webdav', url: dest.url, username: dest.username, passwordSealed: sealed }
+  } else if (dest.type === 'gdrive' || dest.type === 'onedrive') {
+    if (before.destination.type !== dest.type) throw new EgressRefused('Connect the drive first.')
+    stored = before.destination
   } else {
     stored = { type: 'server' }
   }
@@ -226,6 +246,7 @@ async function webdav(app: App, userId: string, d: StoredDestination & { type: '
 export function destinationLabel(d: StoredDestination): string {
   if (d.type === 's3') return `s3:${d.endpoint.replace(/^https?:\/\//, '')}/${d.bucket}/${d.prefix}`
   if (d.type === 'webdav') return `webdav:${d.url.replace(/^https?:\/\//, '')}`
+  if (isCloud(d)) return `${d.type}:${d.account}`
   return 'server'
 }
 
@@ -239,6 +260,17 @@ export interface Run {
   entries: number
   reason: 'scheduled' | 'manual'
   error?: string
+  /** The file's id at a cloud drive, to fetch or delete it later. */
+  remoteId?: string
+}
+
+/** An access token for a cloud destination, keeping a rotated refresh token. */
+async function cloudToken(app: App, userId: string, d: StoredDestination & { type: CloudProvider }): Promise<string> {
+  return accessToken(app, d.type, openSecret(app.config.pepper, userId, d.refreshTokenSealed), async (rotated) => {
+    const cfg = await getConfig(app, userId)
+    if (cfg.destination.type !== d.type) return
+    await app.store.put({ pk: userPk(userId), sk: BKCFG_SK, ...cfg, destination: { ...cfg.destination, refreshTokenSealed: sealSecret(app.config.pepper, userId, rotated) } })
+  })
 }
 
 /** Sorts by time as text, and is safe in a URL. */
@@ -276,7 +308,8 @@ export async function runBackup(app: App, userId: string, reason: Run['reason'])
     } else {
       if (!app.config.personalBackup.remote) throw new Error('This server keeps personal backups on the server only.')
       if (d.type === 's3') await s3Object(s3TargetOf(app, userId, d), 'PUT', `${d.prefix}${file.name}`, file.body, transportFor(app))
-      else await webdav(app, userId, d, 'PUT', file.name, file.body)
+      else if (d.type === 'webdav') await webdav(app, userId, d, 'PUT', file.name, file.body)
+      else run.remoteId = await cloudUpload(app, await cloudToken(app, userId, d), { provider: d.type, ...(d.folderId ? { folderId: d.folderId } : {}) }, file.name, file.body)
     }
     run.ok = true
   } catch (err) {
@@ -307,11 +340,18 @@ async function prune(app: App, userId: string, cfg: BackupConfig): Promise<void>
   if (cfg.destination.type !== 'server') {
     const label = destinationLabel(cfg.destination)
     const here = runs.filter((r) => r['ok'] && r['destination'] === label && !r['removed'])
-    for (const r of here.slice(0, Math.max(0, here.length - keep))) {
+    const old = here.slice(0, Math.max(0, here.length - keep))
+    const d0 = cfg.destination
+    let token: string | null = null
+    for (const r of old) {
       try {
         const d = cfg.destination
         if (d.type === 's3') await s3Object(s3TargetOf(app, userId, d), 'DELETE', `${d.prefix}${String(r['name'])}`, undefined, transportFor(app))
         else if (d.type === 'webdav') await webdav(app, userId, d, 'DELETE', String(r['name']))
+        else if (isCloud(d0)) {
+          token ??= await cloudToken(app, userId, d0)
+          await cloudRemove(app, token, { provider: d0.type }, String(r['name']), String(r['remoteId'] ?? ''))
+        }
         await app.store.put({ ...r, removed: true })
       } catch { /* tried again after the next run */ }
     }
@@ -335,7 +375,8 @@ export async function fetchLatest(app: App, userId: string): Promise<{ name: str
   const name = String(last['name'])
   const body = d.type === 's3'
     ? await s3Object(s3TargetOf(app, userId, d), 'GET', `${d.prefix}${name}`, undefined, transportFor(app))
-    : await webdav(app, userId, d, 'GET', name)
+    : d.type === 'webdav' ? await webdav(app, userId, d, 'GET', name)
+    : await cloudDownload(app, await cloudToken(app, userId, d), { provider: d.type }, name, String(last['remoteId'] ?? ''))
   return { name, body: body.toString('utf8') }
 }
 

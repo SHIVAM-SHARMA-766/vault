@@ -328,7 +328,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 
 **C. Backups, per user (like Zoho)**
 - ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)
-- ⬜ C3 Google Drive / OneDrive, proposed in [0024](../decisions/0024-cloud-drive-backups.md) (WebDAV bridges work today) · ✅ C4 Encrypted offline copy that opens without the server (one HTML file, no network)
+- ✅ C3 Google Drive / OneDrive ([0024](../decisions/0024-cloud-drive-backups.md): OAuth with PKCE to the operator's apps, drive.file / AppFolder scopes, chunked uploads) · ✅ C4 Encrypted offline copy that opens without the server (one HTML file, no network)
 - ✅ C5 Backup history, test restore, and restore through Import & export · ✅ C6 Organization backups (encrypted export of an organization's collections, made in the admin's browser) · ✅ C7 Server backup settings in the admin UI (shown, with Back up now; values stay on the host)
 
 **D. Features others have**

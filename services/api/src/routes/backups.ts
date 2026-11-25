@@ -3,13 +3,14 @@
 // See decisions/0017 and personal-backup.ts.
 
 import type { App } from '../context.js'
+import { CLOUD_PROVIDERS, type CloudProvider, CloudError, connectUrl, finishConnect, providerConfigured } from '../cloud-drive.js'
 import { EgressRefused } from '../egress.js'
-import { type LambdaEvent, type LambdaResponse, badRequest, json, notFound, parseJsonBody } from '../http.js'
+import { type LambdaEvent, type LambdaResponse, badRequest, json, notFound, parseJsonBody, redirect } from '../http.js'
 import { userPk } from '../keys.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import {
   BKCOPY_PREFIX, BKRUN_PREFIX, FREQUENCIES, SERVER_KEEP_MAX, type Destination, type Frequency, type Schedule,
-  checkUrl, fetchLatest, getConfig, publicDestination, runBackup, saveConfig,
+  checkUrl, connectCloud, fetchLatest, getConfig, publicDestination, runBackup, saveConfig,
 } from '../personal-backup.js'
 
 /** Building and uploading a backup is real work; a few an hour is plenty. */
@@ -27,6 +28,8 @@ export async function getBackups(app: App, userId: string): Promise<LambdaRespon
     nextRunAt: cfg.nextRunAt ? new Date(cfg.nextRunAt).toISOString() : null,
     runs, copies,
     remoteAllowed: app.config.personalBackup.remote,
+    // Google Drive and OneDrive, when the operator registered their apps (decisions/0024).
+    cloud: { gdrive: providerConfigured(app, 'gdrive'), onedrive: providerConfigured(app, 'onedrive') },
     serverKeepMax: SERVER_KEEP_MAX,
   })
 }
@@ -61,7 +64,11 @@ function requireDestination(app: App, v: unknown) {
   if (!v || typeof v !== 'object') throw badRequest('destination must be an object.')
   const d = v as Record<string, unknown>
   if (d['type'] === 'server') return { type: 'server' as const }
-  if (d['type'] !== 's3' && d['type'] !== 'webdav') throw badRequest('destination.type must be server, s3 or webdav.')
+  if (CLOUD_PROVIDERS.includes(d['type'] as CloudProvider)) {
+    if (!providerConfigured(app, d['type'] as CloudProvider)) throw badRequest('That cloud drive is not set up on this server.')
+    return { type: d['type'] as CloudProvider }
+  }
+  if (d['type'] !== 's3' && d['type'] !== 'webdav') throw badRequest('destination.type must be server, s3, webdav, gdrive or onedrive.')
   if (!app.config.personalBackup.remote) throw badRequest('This server keeps personal backups on the server only.')
   try {
     if (d['type'] === 's3') {
@@ -100,6 +107,27 @@ export async function putConfig(app: App, userId: string, event: LambdaEvent): P
   } catch (err) {
     if (err instanceof EgressRefused) throw badRequest(err.message)
     throw err
+  }
+}
+
+/** Step one of connecting a drive: the provider's consent page. */
+export async function connect(app: App, userId: string, provider: string): Promise<LambdaResponse> {
+  if (!CLOUD_PROVIDERS.includes(provider as CloudProvider) || !providerConfigured(app, provider as CloudProvider)) throw notFound()
+  return json(200, { url: await connectUrl(app, userId, provider as CloudProvider) })
+}
+
+/** Step two: the provider sends the browser back here. The person's drive
+ *  becomes their destination, and they return to Settings → Backups. */
+export async function oauthCallback(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const q = new URLSearchParams(event.rawQueryString ?? '')
+  const back = (fragment: string) => redirect(`${app.config.origin}/app/settings/backups#${fragment}`)
+  if (q.get('error')) return back(`cloud-error=${encodeURIComponent(q.get('error') === 'access_denied' ? 'You did not allow Vault access.' : 'The provider reported an error.')}`)
+  try {
+    const connected = await finishConnect(app, q.get('state') ?? '', q.get('code') ?? '')
+    await connectCloud(app, connected)
+    return back(`cloud=${connected.provider}`)
+  } catch (err) {
+    return back(`cloud-error=${encodeURIComponent(err instanceof CloudError ? err.message : 'The drive could not be connected. Try again.')}`)
   }
 }
 

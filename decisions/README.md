@@ -43,7 +43,7 @@ someone who would otherwise assume it was an oversight.
 | [0021](0021-sso.md) | Single sign-on (OIDC) for sign-in; the master password still unlocks |
 | [0022](0022-passkeys.md) | WebAuthn second factor; unlock with a passkey (built in 0034); storing passkeys with the extension |
 | [0023](0023-crypto-hardening.md) | Signed key grants, an opt-in secret key, Argon2id, an organization recovery key |
-| [0024](0024-cloud-drive-backups.md) | **Proposed, after the extension:** Google Drive and OneDrive backups via operator-registered OAuth apps |
+| [0024](0024-cloud-drive-backups.md) | Google Drive and OneDrive backups via operator-registered OAuth apps, narrowest scopes |
 | [0025](0025-signed-key-grants.md) | Signed key grants: a signing key per account, grants signed by admins, members verify (closes A15) |
 | [0026](0026-organization-recovery-key.md) | Organization recovery key: org key escrowed to a key the owner keeps offline |
 | [0027](0027-secret-key.md) | Opt-in secret key mixed into key derivation, with an Emergency Kit |

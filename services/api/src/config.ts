@@ -88,6 +88,13 @@ export interface Config {
   /** Single sign-on with an OpenID Connect provider (decisions/0021). The
    *  provider proves who someone is; the master password still unlocks. */
   oidc: { issuer: string; clientId: string; clientSecret: string; name: string; provision: boolean; requireVerifiedEmail: boolean } | null
+  /** Personal backups to Google Drive and OneDrive (decisions/0024): the
+   *  operator's OAuth apps; null when not registered. `endpoints` is for tests. */
+  cloudDrive: {
+    google: { clientId: string; clientSecret: string } | null
+    microsoft: { clientId: string; clientSecret: string } | null
+    endpoints?: Partial<Record<'googleAuth' | 'googleToken' | 'googleApi' | 'msAuth' | 'msToken' | 'msGraph', string>>
+  }
 }
 
 export interface Variable {
@@ -152,6 +159,10 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'OIDC_NAME', required: false, default: 'SSO', description: 'What the sign-in button says: "Sign in with <name>", e.g. Okta, Microsoft, Google.' },
   { name: 'OIDC_PROVISION', required: false, default: 'false', description: '"true" lets someone the provider signs in, with no account here yet, create one without an invitation (they still choose a master password).' },
   { name: 'OIDC_REQUIRE_VERIFIED_EMAIL', required: false, default: 'true', description: '"false" accepts an email claim without email_verified, for providers that never send it (Microsoft Entra ID). Only for a provider whose addresses are all yours.' },
+  { name: 'GOOGLE_OAUTH_CLIENT_ID', required: false, default: '', description: 'Personal backups to Google Drive (decisions/0024): the OAuth client id of a Google Cloud project with the Drive API on (Web application; redirect URI https://<your address>/api/backups/oauth/callback; scope drive.file). The option appears when it is set.' },
+  { name: 'GOOGLE_OAUTH_CLIENT_SECRET', required: false, default: '', secret: true, description: 'Its client secret. Required with GOOGLE_OAUTH_CLIENT_ID.' },
+  { name: 'MS_OAUTH_CLIENT_ID', required: false, default: '', description: 'Personal backups to OneDrive (decisions/0024): the application (client) id of a Microsoft Entra app registration (personal and work accounts; redirect URI https://<your address>/api/backups/oauth/callback; delegated Files.ReadWrite.AppFolder and offline_access).' },
+  { name: 'MS_OAUTH_CLIENT_SECRET', required: false, default: '', secret: true, description: 'Its client secret. Required with MS_OAUTH_CLIENT_ID.' },
   { name: 'PERSONAL_BACKUP_REMOTE', required: false, default: 'true', description: '"false" limits personal backups to copies kept on this server: no outbound connections to people\'s own S3 buckets or WebDAV folders.' },
   { name: 'PERSONAL_BACKUP_ALLOW_PRIVATE', required: false, default: 'false', description: '"true" lets personal backups reach private and loopback addresses, and plain http — for a NAS on the LAN. Leave it off on a server reachable from the internet: it lets any account make this server connect inside your network.' },
 ]
@@ -225,6 +236,12 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     metricsToken: get('METRICS_TOKEN'),
     auditWebhook: { url: get('AUDIT_WEBHOOK_URL'), secret: get('AUDIT_WEBHOOK_SECRET') },
     oidc: null,
+    cloudDrive: { google: null, microsoft: null },
+  }
+  for (const [prefix, key] of [['GOOGLE', 'google'], ['MS', 'microsoft']] as const) {
+    const id = get(`${prefix}_OAUTH_CLIENT_ID`), secret = get(`${prefix}_OAUTH_CLIENT_SECRET`)
+    if (id && !secret) problems.push(`${prefix}_OAUTH_CLIENT_SECRET is required with ${prefix}_OAUTH_CLIENT_ID`)
+    if (id && secret) config.cloudDrive[key] = { clientId: id, clientSecret: secret }
   }
   const issuer = get('OIDC_ISSUER').replace(/\/+$/, '')
   if (issuer) {

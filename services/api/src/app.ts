@@ -192,6 +192,8 @@ export function buildRouter(app: App): Router {
   router.put('/api/prefs', authed((u, e) => prefs.putPrefs(app, u, e)), 'Replace my sealed preferences')
   router.get('/api/backups', authed((u) => backups.getBackups(app, u)), 'My backup schedule, destination, runs and copies')
   router.put('/api/backups/config', authed((u, e) => backups.putConfig(app, u, e)), 'Set my backup schedule and destination')
+  router.post('/api/backups/connect/:provider', authed((u, _e, p) => backups.connect(app, u, p)), 'Start connecting Google Drive (gdrive) or OneDrive (onedrive) for my backups')
+  router.get('/api/backups/oauth/callback', ({ event }) => backups.oauthCallback(app, event), 'The cloud drive\'s answer after the person allowed Vault; redirects to Settings')
   router.post('/api/backups/run', authed((u) => backups.runNow(app, u)), 'Back up now')
   router.get('/api/backups/latest', authed((u) => backups.latest(app, u)), 'The newest backup, fetched back from its destination (for a test restore)')
   router.get('/api/backups/copies/:id', authed((u, _e, id) => backups.getCopy(app, u, id)), 'Download a copy kept on the server')

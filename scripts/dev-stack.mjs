@@ -61,6 +61,11 @@ const app = {
     version: 'dev', updateCheck: { enabled: false, url: '' },
     breachCheck: { enabled: Boolean(process.env.BREACH_CHECK_URL), url: process.env.BREACH_CHECK_URL ?? '' },
     metricsToken: process.env.METRICS_TOKEN ?? '', auditWebhook: { url: '', secret: '' },
+    // CLOUD_MOCK: a stand-in for Google and Microsoft in browser tests.
+    cloudDrive: process.env.CLOUD_MOCK ? {
+      google: { clientId: 'g-e2e', clientSecret: 'g-e2e-secret' }, microsoft: { clientId: 'm-e2e', clientSecret: 'm-e2e-secret' },
+      endpoints: { googleAuth: `${process.env.CLOUD_MOCK}/g/auth`, googleToken: `${process.env.CLOUD_MOCK}/g/token`, googleApi: `${process.env.CLOUD_MOCK}/gapi`, msAuth: `${process.env.CLOUD_MOCK}/m/auth`, msToken: `${process.env.CLOUD_MOCK}/m/token`, msGraph: `${process.env.CLOUD_MOCK}/graph` },
+    } : { google: null, microsoft: null },
     oidc: process.env.OIDC_ISSUER ? { issuer: process.env.OIDC_ISSUER.replace(/\/+$/, ''), clientId: process.env.OIDC_CLIENT_ID ?? '', clientSecret: process.env.OIDC_CLIENT_SECRET ?? '', name: process.env.OIDC_NAME || 'SSO', provision: process.env.OIDC_PROVISION === 'true', requireVerifiedEmail: process.env.OIDC_REQUIRE_VERIFIED_EMAIL !== 'false' } : null,
     mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
     db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },

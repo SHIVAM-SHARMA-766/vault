@@ -277,7 +277,8 @@ Settings → **Backups** keeps your own copies of your vault, independent of the
   month on the 1st — at an hour you choose, in your time zone.
 - **Where**: **on this server** (download any copy; protects against deleting something by
   mistake, not against losing the server), **your S3-compatible bucket** (AWS, R2, B2, Wasabi,
-  MinIO…) or **your WebDAV folder** (Nextcloud, ownCloud, a NAS).
+  MinIO…), **your WebDAV folder** (Nextcloud, ownCloud, a NAS), or **Google Drive** or
+  **OneDrive** when your server offers them.
 - **Copies to keep**: older ones are deleted at the destination. At most 10 are kept on the server.
 - **History** lists every run and, when one fails, why.
 - **Test restore** fetches the newest copy and opens it in your browser, proving it can be
@@ -293,6 +294,14 @@ replaced. Duplicates are skipped if you leave that option on.
 
 For S3 or WebDAV, the server keeps the secret key or password encrypted so it can back up while
 you are away. Create one that can write only to that bucket or folder.
+
+**Google Drive and OneDrive:** choose one, then **Connect** and allow Vault at Google or Microsoft.
+You come back to Vault and sign in again, because the page reloads. Vault asks for the least it can:
+- on Google Drive, only the files it creates (a *Vault backups* folder);
+- on OneDrive, only its own app folder (*Apps → Vault*).
+
+It can see nothing else in your drive. To stop, choose another destination, then remove Vault
+from your Google or Microsoft account's connected apps.
 
 ## Notifications
 
