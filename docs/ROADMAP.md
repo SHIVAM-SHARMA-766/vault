@@ -319,7 +319,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ✅ A3 Server name and support contact set in the admin panel; shown on sign-in and help; Reply-To of every email
 - ✅ A4 "Run your own" page on the site (`/get`)
 - ✅ A5 Update checker in the admin panel (every 12 h from the server, `UPDATE_CHECK=false` turns it off)
-- ⬜ A6 No-domain mode (DuckDNS / Cloudflare Tunnel guide)
+- ✅ A6 No-domain guide ([docs/no-domain.md](no-domain.md): DuckDNS + Caddy, Tailscale, Cloudflare quick tunnel; a loopback-only compose override; the app explains when it is opened over plain http)
 
 **B. An organization on its own server**
 - ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column), groups chosen at invite, send again · ✅ B3 Branding (accent colour, logo)
