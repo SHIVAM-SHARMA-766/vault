@@ -1,6 +1,6 @@
 # 0032: The business edition
 
-Status: Accepted by the operator on 2026-11-23; built in stages (2a–2d)
+Status: Accepted by the operator on 2026-11-23; 2a and 2b built, 2c–2d to come
 Date: 2026-11-23
 Implements: [0030](0030-editions.md) stage 2. Builds on [0031](0031-two-workspaces.md).
 
@@ -55,14 +55,37 @@ registering.
   Overview, Service desk, Audit log and System. Users, Invitations and Organizations are gone
   from the server scope, because People and the company cover them.
 
-### 2b — Permission sets (planned)
+### 2b — Permission sets (built)
 
-Named bundles of collection permissions given to people or groups: *Use only* (fill and copy
-the username, never reveal or copy the password), *Viewer*, *Editor*, *Manager*, and custom sets
-built from finer rights: see history, export, share by link, manage access. The existing
-view/edit/manage and hide-passwords become the four built-in sets. Policy enforced by the
-server where it can be (writes, access changes), and by the app where only it can (reveal,
-copy), as hide-passwords is today.
+A permission set is a named bundle given per collection, to a person or a group. It has four
+rights:
+
+| Right | Means | Kept by |
+|---|---|---|
+| **Items**: open · add and change · add, change and give access | the level (view, edit, manage) | the server: reads, writes, access changes |
+| **See and copy passwords** | off = fill only | the apps (as hide-passwords was) |
+| **Fill pages** with the browser extension | off = never offered for filling | the extension |
+| **Include in backups**, and *Move to my vault* | the organization backup, and taking an item out | the web app |
+
+- **Built-in sets** cannot be changed or removed:
+
+  | Set | Items | See/copy passwords | Fill | Backups |
+  |---|---|:-:|:-:|:-:|
+  | Use only | open | ✗ | ✓ | ✗ |
+  | Viewer | open | ✓ | ✓ | ✗ |
+  | Editor | add and change | ✓ | ✓ | ✓ |
+  | Manager | and give access | ✓ | ✓ | ✓ |
+
+- **Custom sets** are made by an organization's owners and admins in the console (*Permission
+  sets*), up to 50, with unique names. Changing a set changes every grant given with it. A set
+  in use cannot be removed.
+- **The server stores** the set's id on the grant, and also writes the level and hide-passwords
+  it implies, so every existing check is unchanged. Each grant reaches its member with its
+  `rights` (set, reveal, fill, export).
+- **Grants from before sets** read as the built-in set their level and hide-passwords amount to.
+  An edit grant with passwords hidden reads as Editor, with reveal off.
+- "See history" and "share by link" were considered and left out: shared items have no history
+  yet, and share links are made only from personal items.
 
 ### 2c — Team password health (planned)
 

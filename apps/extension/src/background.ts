@@ -51,7 +51,8 @@ interface Unlocked {
   /** The account's generator preferences (Settings → Preferences). */
   generator?: GeneratorPrefs
 }
-interface Shared { orgId: string; collectionId: string; where: string; hidePasswords: boolean; sensitive: boolean }
+/** `fill`: the collection's permission set allows filling (decisions/0032, 2b). */
+interface Shared { orgId: string; collectionId: string; where: string; hidePasswords: boolean; fill: boolean; sensitive: boolean }
 /** `key` is unique across the vault and shared collections; `id` is the
  *  item's own id where it lives. */
 type Item = EntryContent & { id: string; key: string; shared?: Shared }
@@ -194,7 +195,7 @@ async function loadShared(server: string, token1: string, vaultKey: Uint8Array):
                 // `exposed` and `sensitive` are the server's word, never the blob's.
                 const { exposed: _x, sensitive: _s, ...content } = (await openSharedItem(c.id, it.id, it.keyVersion, it.blob, collKey)) as EntryContent & { exposed?: unknown; sensitive?: unknown }
                 if (content.archived) continue
-                out.push({ ...content, id: it.id, key: `${c.id}/${it.id}`, shared: { orgId: row.id, collectionId: c.id, where, hidePasswords: c.access.hidePasswords, sensitive: !!it.sensitive } })
+                out.push({ ...content, id: it.id, key: `${c.id}/${it.id}`, shared: { orgId: row.id, collectionId: c.id, where, hidePasswords: c.access.hidePasswords, fill: c.access.rights?.fill ?? true, sensitive: !!it.sensitive } })
               } catch { /* an item under an older key; rotation re-seals it */ }
             }
           } finally { wipe(collKey) }
@@ -314,7 +315,9 @@ function hostOfUrl(url: string): string {
 async function listItems(pageUrl?: string): Promise<ItemsReply> {
   const all = await items()
   const u = await usedAt()
-  const matches = pageUrl ? rankForPage(all, pageUrl, (e) => e.url, (e) => u[e.key] ?? 0).map((e) => e.key) : []
+  // A shared item whose permission set does not allow filling is not offered (2b).
+  const fillable = all.filter((e) => e.shared?.fill !== false)
+  const matches = pageUrl ? rankForPage(fillable, pageUrl, (e) => e.url, (e) => u[e.key] ?? 0).map((e) => e.key) : []
   return { items: all.map(summary), matches, ...(notice ? { notice } : {}) }
 }
 
@@ -326,6 +329,7 @@ async function find(id: string): Promise<Item> {
 
 async function fill(id: string, tabId: number): Promise<{ filled: number; error?: string }> {
   const item = await find(id)
+  if (item.shared?.fill === false) return { filled: 0, error: 'Your organization does not allow filling this item.' }
   // The tab's URL, as the browser reports it — never as the popup says.
   const tab = await chrome.tabs.get(tabId)
   if (!tab.url) return { filled: 0, error: 'This page cannot be filled.' }

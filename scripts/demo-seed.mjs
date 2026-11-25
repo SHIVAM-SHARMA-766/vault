@@ -229,6 +229,19 @@ async function moveTo(page, itemName, where) {
   if ((await countOf()) <= before) throw new Error(`${itemName} was not moved to ${where}`)
 }
 
+/** Sets what a grant allows: a permission set (decisions/0032) where the
+ *  server has them, else the older permission and hide-passwords controls. */
+async function chooseAccess(row, perm, hide) {
+  const sets = row.locator('select[aria-label="Permission set"]')
+  if (await sets.count()) {
+    const label = perm === 'manage' ? 'Manager' : perm === 'edit' ? 'Editor' : hide ? 'Use only' : 'Viewer'
+    await sets.selectOption({ label })
+    return
+  }
+  await row.locator('select[aria-label="Permission"]').selectOption(perm)
+  if (hide) await row.getByLabel('Hide passwords').check()
+}
+
 /** Opens Organizations afresh: by way of the vault, so the page mounts again
  *  and loads what changed (a member who just accepted, a new grant). */
 async function orgsPage(page) {
@@ -381,7 +394,7 @@ try {
           async () => { await collections(); await row.getByRole('button', { name: 'Access' }).click() })
         {
           // The permission select is shared by the person and group forms.
-          await row.locator('select[aria-label="Permission"]').selectOption(c.perm ?? 'view')
+          await chooseAccess(row, c.perm ?? 'view', false)
           await g.selectOption({ label: c.group })
           await row.getByRole('button', { name: 'Share with group' }).click()
           await admin.waitForSelector('text=Group given access', { state: 'attached' })
@@ -397,8 +410,7 @@ try {
           throw new Error(`${label} cannot be given ${c.name}: not confirmed?`)
         }
         await who.selectOption({ label })
-        await row.locator('select[aria-label="Permission"]').selectOption(p.perm)
-        if (p.hide) await row.getByLabel('Hide passwords').check()
+        await chooseAccess(row, p.perm, !!p.hide)
         await row.getByRole('button', { name: 'Share', exact: true }).click()
         await row.locator('.access-list li', { hasText: label }).waitFor()
       }

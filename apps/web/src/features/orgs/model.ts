@@ -102,6 +102,15 @@ export interface CollectionView {
   key?: Uint8Array
   permission?: SharePermission
   hidePasswords: boolean
+  /** What this account's grant allows (2b): its set, and reveal, fill, export. */
+  rights?: Rights
+}
+
+export interface Rights { set: string; reveal: boolean; fill: boolean; export: boolean }
+
+/** The built-in set an older grant (level and hide-passwords) amounts to. */
+export function legacySet(permission: SharePermission, hidePasswords: boolean): string {
+  return permission === 'view' ? (hidePasswords ? 'use-only' : 'viewer') : permission === 'edit' ? 'editor' : 'manager'
 }
 
 /** A shared item, in the same shape as a personal entry plus where it lives. */
@@ -110,6 +119,7 @@ export interface SharedEntry extends Decrypted {
   collectionId: string
   permission: SharePermission
   hidePasswords: boolean
+  rights?: Rights
   /** Someone who could open this has left; its password should change (B9). */
   exposed?: boolean
   /** Admins are told when it is opened (D12). */
@@ -157,7 +167,7 @@ export function useTeams(vaultKey: Uint8Array) {
         const stale = new Set((await api.orgs.stale(token, row.id).catch(() => ({ items: [] }))).items.map((s) => `${s.collectionId}/${s.itemId}`))
         for (const c of (await api.orgs.collections(token, row.id)).collections) {
           const cname = (await openCollectionMeta(row.id, c.id, c.nameBlob, key).catch(() => ({ name: 'Unreadable collection' }))).name
-          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), ...(c.requested ? { requested: true } : {}), ...(c.recoveryCovered ? { recoveryCovered: true } : {}), ...(c.access?.until ? { until: c.access.until } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false }
+          const view: CollectionView = { ...(row.kind === 'direct' ? { direct: true } : {}), ...(c.requested ? { requested: true } : {}), ...(c.recoveryCovered ? { recoveryCovered: true } : {}), ...(c.access?.until ? { until: c.access.until } : {}), orgId: row.id, orgName: name, id: c.id, name: cname, keyVersion: c.keyVersion, rotationNeeded: c.rotationNeeded, hidePasswords: c.access?.hidePasswords ?? false, ...(c.access?.rights ? { rights: c.access.rights } : {}) }
           const status = c.access && c.access.keyVersion === c.keyVersion
             ? await checkGrant(row.id, c.id, c.keyVersion, c.access, { publicKey: me.publicKeyB64, signingKey: me.signingKeyB64, ...(session.get()?.userId ? { userId: session.get()!.userId } : {}) }, ts.signers, ts.trust)
             : null
@@ -171,7 +181,7 @@ export function useTeams(vaultKey: Uint8Array) {
               try {
                 // `exposed` is the server's word (B9), never the blob's.
                 const { exposed: _x, sensitive: _s, ...content } = (await openSharedItem(c.id, it.id, it.keyVersion, it.blob, view.key)) as EntryContent & { exposed?: unknown; sensitive?: unknown }
-                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords, ...(stale.has(`${c.id}/${it.id}`) ? { exposed: true } : {}), ...(it.sensitive ? { sensitive: true } : {}) })
+                entries.push({ ...content, id: it.id, updatedAt: it.updatedAt, orgId: row.id, collectionId: c.id, permission: view.permission, hidePasswords: view.hidePasswords, ...(view.rights ? { rights: view.rights } : {}), ...(stale.has(`${c.id}/${it.id}`) ? { exposed: true } : {}), ...(it.sensitive ? { sensitive: true } : {}) })
               } catch { /* an item under an older key; rotation re-seals it */ }
             }
           }
@@ -234,12 +244,12 @@ export function useTeams(vaultKey: Uint8Array) {
       for (const c of colls) {
         if (!c.key || c.permission !== 'manage') continue
         const { access } = await api.orgs.access(token, orgId, c.id)
-        for (const a of access as { userId: string; permission: SharePermission; hidePasswords: boolean; signed?: boolean; viaGroup?: string | null }[]) {
+        for (const a of access as { userId: string; permission: SharePermission; hidePasswords: boolean; set?: string; signed?: boolean; viaGroup?: string | null }[]) {
           if (a.signed) continue
           const m = members.find((x) => x.userId === a.userId)
           if (!m || m.status !== 'confirmed') continue
           const keyBlob = await sealCollectionKey(fromBase64Url(m.publicKey), c.key, c.id, c.keyVersion)
-          await api.orgs.grant(token, orgId, c.id, m.userId, { permission: a.permission, hidePasswords: a.hidePasswords, keyBlob, ...(a.viaGroup ? { viaGroup: a.viaGroup } : {}), ...(await signFor(orgId, c.id, c.keyVersion, m.publicKey, m.signingPublicKey, keyBlob)) })
+          await api.orgs.grant(token, orgId, c.id, m.userId, { set: a.set ?? legacySet(a.permission, a.hidePasswords), keyBlob, ...(a.viaGroup ? { viaGroup: a.viaGroup } : {}), ...(await signFor(orgId, c.id, c.keyVersion, m.publicKey, m.signingPublicKey, keyBlob)) })
         }
       }
     } catch { /* tried again at the next load */ }
@@ -367,7 +377,7 @@ export function useTeams(vaultKey: Uint8Array) {
     const org = orgs.find((o) => o.id === orgId)
     if (org?.kind !== 'direct') return
     for (const c of collections.filter((x) => x.orgId === orgId && x.key && x.permission === 'manage')) {
-      await grant(c.id, userId, publicKey, 'edit', false)
+      await grant(c.id, userId, publicKey, 'editor')
     }
   }
 
@@ -379,13 +389,14 @@ export function useTeams(vaultKey: Uint8Array) {
     await api.orgs.confirm(await session.token(), orgId, userId, await sealOrgKey(fromBase64Url(publicKey), org.key, orgId))
   }
 
-  async function grant(collectionId: string, userId: string, publicKey: string, permission: SharePermission, hidePasswords: boolean, viaGroup?: string, hours?: number) {
+  /** Gives a member a collection, with a permission set (decisions/0032, 2b). */
+  async function grant(collectionId: string, userId: string, publicKey: string, set: string, viaGroup?: string, hours?: number) {
     const c = coll(collectionId)
     const token = await session.token()
     const m = (await api.orgs.members(token, c.orgId)).members.find((x) => x.userId === userId)
     const keyBlob = await sealCollectionKey(fromBase64Url(publicKey), c.key, c.id, c.keyVersion)
     await api.orgs.grant(token, c.orgId, c.id, userId, {
-      permission, hidePasswords, keyBlob, ...(viaGroup ? { viaGroup } : {}), ...(hours ? { hours } : {}),
+      set, keyBlob, ...(viaGroup ? { viaGroup } : {}), ...(hours ? { hours } : {}),
       ...(await signFor(c.orgId, c.id, c.keyVersion, publicKey, m?.signingPublicKey, keyBlob)),
     })
   }
@@ -404,7 +415,7 @@ export function useTeams(vaultKey: Uint8Array) {
   }
 
   /** Grants a collection to a group: the key sealed to each member who lacks it. */
-  async function grantGroup(collectionId: string, groupId: string, permission: SharePermission, hidePasswords: boolean) {
+  async function grantGroup(collectionId: string, groupId: string, set: string) {
     const c = coll(collectionId)
     const token = await session.token()
     const [{ groups }, { members }, { access }] = await Promise.all([api.orgs.groups(token, c.orgId), api.orgs.members(token, c.orgId), api.orgs.access(token, c.orgId, c.id)])
@@ -415,7 +426,7 @@ export function useTeams(vaultKey: Uint8Array) {
       const keyBlob = await sealCollectionKey(fromBase64Url(m.publicKey), c.key, c.id, c.keyVersion)
       return { userId: u, keyBlob, ...(await signFor(c.orgId, c.id, c.keyVersion, m.publicKey, m.signingPublicKey, keyBlob)) }
     }))
-    await api.orgs.grantGroup(token, c.orgId, c.id, groupId, { permission, hidePasswords, grants })
+    await api.orgs.grantGroup(token, c.orgId, c.id, groupId, { set, grants })
   }
 
   /** Adds a member to a group and seals the group's collections to them —
@@ -425,7 +436,7 @@ export function useTeams(vaultKey: Uint8Array) {
     let granted = 0
     for (const gc of r.collections) {
       if (!collections.find((c) => c.id === gc.collectionId && c.permission === 'manage')) continue
-      await grant(gc.collectionId, userId, publicKey, gc.permission, gc.hidePasswords, groupId)
+      await grant(gc.collectionId, userId, publicKey, gc.set ?? legacySet(gc.permission, gc.hidePasswords), groupId)
       granted++
     }
     return { granted, skipped: r.collections.length - granted }

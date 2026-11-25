@@ -62,6 +62,38 @@ interface Member extends Item {
   endorsement?: string
 }
 
+// ── Permission sets (decisions/0032, 2b) ─────────────────────────────────────
+// A named bundle of what someone may do in a collection. The level is what the
+// server enforces (reading, writing, managing access); revealing passwords,
+// filling pages and exporting are kept by the apps, as hide-passwords is.
+export interface PermissionSet { id: string; name: string; level: Permission; reveal: boolean; fill: boolean; export: boolean; builtin?: true }
+export const BUILTIN_SETS: readonly PermissionSet[] = [
+  { id: 'use-only', name: 'Use only', level: 'view', reveal: false, fill: true, export: false, builtin: true },
+  { id: 'viewer', name: 'Viewer', level: 'view', reveal: true, fill: true, export: false, builtin: true },
+  { id: 'editor', name: 'Editor', level: 'edit', reveal: true, fill: true, export: true, builtin: true },
+  { id: 'manager', name: 'Manager', level: 'manage', reveal: true, fill: true, export: true, builtin: true },
+]
+const PSET_PREFIX = 'PSET#'
+const psetSk = (id: string) => `${PSET_PREFIX}${id}`
+const MAX_SETS = 50
+
+async function customSets(app: App, orgId: string): Promise<PermissionSet[]> {
+  return (await app.store.query(orgPk(orgId), PSET_PREFIX)).map((r) => ({ id: String(r['id']), name: String(r['name']), level: r['level'] as Permission, reveal: r['reveal'] === true, fill: r['fill'] === true, export: r['export'] === true }))
+}
+async function findSet(app: App, orgId: string, id: unknown): Promise<PermissionSet> {
+  const set = BUILTIN_SETS.find((x) => x.id === id) ?? (typeof id === 'string' && isValidId(id) ? (await customSets(app, orgId)).find((x) => x.id === id) : undefined)
+  if (!set) throw badRequest('set must be one of this organization\'s permission sets.')
+  return set
+}
+/** What a grant allows: its set's rights, or for a grant made before sets,
+ *  the built-in set its level and hide-passwords amount to. */
+function rightsOf(a: { permission: Permission; hidePasswords: boolean; set?: string }, sets: readonly PermissionSet[]): { set: string; reveal: boolean; fill: boolean; export: boolean } {
+  const s = a.set ? sets.find((x) => x.id === a.set) : undefined
+  if (s) return { set: s.id, reveal: s.reveal, fill: s.fill, export: s.export }
+  const builtin = a.permission === 'view' ? (a.hidePasswords ? 'use-only' : 'viewer') : a.permission === 'edit' ? 'editor' : 'manager'
+  return { set: builtin, reveal: !a.hidePasswords, fill: true, export: a.permission !== 'view' }
+}
+
 interface Access extends Item {
   collectionId: string
   userId: string
@@ -69,6 +101,8 @@ interface Access extends Item {
   keyVersion: number
   permission: Permission
   hidePasswords: boolean
+  /** The permission set it was given with (2b); absent on older grants. */
+  set?: string
   /** Granted because the member is in this group; removed with it. */
   viaGroup?: string
   /** A check-out (D7): access ends at this instant (ISO 8601). */
@@ -89,6 +123,8 @@ interface GroupAccess extends Item {
   groupId: string
   permission: Permission
   hidePasswords: boolean
+  /** The permission set the group was given (2b). */
+  set?: string
 }
 
 interface Collection extends Item {
@@ -630,6 +666,7 @@ export async function collections(app: App, userId: string, orgId: string): Prom
   const me = await requireMember(app, orgId, userId, { confirmed: true })
   await requireCompliant(app, orgId, userId)
   const all = await app.store.query(orgPk(orgId), COLLECTION_PREFIX) as Collection[]
+  const sets = [...BUILTIN_SETS, ...(await customSets(app, orgId))]
   const out = []
   for (const c of all) {
     const a = await access(app, orgId, c.id, userId)
@@ -638,7 +675,7 @@ export async function collections(app: App, userId: string, orgId: string): Prom
     const requested = !a && me.role === 'member' ? Boolean(await app.store.get(orgPk(orgId), requestSk(c.id, userId))) : false
     out.push({
       id: c.id, nameBlob: c.nameBlob, keyVersion: c.keyVersion, rotationNeeded: !!c.rotationNeeded, recoveryCovered: Boolean(c.recoveryBlob),
-      access: a ? { keyBlob: a.keyBlob, keyVersion: a.keyVersion, permission: a.permission, hidePasswords: a.hidePasswords, ...(a.until ? { until: a.until } : {}), ...(a.signature ? { signature: a.signature, signedBy: a.signedBy } : {}) } : null,
+      access: a ? { keyBlob: a.keyBlob, keyVersion: a.keyVersion, permission: a.permission, hidePasswords: a.hidePasswords, rights: rightsOf(a, sets), ...(a.until ? { until: a.until } : {}), ...(a.signature ? { signature: a.signature, signedBy: a.signedBy } : {}) } : null,
       ...(requested ? { requested } : {}),
     })
   }
@@ -684,7 +721,8 @@ export async function deleteCollection(app: App, userId: string, orgId: string, 
 export async function collectionAccess(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {
   await requireAccess(app, orgId, collectionId, userId, 'manage')
   const grants = (await app.store.query(orgPk(orgId), accessPrefix(collectionId))) as Access[]
-  return json(200, { access: grants.map((a) => ({ userId: a.userId, permission: a.permission, hidePasswords: a.hidePasswords, keyVersion: a.keyVersion, viaGroup: a.viaGroup ?? null, signed: Boolean(a.signature) })) })
+  const sets = [...BUILTIN_SETS, ...(await customSets(app, orgId))]
+  return json(200, { access: grants.map((a) => ({ userId: a.userId, permission: a.permission, hidePasswords: a.hidePasswords, set: rightsOf(a, sets).set, keyVersion: a.keyVersion, viaGroup: a.viaGroup ?? null, signed: Boolean(a.signature) })) })
 }
 
 /** Grants or changes a member's access. A new grant must carry the
@@ -695,13 +733,17 @@ export async function grantAccess(app: App, userId: string, event: LambdaEvent, 
   const t = await member(app, orgId, target)
   if (!t || t.status !== 'confirmed') throw new HttpError(409, 'conflict', 'Only confirmed members can be given access.')
   const b = body(event)
-  if (!(PERMISSIONS as readonly unknown[]).includes(b['permission'])) throw badRequest('permission must be view, edit or manage.')
+  // A permission set (2b) decides the level and hide-passwords; without one,
+  // the older permission and hidePasswords fields still work.
+  const set = b['set'] !== undefined ? await findSet(app, orgId, b['set']) : null
+  if (!set && !(PERMISSIONS as readonly unknown[]).includes(b['permission'])) throw badRequest('permission must be view, edit or manage.')
   const existing = await access(app, orgId, collectionId, target)
   const keyBlob = b['keyBlob'] === undefined && existing ? existing.keyBlob : requireSharedKey(b['keyBlob'], 'keyBlob')
   const a: Access = {
     pk: orgPk(orgId), sk: accessSk(collectionId, target), collectionId, userId: target, keyBlob,
     keyVersion: b['keyBlob'] === undefined && existing ? existing.keyVersion : c.keyVersion,
-    permission: b['permission'] as Permission, hidePasswords: b['hidePasswords'] === true,
+    permission: set ? set.level : b['permission'] as Permission, hidePasswords: set ? !set.reveal : b['hidePasswords'] === true,
+    ...(set ? { set: set.id } : {}),
     ...(typeof b['viaGroup'] === 'string' && isValidId(b['viaGroup']) ? { viaGroup: b['viaGroup'] } : existing?.viaGroup ? { viaGroup: existing.viaGroup } : {}),
     // A new key blob carries its own signature; a permission change keeps the old one.
     ...(b['keyBlob'] === undefined && existing?.signature && existing.signedBy ? { signature: existing.signature, signedBy: existing.signedBy } : signed(b['signature'], userId)),
@@ -854,7 +896,7 @@ export async function groups(app: App, userId: string, orgId: string): Promise<L
   const ga = rows.filter((r) => r.sk.startsWith(GROUP_ACCESS_PREFIX)) as GroupAccess[]
   return json(200, { groups: gs.map((g) => ({
     id: g.id, nameBlob: g.nameBlob, members: g.members,
-    collections: ga.filter((x) => x.groupId === g.id).map((x) => ({ collectionId: x.collectionId, permission: x.permission, hidePasswords: x.hidePasswords })),
+    collections: ga.filter((x) => x.groupId === g.id).map((x) => ({ collectionId: x.collectionId, permission: x.permission, hidePasswords: x.hidePasswords, ...(x.set ? { set: x.set } : {}) })),
   })) })
 }
 
@@ -885,7 +927,7 @@ export async function addGroupMember(app: App, userId: string, orgId: string, gr
   if (t.pendingGroups?.includes(groupId)) await app.store.put({ ...t, pendingGroups: t.pendingGroups.filter((x) => x !== groupId) })
   // The client now seals the group's collections to them (grantAccess with viaGroup).
   const pendingCollections = ((await app.store.query(orgPk(orgId), GROUP_ACCESS_PREFIX)) as GroupAccess[]).filter((x) => x.groupId === groupId)
-  return json(200, { ok: true, collections: pendingCollections.map((x) => ({ collectionId: x.collectionId, permission: x.permission, hidePasswords: x.hidePasswords })) })
+  return json(200, { ok: true, collections: pendingCollections.map((x) => ({ collectionId: x.collectionId, permission: x.permission, hidePasswords: x.hidePasswords, ...(x.set ? { set: x.set } : {}) })) })
 }
 
 export async function removeGroupMember(app: App, userId: string, orgId: string, groupId: string, target: string): Promise<LambdaResponse> {
@@ -901,9 +943,11 @@ export async function grantGroup(app: App, userId: string, event: LambdaEvent, o
   const { c } = await requireAccess(app, orgId, collectionId, userId, 'manage')
   const g = await requireGroup(app, orgId, groupId)
   const b = body(event)
-  if (!(PERMISSIONS as readonly unknown[]).includes(b['permission'])) throw badRequest('permission must be view, edit or manage.')
-  const permission = b['permission'] as Permission
-  const hidePasswords = b['hidePasswords'] === true
+  const set = b['set'] !== undefined ? await findSet(app, orgId, b['set']) : null
+  if (!set && !(PERMISSIONS as readonly unknown[]).includes(b['permission'])) throw badRequest('permission must be view, edit or manage.')
+  const permission = set ? set.level : b['permission'] as Permission
+  const hidePasswords = set ? !set.reveal : b['hidePasswords'] === true
+  const setField = set ? { set: set.id } : {}
   const sealed = (Array.isArray(b['grants']) ? b['grants'] : []) as Record<string, unknown>[]
   const need: string[] = []
   for (const m of g.members) if (!(await access(app, orgId, collectionId, m))) need.push(m)
@@ -911,9 +955,9 @@ export async function grantGroup(app: App, userId: string, event: LambdaEvent, o
   const sigs = new Map(sealed.map((x) => [String(x['userId']), signed(x['signature'], userId)]))
   const missing = need.filter((m) => !given.has(m))
   if (missing.length) throw new HttpError(409, 'conflict', 'The group\'s members changed; reload and try again.')
-  await app.store.put({ pk: orgPk(orgId), sk: groupAccessSk(collectionId, groupId), collectionId, groupId, permission, hidePasswords })
+  await app.store.put({ pk: orgPk(orgId), sk: groupAccessSk(collectionId, groupId), collectionId, groupId, permission, hidePasswords, ...setField })
   for (const m of need) {
-    await app.store.put({ pk: orgPk(orgId), sk: accessSk(collectionId, m), collectionId, userId: m, keyBlob: given.get(m)!, keyVersion: c.keyVersion, permission, hidePasswords, viaGroup: groupId, ...sigs.get(m) } as Access)
+    await app.store.put({ pk: orgPk(orgId), sk: accessSk(collectionId, m), collectionId, userId: m, keyBlob: given.get(m)!, keyVersion: c.keyVersion, permission, hidePasswords, viaGroup: groupId, ...setField, ...sigs.get(m) } as Access)
   }
   await orgEvent(app, orgId, userId, 'access.grant-group', { collectionId, target: groupId })
   return json(200, { ok: true, granted: need.length })
@@ -1095,5 +1139,43 @@ export async function getTrust(app: App, userId: string, orgId: string): Promise
 export async function putTrust(app: App, userId: string, event: LambdaEvent, orgId: string): Promise<LambdaResponse> {
   await requireMember(app, orgId, userId)
   await app.store.put({ pk: userPk(userId), sk: `TRUST#${orgId}`, blob: requireSealed(body(event)['blob'], 'blob', 4096) })
+  return json(200, { ok: true })
+}
+
+// ── Permission sets: list, save, remove (2b) ───────────────────────────────────
+
+export async function listPermissionSets(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { confirmed: true })
+  return json(200, { sets: [...BUILTIN_SETS, ...(await customSets(app, orgId))] })
+}
+
+export async function putPermissionSet(app: App, userId: string, event: LambdaEvent, orgId: string, setId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  if (BUILTIN_SETS.some((x) => x.id === setId)) throw badRequest('The built-in sets cannot be changed.')
+  if (!isValidId(setId)) throw notFound()
+  const b = body(event)
+  const name = label(b['name'], 'name')
+  if (!name) throw badRequest('name is required.')
+  if (!(PERMISSIONS as readonly unknown[]).includes(b['level'])) throw badRequest('level must be view, edit or manage.')
+  const existing = await customSets(app, orgId)
+  if (!existing.some((x) => x.id === setId) && existing.length >= MAX_SETS) throw badRequest(`At most ${MAX_SETS} permission sets.`)
+  if ([...BUILTIN_SETS, ...existing].some((x) => x.id !== setId && x.name.toLowerCase() === name.toLowerCase())) throw conflict('A permission set with that name exists.')
+  const set = { id: setId, name, level: b['level'] as Permission, reveal: b['reveal'] === true, fill: b['fill'] !== false, export: b['export'] === true }
+  await app.store.put({ pk: orgPk(orgId), sk: psetSk(setId), ...set })
+  // Grants already given with this set follow it: level and hide-passwords.
+  for (const a of (await app.store.query(orgPk(orgId))).filter((r) => r['set'] === setId)) {
+    await app.store.put({ ...a, permission: set.level, hidePasswords: !set.reveal })
+  }
+  await orgEvent(app, orgId, userId, 'policies.change', { target: `permission set ${name}` })
+  return json(200, { set })
+}
+
+export async function deletePermissionSet(app: App, userId: string, orgId: string, setId: string): Promise<LambdaResponse> {
+  await requireMember(app, orgId, userId, { admin: true })
+  if (BUILTIN_SETS.some((x) => x.id === setId)) throw badRequest('The built-in sets cannot be removed.')
+  if (!isValidId(setId)) throw notFound()
+  const inUse = (await app.store.query(orgPk(orgId))).filter((r) => r['set'] === setId && !r.sk.startsWith(PSET_PREFIX)).length
+  if (inUse) throw conflict(`This set is given in ${inUse} place${inUse === 1 ? '' : 's'}. Change those first.`)
+  await app.store.delete(orgPk(orgId), psetSk(setId))
   return json(200, { ok: true })
 }

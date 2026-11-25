@@ -1097,3 +1097,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .account-menu-pop .btn { justify-content: flex-start; }
 .signup-code { margin-top: 12px; }
 .console-prompt { padding-bottom: 0; }
+
+/* Permission sets (decisions/0032, 2b) */
+.set-form { display: grid; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); max-width: 560px; }
+.set-level { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.set-level legend { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.set-hint { margin-top: 8px; }

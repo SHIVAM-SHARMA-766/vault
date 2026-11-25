@@ -15,7 +15,7 @@ import type { Decrypted, Folder, Version } from './model.js'
 import { day, when } from '../../lib/format.js'
 import { t } from '../../lib/i18n.js'
 
-export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean; sensitive?: boolean; onSensitive?: (v: boolean) => Promise<void> }
+export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean; canExport?: boolean; sensitive?: boolean; onSensitive?: (v: boolean) => Promise<void> }
 
 export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
@@ -152,7 +152,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
       ) : null}
 
       {shared && !readOnly ? (
-        <p className="muted small shared-note">Shared in {shared.where}. <button className="link" onClick={onUnshare}>Move to my vault</button></p>
+        <p className="muted small shared-note">Shared in {shared.where}.{shared.canExport !== false ? <> <button className="link" onClick={onUnshare}>Move to my vault</button></> : null}</p>
       ) : null}
       {shared?.onSensitive ? (
         <label className="check sensitive-toggle"><input type="checkbox" checked={!!shared.sensitive} onChange={(e) => void shared.onSensitive!(e.target.checked)} />

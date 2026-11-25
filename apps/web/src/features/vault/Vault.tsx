@@ -480,6 +480,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
             <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
                          shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? {
                            where: (c.direct ? c.name : `${c.orgName} / ${c.name}`), permission: sh.permission, hidePasswords: sh.hidePasswords, sensitive: !!sh.sensitive,
+                           // Taking an item out of the organization is an export (2b).
+                           canExport: sh.rights ? sh.rights.export : sh.permission !== 'view',
                            ...(sh.permission === 'manage' ? { onSensitive: async (v: boolean) => {
                              try { await api.orgs.setSensitive(await session.token(), sh.orgId, sh.collectionId, sh.id, v); await teams.load(); toast(v ? 'Marked sensitive: admins are told when it is opened' : 'No longer sensitive') }
                              catch (err) { toast(err instanceof Error ? err.message : 'Could not change it.', 'error') }
