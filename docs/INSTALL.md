@@ -139,12 +139,12 @@ docker compose logs vault | grep -A6 "First-run setup"
   └───────────────────────────────────────────────────────────────
 ```
 
-Open it and create your account; it becomes the **owner**, with the admin panel (called
+Open it and create your account; it becomes the **owner**, with the admin console (called
 **Server settings** in a personal Vault). **Save the
 recovery key it shows** — nobody, including you as the server's operator, can reset a
 forgotten master password.
 
-Then, in the admin panel's **Overview → Name and support**, give the server a name and a support
+Then, in the admin console's **Overview → Name and support**, give the server a name and a support
 address. Both are shown on the sign-in screen and the help page, and the support address becomes
 the Reply-To of every email Vault sends — so people who reply to an invitation or a sign-in
 notice reach you, not the no-reply sender.
@@ -168,11 +168,11 @@ when something goes wrong.
 
 *Business and hosted editions.*
 
-The admin panel's Overview starts with **Finish setting up**: two-factor for you, a name and
+The admin console's Overview starts with **Finish setting up**: two-factor for you, a name and
 support address, mail, a recent backup, registration not open, and your first invitations. Each
 item ticks itself off.
 
-Admin panel → **Invitations** → who it is for, how long it lasts, and the role they start
+Admin console → **Invitations** → who it is for, how long it lasts, and the role they start
 with. With [mail](#mail) set up, enter their address and they get the code and a link;
 otherwise copy the code to them yourself. Registration stays closed to everyone else
 (Overview → Registration: Closed / Invite only / Open).
@@ -185,7 +185,7 @@ registration is *Invite only* or *Open*; Vault warns if it is closed.
 ### Requests from people outside
 
 The sign-in screen lets anyone ask for access, or for help when locked out of their
-authenticator. Both land in the admin panel's **Service desk**. Approving an access request
+authenticator. Both land in the admin console's **Service desk**. Approving an access request
 issues an invitation in one click; resetting two-factor sign-in is for admins only, after you
 have confirmed who is asking through another channel. Give someone the **Support** role to
 work the queue without access to accounts.
@@ -210,7 +210,7 @@ flowchart LR
   protects the server secrets and the structure of the data.
 - For S3, create a key that can **only write objects in that bucket**, and set a lifecycle
   rule on the bucket to expire old backups.
-- The admin panel's Overview shows when the last backup was taken.
+- The admin console's Overview shows when the last backup was taken.
 
 Take one now:
 
@@ -237,7 +237,7 @@ restored is not a backup.
 
 Set `SMTP_HOST`, `SMTP_PORT` (587 or 465), `SMTP_USER`, `SMTP_PASSWORD` and `MAIL_FROM`. Vault
 then emails invitations, sends a notice on each sign-in (and always when a recovery key is
-used), and the admin panel's Overview has **Send test**. Plain-text SMTP is refused.
+used), and the admin console's Overview has **Send test**. Plain-text SMTP is refused.
 
 Vault does not store email addresses — only keyed digests — so it mails someone only when a
 request carries their address, and does not keep it.

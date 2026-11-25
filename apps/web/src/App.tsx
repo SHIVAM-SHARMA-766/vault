@@ -23,7 +23,7 @@ import { forgetIdentity } from './features/orgs/model.js'
 
 // Screens most visits never open load on demand, so unlocking the vault does
 // not wait for the admin panel, the website editor or import parsers.
-const Admin = lazy(() => import('./features/admin/Admin.js').then((m) => ({ default: m.Admin })))
+const Console = lazy(() => import('./features/console/Console.js').then((m) => ({ default: m.Console })))
 const Settings = lazy(() => import('./features/settings/Settings.js').then((m) => ({ default: m.Settings })))
 const Transfer = lazy(() => import('./features/transfer/Transfer.js').then((m) => ({ default: m.Transfer })))
 const Support = lazy(() => import('./features/desk/Support.js').then((m) => ({ default: m.Support })))
@@ -91,12 +91,8 @@ function Signed({ state }: { state: session.Unlocked }) {
   if (route.name === 'transfer') return <Suspense fallback={<Loading />}><Transfer state={state} /></Suspense>
   if (route.name === 'support' && features.serviceDesk) return <Suspense fallback={<Loading />}><Support state={state} /></Suspense>
   if (route.name === 'orgs' && features.organizations) return <Suspense fallback={<Loading />}><Orgs state={state} /></Suspense>
-  if (route.name === 'admin') {
-    // The role arrives a moment after unlock; until it does, say so rather
-    // than flash the vault or a refusal.
-    if (state.role === undefined) return <div className="boot">Loading…</div>
-    if (state.isAdmin) return <Suspense fallback={<Loading />}><Admin state={state} tab={route.tab} /></Suspense>
-  }
+  // The admin console (decisions/0031): it decides what this account may manage.
+  if (route.name === 'console') return <Suspense fallback={<Loading />}><Console state={state} route={route} /></Suspense>
   return <Vault state={state} />
 }
 
@@ -109,8 +105,8 @@ function AuthScreen() {
   const [view, setView] = useState<AuthView>(setupCode || inviteCode ? 'register' : 'unlock')
   // /app/admin is the admin panel's address. Signing in there is the same
   // sign-in, but the page should say where it leads.
-  const forAdmin = location.pathname.startsWith('/app/admin')
-  const place = forAdmin ? 'Admin panel' : 'Vault'
+  const forAdmin = location.pathname.startsWith('/app/admin') || location.pathname.startsWith('/app/console')
+  const place = forAdmin ? 'Admin console' : 'Vault'
   const instance = useInstance()
   const step = view === 'unlock' ? 'Sign in' : view === 'register' ? 'Create account' : view === 'request-access' ? 'Request access' : view === 'signin-help' ? 'Help signing in' : 'Recover'
 

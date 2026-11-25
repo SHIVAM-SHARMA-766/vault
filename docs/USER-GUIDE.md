@@ -17,7 +17,7 @@ data, taken by `npm run screenshots` (see [Keeping these screenshots current](#k
 - [Sharing with an organization](#sharing-with-an-organization)
 - [Help and support](#help-and-support)
 - [On a phone, and in dark mode](#on-a-phone-and-in-dark-mode)
-- [For owners: the admin panel](#for-owners-the-admin-panel)
+- [For owners: the admin console](#for-owners-the-admin-console)
 - [For staff: the service desk](#for-staff-the-service-desk)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 
@@ -344,25 +344,37 @@ times it can be opened (once, 2, 5, 10, or no limit), then **Create link** and c
 
 *Business and hosted editions. A personal Vault has one account, so it has no one to share with ([0030](../decisions/0030-editions.md)).*
 
-Account menu → **Organizations**.
+Vault keeps using an organization apart from running one
+([0031](../decisions/0031-two-workspaces.md)):
+
+- **My organizations** (account menu) is every member's view. It shows the teams you belong to,
+  what each shares with you, a way to ask for more collections, invitations to accept, your
+  fingerprint, and **New organization**.
+- **Admin console** is for owners and admins. Use the switch at the top, *My vault* |
+  *Admin console*, and choose the organization under **Managing**. Its sections are **Members**,
+  **Groups**, **Collections**, **Policies**, **Activity** and **Recovery & backup**.
 
 <img src="images/organizations.png" alt="Organizations: your fingerprint, an organization's members and collections" width="820">
 
-1. **Create an organization** and add **collections** — "Finance", "Home & streaming".
-2. **Invite** people by email address, and tick the **groups** they should join. They see the
-   invitation when they next sign in, and **Accept**.
-3. **Confirm them.** Ask them to read out the fingerprint shown at the top of their
-   Organizations page — on a call or in person — and press **Confirm…** next to their name.
+1. **Create an organization** under My organizations. You become its owner, see its recovery
+   key once, and land in its Admin console. Add **collections** there, such as "Finance" or
+   "Home & streaming".
+2. **Invite** people by email address under **Members**, and tick the **groups** they should
+   join. They see the invitation when they next sign in, and **Accept** it under My
+   organizations.
+3. **Confirm them.** Ask them to read out the fingerprint shown on their My organizations
+   page — on a call or in person — and press **Confirm…** next to their name in **Members**.
    Confirm only if it matches what you see. This is what stops anyone, the server included,
    from slipping in a key of their own. Confirming also adds them to the groups chosen at
    invitation, with the groups' collections.
-4. Open a collection's **Access** and give confirmed members **Can view**, **Can edit** or
+4. In **Collections**, open a collection's **Access** and give confirmed members **Can view**, **Can edit** or
    **Can manage** (manage lets them share it onward). **Hide passwords** lets someone use a
    login without seeing its password in the app — a policy, not encryption.
 
 **Share with one person.** Open an item, choose **Share**, and type the address of someone
 with an account on this server. Vault makes a private space for the two of you (shown in
-Organizations as a **Direct share**), moves the item into it, and invites them. Once they
+My organizations as a **Direct share**, where you also confirm them), moves the item into it,
+and invites them. Once they
 accept and you confirm their fingerprint, they can open and edit it. Further items shared with
 the same person go into the same space. Removing them works like any member removal.
 
@@ -509,11 +521,13 @@ one in Settings → Preferences; on a phone, the settings sections are the chips
 
 <img src="images/vault-dark.png" alt="The vault in dark mode" width="820">
 
-## For owners: the admin panel
+## For owners: the admin console
 
 *In a personal Vault this is **Server settings**, with only what one person needs: Overview (backups, mail, name, sign-in rules), the audit log and System.*
 
-Staff with a role see **Admin panel** in the account menu. What each role can do:
+Staff with a role see the *My vault* | *Admin console* switch at the top. Under **Managing**,
+choose the server (organizations you run are listed there too). What each role can do on the
+server:
 
 | | Owner | Admin | Support | Marketing | Viewer |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -563,7 +577,7 @@ Every change is in the audit log.
 <details>
 <summary>First-run setup wizard</summary>
 
-On a new server, the owner's first visit to the admin panel opens **Set up this server**. It
+On a new server, the owner's first visit to the admin console opens **Set up this server**. It
 covers the name and support address, who can join (invite only is recommended), sign-in rules
 (two-factor sign-in, strong master passwords, a short auto-lock), whether mail and backups work
 (with a test email), and inviting people. Any step can be skipped, and **Step by step…** on the
@@ -573,7 +587,7 @@ Overview checklist opens it again.
 <details>
 <summary>Someone leaves: Offboard</summary>
 
-Admin panel → **Users** → **Offboard** does everything at once: the account is disabled,
+Admin console → **Users** → **Offboard** does everything at once: the account is disabled,
 signed out on every device, and taken out of every organization. Each organization re-keys
 what they could open and lists the shared passwords they could see for colleagues to change.
 It is refused while the person owns an organization: hand it over or delete it first.
@@ -595,7 +609,7 @@ sign-in page, at the top of the app and on share-link pages.
 <details>
 <summary>System: backups, emails, rate limits</summary>
 
-Admin panel → **System**:
+Admin console → **System**:
 
 - **Server backups** shows how the host is set up (how often, how many kept, where, and when
   the last one ran) and has **Back up now**. The settings themselves (`BACKUP_PASSPHRASE`,
@@ -612,7 +626,7 @@ Admin panel → **System**:
 <details>
 <summary>Organizations (operator view)</summary>
 
-<img src="images/admin-orgs.png" alt="The admin panel's organizations list, by counts" width="820">
+<img src="images/admin-orgs.png" alt="The admin console's organizations list, by counts" width="820">
 
 Every organization on the server, by counts and the name its creator typed. You can delete one
 (recorded in the audit log); you cannot open anything in it.
@@ -631,7 +645,7 @@ escaped, never run, because the website shares its address with the vault.
 A **Support** role works the service desk and issues invitations, and can change nothing
 else.
 
-Nobody in the admin panel — the owner included — can read anyone's vault.
+Nobody in the admin console — the owner included — can read anyone's vault.
 
 ## For staff: the service desk
 
@@ -639,7 +653,7 @@ Nobody in the admin panel — the owner included — can read anyone's vault.
 
 <img src="images/desk.png" alt="The service desk queue: an access request and a support ticket, with filters" width="820">
 
-Admin panel → **Service desk**. Filters show what needs attention, what is waiting on the
+Admin console → **Service desk**. Filters show what needs attention, what is waiting on the
 requester, and what is resolved or closed.
 
 <img src="images/desk-ticket.png" alt="A ticket: the conversation on the left; requester, status, priority and assignment on the right" width="820">

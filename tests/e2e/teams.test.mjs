@@ -9,7 +9,7 @@ import { start } from './helpers.mjs'
 
 async function orgsPage(s, page) {
   await s.menu(page, 'Organizations')
-  await page.waitForSelector('h1:has-text("Organizations")')
+  await page.waitForSelector('h1:has-text("My organizations")')
 }
 
 test('share a collection between two people, confirmed by fingerprint, then remove one', async () => {
@@ -25,12 +25,15 @@ test('share a collection between two people, confirmed by fingerprint, then remo
     await alice.getByLabel('I have stored it somewhere safe').check()
     await alice.getByRole('button', { name: 'Done' }).click()
     await alice.waitForSelector('.org-card h2:has-text("Acme")')
+    // Managed from the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()
     await alice.waitForSelector('.collection-row:has-text("Finance")')
 
     const bob = await s.person()
     await s.register(bob, 'bob@example.test')
+    await s.manage(alice, 'Acme', 'Members')
     await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
     await alice.fill('input[aria-label="Name for this member"]', 'Bob')
     await alice.getByRole('button', { name: 'Invite', exact: true }).click()
@@ -44,13 +47,14 @@ test('share a collection between two people, confirmed by fingerprint, then remo
     const bobFingerprint = (await bob.textContent('.fingerprint code')).trim()
 
     // Alice confirms him after comparing fingerprints.
-    await alice.reload(); await s.unlock(alice, 'alice@example.test'); await orgsPage(s, alice)
+    await alice.reload(); await s.unlock(alice, 'alice@example.test'); await s.manage(alice, 'Acme', 'Members')
     await alice.locator('.device-row', { hasText: 'Bob' }).getByRole('button', { name: 'Confirm…' }).click()
     assert.equal((await alice.textContent('.confirm .fingerprint code')).trim(), bobFingerprint, 'Alice sees exactly the fingerprint Bob reads out')
     await alice.getByRole('button', { name: 'It matches — confirm' }).click()
     await alice.waitForSelector('.device-row:has-text("Bob") >> text=confirmed')
 
     // Alice gives Bob view access to Finance.
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.locator('.collection-row', { hasText: 'Finance' }).getByRole('button', { name: 'Access' }).click()
     await alice.selectOption('select[aria-label="Member"]', { label: 'Bob' })
     await alice.getByRole('button', { name: 'Share', exact: true }).click()
@@ -77,13 +81,14 @@ test('share a collection between two people, confirmed by fingerprint, then remo
     assert.equal(await bob.getByRole('button', { name: 'Edit' }).isDisabled(), true)
 
     // Alice removes Bob; he loses the collection. First, the audit shows he opened it.
-    await orgsPage(s, alice)
-    await alice.getByRole('button', { name: 'Activity…' }).click()
+    await s.manage(alice, 'Acme', 'Activity')
     await alice.waitForSelector('.audit li:has-text("Bob opened AWS root in Finance")')
+    await s.manage(alice, 'Acme', 'Members')
     alice.once('dialog', (d) => d.accept())
     await alice.getByRole('button', { name: 'Remove Bob' }).click()
     // Removal re-keys the collection automatically: Bob's old key is retired.
     await alice.waitForSelector('text=1 of 1 collection key(s) rotated')
+    await s.manage(alice, 'Acme', 'Collections')
     assert.equal(await alice.locator('.collection-row:has-text("Key rotation due")').count(), 0)
     await s.menu(alice, 'Vault')
     await alice.getByRole('button', { name: /Finance/ }).click()

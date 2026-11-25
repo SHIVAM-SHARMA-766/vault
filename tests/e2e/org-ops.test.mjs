@@ -19,6 +19,8 @@ test('an organization backup opens in Import & export, each collection a folder'
     await alice.getByLabel('I have stored it somewhere safe').check()
     await alice.getByRole('button', { name: 'Done' }).click()
     await alice.waitForSelector('.org-card h2:has-text("Acme")')
+    // Managed from the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()
     await alice.waitForSelector('.collection-row:has-text("Finance")')
@@ -34,7 +36,7 @@ test('an organization backup opens in Import & export, each collection a folder'
     await alice.getByRole('button', { name: 'Move to collection' }).click()
     await alice.waitForSelector('.badge-shared:has-text("Acme / Finance")')
 
-    await s.menu(alice, 'Organizations')
+    await s.manage(alice, 'Acme', 'Recovery & backup')
     await alice.getByRole('button', { name: 'Back up this organization…' }).click()
     await alice.waitForSelector('text=1 item in 1 collection')
     await alice.getByLabel('Backup password', { exact: true }).fill('an organization backup password')

@@ -164,8 +164,8 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     <form onSubmit={submit} noValidate={false}>
       {forAdmin ? (
         <>
-          <h2 className="auth-title">Sign in to the admin panel</h2>
-          <p className="auth-sub">Use your Vault account. What you can do in the panel depends on the role the owner gave you.</p>
+          <h2 className="auth-title">Sign in to the admin console</h2>
+          <p className="auth-sub">Use your Vault account. What you can manage depends on your role: the server, or the organizations you run.</p>
         </>
       ) : (
         <>

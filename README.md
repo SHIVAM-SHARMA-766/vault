@@ -176,7 +176,7 @@ Kit. A full copy of the server then gives nothing to guess against.
 </details>
 
 <details>
-<summary><b>Website editor</b> in the admin panel</summary>
+<summary><b>Website editor</b> in the admin console</summary>
 <br>
 <img src="docs/images/admin-website.png" alt="The website editor" width="860">
 </details>
@@ -261,7 +261,7 @@ npm run openapi --workspace @vault/api   # regenerate docs/openapi.json
 | [`packages/crypto/`](packages/crypto/) | Every cryptographic operation. Zero dependencies |
 | [`packages/core/`](packages/core/) | Item model, search, import/export, password health. Shared by every client, no UI |
 | [`services/api/`](services/api/) | The API, its storage adapters, and its OpenAPI generator |
-| [`apps/web/`](apps/web/) | The vault client and the admin panel, at `/app/` |
+| [`apps/web/`](apps/web/) | The vault client and the admin console, at `/app/` |
 | [`apps/site/`](apps/site/) | The public website: templates, editable content, renderer |
 | [`apps/extension/`](apps/extension/) | The browser extension for Chrome and Firefox |
 | [`services/`](services/) | Backup and restore drill, release pull agent, health probe |

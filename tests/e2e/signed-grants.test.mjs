@@ -24,9 +24,12 @@ test('a swapped or unsigned grant is refused after signing; honest grants open',
     await alice.waitForSelector('#ork-title')
     await alice.getByLabel('I have stored it somewhere safe').check()
     await alice.getByRole('button', { name: 'Done' }).click()
+    // Managed from the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()
     await alice.waitForSelector('.collection-row:has-text("Finance")')
+    await s.manage(alice, 'Acme', 'Members')
     await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
     await alice.fill('input[aria-label="Name for this member"]', 'Bob')
     await alice.getByRole('button', { name: 'Invite', exact: true }).click()
@@ -35,7 +38,7 @@ test('a swapped or unsigned grant is refused after signing; honest grants open',
     await bob.waitForSelector('text=An admin must confirm you')
 
     await alice.reload(); await s.unlock(alice, 'alice@example.test')
-    await s.menu(alice, 'Organizations')
+    await s.manage(alice, 'Acme', 'Members')
     await alice.locator('.device-row', { hasText: 'Bob' }).getByRole('button', { name: 'Confirm…' }).click()
     // The fingerprint Alice compares is the same one Bob sees: both keys.
     const shownToAlice = (await alice.textContent('.confirm .fingerprint code')).trim()
@@ -44,6 +47,7 @@ test('a swapped or unsigned grant is refused after signing; honest grants open',
     assert.equal(shownToAlice, bobsOwn)
     await alice.getByRole('button', { name: 'It matches — confirm' }).click()
     await alice.waitForSelector('text=Bob confirmed', { state: 'attached' })
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.locator('.collection-row', { hasText: 'Finance' }).getByRole('button', { name: 'Access' }).click()
     await alice.selectOption('select[aria-label="Member"]', { label: 'Bob' })
     await alice.getByRole('button', { name: 'Share', exact: true }).click()

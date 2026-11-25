@@ -86,10 +86,26 @@ export async function start({ owner = 'owner@example.test', edition = 'hosted' }
     await page.waitForSelector('.topbar', { timeout: 60_000 })
   }
 
-  /** Opens a screen from the account menu (Vault, Account settings, Admin panel). */
+  /** Opens a screen from the account menu (Vault, Account settings, Admin
+   *  console…). The names from before the admin console (decisions/0031)
+   *  still work: Organizations is My organizations, Admin panel the console. */
   async function menu(page, item) {
+    const name = { Organizations: 'My organizations', 'Admin panel': 'Admin console' }[item] ?? item
     await page.getByRole('button', { name: 'Account menu' }).click()
-    await page.getByRole('menuitem', { name: item }).click()
+    await page.getByRole('menuitem', { name }).click()
+  }
+
+  /** Opens one section of an organization in the admin console (Members,
+   *  Groups, Collections, Policies, Activity, Recovery & backup). */
+  async function manage(page, org, section = 'Members') {
+    await menu(page, 'Admin console')
+    await page.waitForSelector('.console-layout')
+    const picker = page.locator('.sidebar select#scope')
+    if (await picker.count()) await picker.selectOption({ label: org })
+    else await page.locator('.sidebar .scope-name', { hasText: org }).waitFor()
+    await page.locator('.console-layout .sidebar .side-item', { hasText: section }).click()
+    await page.waitForSelector(`.console-org h1:has-text("${section}")`)
+    await page.locator(`.admin-main .org-card[aria-label="${org}"]`).first().waitFor()
   }
 
   /** Opens a section of Account settings (Account, Security, Preferences,
@@ -107,5 +123,5 @@ export async function start({ owner = 'owner@example.test', edition = 'hosted' }
     stack.kill()
   }
 
-  return { base, person, register, unlock, menu, settings, setRegistration, errors, stop, log: () => log }
+  return { base, person, register, unlock, menu, manage, settings, setRegistration, errors, stop, log: () => log }
 }

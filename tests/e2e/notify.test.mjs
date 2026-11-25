@@ -8,7 +8,7 @@ import { start } from './helpers.mjs'
 
 async function orgsPage(s, page) {
   await s.menu(page, 'Organizations')
-  await page.waitForSelector('h1:has-text("Organizations")')
+  await page.waitForSelector('h1:has-text("My organizations")')
 }
 
 async function openBell(page, s, email) {
@@ -34,9 +34,12 @@ test('invite, accept, ask for a collection, check it out, and a sensitive item o
     await alice.getByLabel('I have stored it somewhere safe').check()
     await alice.getByRole('button', { name: 'Done' }).click()
     await alice.waitForSelector('.org-card h2:has-text("Acme")')
+    // Managed from the admin console (decisions/0031).
+    await s.manage(alice, 'Acme', 'Collections')
     await alice.fill('input[aria-label="New collection name"]', 'Finance')
     await alice.getByRole('button', { name: 'Add collection' }).click()
     await alice.waitForSelector('.collection-row:has-text("Finance")')
+    await s.manage(alice, 'Acme', 'Members')
     await alice.fill('input[aria-label="Email to invite"]', 'bob@example.test')
     await alice.fill('input[aria-label="Name for this member"]', 'Bob')
     await alice.getByRole('button', { name: 'Invite', exact: true }).click()

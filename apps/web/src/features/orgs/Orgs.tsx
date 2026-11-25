@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react'
 import { fingerprintOf, loadTrust, saveTrust } from './trust.js'
 
 import { type OrgMember, type OrgPending, type SharePermission, api } from '../../lib/api.js'
-import { Link } from '../../lib/router.js'
+import { Link, href, navigate } from '../../lib/router.js'
+import { refreshScopes } from '../../lib/workspace.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconFolder, IconPlus, IconShield, IconUser, IconX } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
@@ -21,7 +22,30 @@ export function Orgs({ state }: { state: session.Unlocked }) {
   const toast = useToast()
   const teams = useTeams(state.vaultKey)
   const [name, setName] = useState('')
-  const [showKey, setShowKey] = useState<{ org: string; key: string } | null>(null)
+  const [showKey, setShowKey] = useState<{ org: string; key: string; id: string } | null>(null)
+  const newcomer = teams.orgs.length === 0 && teams.invitations.length === 0
+  const fingerprint = (
+        <section className="settings-card" aria-labelledby="o-fp">
+          <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
+          <p className="muted small">When you join an organization, an admin confirms you by checking this matches what they see. Read it to them on a call or in person — not by email or chat.</p>
+          <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
+        </section>
+  )
+  const newOrg = (
+        <form className="settings-card" aria-labelledby="o-new" onSubmit={async (e) => {
+          e.preventDefault()
+          try {
+            const made = await teams.createOrg(name.trim(), state.email.split('@')[0]!)
+            refreshScopes()
+            setShowKey({ org: name.trim(), key: made.recoveryKey, id: made.id }); setName(''); toast('Organization created')
+          } catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
+        }}>
+          <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">New organization</h2></div>
+          <div className="field"><label htmlFor="o-name">Name</label><input id="o-name" required maxLength={80} placeholder="e.g. Acme Finance" value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <p className="hint">You become its owner and manage it from the <strong>Admin console</strong>. The name is encrypted for members; people you invite see it in their invitation.</p>
+          <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={!name.trim()}>Create</button></div>
+        </form>
+  )
 
   return (
     <Shell state={state}>
@@ -29,10 +53,10 @@ export function Orgs({ state }: { state: session.Unlocked }) {
         <div className="settings-head">
           <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
             <li><Link to="/app/">Vault</Link></li>
-            <li aria-current="page">Organizations</li>
+            <li aria-current="page">My organizations</li>
           </ol>
-          <h1>Organizations</h1>
-          <p className="muted">Share collections of items with people you work with. Everything shared is encrypted to each person's own key; the server cannot read it.</p>
+          <h1>My organizations</h1>
+          <p className="muted">The teams you belong to and what they share with you. Shared items are used from your vault, under <strong>Shared</strong>; everything is encrypted to your own key.</p>
         </div>
 
         {teams.error ? <p className="alert alert-error"><IconAlert size={16} />{teams.error}</p> : null}
@@ -54,88 +78,137 @@ export function Orgs({ state }: { state: session.Unlocked }) {
           </section>
         ) : null}
 
-        {teams.orgs.map((o) => <OrgCard key={o.id} org={o} teams={teams} selfId={state.userId} />)}
+        {teams.orgs.map((o) => <MemberCard key={o.id} org={o} teams={teams} />)}
 
-        <form className="settings-card" aria-labelledby="o-new" onSubmit={async (e) => {
-          e.preventDefault()
-          try { const made = await teams.createOrg(name.trim(), state.email.split('@')[0]!); setShowKey({ org: name.trim(), key: made.recoveryKey }); setName(''); toast('Organization created') }
-          catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
-        }}>
-          <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">New organization</h2></div>
-          <div className="field"><label htmlFor="o-name">Name</label><input id="o-name" required maxLength={80} placeholder="e.g. Acme Finance" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <p className="hint">The name is encrypted for members. People you invite see it in their invitation before they join.</p>
-          <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={!name.trim()}>Create</button></div>
-        </form>
-
-        <section className="settings-card" aria-labelledby="o-fp">
-          <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
-          <p className="muted small">When you join an organization, an admin confirms you by checking this matches what they see. Read it to them on a call or in person — not by email or chat.</p>
-          <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
-        </section>
+        {/* Someone in no organization yet sees how to start one first; someone in
+            one needs their fingerprint first, for the admins who confirm them. */}
+        {newcomer ? <>{newOrg}{fingerprint}</> : <>{fingerprint}{newOrg}</>}
       </main>
-      {showKey ? <RecoveryKeyShown org={showKey.org} recoveryKey={showKey.key} onDone={() => setShowKey(null)} /> : null}
+      {showKey ? <RecoveryKeyShown org={showKey.org} recoveryKey={showKey.key} onDone={() => { const id = showKey.id; setShowKey(null); navigate(href({ name: 'console', scope: 'org', org: id, section: 'members' })) }} /> : null}
     </Shell>
   )
 }
 
-function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: string }) {
-  const toast = useToast()
-  const admin = org.status === 'confirmed' && org.role !== 'member'
-  const [members, setMembers] = useState<OrgMember[]>([])
-  const [pending, setPending] = useState<OrgPending[]>([])
-  const [confirming, setConfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
-  const [reconfirming, setReconfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
-  const [email, setEmail] = useState('')
-  const [label, setLabel] = useState('')
-  const [inviteGroups, setInviteGroups] = useState<string[]>([])
-  const [collName, setCollName] = useState('')
-  const [groupsList, setGroupsList] = useState<GroupView[]>([])
+/** One organization, as a member sees it: what it requires, the collections it
+ *  shares with you and asking for more. Admins manage it in the console. */
+function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
+  const admin = org.status === 'confirmed' && org.role !== 'member' && org.kind !== 'direct'
   const colls = teams.collections.filter((c) => c.orgId === org.id)
-
-  const loadMembers = async () => {
-    if (org.status !== 'confirmed') return
-    const r = await api.orgs.members(await session.token(), org.id)
-    setMembers(r.members); setPending(r.pending)
-  }
-  useEffect(() => { void loadMembers() }, [org.id, org.status])
+  const mine = colls.filter((c) => c.permission)
+  const others = colls.filter((c) => !c.permission)
 
   if (org.status !== 'confirmed') {
     return (
-      <section className="settings-card">
+      <section className="settings-card org-card" aria-label={org.name}>
         <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill">Waiting</span></div>
         <p className="muted small">You have joined. An admin must confirm you — by checking your fingerprint (below) — before anything is shared with you.</p>
         <OrgRecovery org={org} teams={teams} />
       </section>
     )
   }
+  // A direct share (D11) made by this account: confirming the other person
+  // happens here, not in the admin console, which is for organizations.
+  if (org.kind === 'direct' && org.role !== 'member') return <DirectShare org={org} teams={teams} />
+  return (
+    <section className="settings-card org-card" aria-label={org.name}>
+      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>
+        {org.kind === 'direct' ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span> : <span className="pill pill-accent">{org.role}</span>}
+      </div>
+      {org.policyGap ? <p className="alert alert-warn"><IconAlert size={16} />{org.policyGap} Until then, its collections stay closed to you.</p> : <PolicySummary org={org} />}
+      {org.ownerChanged ? <OwnerChanged org={org} teams={teams} /> : null}
+      {admin ? (
+        <p className="org-manage"><Link className="btn btn-secondary btn-sm" to={href({ name: 'console', scope: 'org', org: org.id, section: 'members' })}>Manage {org.name} in the Admin console</Link></p>
+      ) : null}
+
+      <h3 className="small-head">Shared with you</h3>
+      {mine.length === 0 ? <p className="muted small">Nothing yet. An admin gives you collections; ask for one below.</p> : (
+        <ul className="device-list">{mine.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} />)}</ul>
+      )}
+      {others.length ? (
+        <>
+          <h3 className="small-head">Other collections</h3>
+          <ul className="device-list">{others.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} />)}</ul>
+        </>
+      ) : null}
+      {!admin ? <details className="org-more"><summary className="small">If every owner is locked out</summary><OrgRecovery org={org} teams={teams} /></details> : null}
+    </section>
+  )
+}
+
+function DirectShare({ org, teams }: { org: OrgView; teams: Teams }) {
+  const people = useOrgPeople(org, teams)
+  return <OrgMembers org={org} teams={teams} selfId={session.get()?.userId ?? ''} people={people} direct />
+}
+
+function OwnerChanged({ org, teams }: { org: OrgView; teams: Teams }) {
+  const toast = useToast()
+  return (
+    <div className="alert alert-warn" role="alert"><IconAlert size={16} />
+      <span><strong>The owner&apos;s key changed.</strong> Keys they share are not trusted until you check: ask the owner to read you their fingerprint (My organizations → Your fingerprint), and compare it with the one in this organization&apos;s member list. <button className="link" onClick={async () => { await resetOwnerPin(org.id, teams); toast('The new owner key is trusted') }}>It matches — trust the new key</button></span>
+    </div>
+  )
+}
+
+/** Members, people invited, and groups, loaded together: every admin section
+ *  needs some of them. */
+export function useOrgPeople(org: OrgView | undefined, teams: Teams) {
+  const [members, setMembers] = useState<OrgMember[]>([])
+  const [pending, setPending] = useState<OrgPending[]>([])
+  const [groups, setGroups] = useState<GroupView[]>([])
+  const reload = async () => {
+    if (!org || org.status !== 'confirmed') return
+    const t = await session.token()
+    const [r, g] = await Promise.all([api.orgs.members(t, org.id), api.orgs.groups(t, org.id)])
+    setMembers(r.members); setPending(r.pending)
+    setGroups(await Promise.all(g.groups.map(async (x) => ({ id: x.id, members: x.members, name: await teams.groupName(org.id, x.id, x.nameBlob) }))))
+  }
+  useEffect(() => { void reload() }, [org?.id, org?.status, teams.collections.length])
+  return { members, pending, groups, reload }
+}
+export type OrgPeople = ReturnType<typeof useOrgPeople>
+
+/** The admin's members section: confirming by fingerprint, re-confirming
+ *  after a key change, removing, and inviting. */
+export function OrgMembers({ org, teams, selfId, people, direct = false }: { org: OrgView; teams: Teams; selfId: string; people: OrgPeople; direct?: boolean }) {
+  const toast = useToast()
+  const { members, pending, groups } = people
+  const [confirming, setConfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
+  const [reconfirming, setReconfirming] = useState<{ m: OrgMember; fp: string } | null>(null)
+  const [email, setEmail] = useState('')
+  const [label, setLabel] = useState('')
+  const [inviteGroups, setInviteGroups] = useState<string[]>([])
+  const waiting = members.filter((m) => m.status === 'accepted')
+  // Waiting for confirmation first, then owners and admins, then by name.
+  const rank = (m: OrgMember) => (m.status === 'accepted' ? 0 : m.role === 'owner' ? 1 : m.role === 'admin' ? 2 : 3)
+  const sorted = [...members].sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
 
   return (
     <section className="settings-card org-card" aria-label={org.name}>
-      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>{org.kind === 'direct' ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span> : <span className="pill pill-accent">{org.role}</span>}</div>
+      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2>{direct
+        ? <span className="pill" title="Made by Share with a person: just the two of you">Direct share</span>
+        : <span className="muted small">{members.length} member{members.length === 1 ? '' : 's'}{pending.length ? ` · ${pending.length} invited` : ''}</span>}</div>
+      {waiting.length ? <p className="alert alert-info"><IconAlert size={16} /><span>{waiting.length === 1 ? `${waiting[0]!.label} is` : `${waiting.length} people are`} waiting for you to confirm them. Ask them to read you their fingerprint first.</span></p> : null}
+      {org.ownerChanged ? <OwnerChanged org={org} teams={teams} /> : null}
 
-      {org.policyGap ? <p className="alert alert-warn"><IconAlert size={16} />{org.policyGap} Until then, its collections stay closed to you.</p> : null}
-      {admin ? <PoliciesForm org={org} teams={teams} /> : <PolicySummary org={org} />}
-
-      <h3 className="small-head">Members</h3>
       <ul className="device-list">
-        {members.map((m) => (
+        {sorted.map((m) => (
           <li key={m.userId} className="device-row">
             <div className="device-text">
               <span className="device-name">{m.label}{m.userId === selfId ? <span className="pill">You</span> : null}</span>
               <span className="muted small">{m.role} · {m.status === 'confirmed' ? 'confirmed' : 'waiting for confirmation'}</span>
             </div>
             <div className="device-actions">
-              {admin && m.status === 'accepted' ? (
+              {m.status === 'accepted' ? (
                 <button className="btn btn-primary btn-sm" onClick={async () => setConfirming({ m, fp: await fingerprintOf(m.publicKey, m.currentSigningKey ?? null) })}>Confirm…</button>
               ) : null}
-              {admin && m.status === 'confirmed' && m.currentSigningKey && m.currentSigningKey !== m.signingPublicKey && m.userId !== selfId ? (
+              {m.status === 'confirmed' && m.currentSigningKey && m.currentSigningKey !== m.signingPublicKey && m.userId !== selfId ? (
                 <button className="btn btn-secondary btn-sm" title="Their fingerprint changed: a signing key was added" onClick={async () => setReconfirming({ m, fp: await fingerprintOf(m.publicKey, m.currentSigningKey ?? null) })}>Re-confirm…</button>
               ) : null}
-              {admin && m.role !== 'owner' && m.userId !== selfId ? (
+              {m.role !== 'owner' && m.userId !== selfId ? (
                 <button className="icon-btn icon-danger" aria-label={`Remove ${m.label}`} title="Remove" onClick={async () => {
                   if (!window.confirm(`Remove ${m.label}? They lose access at once.`)) return
                   const r = await api.orgs.removeMember(await session.token(), org.id, m.userId)
-                  await loadMembers(); await teams.load()
+                  await people.reload(); await teams.load()
                   // Re-key what they could open, where this admin can.
                   let rotated = 0
                   for (const cid of r.rotationNeeded) {
@@ -152,8 +225,8 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
         ))}
         {pending.map((p) => (
           <li key={p.id} className="device-row">
-            <div className="device-text"><span className="device-name">{p.label}</span><span className="muted small">invited · has not joined yet{p.groups?.length ? ` · will join ${p.groups.map((g) => groupsList.find((x) => x.id === g)?.name ?? 'a group').join(', ')}` : ''}</span></div>
-            {admin ? <button className="btn btn-secondary btn-sm" onClick={async () => { await api.orgs.withdraw(await session.token(), org.id, p.id); await loadMembers() }}>Withdraw</button> : null}
+            <div className="device-text"><span className="device-name">{p.label}</span><span className="muted small">invited · has not joined yet{p.groups?.length ? ` · will join ${p.groups.map((g) => groups.find((x) => x.id === g)?.name ?? 'a group').join(', ')}` : ''}</span></div>
+            <button className="btn btn-secondary btn-sm" onClick={async () => { await api.orgs.withdraw(await session.token(), org.id, p.id); await people.reload() }}>Withdraw</button>
           </li>
         ))}
       </ul>
@@ -165,16 +238,10 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
           <div className="confirm-actions">
             <button className="btn btn-secondary btn-sm" onClick={() => setReconfirming(null)}>Cancel</button>
             <button className="btn btn-primary btn-sm" onClick={async () => {
-              try { await api.orgs.reconfirm(await session.token(), org.id, reconfirming.m.userId); toast(`${reconfirming.m.label} re-confirmed`); setReconfirming(null); await loadMembers(); await teams.load() }
+              try { await api.orgs.reconfirm(await session.token(), org.id, reconfirming.m.userId); toast(`${reconfirming.m.label} re-confirmed`); setReconfirming(null); await people.reload(); await teams.load() }
               catch (err) { toast(err instanceof Error ? err.message : 'Could not re-confirm.', 'error') }
             }}><IconCheck size={15} />It matches — re-confirm</button>
           </div>
-        </div>
-      ) : null}
-
-      {org.ownerChanged ? (
-        <div className="alert alert-warn" role="alert"><IconAlert size={16} />
-          <span><strong>The owner&apos;s key changed.</strong> Keys they share are not trusted until you check: ask the owner to read you their fingerprint (Organizations → Your fingerprint), and compare it with the one in this organization&apos;s member list. <button className="link" onClick={async () => { await resetOwnerPin(org.id, teams); toast('The new owner key is trusted') }}>It matches — trust the new key</button></span>
         </div>
       ) : null}
 
@@ -196,7 +263,7 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
                   try { await teams.addToGroup(org.id, g, confirming.m.userId, confirming.m.publicKey); joined++ } catch { /* stays pending; add by hand */ }
                 }
                 toast(joined ? `${confirming.m.label} confirmed and added to ${joined} group${joined === 1 ? '' : 's'}` : `${confirming.m.label} confirmed`)
-                setConfirming(null); await loadMembers(); await teams.load()
+                setConfirming(null); await people.reload(); await teams.load()
               }
               catch (err) { toast(err instanceof Error ? err.message : 'Could not confirm.', 'error') }
             }}><IconCheck size={15} />It matches — confirm</button>
@@ -204,56 +271,60 @@ function OrgCard({ org, teams, selfId }: { org: OrgView; teams: Teams; selfId: s
         </div>
       ) : null}
 
-      {admin ? (
-        <form className="inline-form org-invite" onSubmit={async (e) => {
-          e.preventDefault()
-          await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups)
-          toast('Invited. They will see it when they sign in.'); setEmail(''); setLabel(''); setInviteGroups([]); await loadMembers()
-        }}>
+      {direct ? null : <form className="org-invite" onSubmit={async (e) => {
+        e.preventDefault()
+        await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups)
+        toast('Invited. They will see it when they sign in.'); setEmail(''); setLabel(''); setInviteGroups([]); await people.reload()
+      }}>
+        <h3 className="small-head">Invite someone</h3>
+        <div className="inline-form">
           <input type="email" required placeholder="Email to invite" aria-label="Email to invite" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input placeholder="Name (for you)" aria-label="Name for this member" maxLength={80} value={label} onChange={(e) => setLabel(e.target.value)} />
           <button className="btn btn-secondary btn-sm" type="submit">Invite</button>
-          {groupsList.length ? (
-            <fieldset className="invite-groups">
-              <legend className="small muted">Add to groups once confirmed</legend>
-              {groupsList.map((g) => (
-                <label key={g.id} className="check"><input type="checkbox" checked={inviteGroups.includes(g.id)}
-                  onChange={(e) => setInviteGroups(e.target.checked ? [...inviteGroups, g.id] : inviteGroups.filter((x) => x !== g.id))} /><span>{g.name}</span></label>
-              ))}
-            </fieldset>
-          ) : null}
-        </form>
-      ) : null}
-
-      {admin ? <Activity org={org} teams={teams} members={members} /> : null}
-      {admin ? <OrgBackup org={org} teams={teams} /> : null}
-      <OrgRecovery org={org} teams={teams} />
-
-      <Groups org={org} teams={teams} members={members} admin={admin} list={groupsList} setList={setGroupsList} />
-
-      {admin ? <Requests org={org} teams={teams} members={members} /> : null}
-
-      <h3 className="small-head">Collections</h3>
-      {colls.length === 0 ? <p className="muted small">No collections yet.</p> : (
-        <ul className="device-list">
-          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={members} groups={groupsList} />)}
-        </ul>
-      )}
-      {admin ? (
-        <form className="inline-form" onSubmit={async (e) => {
-          e.preventDefault()
-          try { await teams.createCollection(org.id, collName.trim()); setCollName(''); toast('Collection created') }
-          catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
-        }}>
-          <input required placeholder="New collection, e.g. Finance" aria-label="New collection name" maxLength={80} value={collName} onChange={(e) => setCollName(e.target.value)} />
-          <button className="btn btn-secondary btn-sm" type="submit"><IconPlus size={14} />Add collection</button>
-        </form>
-      ) : null}
+        </div>
+        {groups.length ? (
+          <div className="invite-groups" role="group" aria-label="Add to groups once confirmed">
+            <span className="small muted">Add to groups once confirmed:</span>
+            {groups.map((g) => (
+              <label key={g.id} className="check"><input type="checkbox" checked={inviteGroups.includes(g.id)}
+                onChange={(e) => setInviteGroups(e.target.checked ? [...inviteGroups, g.id] : inviteGroups.filter((x) => x !== g.id))} /><span>{g.name}</span></label>
+            ))}
+          </div>
+        ) : null}
+        <p className="hint">They need an account on this server. They accept under My organizations, then you confirm them here by fingerprint.</p>
+      </form>}
     </section>
   )
 }
 
-function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams: Teams; members: OrgMember[]; groups: { id: string; name: string }[] }) {
+/** The admin's collections section: access requests first, then every
+ *  collection with who can open it, then a new one. */
+export function OrgCollections({ org, teams, people }: { org: OrgView; teams: Teams; people: OrgPeople }) {
+  const toast = useToast()
+  const [collName, setCollName] = useState('')
+  const colls = teams.collections.filter((c) => c.orgId === org.id)
+  return (
+    <section className="settings-card org-card" aria-label={org.name}>
+      <div className="settings-card-head"><IconFolder size={18} /><h2>{org.name}</h2><span className="muted small">{colls.length} collection{colls.length === 1 ? '' : 's'}</span></div>
+      <Requests org={org} teams={teams} members={people.members} />
+      {colls.length === 0 ? <p className="muted small">No collections yet. A collection is a shared folder: items moved into it are encrypted to everyone you give it to.</p> : (
+        <ul className="device-list">
+          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={people.members} groups={people.groups} />)}
+        </ul>
+      )}
+      <form className="inline-form" onSubmit={async (e) => {
+        e.preventDefault()
+        try { await teams.createCollection(org.id, collName.trim()); setCollName(''); toast('Collection created') }
+        catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
+      }}>
+        <input required placeholder="New collection, e.g. Finance" aria-label="New collection name" maxLength={80} value={collName} onChange={(e) => setCollName(e.target.value)} />
+        <button className="btn btn-secondary btn-sm" type="submit"><IconPlus size={14} />Add collection</button>
+      </form>
+    </section>
+  )
+}
+
+export function CollectionRow({ c, teams, members, groups, manageable = true }: { c: CollectionView; teams: Teams; members: OrgMember[]; groups: { id: string; name: string }[]; manageable?: boolean }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [grants, setGrants] = useState<{ userId: string; permission: SharePermission; hidePasswords: boolean }[]>([])
@@ -261,7 +332,7 @@ function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams
   const [perm, setPerm] = useState<SharePermission>('view')
   const [hide, setHide] = useState(false)
   const [group, setGroup] = useState('')
-  const manage = c.permission === 'manage'
+  const manage = manageable && c.permission === 'manage'
   const load = async () => setGrants((await api.orgs.access(await session.token(), c.orgId, c.id)).access)
 
   return (
@@ -337,24 +408,19 @@ function CollectionRow({ c, teams, members, groups }: { c: CollectionView; teams
 
 interface GroupView { id: string; name: string; members: string[] }
 
-function Groups({ org, teams, members, admin, list, setList }: {
-  org: OrgView; teams: Teams; members: OrgMember[]; admin: boolean; list: GroupView[]; setList: (l: GroupView[]) => void
-}) {
+export function Groups({ org, teams, people, admin = true }: { org: OrgView; teams: Teams; people: OrgPeople; admin?: boolean }) {
   const toast = useToast()
   const [name, setName] = useState('')
   const [adding, setAdding] = useState<Record<string, string>>({})
-  const load = async () => {
-    const { groups } = await api.orgs.groups(await session.token(), org.id)
-    const named = await Promise.all(groups.map(async (g) => ({ id: g.id, members: g.members, name: await teams.groupName(org.id, g.id, g.nameBlob) })))
-    setList(named)
-  }
-  useEffect(() => { void load() }, [org.id, teams.collections.length])
+  const { members, groups: list } = people
+  const load = people.reload
   const label = (u: string) => members.find((m) => m.userId === u)?.label ?? 'Member'
 
   if (!admin && list.length === 0) return null
   return (
-    <>
-      <h3 className="small-head">Groups</h3>
+    <section className="settings-card org-card" aria-label={org.name}>
+      <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="muted small">{list.length} group{list.length === 1 ? '' : 's'}</span></div>
+      <p className="muted small">A group gives a whole team access to collections at once. People added to a group get its collections; removing them retires their copies of the keys.</p>
       {list.length === 0 ? <p className="muted small">No groups yet. A group lets you give a whole team access to a collection at once.</p> : (
         <ul className="device-list">
           {list.map((g) => (
@@ -406,11 +472,11 @@ function Groups({ org, teams, members, admin, list, setList }: {
           <button className="btn btn-secondary btn-sm" type="submit"><IconPlus size={14} />Add group</button>
         </form>
       ) : null}
-    </>
+    </section>
   )
 }
 
-function PolicySummary({ org }: { org: OrgView }) {
+export function PolicySummary({ org }: { org: OrgView }) {
   const p = org.policies
   const rules = [p.requireTwoFactor && 'two-factor sign-in', p.minPasswordScore > 0 && `a master password rated at least ${STRENGTH[p.minPasswordScore]}`, p.maxIdleMinutes && `locking after ${p.maxIdleMinutes} minutes idle`].filter(Boolean)
   return rules.length ? <p className="muted small">This organization requires {rules.join(', ')}.</p> : null
@@ -418,15 +484,15 @@ function PolicySummary({ org }: { org: OrgView }) {
 
 const STRENGTH = ['', 'Weak', 'Fair', 'Strong', 'Excellent']
 
-function PoliciesForm({ org, teams }: { org: OrgView; teams: Teams }) {
+export function PoliciesForm({ org, teams, always = false }: { org: OrgView; teams: Teams; always?: boolean }) {
   const toast = useToast()
   const [p, setP] = useState(org.policies)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(always)
   if (!open) return <div className="policy-line"><PolicySummary org={org} /><button className="link small" onClick={() => setOpen(true)}>Policies…</button></div>
   return (
     <form className="policies" onSubmit={async (e) => {
       e.preventDefault()
-      try { await api.orgs.setPolicies(await session.token(), org.id, p); toast('Policies saved'); setOpen(false); await teams.load() }
+      try { await api.orgs.setPolicies(await session.token(), org.id, p); toast('Policies saved'); if (!always) setOpen(false); await teams.load() }
       catch (err) { toast(err instanceof Error ? err.message : 'Could not save.', 'error') }
     }}>
       <h3 className="small-head">Policies</h3>
@@ -443,7 +509,7 @@ function PoliciesForm({ org, teams }: { org: OrgView; teams: Teams }) {
         </select>
       </div>
       <p className="alert alert-warn"><IconAlert size={16} />Policies apply to everyone here, you included. Members who do not meet them cannot open the organization's collections until they do.</p>
-      <div className="settings-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button><button type="submit" className="btn btn-primary btn-sm">Save policies</button></div>
+      <div className="settings-actions">{always ? null : <button type="button" className="btn btn-secondary btn-sm" onClick={() => setOpen(false)}>Cancel</button>}<button type="submit" className="btn btn-primary btn-sm">Save policies</button></div>
     </form>
   )
 }
@@ -455,15 +521,16 @@ const ACTION_LABEL: Record<string, string> = {
   'member.invite': 'invited', 'member.confirm': 'confirmed', 'member.remove': 'removed', 'member.leave': 'left', 'policies.change': 'changed the policies',
 }
 
-function Activity({ org, teams, members }: { org: OrgView; teams: Teams; members: OrgMember[] }) {
-  const [open, setOpen] = useState(false)
+export function Activity({ org, teams, members, always = false }: { org: OrgView; teams: Teams; members: OrgMember[]; always?: boolean }) {
+  const [open, setOpen] = useState(always)
   const [events, setEvents] = useState<Awaited<ReturnType<typeof api.orgs.events>>['events']>([])
+  useEffect(() => { if (always) void session.token().then((t) => api.orgs.events(t, org.id)).then((r) => setEvents(r.events)).catch(() => {}) }, [org.id, always])
   const who = (u: string | null) => members.find((m) => m.userId === u)?.label ?? (u ? 'A former member' : '—')
   const item = (id: string | null) => teams.shared.find((e) => e.id === id)?.name ?? (id ? 'an item' : '')
   const coll = (id: string | null) => teams.collections.find((c) => c.id === id)?.name ?? ''
   return (
     <div className="policy-line">
-      <button className="link small" onClick={async () => { if (!open) setEvents((await api.orgs.events(await session.token(), org.id)).events); setOpen(!open) }}>{open ? 'Hide activity' : 'Activity…'}</button>
+      {always ? null : <button className="link small" onClick={async () => { if (!open) setEvents((await api.orgs.events(await session.token(), org.id)).events); setOpen(!open) }}>{open ? 'Hide activity' : 'Activity…'}</button>}
       {open ? (
         <div className="audit">
           <p className="muted small">Who did what, for a year. Opening, revealing, copying and filling are reported by each member's app.</p>
@@ -486,7 +553,7 @@ const DURATIONS: [number | 0, string][] = [[0, 'For good'], [1, 'For 1 hour'], [
 
 /** Access requests waiting on this organization's admins (D7). Approving
  *  seals the collection key to them here, for good or as a check-out. */
-function Requests({ org, teams, members }: { org: OrgView; teams: Teams; members: OrgMember[] }) {
+export function Requests({ org, teams, members }: { org: OrgView; teams: Teams; members: OrgMember[] }) {
   const toast = useToast()
   const [list, setList] = useState<{ collectionId: string; userId: string; label: string; reason: string; at: string }[]>([])
   const [choice, setChoice] = useState<Record<string, { perm: SharePermission; hours: number }>>({})
@@ -541,7 +608,7 @@ function Requests({ org, teams, members }: { org: OrgView; teams: Teams; members
  *  from the collections this admin can open. The file is a Vault encrypted
  *  export: each collection a folder under the organization's name, so it
  *  opens in Import & export with its password — on this server or another. */
-function OrgBackup({ org, teams }: { org: OrgView; teams: Teams }) {
+export function OrgBackup({ org, teams }: { org: OrgView; teams: Teams }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [pw, setPw] = useState('')
@@ -590,7 +657,7 @@ function OrgBackup({ org, teams }: { org: OrgView; teams: Teams }) {
 }
 
 /** Shown once: the recovery key of an organization just created or replaced. */
-function RecoveryKeyShown({ org, recoveryKey, onDone }: { org: string; recoveryKey: string; onDone: () => void }) {
+export function RecoveryKeyShown({ org, recoveryKey, onDone }: { org: string; recoveryKey: string; onDone: () => void }) {
   const [ack, setAck] = useState(false)
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="ork-title">
@@ -608,7 +675,7 @@ function RecoveryKeyShown({ org, recoveryKey, onDone }: { org: string; recoveryK
 
 /** The organization recovery key (decisions/0026): the owner creates or
  *  replaces it; any member can use it to take the organization back. */
-function OrgRecovery({ org, teams }: { org: OrgView; teams: Teams }) {
+export function OrgRecovery({ org, teams }: { org: OrgView; teams: Teams }) {
   const toast = useToast()
   const [shown, setShown] = useState<string | null>(null)
   const [recovering, setRecovering] = useState(false)

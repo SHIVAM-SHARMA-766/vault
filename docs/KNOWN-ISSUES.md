@@ -179,7 +179,7 @@ before very large installs. Off-site retention is the bucket's lifecycle rule, n
 <summary>🟠 <b>Mail is tested against a stand-in, not a live SMTP server</b></summary>
 
 The API tests check every message Vault sends through an injected mailer; the SMTP connection
-itself is nodemailer's, configured to refuse plain text. The admin panel's "Send test" is
+itself is nodemailer's, configured to refuse plain text. The admin console's "Send test" is
 the check against a real server.
 </details>
 
@@ -249,6 +249,6 @@ attachments out; personal backups carry them. ([0020](../decisions/0020-attachme
 <summary>🟡 <b>Translations cover the main screens only</b></summary>
 
 Hindi and Spanish are available for sign-in, the vault, items, the sidebar and settings
-navigation. Other screens (the admin panel, organizations, imports, most help text) still show
+navigation. Other screens (the admin console, organizations, imports, most help text) still show
 in English until their strings are translated.
 </details>
