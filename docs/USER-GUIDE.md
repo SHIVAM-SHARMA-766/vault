@@ -398,6 +398,12 @@ managed:
 - **Each person's account.** An admin who also manages accounts sees each person's last sign-in
   and two-factor status, with **Account** actions: disable sign-in, reset two-factor, offboard.
 
+**On a hosted Vault** ([0033](../decisions/0033-hosted-edition.md)), companies are invited by
+the people who run the server. They send the company's admin a code from *Tenants → Invite a
+company*. The admin signs up with it, creates the company under My organizations, and runs it
+from the Admin console. Other accounts are personal: they cannot create organizations, but can
+still share an item with one person.
+
 **Share with one person.** Open an item, choose **Share**, and type the address of someone
 with an account on this server. Vault makes a private space for the two of you (shown in
 My organizations as a **Direct share**, where you also confirm them), moves the item into it,

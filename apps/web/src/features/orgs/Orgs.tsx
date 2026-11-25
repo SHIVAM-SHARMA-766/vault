@@ -36,6 +36,12 @@ export function Orgs({ state }: { state: session.Unlocked }) {
           <div className="fingerprint">{teams.identity ? <><code>{teams.identity.fingerprint}</code><CopyButton value={teams.identity.fingerprint} label="Fingerprint" /></> : <span className="muted">Loading…</span>}</div>
         </section>
   )
+  const invitedOnly = (
+        <section className="settings-card" aria-labelledby="o-invited">
+          <div className="settings-card-head"><IconUser size={18} /><h2 id="o-invited">Companies on this server</h2></div>
+          <p className="muted small">Companies here are invited by the people who run this server: ask them if yours should have one. You can still share an item with one person, from the item&apos;s <strong>Share</strong> button.</p>
+        </section>
+  )
   const newOrg = (
         <form className="settings-card" aria-labelledby="o-new" onSubmit={async (e) => {
           e.preventDefault()
@@ -87,7 +93,11 @@ export function Orgs({ state }: { state: session.Unlocked }) {
 
         {/* Someone in no organization yet sees how to start one first; someone in
             one needs their fingerprint first, for the admins who confirm them. */}
-        {!teams.loaded ? fingerprint : business && hasCompany ? fingerprint : newcomer ? <>{newOrg}{fingerprint}</> : <>{fingerprint}{newOrg}</>}
+        {!teams.loaded ? fingerprint
+          : business && hasCompany ? fingerprint
+          // A hosted server's companies are invited by its operator (decisions/0033).
+          : state.canCreateCompany === false ? <>{fingerprint}{invitedOnly}</>
+          : newcomer ? <>{newOrg}{fingerprint}</> : <>{fingerprint}{newOrg}</>}
       </main>
       {showKey ? <RecoveryKeyShown org={showKey.org} recoveryKey={showKey.key} onDone={() => { const id = showKey.id; setShowKey(null); navigate(href({ name: 'console', scope: 'org', org: id, section: 'members' })) }} /> : null}
     </Shell>

@@ -441,6 +441,8 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
     // What this server includes (decisions/0030); the clients shape themselves from it.
     edition: app.config.edition,
     features: featuresOf(app.config.edition),
+    // Companies here are invited by the operator (decisions/0033).
+    companiesInvited: app.config.hostedTenants,
     mail: Boolean(app.mailer),
     breachCheck: app.config.breachCheck.enabled,
     // The weakest master password this server accepts (0–4), so the sign-up
@@ -509,6 +511,7 @@ export async function listInvitesRoute(app: App): Promise<LambdaResponse> {
       usedAt: i.usedAt ?? null,
       usedBy: i.usedBy ?? null,
       role: i.role ?? 'user',
+      ...(i.company ? { company: true } : {}),
       status: i.usedAt ? 'used' : Date.parse(i.expiresAt) <= now ? 'expired' : 'active',
     }))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -537,6 +540,23 @@ export async function createInviteRoute(app: App, actor: string, actorRole: Role
   const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
   // The code is returned exactly once. Only its hash is stored.
   return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, role }, ...(await closedWarning(app)) })
+}
+
+/** A company invitation (decisions/0033): on a hosted server, the code lets the
+ *  person who signs up with it create one company, which they then run. */
+export async function createCompanyInviteRoute(app: App, actor: string, event: LambdaEvent): Promise<LambdaResponse> {
+  if (!app.config.hostedTenants) throw new HttpError(404, 'not_in_edition', 'Company invitations are for a hosted Vault (EDITION=hosted).')
+  const body = parseJsonBody<{ label?: unknown; days?: unknown; email?: unknown }>(event)
+  const email = body.email === undefined || body.email === '' ? '' : requireEmail(body.email)
+  if (email && !app.mailer) throw new HttpError(503, 'unavailable', 'Mail is not set up on this server (SMTP_HOST). Copy the code and send it yourself.')
+  const label = typeof body.label === 'string' ? body.label.trim() : ''
+  if (!label || label.length > 80) throw badRequest('label (the company) is required, at most 80 characters.')
+  const days = body.days === undefined ? 14 : body.days
+  if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 30) throw badRequest('days must be a whole number from 1 to 30.')
+  await audit(app, actor, 'invite.company', undefined, label)
+  const { code, invite } = await createInvite(app, actor, label, days, 'user', { company: true })
+  const emailed = email ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, label, invite.expiresAt) }) : false
+  return json(201, { code, emailed, invite: { id: invite.id, label, expiresAt: invite.expiresAt, company: true } })
 }
 
 /** Sends an unused invitation again (B2). Codes are stored only as hashes,

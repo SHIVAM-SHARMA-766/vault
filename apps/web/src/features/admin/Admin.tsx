@@ -30,7 +30,7 @@ import { Website } from './Website.js'
 import { System } from './System.js'
 import { download } from '../../lib/download.js'
 import { SetupWizard, wizardDone } from './SetupWizard.js'
-import { applyBranding, refresh as refreshInstance, useEdition } from '../../lib/instance.js'
+import { applyBranding, refresh as refreshInstance, useEdition, useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
@@ -70,11 +70,13 @@ export type ServerTab = Tab
 export const SERVER_TABS = TABS
 
 /** The server sections this account may open, in this edition. */
-export function serverTabs(state: session.Unlocked, features: Features, edition: Edition = 'hosted'): typeof TABS {
+export function serverTabs(state: session.Unlocked, features: Features, edition: Edition = 'hosted', companiesInvited = false): typeof TABS {
   const perms = new Set<Permission>(state.permissions ?? [])
   // A business Vault's people are managed under the company (decisions/0032).
   const company = edition === 'business' ? new Set<Tab>(['users', 'invites', 'orgs']) : new Set<Tab>()
   return TABS.filter((t) => perms.has(t.needs) && (!t.feature || features[t.feature]) && !company.has(t.id))
+    // A hosted server's organizations are its tenants (decisions/0033).
+    .map((t) => (companiesInvited && t.id === 'orgs' ? { ...t, label: 'Tenants' } : t))
 }
 
 /** One server section, inside the admin console (decisions/0031). */
@@ -86,7 +88,7 @@ export function ServerSection({ state, tab, onGo }: { state: session.Unlocked; t
       {tab === 'desk' && perms.has('desk.read') ? <Desk selfId={state.userId} canWrite={perms.has('desk.write')} canApprove={perms.has('invites.write')} canReset={perms.has('users.write')} /> : null}
       {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
       {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
-      {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} /> : null}
+      {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} canInvite={perms.has('invites.write')} /> : null}
       {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
       {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
       {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
@@ -843,18 +845,51 @@ const ACTIONS: Record<string, string> = {
 
 const loadOrgs = (t: string) => api.admin.orgs(t)
 
-function AdminOrgs({ canWrite }: { canWrite: boolean }) {
+function AdminOrgs({ canWrite, canInvite }: { canWrite: boolean; canInvite: boolean }) {
   const toast = useToast()
   const { data, error, reload } = useAdminData(loadOrgs)
+  // A hosted server's companies are its tenants, invited by its operator (decisions/0033).
+  const hosted = useInstance()?.companiesInvited === true
+  const orgs = (data?.orgs ?? []).filter((o) => !hosted || o.kind !== 'direct')
+  const directs = hosted ? (data?.orgs ?? []).length - orgs.length : 0
+  const [company, setCompany] = useState('')
+  const [email, setEmail] = useState('')
+  const [issued, setIssued] = useState<{ code: string; label: string; expiresAt: string; emailed: boolean } | null>(null)
   return (
-    <Section title="Organizations" sub="Every organization on this server, by counts. Names, collections and items are encrypted for their members; nobody here can open them.">
+    <Section title={hosted ? 'Tenants' : 'Organizations'} sub={hosted
+      ? 'The companies on this server. Each runs itself from its own Admin console; names, collections and items are encrypted for their members, and nobody here can open them.'
+      : 'Every organization on this server, by counts. Names, collections and items are encrypted for their members; nobody here can open them.'}>
       <ErrorBox error={error} />
-      {!data ? <div className="skeletons"><div className="skeleton" /></div> : data.orgs.length === 0 ? <div className="empty"><h3>No organizations yet</h3><p>Members create them from Account menu → Organizations.</p></div> : (
+      {hosted && canInvite ? (
+        <form className="admin-card company-invite" onSubmit={async (e) => {
+          e.preventDefault()
+          try {
+            const res = await api.admin.companyInvite(await session.token(), company.trim(), email.trim())
+            setIssued({ code: res.code, label: res.invite.label, expiresAt: res.invite.expiresAt, emailed: res.emailed }); setCompany(''); setEmail('')
+          } catch (err) { toast(err instanceof Error ? err.message : 'Could not create the invitation.', 'error') }
+        }}>
+          <div className="admin-card-head"><h2>Invite a company</h2></div>
+          <p className="muted small">The person who signs up with the code may create one company, and runs it from their own Admin console: its people, collections and policies.</p>
+          <div className="inline-form">
+            <input required maxLength={80} placeholder="Company, e.g. Acme Corp" aria-label="Company name" value={company} onChange={(e) => setCompany(e.target.value)} />
+            <input type="email" placeholder="Their email (optional)" aria-label="Their email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <button className="btn btn-primary btn-sm" type="submit" disabled={!company.trim()}>Create invitation</button>
+          </div>
+          {issued ? (
+            <div className="issued company-code">
+              <p><strong>Invitation for {issued.label}</strong> — expires {when(issued.expiresAt)}. {issued.emailed ? 'Emailed, with a link. ' : ''}This code is shown once.</p>
+              <div className="recovery-key"><code>{issued.code}</code><CopyButton value={issued.code} label="Company invitation code" /></div>
+              <button className="link" onClick={() => setIssued(null)}>Done</button>
+            </div>
+          ) : null}
+        </form>
+      ) : null}
+      {!data ? <div className="skeletons"><div className="skeleton" /></div> : orgs.length === 0 ? <div className="empty"><h3>{hosted ? 'No tenants yet' : 'No organizations yet'}</h3><p>{hosted ? 'Invite a company above.' : 'Members create them from Account menu → My organizations.'}</p></div> : (
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>Name (as typed by its creator)</th><th className="num">Members</th><th className="num">Collections</th><th className="num">Items</th><th>Policies</th><th>Created</th>{canWrite ? <th aria-label="Actions" /> : null}</tr></thead>
             <tbody>
-              {data.orgs.map((o) => (
+              {orgs.map((o) => (
                 <tr key={o.id}>
                   <td>{o.hint || <span className="muted">Unnamed</span>}{o.rotationDue ? <span className="pill pill-danger" title="A collection key should be rotated by one of its managers">{o.rotationDue} key rotation due</span> : null}</td>
                   <td className="num" title={`${o.awaiting} awaiting confirmation, ${o.pending} invited`}>{o.members}{o.awaiting + o.pending ? <span className="muted"> +{o.awaiting + o.pending}</span> : null}</td>
@@ -872,6 +907,7 @@ function AdminOrgs({ canWrite }: { canWrite: boolean }) {
           </table>
         </div>
       )}
+      {directs ? <p className="muted small">Not listed: {directs} private share{directs === 1 ? '' : 's'} between two people.</p> : null}
     </Section>
   )
 }

@@ -55,6 +55,8 @@ export function harness(options: { edition?: 'personal' | 'business' | 'hosted';
       webRoot: '',
       origin: 'https://vault.test',
       edition: options.edition ?? 'hosted',
+      // As on a server where EDITION was set: only when a test asks for hosted.
+      hostedTenants: options.edition === 'hosted',
       allowRegistration: false,
       adminEmails: [],
       site: { sourceDir: '', outputDir: '' },

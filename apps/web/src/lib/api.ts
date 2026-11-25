@@ -108,7 +108,7 @@ export interface InstanceProfile { name: string; supportEmail: string; supportUr
 /** Editions (decisions/0030): which features this server includes. */
 export type Edition = 'personal' | 'business' | 'hosted'
 export interface Features { organizations: boolean; invitations: boolean; serviceDesk: boolean; website: boolean; staffRoles: boolean; emergencyAccess: boolean }
-export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean; edition?: Edition; features?: Features }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean; edition?: Edition; features?: Features; companiesInvited?: boolean }
 /** Server-wide rules set by an administrator (G1, G3, G7). */
 export interface ShareRow {
   id: string
@@ -250,7 +250,7 @@ export const api = {
   /** Self-reported strength (0–4) of the master password, for organization policies. */
   passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
-    request<{ userId: string; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
+    request<{ userId: string; canCreateCompany?: boolean; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -478,6 +478,9 @@ export const api = {
       ),
     orgs: (token: string) => request<{ orgs: AdminOrg[] }>('GET', '/api/admin/orgs', { token }),
     deleteOrg: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/admin/orgs/${id}`, { token }),
+    /** A company invitation (decisions/0033, hosted): the code lets its holder create one company. */
+    companyInvite: (token: string, label: string, email: string, days = 14) =>
+      request<{ code: string; emailed: boolean; invite: { id: string; label: string; expiresAt: string } }>('POST', '/api/admin/company-invites', { token, body: { label, days, ...(email ? { email } : {}) } }),
     desk: (token: string) => request<{ tickets: StaffTicket[]; counts: Record<TicketStatus, number> }>('GET', '/api/admin/desk', { token }),
     ticket: (token: string, id: string) =>
       request<{ ticket: StaffTicket; messages: TicketMessage[] }>('GET', `/api/admin/desk/${encodeURIComponent(id)}`, { token }),
@@ -519,7 +522,7 @@ export const api = {
 export interface EmergencyGrant { id: string; label: string; waitDays: number; status: string; granteePublicKey: string | null; granteeSigningKey?: string | null; requestedAt: string | null; opensAt: string | null }
 export interface EmergencyTrust { id: string; fromName: string; waitDays: number; status: string; requestedAt: string | null; opensAt: string | null }
 export interface AdminOrg {
-  id: string; hint: string; createdAt: string; ownerId: string | null; members: number; awaiting: number; pending: number
+  id: string; hint: string; kind?: 'team' | 'direct'; createdAt: string; ownerId: string | null; members: number; awaiting: number; pending: number
   collections: number; items: number; rotationDue: number; policies: OrgPolicies
 }
 /** 'guest' (decisions/0032, 2d): only the collections given, maybe until a date. */

@@ -28,6 +28,8 @@ export interface Unlocked {
    *  whether the admin panel is offered; every admin route checks again. */
   isAdmin?: boolean
   role?: Role
+  /** Whether this account may create a company (decisions/0033). */
+  canCreateCompany?: boolean
   permissions?: Permission[]
   /** What the server policy asks that this account has not done yet. */
   policyGap?: string | null
@@ -37,7 +39,7 @@ export interface Unlocked {
 
 /** Updates fields of the unlocked state without touching the keys. */
 export function patch(fields: Partial<Pick<Unlocked,
-  'userId' | 'isAdmin' | 'role' | 'permissions' | 'policyGap' | 'shareLinks' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
+  'userId' | 'isAdmin' | 'role' | 'canCreateCompany' | 'permissions' | 'policyGap' | 'shareLinks' | 'kdf' | 'accessToken' | 'refreshToken' | 'accessExpiresAt'
 >>): void {
   if (!current) return
   current = { ...current, ...fields }

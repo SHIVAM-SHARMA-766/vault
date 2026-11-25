@@ -59,7 +59,8 @@ test('inviting an address without an account gives a sign-up code, in business o
   await hosted.h.request('POST', '/api/orgs', { token: hosted.token, body: await hosted.org(hid) })
   const h2 = await hosted.h.request('POST', `/api/orgs/${hid}/invites`, { token: hosted.token, body: { email: 'someone@example.com', withSignup: true } })
   assert.equal(h2.status, 201)
-  assert.equal(h2.body['signup'], undefined)
+  // A hosted server (EDITION=hosted) gives a code for any address, so nothing is learnt (0033).
+  assert.ok((h2.body['signup'] as { code?: string } | undefined)?.code)
 })
 
 test('Add to company invites an existing account by its id, for admins who see accounts', async () => {

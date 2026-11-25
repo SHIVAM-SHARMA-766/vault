@@ -151,6 +151,18 @@ async function inviteCode(owner, label) {
   return code
 }
 
+/** On a server where companies are invited (decisions/0033), the code that
+ *  lets a tenant's admin create their company; elsewhere, a plain invitation. */
+async function companyCode(owner, company) {
+  await menu(owner, 'Admin')
+  const tenants = owner.locator('.sidebar .side-item', { hasText: 'Tenants' })
+  if (!(await tenants.count())) return null
+  await tenants.click()
+  await owner.fill('input[aria-label="Company name"]', company)
+  await owner.getByRole('button', { name: 'Create invitation' }).click()
+  return (await owner.locator('.company-code .recovery-key code').innerText()).trim()
+}
+
 async function register(page, email, code) {
   for (;;) {
     await go(page, `${BASE}/app/`)
@@ -177,13 +189,13 @@ async function register(page, email, code) {
 }
 
 /** A signed-in page for a demo account, registering it first if needed. */
-async function person(owner, email, name) {
+async function person(owner, email, name, company) {
   if (pages.has(email)) return pages.get(email)
   const page = await newPage()
   if (state.accounts[email]) {
     await unlock(page, email, DEMO_PASSWORD)
   } else {
-    const code = await inviteCode(owner, `${name} (demo)`)
+    const code = (company ? await companyCode(owner, company) : null) ?? await inviteCode(owner, `${name} (demo)`)
     try {
       await register(page, email, code)
     } catch (err) {
@@ -302,7 +314,7 @@ try {
 
   for (const t of TENANTS) {
     const done = state.tenants[t.org] ?? {}
-    const admin = await person(owner, t.admin.email, t.admin.name)
+    const admin = await person(owner, t.admin.email, t.admin.name, t.org)
     for (const m of t.members) await person(owner, m.email, m.name)
     if (done.complete) { log(`${t.org}: already set up`); continue }
 

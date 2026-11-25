@@ -167,6 +167,8 @@ export interface RegistryFields {
   label?: string
   disabled?: boolean
   inviteId?: string
+  /** On a hosted server, this account may create one company (decisions/0033). */
+  companyGrant?: boolean
   /** A staff role granted by an owner: admin, marketing or viewer. Absent
    *  means a plain user. Owner is never stored; see roles.ts. */
   role?: string
@@ -244,10 +246,12 @@ export interface Invite extends Item {
   role?: string
   /** First-run setup: creates the owner, even while registration is closed. */
   setup?: boolean
+  /** A company invitation (decisions/0033): the new account may create one company. */
+  company?: boolean
 }
 
 export async function createInvite(
-  app: App, actor: string, label: string, days: number, role?: string,
+  app: App, actor: string, label: string, days: number, role?: string, opts: { company?: boolean } = {},
 ): Promise<{ code: string; invite: Invite }> {
   const code = newInviteCode()
   const id = hashInviteCode(code)
@@ -261,6 +265,7 @@ export async function createInvite(
     expiresAt: new Date(now + days * 86_400_000).toISOString(),
     createdBy: actor,
     ...(role && role !== 'user' ? { role } : {}),
+    ...(opts.company ? { company: true } : {}),
   }
   await app.store.put(invite, { mustNotExist: true })
   return { code, invite }

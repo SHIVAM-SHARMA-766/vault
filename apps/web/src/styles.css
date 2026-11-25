@@ -1120,3 +1120,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 /* Guests (decisions/0032, 2d) */
 .guest-until { display: grid; gap: 4px; margin-top: 8px; max-width: 420px; }
 .guest-until input { max-width: 200px; }
+
+/* Tenants (decisions/0033) */
+.company-invite { margin-bottom: 18px; }
+.company-invite .inline-form { flex-wrap: wrap; }
+.company-invite .inline-form input { flex: 1 1 220px; }
+.company-code { margin-top: 12px; }
