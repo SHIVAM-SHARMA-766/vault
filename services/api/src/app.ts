@@ -212,6 +212,7 @@ export function buildRouter(app: App): Router {
   router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode or the instance profile')
   router.get('/api/admin/invites', admined('invites.read', () => admin.listInvitesRoute(app)), 'Open invitations')
   router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)), 'Create an invitation code')
+  router.post('/api/admin/company-invites', admined('invites.write', (u, e) => admin.createCompanyInviteRoute(app, u, e)), 'Invite a company: the code lets its admin create one company (hosted)')
   router.post('/api/admin/invites/bulk', admined('invites.write', (u, e, _p, r) => admin.bulkInviteRoute(app, u, r, e)), 'Invite many people at once')
   router.post('/api/admin/invites/:id/resend', admined('invites.write', (u, e, id, r) => admin.resendInviteRoute(app, u, r, e, id)), 'Send an unused invitation again, with a fresh code')
   router.delete('/api/admin/invites/:id', admined('invites.write', (u, _e, id) => admin.deleteInviteRoute(app, u, id)), 'Withdraw an invitation')

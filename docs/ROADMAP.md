@@ -376,8 +376,12 @@ people.
     collection, items to fix, breach check), in the admin's browser.
   - [x] 2d: guests: only the collections given, never the other members or groups, cannot
     ask for more, optional end date enforced by the server.
-- [ ] **Stage 3, the hosted edition:** business tenants, the operator console, tenant-scoped admin
-  consoles, and the operator's responsibilities (uptime, abuse, terms).
+- [x] **Stage 3, the hosted edition** ([0033](../decisions/0033-hosted-edition.md)):
+  - companies are invited by the operator (*Tenants → Invite a company*) and run from their own
+    Admin console;
+  - personal accounts keep their vaults and direct shares;
+  - a tenant admin's invitations reveal nothing about other tenants;
+  - applies when `EDITION=hosted` is set. The operator's responsibilities are noted, not built.
 
 ### Phase 4 — Browser extension
 

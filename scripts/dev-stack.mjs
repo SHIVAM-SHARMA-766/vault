@@ -52,6 +52,7 @@ const app = {
     port: PORT, host: '127.0.0.1', trustProxy: true, serveStatic: true, webRoot: '', origin: `http://localhost:${PORT}`, allowRegistration: true, adminEmails: OWNER ? [OWNER] : [],
     // EDITION=personal|business|hosted (decisions/0030); hosted by default, as in production.
     edition: process.env.EDITION || 'hosted',
+    hostedTenants: process.env.EDITION === 'hosted',
     site: { sourceDir: '', outputDir: '' },
     backup: { passphrase: '', dir: '', keep: 14, intervalHours: 0 },
     // Personal backups: remote destinations on; private addresses off, as in production.

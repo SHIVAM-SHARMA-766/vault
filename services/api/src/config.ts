@@ -55,6 +55,10 @@ export interface Config {
   tokenKey: string
   /** Which features this server has (decisions/0030). */
   edition: Edition
+  /** EDITION=hosted set on purpose: companies are invited by the operator
+   *  (decisions/0033). An install that never set EDITION keeps letting anyone
+   *  create an organization, as before editions. */
+  hostedTenants: boolean
   /** Closed unless explicitly opened. */
   allowRegistration: boolean
   /** Addresses that hold the owner role. Turned into digests by the server;
@@ -199,6 +203,7 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     pepper: secret('SERVER_PEPPER'),
     tokenKey: secret('TOKEN_SIGNING_KEY'),
     edition: edition(get('EDITION')),
+    hostedTenants: get('EDITION') === 'hosted',
     allowRegistration: get('ALLOW_REGISTRATION') === 'true',
     adminEmails: get('ADMIN_EMAILS').split(',').map((e) => e.trim()).filter(Boolean),
     site: { sourceDir: get('SITE_SOURCE') || join(here, 'site'), outputDir: get('SITE_ROOT') },

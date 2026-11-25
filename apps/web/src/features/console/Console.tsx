@@ -87,7 +87,7 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
         <div className="console-mobile">
           <ScopePicker id="scope-m" scopes={scopes} current={current} serverName={serverName} onChoose={choose} />
           {current.kind === 'server'
-            ? <Chips items={serverTabs(state, features, edition)} active={serverTabs(state, features, edition).find((t) => t.id === route.section)?.id ?? serverTabs(state, features, edition)[0]?.id ?? 'overview'} onGo={(id) => navigate(href({ name: 'console', scope: 'server', section: id }))} />
+            ? <Chips items={serverTabs(state, features, edition, instance?.companiesInvited === true)} active={serverTabs(state, features, edition, instance?.companiesInvited === true).find((t) => t.id === route.section)?.id ?? serverTabs(state, features, edition, instance?.companiesInvited === true)[0]?.id ?? 'overview'} onGo={(id) => navigate(href({ name: 'console', scope: 'server', section: id }))} />
             : <Chips items={[...ORG_SECTIONS]} active={ORG_SECTIONS.find((t) => t.id === route.section)?.id ?? 'members'} onGo={(id) => navigate(href({ name: 'console', scope: 'org', org: current.id, section: id }))} />}
         </div>
         <main className="admin-main">
@@ -133,14 +133,14 @@ function NavList({ items, active, onGo }: { items: { id: string; label: string; 
 }
 
 function ServerNav({ state, features, edition, section }: { state: session.Unlocked; features: Features; edition: Edition; section: string | null }) {
-  const tabs = serverTabs(state, features, edition)
+  const tabs = serverTabs(state, features, edition, useInstance()?.companiesInvited === true)
   const active = tabs.find((t) => t.id === section)?.id ?? tabs[0]?.id ?? 'overview'
   const go = (id: string) => navigate(href({ name: 'console', scope: 'server', section: id }))
   return <NavList items={tabs} active={active} onGo={go} />
 }
 
 function ServerScope({ state, features, edition, section }: { state: session.Unlocked; features: Features; edition: Edition; section: string | null }) {
-  const tabs = serverTabs(state, features, edition)
+  const tabs = serverTabs(state, features, edition, useInstance()?.companiesInvited === true)
   const tab = (tabs.find((t) => t.id === section)?.id ?? tabs[0]?.id ?? 'overview') as ServerTab
   return <ServerSection state={state} tab={tab} onGo={(t) => navigate(href({ name: 'console', scope: 'server', section: t }))} />
 }

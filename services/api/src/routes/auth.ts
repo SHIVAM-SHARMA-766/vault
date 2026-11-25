@@ -241,7 +241,10 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   let inviteId: string | undefined
   let label: string | undefined
   let role: string | undefined
-  if (!open) {
+  let company = false
+  // A company invitation is claimed even while registration is open, so the
+  // grant it carries is not lost (decisions/0033).
+  if (!open || (usable && pending!['company'] === true)) {
     const invite = await claimInvite(app, inviteCode, userId)
     if (!invite) {
       // Lost a race for the same code. Give the address back.
@@ -251,6 +254,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     inviteId = invite.id
     label = invite.label
     role = invite.role
+    company = invite.company === true
   }
 
   const [authVerifier, recoveryVerifier] = await Promise.all([
@@ -274,6 +278,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     ...(label ? { label } : {}),
     ...(inviteId ? { inviteId } : {}),
     ...(role ? { role } : {}),
+    ...(company ? { companyGrant: true } : {}),
   })
 
   await recordActivity(app, userId, 'register', event)
@@ -414,10 +419,14 @@ export async function setPasswordScore(app: App, userId: string, event: LambdaEv
 export async function me(app: App, userId: string): Promise<LambdaResponse> {
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as Profile | null
   if (!profile) throw unauthorized()
-  const role = roleFromDigest(app, profile.emailDigest, (await getRegistry(app, userId))?.role)
+  const reg = await getRegistry(app, userId)
+  const role = roleFromDigest(app, profile.emailDigest, reg?.role)
   const { policy } = await getSettings(app)
   return json(200, {
     userId: profile.userId,
+    // Whether this account may create a company (decisions/0033): on a hosted
+    // server only its owner and admins, or someone invited to start one.
+    canCreateCompany: !app.config.hostedTenants || role === 'owner' || role === 'admin' || reg?.companyGrant === true,
     kdf: profile.kdf,
     wrappedVaultKey: profile.wrappedVaultKey,
     createdAt: profile.createdAt,

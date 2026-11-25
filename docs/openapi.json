@@ -5049,6 +5049,36 @@
         }
       }
     },
+    "/api/admin/company-invites": {
+      "post": {
+        "summary": "Invite a company: the code lets its admin create one company (hosted)",
+        "operationId": "postAdminCompanyInvites",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "invites.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/invites/bulk": {
       "post": {
         "summary": "Invite many people at once",

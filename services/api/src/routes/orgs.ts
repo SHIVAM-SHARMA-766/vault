@@ -27,9 +27,9 @@ import {
 } from '../keys.js'
 import { AlreadyExists, type Item } from '../store.js'
 import { requireEmail, requireSealed, requireSharedKey } from '../validate.js'
-import { audit, createInvite, getRegistry, getSettings } from '../system.js'
+import { audit, createInvite, getRegistry, getSettings, putRegistry } from '../system.js'
 import { inviteMessage, notify } from '../mail.js'
-import { requirePermission } from '../roles.js'
+import { requirePermission, roleOf } from '../roles.js'
 import { addNote, addNotes } from '../inbox.js'
 import { enforce, type Limit } from '../ratelimit.js'
 import { streamAudit } from '../audit-stream.js'
@@ -346,6 +346,17 @@ export async function createOrg(app: App, userId: string, event: LambdaEvent): P
   // person". The same keys, confirmation and audit as any organization; only
   // the size is fixed and the app presents it as a person, not a team.
   const kind = b['kind'] === 'direct' ? 'direct' : 'team'
+  // On a hosted server, companies are invited by its operator (decisions/0033):
+  // its owner and admins may create one, or someone holding a company
+  // invitation, once. Direct shares between two people are always allowed.
+  let usedGrant = false
+  if (kind === 'team' && app.config.hostedTenants) {
+    const role = await roleOf(app, userId)
+    if (role !== 'owner' && role !== 'admin') {
+      if ((await getRegistry(app, userId))?.companyGrant !== true) throw new HttpError(403, 'forbidden', 'Companies on this server are invited by its operator. You can still share an item with one person.')
+      usedGrant = true
+    }
+  }
   // A business Vault is one company (decisions/0032). Direct shares between
   // two people are still allowed.
   if (kind === 'team' && app.config.edition === 'business') {
@@ -367,6 +378,11 @@ export async function createOrg(app: App, userId: string, event: LambdaEvent): P
   await app.store.put(owner)
   await app.store.put({ pk: userPk(userId), sk: userOrgSk(orgId), orgId })
   await app.store.put({ pk: SYSTEM_PK, sk: systemOrgSk(orgId), orgId, createdAt: at, createdBy: userId })
+  // A company invitation creates one company.
+  if (usedGrant) {
+    const reg = await getRegistry(app, userId)
+    if (reg) { const { companyGrant: _g, ...rest } = reg; await putRegistry(app, rest) }
+  }
   return json(201, { id: orgId })
 }
 
@@ -424,7 +440,7 @@ export async function adminList(app: App): Promise<LambdaResponse> {
     let items = 0
     for (const c of colls) items += (await app.store.query(collectionItemsPk(orgId, c.id), ITEM_PREFIX)).length
     out.push({
-      id: orgId, hint: meta['hint'] ?? '', createdAt: meta['createdAt'], ownerId: members.find((m) => m.role === 'owner')?.userId ?? null,
+      id: orgId, hint: meta['hint'] ?? '', kind: meta['kind'] === 'direct' ? 'direct' : 'team', createdAt: meta['createdAt'], ownerId: members.find((m) => m.role === 'owner')?.userId ?? null,
       members: members.filter((m) => m.status === 'confirmed').length, awaiting: members.filter((m) => m.status !== 'confirmed').length,
       pending: rows.filter((r) => r.sk.startsWith(ORG_PENDING_PREFIX)).length, collections: colls.length, items,
       rotationDue: colls.filter((c) => c.rotationNeeded).length,
@@ -517,7 +533,10 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
   // One invitation (decisions/0032): in a business Vault, an address with no
   // account also gets a sign-up code. Only there: elsewhere it would tell an
   // organization's admin whether an address has an account on the server.
-  if (b['withSignup'] === true && email && !pointer && app.config.edition === 'business') {
+  // On a hosted server a tenant's admin always gets a code, whether or not
+  // the address has an account, so it reveals nothing about other tenants (0033).
+  const hostedSignup = app.config.hostedTenants && meta?.['kind'] !== 'direct'
+  if (b['withSignup'] === true && email && ((!pointer && app.config.edition === 'business') || hostedSignup)) {
     await audit(app, userId, 'invite.create', undefined, memberLabel)
     const { code, invite: signup } = await createInvite(app, userId, memberLabel, 7, 'user')
     const emailed = app.mailer ? await notify(app, { to: email, ...inviteMessage(app.config.origin, code, memberLabel, signup.expiresAt) }) : false
