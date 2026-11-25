@@ -99,6 +99,23 @@ Each person can back up their own vault on their own schedule (Settings → Back
 | `PERSONAL_BACKUP_REMOTE` | `true` | | `false` keeps personal backups on this server only: no outbound connections to people's S3 buckets or WebDAV folders |
 | `PERSONAL_BACKUP_ALLOW_PRIVATE` | `false` | | `true` lets destinations be private or loopback addresses, over plain http — for a NAS on the LAN. Leave off on a server reachable from the internet |
 
+### Single sign-on
+
+Sign in with your identity provider: Microsoft Entra ID, Google Workspace, Okta, Keycloak,
+Authentik ([decision 0021](../decisions/0021-sso.md)). The provider proves who someone is, and
+the master password still unlocks the vault. Register `https://<your address>/api/auth/sso/callback`
+as the redirect URI. Ask for the `openid email profile` scopes, with a confidential client.
+*Require single sign-on* is a server policy in the console (Policies).
+
+| Variable | Default | Secret | Purpose |
+|---|---|---|---|
+| `OIDC_ISSUER` | | | The provider's issuer URL (https), e.g. `https://login.microsoftonline.com/<tenant>/v2.0` or `https://keycloak.example.com/realms/acme`. Its discovery document must be at `<issuer>/.well-known/openid-configuration` |
+| `OIDC_CLIENT_ID` | | | The client id. Required with `OIDC_ISSUER` |
+| `OIDC_CLIENT_SECRET` | | ✓ | The client secret. Required with `OIDC_ISSUER` |
+| `OIDC_NAME` | `SSO` | | The button says "Sign in with <name>" |
+| `OIDC_PROVISION` | `false` | | `true` lets someone the provider signs in, who has no account here yet, create one without an invitation (they still choose a master password) |
+| `OIDC_REQUIRE_VERIFIED_EMAIL` | `true` | | `false` accepts an email without `email_verified`, for providers that never send it (Entra ID). Only for a provider whose addresses are all yours |
+
 ## Where they live on the reference instance
 
 | File | Holds | Written by |

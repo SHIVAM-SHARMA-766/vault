@@ -23,6 +23,7 @@ import * as shares from './routes/shares.js'
 import * as attachments from './routes/attachments.js'
 import * as webauthn from './routes/webauthn.js'
 import * as passkeys from './routes/passkeys.js'
+import * as sso from './routes/sso.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
 import { metricsRoute, recordRequest } from './metrics.js'
@@ -44,6 +45,9 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/prelogin', ({ event }) => auth.prelogin(app, event), 'KDF parameters for an address (a decoy for unknown ones)')
   router.post('/api/auth/register', ({ event }) => auth.register(app, event), 'Create an account')
   router.post('/api/auth/login', ({ event }) => auth.login(app, event), 'Sign in with the auth key (and second factor)')
+  router.get('/api/auth/sso/start', ({ event }) => sso.start(app, event), 'Single sign-on: redirect to the identity provider (decisions/0021)')
+  router.get('/api/auth/sso/callback', ({ event }) => sso.callback(app, event), 'Single sign-on: the identity provider\'s answer; redirects to the app with a ticket')
+  router.post('/api/auth/sso/ticket', ({ event }) => sso.ticketInfo(app, event), 'Which account a single sign-on ticket is for')
   router.post('/api/auth/passkey-login/options', ({ event }) => passkeys.loginOptions(app, event), 'Start signing in with a passkey (no account named)')
   router.post('/api/auth/passkey-login', ({ event }) => passkeys.login(app, event), 'Sign in with a passkey; returns the passkey-wrapped vault key')
   router.post('/api/auth/recovery-login', ({ event }) => auth.recoveryLogin(app, event), 'Sign in with the recovery key\'s proof')

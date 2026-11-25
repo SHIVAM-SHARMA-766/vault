@@ -15,6 +15,7 @@ import { getSettings } from '../system.js'
 export type ActivityKind =
   | 'register'
   | 'login'
+  | 'sso-login'
   | 'recovery-login'
   | 'change-password'
   | 'add-secret-key'

@@ -70,6 +70,7 @@ import {
 } from '../system.js'
 import { assertNetwork } from '../networks.js'
 import { loginOptions, verifyLogin } from './webauthn.js'
+import { provisionTicket, readTicket, ssoGate, useTicket } from './sso.js'
 
 export interface Profile extends Item {
   userId: string
@@ -205,8 +206,13 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     throw new HttpError(403, 'forbidden', 'This is a personal Vault: it has one account, and no one else can join.')
   }
   const open = !setup && (app.allowRegistration || mode === 'open')
-  if (!open && !setup && mode !== 'invite') throw registrationRefused()
-  if (!open && !usable) throw registrationRefused()
+  // Someone the identity provider just signed in, with no account here, when
+  // the operator lets the provider's people join (decisions/0021).
+  const ssoTicket = body['ssoTicket']
+  const viaSso = !open && !setup && app.config.oidc?.provision === true && typeof body['email'] === 'string'
+    && (await readTicket(app, ssoTicket))?.emailDigest === emailDigest(requireEmail(body['email']), app.config.pepper)
+  if (!open && !setup && mode !== 'invite' && !viaSso) throw registrationRefused()
+  if (!open && !usable && !viaSso) throw registrationRefused()
 
   const email = requireEmail(body['email'])
   await limitAuth(app, event, email)
@@ -245,7 +251,11 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   let company = false
   // A company invitation is claimed even while registration is open, so the
   // grant it carries is not lost (decisions/0033).
-  if (!open || (usable && pending!['company'] === true)) {
+  if (viaSso && !(await provisionTicket(app, ssoTicket, email))) {
+    await app.store.delete(emailPk(digest), EMAIL_SK)
+    throw registrationRefused()
+  }
+  if ((!open && !viaSso) || (usable && pending!['company'] === true)) {
     const invite = await claimInvite(app, inviteCode, userId)
     if (!invite) {
       // Lost a race for the same code. Give the address back.
@@ -303,13 +313,17 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   // Only after the password is proved, so a disabled account cannot be told
   // apart from a wrong password by someone who does not hold it.
   await assertEnabled(app, profile.userId)
+  // Single sign-on, when used or required (decisions/0021). The ticket is
+  // checked now and used up only once the second factor is in too.
+  const sso = await ssoGate(app, profile, body['ssoTicket'])
   await requireSecondFactor(app, profile, body, event)
+  if (sso && !(await useTicket(app, sso))) throw new HttpError(401, 'sso_invalid', 'That single sign-on was already used. Sign in again.')
 
   await touchLogin(app, profile.userId, profile)
   // The person can turn the ordinary sign-in email off (F5). Signing in with
   // the recovery key always sends one.
   if (app.config.mail.signInNotices && profile['signInAlerts'] !== false) sendSignInNotice(app, email, event, false)
-  await recordActivity(app, profile.userId, 'login', event)
+  await recordActivity(app, profile.userId, sso ? 'sso-login' : 'login', event)
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
     kdf: profile.kdf,
@@ -334,9 +348,11 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
   if (!ok || !profile) throw invalidCredentials()
   await assertNetwork(app, profile.userId, event.requestContext.http.sourceIp)
   await assertEnabled(app, profile.userId)
+  const sso = await ssoGate(app, profile, body['ssoTicket'])
   // The recovery key replaces the password, not the second factor; losing
   // the phone too is what recovery codes are for.
   await requireSecondFactor(app, profile, body, event)
+  if (sso && !(await useTicket(app, sso))) throw new HttpError(401, 'sso_invalid', 'That single sign-on was already used. Sign in again.')
 
   // A recovery key in use means the master password is believed lost. Every
   // existing session is dropped, because the next step is to set a new one.

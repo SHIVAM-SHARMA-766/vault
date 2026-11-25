@@ -21,6 +21,12 @@ export interface Limit {
  *  password online should exhaust their patience long before the key space. */
 export const AUTH_LIMIT: Limit = { max: 10, windowSeconds: 15 * 60 }
 
+/** The single sign-on round trip (decisions/0021): starting it and reading a
+ *  ticket. Neither checks a secret anyone could guess (a ticket is 256 random
+ *  bits), so they are kept off AUTH_LIMIT, where the sign-in that follows is
+ *  counted, and bounded only against floods. */
+export const SSO_LIMIT: Limit = { max: 30, windowSeconds: 15 * 60 }
+
 /** Everything an authenticated client does. Loose enough that ordinary use
  *  never notices, tight enough to bound a runaway client against the 25
  *  provisioned write units. */

@@ -1,6 +1,7 @@
 // Spanish. Keys are the English text in the code; anything missing shows in English.
 export const es: Record<string, string> = {
   'or': 'o',
+  'Sign in with': 'Inicia sesión con',
   'Sign in with a passkey': 'Inicia sesión con una llave de acceso',
   'Unlock your vault': 'Abre tu bóveda',
   'Enter your email and master password. Decryption happens in this browser.': 'Escribe tu correo y tu contraseña maestra. El descifrado ocurre en este navegador.',

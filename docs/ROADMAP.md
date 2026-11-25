@@ -324,7 +324,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **B. An organization on its own server**
 - ✅ B1 Setup checklist in the admin panel · ✅ B2 Bulk invite (paste a list or a spreadsheet column), groups chosen at invite, send again · ✅ B3 Branding (accent colour, logo)
 - ✅ B4 Member onboarding (fingerprint guidance while waiting, a welcome once confirmed) · ✅ B5 Helm chart and reverse-proxy guides (`deploy/helm/vault`, docs/kubernetes.md, docs/reverse-proxy.md) · ✅ B6 Metrics endpoint and dashboard (`/api/metrics` behind a token, Grafana dashboard and alerts)
-- ✅ B7 Audit export and SIEM stream (CSV/JSON download, signed webhook) · ⬜ B8 SSO (OIDC), proposed in [0021](../decisions/0021-sso.md) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
+- ✅ B7 Audit export and SIEM stream (CSV/JSON download, signed webhook) · ✅ B8 SSO (OIDC, [0021](../decisions/0021-sso.md) option 1: PKCE, ID tokens checked, the master password still unlocks, require-SSO policy with owners exempt, provisioning, tested against Keycloak) · ✅ B9 Offboarding (one step: disable, sign out, leave organizations; collections re-keyed; passwords they could see listed until changed)
 
 **C. Backups, per user (like Zoho)**
 - ✅ C1 Schedule, time and retention in Settings · ✅ C2 Destinations: on the server (download), S3-compatible, WebDAV — email left out, see [0017](../decisions/0017-personal-backups.md)

@@ -38,6 +38,8 @@ export const ERROR_CODES = {
   invalid_two_factor: 'The TOTP or recovery code is wrong or already used.',
   forbidden: 'Signed in, but not permitted (role, disabled account, closed registration).',
   network_not_allowed: 'The server\'s sign-in allow-list does not include this address.',
+  sso_required: 'This server requires single sign-on (decisions/0021): sign in with the identity provider first and send its ticket.',
+  sso_invalid: 'The single sign-on ticket is unknown, expired, used, or for another account.',
   not_found: 'No such route or item.',
   conflict: 'The item already exists, or the change conflicts with the current state.',
   too_large: 'The body or a stored item exceeds its size limit.',
@@ -93,6 +95,11 @@ const BASE_HEADERS: Record<string, string> = {
   'cache-control': 'no-store',
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
+}
+
+/** A redirect, for the single sign-on round trip through the browser. */
+export function redirect(location: string): LambdaResponse {
+  return { statusCode: 302, headers: { ...BASE_HEADERS, location }, body: '' }
 }
 
 export function json(status: number, body: unknown, extra: Record<string, string> = {}): LambdaResponse {

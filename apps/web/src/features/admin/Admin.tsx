@@ -357,6 +357,7 @@ const days = (n: number) => (n % 365 === 0 ? (n === 365 ? '1 year' : `${n / 365}
 /** Server-wide rules for every account (G1, G3, G7). */
 function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: number; onGo: () => void }) {
   const toast = useToast()
+  const instance = useInstance()
   const [form, setForm] = useState<ServerPolicy | null>(null)
   const [saved, setSaved] = useState<ServerPolicy | null>(null)
   // The list as typed, so a new empty line survives until something is on it.
@@ -384,6 +385,12 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
         <input type="checkbox" disabled={!canWrite} checked={form.requireTwoFactor} onChange={(e) => setForm({ ...form, requireTwoFactor: e.target.checked })} />
         <span>Require two-factor sign-in</span>
       </label>
+      {instance?.sso ? (
+        <label className="check">
+          <input type="checkbox" disabled={!canWrite} checked={form.requireSso === true} onChange={(e) => setForm({ ...form, requireSso: e.target.checked })} />
+          <span>Require single sign-on with {instance.sso.name} (owners can still use their master password alone, so a broken provider cannot lock everyone out)</span>
+        </label>
+      ) : null}
       <div className="grid-3">
         <div className="field">
           <label htmlFor="pol-score">Weakest master password</label>

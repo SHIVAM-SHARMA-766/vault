@@ -312,6 +312,15 @@ this server's real address, so a look-alike phishing page gets nothing. Your fir
 comes with ten recovery codes; save them. Removing a key asks for your master password and a
 second factor. Your master password still unlocks the vault: a key protects signing in.
 
+### Signing in with your company account (single sign-on)
+
+If your administrator set it up, the sign-in screen offers **Sign in with** your company's
+provider (Okta, Microsoft, Google…). Sign in there as usual. You come back to Vault with your
+address filled in, and enter your **master password**. The provider proves who you are, but only
+your master password opens your vault: your company's provider cannot read it. If your
+administrator requires single sign-on, the provider is the only way in, for passkeys and the
+recovery key too.
+
 ### Upgrade key derivation
 
 Vault turns your master password into keys with **Argon2id**. Every guess costs 64 MiB of

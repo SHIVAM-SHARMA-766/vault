@@ -25,9 +25,9 @@ type Step =
   | { kind: 'second'; proof: string; key: string }
   | { kind: 'password'; vaultKey: Uint8Array; proof: string; token: string }
 
-export function Recover({ onCancel }: { onCancel: () => void }) {
+export function Recover({ onCancel, sso = null }: { onCancel: () => void; sso?: { ticket: string; email: string } | null }) {
   const [step, setStep] = useState<Step>({ kind: 'key' })
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(sso?.email ?? '')
   const [recoveryKey, setRecoveryKey] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -43,7 +43,7 @@ export function Recover({ onCancel }: { onCancel: () => void }) {
   }
 
   async function open(proof: string, key: string, second?: SecondFactor) {
-    const res = await api.recoveryLogin(email, proof, second)
+    const res = await api.recoveryLogin(email, proof, second, sso?.ticket)
     const vaultKey = await unlockWithRecoveryKey(key, res.wrappedVaultKeyForRecovery)
     setStep({ kind: 'password', vaultKey, proof, token: res.accessToken })
     setRecoveryKey('')

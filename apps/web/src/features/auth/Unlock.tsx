@@ -14,13 +14,21 @@ import { PasswordInput } from '../../ui/kit.js'
 import { SecondFactorStep } from '../../ui/SecondFactor.js'
 import { t } from '../../lib/i18n.js'
 
-export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, forAdmin = false }: {
+export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, forAdmin = false, sso = null, ssoError = '', onSsoCancel }: {
   onRegister: () => void; onRecover: () => void; onRequestAccess: () => void; onSigninHelp: () => void; forAdmin?: boolean
+  /** Back from the identity provider (decisions/0021): its ticket and the account it named. */
+  sso?: { ticket: string; email: string } | null; ssoError?: string; onSsoCancel?: () => void
 }) {
   const instance = useInstance()
   const mode = instance?.registration
   const deskOn = instance?.features?.serviceDesk ?? true
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(sso?.email ?? '')
+  useEffect(() => { if (sso) setEmail(sso.email) }, [sso])
+  // When the server requires single sign-on, the password-only form is for
+  // owners (who are exempt) and stays folded away.
+  const [ownerPath, setOwnerPath] = useState(false)
+  const ssoOffer = instance?.sso ?? null
+  const ssoOnly = !!ssoOffer?.required && !sso && !ownerPath
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -41,7 +49,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
     setError('')
     setBusy(true)
     try {
-      await signInWithPasskey()
+      await signInWithPasskey(sso?.ticket)
     } catch (err) {
       if (err instanceof NoPrfError) setError(err.message)
       else if (err instanceof DOMException) setError('No passkey was used. If you have not added one, sign in with your master password and add it in Settings → Security.')
@@ -57,7 +65,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       // The server accepted the auth key but the blob would not open. That
       // is corruption or the wrong account, not a wrong password.
       setError('The vault did not open. The stored key may be damaged.')
-    } else if (err instanceof ApiError && (err.code === 'invalid_two_factor' || err.code === 'network_not_allowed')) {
+    } else if (err instanceof ApiError && (err.code === 'invalid_two_factor' || err.code === 'network_not_allowed' || err.code === 'sso_required' || err.code === 'sso_invalid')) {
       setError(err.message)
     } else if (err instanceof ApiError && err.status === 403) {
       setError('This account has been disabled. Contact the person who runs this vault.')
@@ -77,7 +85,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
    *  then unwrap the vault key here. A wrong password fails at the server; a
    *  damaged key fails in this browser. */
   async function finish(authKey: string, kek: Uint8Array, second?: SecondFactor, typedKey?: Uint8Array) {
-    const result = await api.login(email, authKey, second)
+    const result = await api.login(email, authKey, second, sso?.ticket)
     const vaultKey = await unwrapVaultKey(result.wrappedVaultKey, kek, 'master')
     if (typedKey) { await storeSecretKey(email, typedKey).catch(() => {}); typedKey.fill(0) }
     session.unlock({
@@ -167,7 +175,7 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       setBusy(false)
       // A key's challenge works once: ask for a fresh one for the next try.
       if ('webauthn' in second) {
-        try { await api.login(email, pending.authKey) } catch (again) {
+        try { await api.login(email, pending.authKey, undefined, sso?.ticket) } catch (again) {
           if (again instanceof ApiError && again.code === 'two_factor_required') setOffer((again.details as SecondFactorOffer | undefined) ?? null)
         }
       }
@@ -196,10 +204,24 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
         </>
       )}
 
+      {ssoError ? <p className="alert alert-error"><IconAlert size={16} />{ssoError}</p> : null}
+      {sso ? (
+        <p className="alert alert-info sso-banner"><span>{ssoOffer?.name ?? 'Your identity provider'} signed you in as <strong>{sso.email}</strong>. Enter your master password: it, not the provider, opens your vault.{' '}
+          <button type="button" className="link" onClick={onSsoCancel}>Not you?</button></span></p>
+      ) : ssoOffer ? (
+        <>
+          <a className={`btn ${ssoOffer.required ? 'btn-primary' : 'btn-secondary'} btn-block sso-start`} href="/api/auth/sso/start">{t('Sign in with')} {ssoOffer.name}</a>
+          {ssoOnly ? (
+            <p className="hint sso-owner"><button type="button" className="link" onClick={() => setOwnerPath(true)}>Server owner? Sign in with your master password</button></p>
+          ) : <div className="auth-or"><span>{t('or')}</span></div>}
+        </>
+      ) : null}
+
+      {ssoOnly ? null : <>
       <div className="field">
         <label htmlFor="email">{t('Email')}</label>
-        <input id="email" type="email" autoComplete="username" required autoFocus
-               placeholder="you@example.com"
+        <input id="email" type="email" autoComplete="username" required autoFocus={!ssoOffer}
+               placeholder="you@example.com" readOnly={!!sso}
                value={email} onChange={(e) => { setEmail(e.target.value); setHeldButRefused(false) }} />
       </div>
 
@@ -236,6 +258,8 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
           </button>
         </>
       ) : null}
+
+      </>}
 
       <p className="auth-forgot">
         <button type="button" className="link" onClick={onRecover}>{t('Forgot your master password? Use your recovery key')}</button>
