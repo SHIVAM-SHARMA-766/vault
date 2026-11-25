@@ -202,6 +202,21 @@ export const api = {
       'POST', '/api/auth/recovery-login', { body: { email, recoveryAuthKey, ...second } },
     ),
 
+  // Unlock with a passkey (decisions/0034).
+  passkeyLogin: {
+    options: () => request<{ options: Record<string, unknown> }>('POST', '/api/auth/passkey-login/options', { body: {} }),
+    finish: (response: Record<string, unknown>) =>
+      request<Session & { credentialId: string; wrappedVaultKey: string; sealedEmail: string; kdf: KdfParams }>('POST', '/api/auth/passkey-login', { body: { response } }),
+  },
+  passkeys: {
+    options: (token: string, currentAuthKey: string) =>
+      request<{ options: Record<string, unknown> }>('POST', '/api/auth/passkeys/options', { token, body: { currentAuthKey } }),
+    add: (token: string, name: string, response: Record<string, unknown>, wrapping: { wrappedVaultKey: string; sealedEmail: string }) =>
+      request<{ id: string; name: string }>('POST', '/api/auth/passkeys', { token, body: { name, response, ...wrapping } }),
+    remove: (token: string, id: string) =>
+      request<{ ok: true }>('DELETE', `/api/auth/passkeys/${encodeURIComponent(id)}`, { token }),
+  },
+
   twoFactor: {
     setup: (token: string, currentAuthKey: string) =>
       request<{ secret: string }>('POST', '/api/auth/2fa/setup', { token, body: { currentAuthKey } }),
@@ -250,7 +265,7 @@ export const api = {
   /** Self-reported strength (0–4) of the master password, for organization policies. */
   passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
-    request<{ userId: string; canCreateCompany?: boolean; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
+    request<{ userId: string; canCreateCompany?: boolean; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; passkeys?: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[]; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
       'GET', '/api/auth/me', { token },
     ),
 

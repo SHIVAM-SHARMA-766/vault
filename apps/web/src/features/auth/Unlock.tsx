@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { passwordStrength } from '@vault/core'
 
@@ -6,9 +6,10 @@ import { SecretKeyFormatError, UnsealError, deriveLoginKeys, fromBase64Url, pars
 
 import { ApiError, type SecondFactor, type SecondFactorOffer, api } from '../../lib/api.js'
 import { useInstance } from '../../lib/instance.js'
+import { NoPrfError, passkeysOffered, signInWithPasskey } from '../../lib/passkey.js'
 import { forgetSecretKey, loadSecretKey, storeSecretKey } from '../../lib/secretkey.js'
 import * as session from '../../lib/session.js'
-import { IconAlert } from '../../ui/icons.js'
+import { IconAlert, IconFingerprint } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
 import { SecondFactorStep } from '../../ui/SecondFactor.js'
 import { t } from '../../lib/i18n.js'
@@ -32,6 +33,24 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
   const [secretText, setSecretText] = useState('')
   const [heldButRefused, setHeldButRefused] = useState(false)
   const [offer, setOffer] = useState<SecondFactorOffer | null>(null)
+  // Unlock with a passkey (decisions/0034): offered where the browser can.
+  const [passkeys, setPasskeys] = useState(false)
+  useEffect(() => { void passkeysOffered().then(setPasskeys) }, [])
+
+  async function withPasskey() {
+    setError('')
+    setBusy(true)
+    try {
+      await signInWithPasskey()
+    } catch (err) {
+      if (err instanceof NoPrfError) setError(err.message)
+      else if (err instanceof DOMException) setError('No passkey was used. If you have not added one, sign in with your master password and add it in Settings → Security.')
+      else if (err instanceof ApiError && err.code === 'invalid_credentials') setError(err.message)
+      else explain(err)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   function explain(err: unknown) {
     if (err instanceof UnsealError) {
@@ -205,6 +224,15 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
       <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
         {busy ? <><span className="spinner" />{t('Deriving key…')}</> : t('Unlock')}
       </button>
+
+      {passkeys ? (
+        <>
+          <div className="auth-or"><span>{t('or')}</span></div>
+          <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => void withPasskey()}>
+            <IconFingerprint size={16} />{t('Sign in with a passkey')}
+          </button>
+        </>
+      ) : null}
 
       <p className="auth-forgot">
         <button type="button" className="link" onClick={onRecover}>{t('Forgot your master password? Use your recovery key')}</button>

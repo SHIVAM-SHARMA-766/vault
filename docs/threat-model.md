@@ -304,6 +304,22 @@ particular device maker, and needs no metadata service). Admin and help-desk two
 clear keys as well as the authenticator app, after the verification those flows already require
 (A13).
 
+### A21b — Unlocking with a passkey
+
+A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the
+master password for that vault, and is opt-in per passkey.
+
+- **What the server holds:** the vault key wrapped under an HKDF branch of the passkey's PRF
+  output. That output is computed inside the authenticator after user verification and never
+  sent, so a database dump gives nothing to guess offline.
+- **Sign-in:** names no account (discoverable credentials, A7). It requires user verification
+  and a single-use challenge. It obeys the network allow-list, disabled accounts and the
+  sign-in rate limits.
+- **Binding:** the blobs are bound to the credential id, so a hostile server cannot make one
+  passkey open another's blob.
+- **What the person must weigh:** a synced passkey is as strong as the account it syncs
+  through.
+
 ### A22 — The organization recovery key
 
 The recovery key ([0026](../decisions/0026-organization-recovery-key.md)) is the secret half of a

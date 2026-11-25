@@ -39,12 +39,12 @@ export class SoftAuthenticator {
   private get rpIdHash() { return sha256(new URL(this.origin).hostname) }
 
   /** The answer to navigator.credentials.create(options). */
-  register(options: { challenge: string }): Record<string, unknown> {
+  register(options: { challenge: string }, opts: { uv?: boolean } = {}): Record<string, unknown> {
     const clientData = Buffer.from(JSON.stringify({ type: 'webauthn.create', challenge: options.challenge, origin: this.origin, crossOrigin: false }))
     const cose = cbor(new Map<Cbor, Cbor>([[1, 2], [3, -7], [-1, 1], [-2, this.pub.x], [-3, this.pub.y]]))
     const idLen = Buffer.alloc(2); idLen.writeUInt16BE(this.id.length)
     const counter = Buffer.alloc(4)
-    const authData = Buffer.concat([this.rpIdHash, Buffer.from([0x41]), counter, Buffer.alloc(16), idLen, this.id, cose])
+    const authData = Buffer.concat([this.rpIdHash, Buffer.from([opts.uv ? 0x45 : 0x41]), counter, Buffer.alloc(16), idLen, this.id, cose])
     const attestationObject = cbor({ fmt: 'none', attStmt: new Map(), authData })
     return {
       id: b64u(this.id), rawId: b64u(this.id), type: 'public-key', clientExtensionResults: {},
@@ -53,15 +53,15 @@ export class SoftAuthenticator {
   }
 
   /** The answer to navigator.credentials.get(options). */
-  assert(options: { challenge: string }, opts: { origin?: string } = {}): Record<string, unknown> {
+  assert(options: { challenge: string }, opts: { origin?: string; uv?: boolean; userHandle?: string } = {}): Record<string, unknown> {
     this.counter++
     const clientData = Buffer.from(JSON.stringify({ type: 'webauthn.get', challenge: options.challenge, origin: opts.origin ?? this.origin, crossOrigin: false }))
     const counter = Buffer.alloc(4); counter.writeUInt32BE(this.counter)
-    const authData = Buffer.concat([this.rpIdHash, Buffer.from([0x01]), counter])
+    const authData = Buffer.concat([this.rpIdHash, Buffer.from([opts.uv ? 0x05 : 0x01]), counter])
     const signature = sign('sha256', Buffer.concat([authData, sha256(clientData)]), this.key)
     return {
       id: b64u(this.id), rawId: b64u(this.id), type: 'public-key', clientExtensionResults: {},
-      response: { clientDataJSON: b64u(clientData), authenticatorData: b64u(authData), signature: b64u(signature) },
+      response: { clientDataJSON: b64u(clientData), authenticatorData: b64u(authData), signature: b64u(signature), ...(opts.userHandle !== undefined ? { userHandle: b64u(Buffer.from(opts.userHandle, 'utf8')) } : {}) },
     }
   }
 }
