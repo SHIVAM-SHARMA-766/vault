@@ -311,8 +311,13 @@ export const api = {
     accept: (token: string, org: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/accept`, { token }),
     decline: (token: string, org: string) => request<{ ok: true }>('POST', `/api/orgs/${org}/decline`, { token }),
     members: (token: string, org: string) => request<{ members: OrgMember[]; pending: OrgPending[] }>('GET', `/api/orgs/${org}/members`, { token }),
-    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin', groups: string[] = []) =>
-      request<{ ok: true }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role, ...(groups.length ? { groups } : {}) } }),
+    /** `withSignup`: in a business Vault, an address with no account also gets a
+     *  sign-up code (decisions/0032). */
+    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin', groups: string[] = [], withSignup = false) =>
+      request<{ ok: true; signup?: { code: string; emailed: boolean; expiresAt: string }; warning?: string }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role, ...(groups.length ? { groups } : {}), ...(withSignup ? { withSignup } : {}) } }),
+    /** Add to company: an existing account, by id, for an admin who sees accounts. */
+    inviteAccount: (token: string, org: string, userId: string, groups: string[] = []) =>
+      request<{ ok: true }>('POST', `/api/orgs/${org}/invites`, { token, body: { userId, ...(groups.length ? { groups } : {}) } }),
     stale: (token: string, org: string) => request<{ items: { collectionId: string; itemId: string; since: string; who: string }[] }>('GET', `/api/orgs/${org}/stale`, { token }),
     withdraw: (token: string, org: string, id: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/invites/${encodeURIComponent(id)}`, { token }),
     confirm: (token: string, org: string, user: string, orgKeyBlob: string) =>

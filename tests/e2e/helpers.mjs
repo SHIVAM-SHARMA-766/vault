@@ -95,9 +95,11 @@ export async function start({ owner = 'owner@example.test', edition = 'hosted' }
     await page.getByRole('menuitem', { name }).click()
   }
 
-  /** Opens one section of an organization in the admin console (Members,
-   *  Groups, Collections, Policies, Activity, Recovery & backup). */
-  async function manage(page, org, section = 'Members') {
+  /** Opens one section of an organization in the admin console (People —
+   *  "Members" still works —, Groups, Collections, Policies, Activity,
+   *  Recovery & backup). */
+  async function manage(page, org, section = 'People') {
+    if (section === 'Members') section = 'People'
     await menu(page, 'Admin console')
     await page.waitForSelector('.console-layout')
     const picker = page.locator('.sidebar select#scope')

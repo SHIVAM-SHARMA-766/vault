@@ -371,6 +371,18 @@ Vault keeps using an organization apart from running one
    **Can manage** (manage lets them share it onward). **Hide passwords** lets someone use a
    login without seeing its password in the app — a policy, not encryption.
 
+**In a business Vault** ([0032](../decisions/0032-business-edition.md)) the server is one
+company. The owner creates it once, and the console's **People** section is where everyone is
+managed:
+
+- **Invite by email address.** Someone without an account gets a single-use sign-up code,
+  emailed if mail is set up and shown to you otherwise. They sign up, accept, and you confirm
+  them by fingerprint.
+- **Add to company.** Accounts already on the server but not in the company are listed under
+  *On this server, not in …*, with **Add to company**.
+- **Each person's account.** An admin who also manages accounts sees each person's last sign-in
+  and two-factor status, with **Account** actions: disable sign-in, reset two-factor, offboard.
+
 **Share with one person.** Open an item, choose **Share**, and type the address of someone
 with an account on this server. Vault makes a private space for the two of you (shown in
 My organizations as a **Direct share**, where you also confirm them), moves the item into it,

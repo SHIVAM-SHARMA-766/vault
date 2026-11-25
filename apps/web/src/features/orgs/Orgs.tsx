@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react'
 
 import { fingerprintOf, loadTrust, saveTrust } from './trust.js'
 
-import { type OrgMember, type OrgPending, type SharePermission, api } from '../../lib/api.js'
+import { type AdminUser, type OrgMember, type OrgPending, type SharePermission, api } from '../../lib/api.js'
+import { useEdition } from '../../lib/instance.js'
 import { Link, href, navigate } from '../../lib/router.js'
 import { refreshScopes } from '../../lib/workspace.js'
 import * as session from '../../lib/session.js'
@@ -24,6 +25,10 @@ export function Orgs({ state }: { state: session.Unlocked }) {
   const [name, setName] = useState('')
   const [showKey, setShowKey] = useState<{ org: string; key: string; id: string } | null>(null)
   const newcomer = teams.orgs.length === 0 && teams.invitations.length === 0
+  // A business Vault has one company (decisions/0032): created once, then never offered again.
+  const { edition } = useEdition()
+  const business = edition === 'business'
+  const hasCompany = teams.orgs.some((o) => o.kind !== 'direct')
   const fingerprint = (
         <section className="settings-card" aria-labelledby="o-fp">
           <div className="settings-card-head"><IconShield size={18} /><h2 id="o-fp">Your fingerprint</h2></div>
@@ -40,7 +45,7 @@ export function Orgs({ state }: { state: session.Unlocked }) {
             setShowKey({ org: name.trim(), key: made.recoveryKey, id: made.id }); setName(''); toast('Organization created')
           } catch (err) { toast(err instanceof Error ? err.message : 'Could not create it.', 'error') }
         }}>
-          <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">New organization</h2></div>
+          <div className="settings-card-head"><IconPlus size={18} /><h2 id="o-new">{business ? 'Create your company' : 'New organization'}</h2></div>
           <div className="field"><label htmlFor="o-name">Name</label><input id="o-name" required maxLength={80} placeholder="e.g. Acme Finance" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <p className="hint">You become its owner and manage it from the <strong>Admin console</strong>. The name is encrypted for members; people you invite see it in their invitation.</p>
           <div className="settings-actions"><button className="btn btn-primary" type="submit" disabled={!name.trim()}>Create</button></div>
@@ -82,7 +87,7 @@ export function Orgs({ state }: { state: session.Unlocked }) {
 
         {/* Someone in no organization yet sees how to start one first; someone in
             one needs their fingerprint first, for the admins who confirm them. */}
-        {newcomer ? <>{newOrg}{fingerprint}</> : <>{fingerprint}{newOrg}</>}
+        {!teams.loaded ? fingerprint : business && hasCompany ? fingerprint : newcomer ? <>{newOrg}{fingerprint}</> : <>{fingerprint}{newOrg}</>}
       </main>
       {showKey ? <RecoveryKeyShown org={showKey.org} recoveryKey={showKey.key} onDone={() => { const id = showKey.id; setShowKey(null); navigate(href({ name: 'console', scope: 'org', org: id, section: 'members' })) }} /> : null}
     </Shell>
@@ -140,6 +145,16 @@ function DirectShare({ org, teams }: { org: OrgView; teams: Teams }) {
   return <OrgMembers org={org} teams={teams} selfId={session.get()?.userId ?? ''} people={people} direct />
 }
 
+/** What the server knows about an account: last sign-in and two-factor. */
+function AccountFacts({ a }: { a: AdminUser }) {
+  return (
+    <span className="account-facts muted small">
+      {a.lastLoginAt ? `Signed in ${when(a.lastLoginAt)}` : 'Never signed in'}
+      {' · '}{a.twoFactor ? <span className="fact-ok">two-factor on</span> : <span className="fact-warn">no two-factor</span>}
+    </span>
+  )
+}
+
 function OwnerChanged({ org, teams }: { org: OrgView; teams: Teams }) {
   const toast = useToast()
   return (
@@ -178,6 +193,23 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
   const [label, setLabel] = useState('')
   const [inviteGroups, setInviteGroups] = useState<string[]>([])
   const waiting = members.filter((m) => m.status === 'accepted')
+  // People (decisions/0032): with the server's account facts and actions for
+  // an admin who also holds those permissions, and in a business Vault, the
+  // accounts not yet in the company.
+  const { edition } = useEdition()
+  const perms = new Set(session.get()?.permissions ?? [])
+  const seeAccounts = !direct && perms.has('users.read')
+  const manageAccounts = !direct && perms.has('users.write')
+  const [accounts, setAccounts] = useState<AdminUser[] | null>(null)
+  const loadAccounts = async () => { if (seeAccounts) setAccounts((await api.admin.users(await session.token())).users) }
+  useEffect(() => { void loadAccounts().catch(() => setAccounts(null)) }, [seeAccounts, members.length])
+  const accountOf = (id: string) => accounts?.find((a) => a.userId === id)
+  const outside = edition === 'business' && accounts ? accounts.filter((a) => !members.some((m) => m.userId === a.userId)) : []
+  const [signup, setSignup] = useState<{ label: string; code: string; emailed: boolean; expiresAt: string; warning?: string } | null>(null)
+  async function accountAction(label: string, run: (t: string) => Promise<unknown>, done: string) {
+    try { await run(await session.token()); toast(done); await loadAccounts() }
+    catch (err) { toast(err instanceof Error ? err.message : `Could not ${label}.`, 'error') }
+  }
   // Waiting for confirmation first, then owners and admins, then by name.
   const rank = (m: OrgMember) => (m.status === 'accepted' ? 0 : m.role === 'owner' ? 1 : m.role === 'admin' ? 2 : 3)
   const sorted = [...members].sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
@@ -194,10 +226,21 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
         {sorted.map((m) => (
           <li key={m.userId} className="device-row">
             <div className="device-text">
-              <span className="device-name">{m.label}{m.userId === selfId ? <span className="pill">You</span> : null}</span>
+              <span className="device-name">{m.label}{m.userId === selfId ? <span className="pill">You</span> : null}{accountOf(m.userId)?.disabled ? <span className="pill pill-danger">Disabled</span> : null}</span>
               <span className="muted small">{m.role} · {m.status === 'confirmed' ? 'confirmed' : 'waiting for confirmation'}</span>
+              {accountOf(m.userId) ? <AccountFacts a={accountOf(m.userId)!} /> : null}
             </div>
             <div className="device-actions">
+              {manageAccounts && accountOf(m.userId) && m.userId !== selfId && m.role !== 'owner' ? (
+                <details className="account-menu">
+                  <summary className="btn btn-ghost btn-sm" aria-label={`Account actions for ${m.label}`}>Account</summary>
+                  <div className="account-menu-pop">
+                    <button className="btn btn-ghost btn-sm" onClick={() => void accountAction('change it', (t) => api.admin.setDisabled(t, m.userId, !accountOf(m.userId)!.disabled), accountOf(m.userId)!.disabled ? `${m.label} can sign in again` : `${m.label} is disabled`)}>{accountOf(m.userId)!.disabled ? 'Enable sign-in' : 'Disable sign-in'}</button>
+                    {accountOf(m.userId)!.twoFactor ? <button className="btn btn-ghost btn-sm" onClick={() => { if (window.confirm(`Turn off two-factor sign-in for ${m.label}? Do this only after confirming who is asking.`)) void accountAction('reset it', (t) => api.admin.resetTwoFactor(t, m.userId), 'Two-factor sign-in turned off') }}>Reset two-factor</button> : null}
+                    <button className="btn btn-ghost btn-sm" onClick={() => { if (window.confirm(`Offboard ${m.label}? Their sign-in is disabled and every device signed out.`)) void accountAction('offboard', (t) => api.admin.offboard(t, m.userId), `${m.label} offboarded`) }}>Offboard…</button>
+                  </div>
+                </details>
+              ) : null}
               {m.status === 'accepted' ? (
                 <button className="btn btn-primary btn-sm" onClick={async () => setConfirming({ m, fp: await fingerprintOf(m.publicKey, m.currentSigningKey ?? null) })}>Confirm…</button>
               ) : null}
@@ -230,6 +273,28 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
           </li>
         ))}
       </ul>
+
+      {outside.length ? (
+        <>
+          <h3 className="small-head">On this server, not in {org.name}</h3>
+          <ul className="device-list">
+            {outside.map((a) => (
+              <li key={a.userId} className="device-row outside-row">
+                <div className="device-text">
+                  <span className="device-name">{a.label || <span className="muted">Unlabelled account</span>}{a.disabled ? <span className="pill pill-danger">Disabled</span> : null}</span>
+                  <AccountFacts a={a} />
+                </div>
+                {pending.some((p) => p.label === a.label) ? <span className="muted small">Invited</span> : (
+                  <button className="btn btn-secondary btn-sm" disabled={a.disabled} onClick={async () => {
+                    try { await api.orgs.inviteAccount(await session.token(), org.id, a.userId); toast(`${a.label || 'They'} will see the invitation when they sign in`); await people.reload() }
+                    catch (err) { toast(err instanceof Error ? err.message : 'Could not invite.', 'error') }
+                  }}>Add to {edition === 'business' ? 'company' : org.name}</button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       {reconfirming ? (
         <div className="confirm" role="dialog" aria-label="Re-confirm member">
@@ -273,8 +338,14 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
 
       {direct ? null : <form className="org-invite" onSubmit={async (e) => {
         e.preventDefault()
-        await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups)
-        toast('Invited. They will see it when they sign in.'); setEmail(''); setLabel(''); setInviteGroups([]); await people.reload()
+        try {
+          // A business Vault sends someone without an account a sign-up code too (0032).
+          const res = await api.orgs.invite(await session.token(), org.id, email.trim(), label.trim(), 'member', inviteGroups, edition === 'business')
+          const who = label.trim() || email.trim().split('@')[0]!
+          if (res.signup) setSignup({ label: who, ...res.signup, ...(res.warning ? { warning: res.warning } : {}) })
+          else toast('Invited. They will see it when they sign in.')
+          setEmail(''); setLabel(''); setInviteGroups([]); await people.reload()
+        } catch (err) { toast(err instanceof Error ? err.message : 'Could not invite.', 'error') }
       }}>
         <h3 className="small-head">Invite someone</h3>
         <div className="inline-form">
@@ -291,7 +362,17 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
             ))}
           </div>
         ) : null}
-        <p className="hint">They need an account on this server. They accept under My organizations, then you confirm them here by fingerprint.</p>
+        <p className="hint">{edition === 'business'
+          ? 'Someone without an account gets a sign-up code. They accept under My organizations, then you confirm them here by fingerprint.'
+          : 'They need an account on this server. They accept under My organizations, then you confirm them here by fingerprint.'}</p>
+        {signup ? (
+          <div className="confirm signup-code" role="status">
+            <p><strong>{signup.label} has no account yet.</strong> {signup.emailed ? 'They were emailed a sign-up link.' : 'Send them this sign-up code, by a channel you trust:'} It works once, until {when(signup.expiresAt)}; then they accept the invitation and you confirm them here.</p>
+            {signup.emailed ? null : <div className="recovery-key"><code>{signup.code}</code><CopyButton value={signup.code} label="Sign-up code" /></div>}
+            {signup.warning ? <p className="alert alert-warn"><IconAlert size={16} />{signup.warning}</p> : null}
+            <div className="confirm-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setSignup(null)}>Done</button></div>
+          </div>
+        ) : null}
       </form>}
     </section>
   )

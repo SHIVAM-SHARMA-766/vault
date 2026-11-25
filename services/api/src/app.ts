@@ -123,7 +123,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/orgs/:org/accept', authedP((u, _e, [o]) => orgs.acceptInvite(app, u, o!)), 'Accept an invitation')
   router.post('/api/orgs/:org/decline', authedP((u, _e, [o]) => orgs.declineInvite(app, u, o!)), 'Decline an invitation')
   router.get('/api/orgs/:org/members', authedP((u, _e, [o]) => orgs.members(app, u, o!)), 'Members, with public keys, and pending invitations')
-  router.post('/api/orgs/:org/invites', authedP((u, e, [o]) => orgs.invite(app, u, e, o!)), 'Invite someone by email address')
+  router.post('/api/orgs/:org/invites', authedP((u, e, [o]) => orgs.invite(app, u, e, o!)), 'Invite someone by email address, or an existing account by id (business: with a sign-up code)')
   router.delete('/api/orgs/:org/invites/:digest', authedP((u, _e, [o, d]) => orgs.withdrawInvite(app, u, o!, d!)), 'Withdraw an invitation')
   router.post('/api/orgs/:org/members/:user/confirm', authedP((u, e, [o, t]) => orgs.confirmMember(app, u, e, o!, t!)), 'Confirm a member by fingerprint: send them the org key')
   router.put('/api/orgs/:org/members/:user', authedP((u, e, [o, t]) => orgs.setMemberRole(app, u, e, o!, t!)), 'Change a member\'s role (owner)')

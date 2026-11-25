@@ -2068,7 +2068,7 @@
     },
     "/api/orgs/{org}/invites": {
       "post": {
-        "summary": "Invite someone by email address",
+        "summary": "Invite someone by email address, or an existing account by id (business: with a sign-up code)",
         "operationId": "postOrgsOrgInvites",
         "tags": [
           "orgs"

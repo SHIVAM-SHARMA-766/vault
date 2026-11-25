@@ -5,9 +5,9 @@
 
 import { useEffect, type ReactElement } from 'react'
 
-import type { Features } from '../../lib/api.js'
+import type { Edition, Features } from '../../lib/api.js'
 import { useEdition, useInstance } from '../../lib/instance.js'
-import { type Route, href, navigate } from '../../lib/router.js'
+import { Link, type Route, href, navigate } from '../../lib/router.js'
 import * as session from '../../lib/session.js'
 import { type Scope, useScopes } from '../../lib/workspace.js'
 import { IconAlert, IconFolder, IconGrid, IconNote, IconShield, IconSliders, IconUser, IconUsers } from '../../ui/icons.js'
@@ -19,7 +19,7 @@ import { Activity, Groups, OrgBackup, OrgCollections, OrgMembers, OrgRecovery, P
 type ConsoleRoute = Extract<Route, { name: 'console' }>
 
 const ORG_SECTIONS = [
-  { id: 'members', label: 'Members', Icon: IconUser, intro: 'Who belongs, who is waiting for you to confirm them, and inviting more.' },
+  { id: 'members', label: 'People', Icon: IconUser, intro: 'Everyone in the organization: who is waiting for you to confirm them, who is invited, and inviting more.' },
   { id: 'groups', label: 'Groups', Icon: IconUsers, intro: 'Teams of members, to give collections to several people at once.' },
   { id: 'collections', label: 'Collections', Icon: IconFolder, intro: 'Shared folders, who can open each, and requests for access.' },
   { id: 'policies', label: 'Policies', Icon: IconSliders, intro: 'Rules every member must meet before the collections open for them.' },
@@ -31,8 +31,11 @@ type OrgSection = (typeof ORG_SECTIONS)[number]['id']
 const scopeKey = (s: Scope) => (s.kind === 'server' ? 'server' : `org:${s.id}`)
 
 export function Console({ state, route }: { state: session.Unlocked; route: ConsoleRoute }) {
-  const { scopes, loaded } = useScopes(state)
-  const { features } = useEdition()
+  const { scopes: found, loaded } = useScopes(state)
+  const { features, edition } = useEdition()
+  // A business Vault is its company first; the server second (decisions/0032).
+  const scopes = edition === 'business' ? [...found.filter((s) => s.kind === 'org'), ...found.filter((s) => s.kind === 'server')] : found
+  const noCompany = edition === 'business' && !found.some((s) => s.kind === 'org') && state.role === 'owner'
   const instance = useInstance()
 
   const current: Scope | undefined = route.scope === 'server' ? scopes.find((s) => s.kind === 'server')
@@ -69,7 +72,7 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
         <nav className="sidebar" aria-label="Admin console">
           <ScopePicker id="scope" scopes={scopes} current={current} serverName={serverName} onChoose={choose} />
           {current.kind === 'server'
-            ? <ServerNav state={state} features={features} section={route.section} />
+            ? <ServerNav state={state} features={features} edition={edition} section={route.section} />
             : <OrgNav orgId={current.id} section={route.section} />}
           <div className="sidebar-foot">
             <IconShield size={14} /> {current.kind === 'server'
@@ -81,12 +84,19 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
         <div className="console-mobile">
           <ScopePicker id="scope-m" scopes={scopes} current={current} serverName={serverName} onChoose={choose} />
           {current.kind === 'server'
-            ? <Chips items={serverTabs(state, features)} active={serverTabs(state, features).find((t) => t.id === route.section)?.id ?? serverTabs(state, features)[0]?.id ?? 'overview'} onGo={(id) => navigate(href({ name: 'console', scope: 'server', section: id }))} />
+            ? <Chips items={serverTabs(state, features, edition)} active={serverTabs(state, features, edition).find((t) => t.id === route.section)?.id ?? serverTabs(state, features, edition)[0]?.id ?? 'overview'} onGo={(id) => navigate(href({ name: 'console', scope: 'server', section: id }))} />
             : <Chips items={[...ORG_SECTIONS]} active={ORG_SECTIONS.find((t) => t.id === route.section)?.id ?? 'members'} onGo={(id) => navigate(href({ name: 'console', scope: 'org', org: current.id, section: id }))} />}
         </div>
         <main className="admin-main">
           {current.kind === 'server'
-            ? <ServerScope state={state} features={features} section={route.section} />
+            ? <>
+                {noCompany ? (
+                  <div className="admin-section console-prompt">
+                    <p className="alert alert-info"><IconAlert size={16} /><span><strong>Create your company</strong> to invite your people: they join it, you confirm them by fingerprint, and you share collections with them. <Link className="link" to="/app/orgs">Create the company</Link></span></p>
+                  </div>
+                ) : null}
+                <ServerScope state={state} features={features} edition={edition} section={route.section} />
+              </>
             : <OrgScope state={state} orgId={current.id} fallbackName={current.name} section={route.section} />}
         </main>
       </div>
@@ -119,15 +129,15 @@ function NavList({ items, active, onGo }: { items: { id: string; label: string; 
   )
 }
 
-function ServerNav({ state, features, section }: { state: session.Unlocked; features: Features; section: string | null }) {
-  const tabs = serverTabs(state, features)
+function ServerNav({ state, features, edition, section }: { state: session.Unlocked; features: Features; edition: Edition; section: string | null }) {
+  const tabs = serverTabs(state, features, edition)
   const active = tabs.find((t) => t.id === section)?.id ?? tabs[0]?.id ?? 'overview'
   const go = (id: string) => navigate(href({ name: 'console', scope: 'server', section: id }))
   return <NavList items={tabs} active={active} onGo={go} />
 }
 
-function ServerScope({ state, features, section }: { state: session.Unlocked; features: Features; section: string | null }) {
-  const tabs = serverTabs(state, features)
+function ServerScope({ state, features, edition, section }: { state: session.Unlocked; features: Features; edition: Edition; section: string | null }) {
+  const tabs = serverTabs(state, features, edition)
   const tab = (tabs.find((t) => t.id === section)?.id ?? tabs[0]?.id ?? 'overview') as ServerTab
   return <ServerSection state={state} tab={tab} onGo={(t) => navigate(href({ name: 'console', scope: 'server', section: t }))} />
 }

@@ -1085,3 +1085,15 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .invite-groups { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 8px; border: 0; padding: 0; }
 .invite-groups .check { margin: 0; display: inline-flex; align-items: center; gap: 6px; width: auto; }
 .invite-groups .check input[type=checkbox] { width: 15px; height: 15px; flex: none; margin: 0; }
+
+/* People (decisions/0032) */
+.account-facts { display: block; margin-top: 2px; }
+.fact-ok { color: var(--ok-text, var(--ok)); }
+.fact-warn { color: var(--warn); }
+.account-menu { position: relative; }
+.account-menu summary { list-style: none; cursor: pointer; }
+.account-menu summary::-webkit-details-marker { display: none; }
+.account-menu-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: grid; min-width: 180px; padding: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); }
+.account-menu-pop .btn { justify-content: flex-start; }
+.signup-code { margin-top: 12px; }
+.console-prompt { padding-bottom: 0; }
