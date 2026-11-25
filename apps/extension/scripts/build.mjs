@@ -84,7 +84,7 @@ async function bundle(out, test) {
     define: { 'process.env.NODE_ENV': '"production"', __VAULT_TEST__: String(test) },
   }
   await build({ ...common, entryPoints: { background: `${root}src/background.ts`, popup: `${root}src/popup/popup.tsx` }, outdir: out, format: 'esm' })
-  await build({ ...common, entryPoints: { content: `${root}src/content.ts` }, outdir: out, format: 'iife' })
+  await build({ ...common, entryPoints: { content: `${root}src/content.ts`, 'passkey-page': `${root}src/passkey-page.ts`, 'passkey-bridge': `${root}src/passkey-bridge.ts` }, outdir: out, format: 'iife' })
 }
 await bundle(`${dist}/.bundle`, false)
 if (test) await bundle(`${dist}/.bundle-test`, true)

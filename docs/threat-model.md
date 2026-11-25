@@ -395,6 +395,14 @@ is typed. It holds no keys.
 - **What a hostile page can do:** offer itself a "save" for its own origin. That stores a login
   for that origin, never another site's password.
 
+**Passkeys** ([0035](../decisions/0035-passkeys-in-the-extension.md)), when turned on, add a
+script in the page's own world that wraps `navigator.credentials`. It decides nothing. The
+background takes the origin from the browser, refuses an rpId that is not the page's own
+registrable domain (or a parent of the host that is not a public suffix), and acts only after a
+trusted click in a closed shadow root. Clicks in the card's first 600 ms are ignored. A page can
+therefore get a passkey assertion only for itself, and only when the person chooses one. The
+private keys live inside sealed items like passwords.
+
 Shared collections in the extension get the same A15 protection as in the web app. It runs the
 same grant checks (`grants.ts`), so a collection key the server swapped or signed itself is
 refused, and the popup says so.

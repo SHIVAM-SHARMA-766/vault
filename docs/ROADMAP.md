@@ -37,7 +37,7 @@ flowchart LR
 | 2 — Self-hosted product | Anyone installs and upgrades it with one command | ✅ All 8 steps built 2026-11-07; licence, pricing and update channel still to decide |
 | 3 — Service desk, then teams | Help and support built in; then organizations, shared collections, policies | ✅ Built 2026-11-07 |
 | 3.5 — Improvement pass | Harden, polish and speed up everything built so far, before a second client | ⬜ Next |
-| 4 — Browser extension | Autofill, the main way a password manager is used | 🟡 Stage 1 built ([0029](../decisions/0029-browser-extension.md)) |
+| 4 — Browser extension | Autofill, the main way a password manager is used | 🟡 Stages 1–5 built ([0029](../decisions/0029-browser-extension.md)); store submission is the operator's step |
 | 5 — Android | Autofill and biometric unlock on the phone | ⬜ Planned |
 | 6 — Enterprise | SSO, SCIM, HA | ⬜ Planned |
 
@@ -334,7 +334,7 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 **D. Features others have**
 - ✅ D1 More item types (API credential, database, server, software licence, passport, driving licence, membership, crypto wallet; grouped picker; dates with an Expired badge) · ✅ D2 File attachments (key per file inside the sealed entry; personal items; in backups; [0020](../decisions/0020-attachments-and-offline-copy.md)) · ✅ D3 Secure share links (key in the link, expiry and view limits, revoke, opens in activity; [0018](../decisions/0018-share-links.md)) · ✅ D4 Archive
 - ✅ D5 Breach check (k-anonymity via the server, on request; [0019](../decisions/0019-breach-check.md)) and a health dashboard with expired / expiring items · ✅ D6 Expiry and rotation reminders (expiry and "remind me to change" in health; email reminders are not possible because the server keeps no addresses) · ✅ D7 Access requests (request with a reason, approve for good or as a 1 h–1 week check-out that ends by itself, decline)
-- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ✅ D9 Passkeys and security keys ([0022](../decisions/0022-passkeys.md)): ✅ as a second factor; ✅ unlock with a passkey (PRF, [0034](../decisions/0034-passkey-unlock.md)); storing passkeys comes with the extension · ✅ D10 The crypto decisions ([0023](../decisions/0023-crypto-hardening.md)): ✅ organization recovery key ([0026](../decisions/0026-organization-recovery-key.md)); ✅ signed key grants ([0025](../decisions/0025-signed-key-grants.md)); ✅ secret key, opt-in ([0027](../decisions/0027-secret-key.md)); ✅ Argon2id ([0028](../decisions/0028-argon2id.md): our own WebAssembly, new accounts and password changes, one-click upgrade)
+- ✅ D8 Passphrase generator (EFF large list, defaults in Preferences) · ✅ D9 Passkeys and security keys ([0022](../decisions/0022-passkeys.md)): ✅ as a second factor; ✅ unlock with a passkey (PRF, [0034](../decisions/0034-passkey-unlock.md)); ✅ storing passkeys for other sites, with the extension ([0035](../decisions/0035-passkeys-in-the-extension.md)) · ✅ D10 The crypto decisions ([0023](../decisions/0023-crypto-hardening.md)): ✅ organization recovery key ([0026](../decisions/0026-organization-recovery-key.md)); ✅ signed key grants ([0025](../decisions/0025-signed-key-grants.md)); ✅ secret key, opt-in ([0027](../decisions/0027-secret-key.md)); ✅ Argon2id ([0028](../decisions/0028-argon2id.md): our own WebAssembly, new accounts and password changes, one-click upgrade)
 - ✅ D11 Share one item with one person (a direct share: two-person space, fingerprint-confirmed) · ✅ D12 Notify on access to a sensitive item (owner and admins notified on open, reveal or copy)
 
 **E. UI/UX**
@@ -404,7 +404,7 @@ Design: [0029](../decisions/0029-browser-extension.md). Built in stages.
   the listing and privacy policy, and a packaging workflow (stage 4). Submitting is the
   operator's step: AMO and Edge are free; the Chrome Web Store's one-time fee is the operator's
   decision ([docs/extension-stores.md](extension-stores.md)).
-- [ ] Passkey storage and use, after autofill is solid (stage 5).
+- [x] Passkey storage and use: Vault saves the passkeys sites offer and signs in with them, the person confirming in the page; kept encrypted in the login item ([0035](../decisions/0035-passkeys-in-the-extension.md), stage 5).
 
 **Exit criteria:** fills and saves on the top sites in a test matrix; a phishing page on a
 look-alike domain gets nothing; published to the Chrome Web Store and Firefox Add-ons.

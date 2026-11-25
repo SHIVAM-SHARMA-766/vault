@@ -330,6 +330,18 @@ your master password opens your vault: your company's provider cannot read it. I
 administrator requires single sign-on, the provider is the only way in, for passkeys and the
 recovery key too.
 
+### Passkeys for websites (browser extension)
+
+In the extension's popup, turn on **Save and use passkeys in Vault**. When a site offers to
+create a passkey, Vault asks **Save a passkey for example.com?**:
+- **Save in Vault** keeps the passkey, encrypted in that site's login, on all your devices;
+- **Use another device** leaves it to your browser or phone.
+
+When the site asks you to sign in with a passkey, Vault lists the ones it has for that site. It
+never offers a passkey to a different site. Your vault must be unlocked; if it is not, the card
+says so. The login item in Vault shows its passkeys, and you can remove one in **Edit**. Remove
+it in the site's security settings as well.
+
 ### Upgrade key derivation
 
 Vault turns your master password into keys with **Argon2id**. Every guess costs 64 MiB of

@@ -29,6 +29,12 @@ extension. The server stores only ciphertext it cannot read.
   is cleared when the browser closes or the vault locks, and content scripts cannot read it.
 - If your account uses a secret key, that key, under a non-extractable device key.
 
+## Passkeys
+
+If you turn on *Save and use passkeys in Vault*, a passkey you save for a site is stored like a
+password: encrypted inside that site's login in your vault, on your Vault server. Vault answers
+a site's passkey request only for that site, and only after you choose it.
+
 ## Web pages
 
 The extension reads a page only to fill a login you asked it to fill, in the tab you acted in,

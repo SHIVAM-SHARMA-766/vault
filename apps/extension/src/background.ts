@@ -6,7 +6,7 @@
 // decrypted items are cached in this worker's memory only and rebuilt from the
 // server when the worker restarts.
 
-import { DEFAULT_PREFS, type GeneratorPrefs, effectiveLockMinutes, generateFromPrefs, matchSite, normalizePrefs, rankForPage } from '@vault/core'
+import { DEFAULT_PREFS, type GeneratorPrefs, type StoredPasskey, assertPasskey, createPasskey, effectiveLockMinutes, generateFromPrefs, matchSite, normalizePrefs, rankForPage, rpIdAllowed } from '@vault/core'
 import { WORDS } from '@vault/core/words'
 import {
   type EntryContent,
@@ -377,7 +377,7 @@ async function handle(req: Request): Promise<unknown> {
     case 'state': {
       const server = await getServer()
       const u = await getUnlocked()
-      return { server: server?.url ?? null, serverName: server?.name ?? null, locked: !u, email: u?.email ?? null, inline: await inlineOn() } satisfies StateReply
+      return { server: server?.url ?? null, serverName: server?.name ?? null, locked: !u, email: u?.email ?? null, inline: await inlineOn(), passkeys: await passkeysOn() } satisfies StateReply
     }
     case 'setServer': return setServer(req.url)
     case 'forgetServer': await lock(); await chrome.storage.local.remove('server'); return { ok: true }
@@ -389,6 +389,7 @@ async function handle(req: Request): Promise<unknown> {
     case 'sync': cache = null; await items(); return { ok: true }
     case 'lock': await lock(); return { ok: true }
     case 'setInline': return setInline(req.on)
+    case 'setPasskeys': return setPasskeys(req.on)
   }
 }
 
@@ -475,6 +476,142 @@ async function answer(p: Pending): Promise<void> {
   } finally { wipe(key) }
 }
 
+// ── Passkeys in Vault (decisions/0035) ─────────────────────────────────────
+
+const PASSKEY_PAGE_ID = 'vault-passkey-page'
+const PASSKEY_BRIDGE_ID = 'vault-passkey-bridge'
+const PASSKEY_MS = 5 * 60_000
+
+async function passkeysOn(): Promise<boolean> { return ((await chrome.storage.local.get('passkeys'))['passkeys'] as boolean | undefined) ?? false }
+
+/** Two scripts, registered at run time like the inline one: the page-world
+ *  wrapper of navigator.credentials, and the isolated bridge with the UI. */
+async function setPasskeys(on: boolean): Promise<{ ok: true } | { ok: false; error: string }> {
+  const ids = [PASSKEY_PAGE_ID, PASSKEY_BRIDGE_ID]
+  const registered = (await chrome.scripting.getRegisteredContentScripts({ ids })).map((s) => s.id)
+  if (on) {
+    if (!(await chrome.permissions.contains({ origins: INLINE_ORIGINS }))) return { ok: false, error: 'The extension needs permission to work inside pages.' }
+    const add: chrome.scripting.RegisteredContentScript[] = []
+    if (!registered.includes(PASSKEY_PAGE_ID)) add.push({ id: PASSKEY_PAGE_ID, js: ['passkey-page.js'], matches: INLINE_ORIGINS, runAt: 'document_start', allFrames: false, world: 'MAIN' } as chrome.scripting.RegisteredContentScript)
+    if (!registered.includes(PASSKEY_BRIDGE_ID)) add.push({ id: PASSKEY_BRIDGE_ID, js: ['passkey-bridge.js'], matches: INLINE_ORIGINS, runAt: 'document_start', allFrames: false })
+    if (add.length) await chrome.scripting.registerContentScripts(add)
+  } else if (registered.length) {
+    await chrome.scripting.unregisterContentScripts({ ids: registered })
+  }
+  await chrome.storage.local.set({ passkeys: on })
+  return { ok: true }
+}
+
+interface PasskeyRequest { kind: 'create' | 'get'; tabId: number; origin: string; rpId: string; challenge: string; user?: { id: string; name: string; displayName: string }; ids?: string[]; at: number }
+
+async function passkeyRequests(): Promise<Record<string, PasskeyRequest>> {
+  return ((await chrome.storage.session.get('passkeyRequests'))['passkeyRequests'] as Record<string, PasskeyRequest> | undefined) ?? {}
+}
+async function setPasskeyRequests(all: Record<string, PasskeyRequest>) {
+  const now = Date.now()
+  for (const [k, v] of Object.entries(all)) if (now - v.at > PASSKEY_MS) delete all[k]
+  await chrome.storage.session.set({ passkeyRequests: all })
+}
+
+const b64uOk = (s: unknown, max = 1024): s is string => typeof s === 'string' && s.length > 0 && s.length <= max && /^[A-Za-z0-9_-]+$/.test(s)
+const textOk = (s: unknown, max = 256): s is string => typeof s === 'string' && s.length <= max
+const fail = (name: string, message: string) => ({ error: { name, message } })
+
+/** My own items that hold passkeys (shared items are not used for passkeys). */
+async function passkeyItems(): Promise<Item[]> {
+  return (await items()).filter((e) => !e.shared && e.passkeys?.length)
+}
+
+/** A page asked for a passkey. Checked here, against the tab's origin as the
+ *  browser reports it; the person then chooses in the page (passkey-bridge). */
+async function passkeyBegin(req: { kind?: unknown; options?: unknown }, tab: chrome.tabs.Tab, ours: boolean): Promise<unknown> {
+  if (!(await passkeysOn()) || ours) return { fallback: true }
+  let origin: string
+  try { origin = new URL(tab.url ?? '').origin } catch { return { fallback: true } }
+  const host = new URL(origin).hostname
+  const o = (req.options ?? {}) as Record<string, unknown>
+  if (!b64uOk(o['challenge'], 1024)) return { fallback: true }
+  if (req.kind === 'create') {
+    const rp = (o['rp'] ?? {}) as Record<string, unknown>
+    const user = (o['user'] ?? {}) as Record<string, unknown>
+    const rpId = typeof rp['id'] === 'string' && rp['id'] ? rp['id'].toLowerCase() : host
+    if (!rpIdAllowed(origin, rpId)) return fail('SecurityError', 'The relying party ID is not a registrable domain suffix of this site.')
+    if (!b64uOk(user['id'], 128) || !textOk(user['name']) || !textOk(user['displayName'] ?? '')) return { fallback: true }
+    // Vault makes ES256 keys; a site that wants a security key gets the browser.
+    if (!Array.isArray(o['algs']) || !o['algs'].includes(-7) || o['attachment'] === 'cross-platform') return { fallback: true }
+    if (!(await getUnlocked())) return { locked: true, rpId }
+    await touch()
+    const all = (await passkeyItems()).flatMap((e) => e.passkeys!)
+    const exclude = Array.isArray(o['exclude']) ? o['exclude'].filter((x): x is string => typeof x === 'string') : []
+    if (all.some((p) => exclude.includes(p.credentialId))) return fail('InvalidStateError', 'Vault already has a passkey for this account.')
+    const requestId = crypto.randomUUID()
+    const reqs = await passkeyRequests()
+    reqs[requestId] = { kind: 'create', tabId: tab.id!, origin, rpId, challenge: o['challenge'], user: { id: user['id'], name: String(user['name']), displayName: String(user['displayName'] ?? '') }, at: Date.now() }
+    await setPasskeyRequests(reqs)
+    return { requestId, kind: 'create', rpId, userName: String(user['name']), replaces: all.some((p) => p.rpId === rpId && p.userHandle === user['id']) }
+  }
+  if (req.kind === 'get') {
+    const rpId = typeof o['rpId'] === 'string' && o['rpId'] ? o['rpId'].toLowerCase() : host
+    if (!rpIdAllowed(origin, rpId)) return fail('SecurityError', 'The relying party ID is not a registrable domain suffix of this site.')
+    if (!(await getUnlocked())) return { locked: true, rpId }
+    const allow = Array.isArray(o['allow']) ? o['allow'].filter((x): x is string => typeof x === 'string') : []
+    const accounts = (await passkeyItems()).flatMap((e) => e.passkeys!.filter((p) => p.rpId === rpId && (!allow.length || allow.includes(p.credentialId))).map((p) => ({ credentialId: p.credentialId, userName: p.userDisplayName || p.userName, name: e.name })))
+    if (!accounts.length) return { fallback: true }
+    await touch()
+    const requestId = crypto.randomUUID()
+    const reqs = await passkeyRequests()
+    reqs[requestId] = { kind: 'get', tabId: tab.id!, origin, rpId, challenge: o['challenge'], ids: accounts.map((a) => a.credentialId), at: Date.now() }
+    await setPasskeyRequests(reqs)
+    return { requestId, kind: 'get', rpId, accounts }
+  }
+  return { fallback: true }
+}
+
+/** The person chose. The request must be this tab's, on the same origin, and
+ *  recent; it is used once. */
+async function passkeyFinish(req: { requestId?: unknown; credentialId?: unknown }, tab: chrome.tabs.Tab): Promise<unknown> {
+  const reqs = await passkeyRequests()
+  const p = typeof req.requestId === 'string' ? reqs[req.requestId] : undefined
+  if (p) { delete reqs[req.requestId as string]; await setPasskeyRequests(reqs) }
+  let origin = ''
+  try { origin = new URL(tab.url ?? '').origin } catch { /* below */ }
+  if (!p || p.tabId !== tab.id || p.origin !== origin || Date.now() - p.at > PASSKEY_MS) return fail('NotAllowedError', 'That request is no longer open. Try again.')
+  const u = await getUnlocked()
+  const server = await getServer()
+  if (!u || !server) return fail('NotAllowedError', 'Vault is locked.')
+  await touch()
+  if (p.kind === 'get') {
+    const chosen = typeof req.credentialId === 'string' && p.ids?.includes(req.credentialId) ? req.credentialId : null
+    const item = chosen ? (await passkeyItems()).find((e) => e.passkeys!.some((k) => k.credentialId === chosen)) : undefined
+    const stored = item?.passkeys!.find((k) => k.credentialId === chosen && k.rpId === p.rpId)
+    if (!item || !stored) return fail('NotAllowedError', 'That passkey is no longer in Vault.')
+    await markUsed(item.key)
+    return { result: await assertPasskey(stored as StoredPasskey, { origin: p.origin, challenge: p.challenge }) }
+  }
+  // Create: keep it in this site's login for the same username, or a new one.
+  const { stored, response } = await createPasskey({ rpId: p.rpId, origin: p.origin, challenge: p.challenge, userHandle: p.user!.id, userName: p.user!.name, userDisplayName: p.user!.displayName })
+  const a = api(server.url)
+  const key = fromBase64Url(u.vaultKey)
+  try {
+    const mine = (await items()).filter((e) => !e.shared)
+    const same = mine.find((e) => e.passkeys?.some((k) => k.rpId === p.rpId && k.userHandle === p.user!.id))
+      ?? mine.find((e) => matchSite(e.url, p.origin) && (e.username ?? '').toLowerCase() === p.user!.name.toLowerCase())
+    const t = await token()
+    if (same) {
+      const { id, key: _k, shared: _s, ...before } = same
+      const kept = (before.passkeys ?? []).filter((k) => !(k.rpId === p.rpId && k.userHandle === p.user!.id))
+      await a.addHistory(t, id, await sealHistory(id, before, key))
+      await a.putEntry(t, id, await sealEntry(id, { ...before, passkeys: [...kept, stored] }, key))
+    } else {
+      const id = crypto.randomUUID()
+      const entry: EntryContent = { name: p.rpId, type: 'login', username: p.user!.name, url: p.origin, tags: [], customFields: [], favorite: false, passkeys: [stored] }
+      await a.putEntry(t, id, await sealEntry(id, entry, key))
+    }
+    cache = null
+  } finally { wipe(key) }
+  return { result: response }
+}
+
 type ContentRequest =
   | { type: 'inline:hello' }
   | { type: 'inline:list' }
@@ -484,6 +621,8 @@ type ContentRequest =
   | { type: 'inline:offer' }
   | { type: 'inline:answer'; save: boolean }
   | { type: 'inline:unlock' }
+  | { type: 'passkey:begin'; kind: 'create' | 'get'; options: unknown }
+  | { type: 'passkey:finish'; requestId: string; credentialId?: string }
 
 /** A content script's question. The page's URL and tab come from the browser
  *  (the sender), never from the message. */
@@ -494,6 +633,8 @@ async function handleContent(req: ContentRequest, tab: chrome.tabs.Tab): Promise
   // Never on the Vault server's own pages: the master password is typed there.
   const ours = !!server && (() => { try { return new URL(url).origin === server.url } catch { return true } })()
   if (req.type === 'inline:hello') return { active: !ours && (await inlineOn()) }
+  if (req.type === 'passkey:begin') { await lockIfIdle(); return passkeyBegin(req, tab, ours) }
+  if (req.type === 'passkey:finish') { await lockIfIdle(); return ours ? fail('NotAllowedError', 'Not here.') : passkeyFinish(req, tab) }
   if (ours) return null
   await lockIfIdle()
   const unlocked = !!(await getUnlocked())
@@ -548,7 +689,7 @@ chrome.runtime.onMessage.addListener((message: Request | ContentRequest, sender,
     (result) => sendResponse({ result } satisfies Wire<unknown>),
     (err: unknown) => sendResponse({ error: err instanceof Error ? err.message : 'Something went wrong.', locked: err instanceof Locked } satisfies Wire<unknown>),
   )
-  if (sender.tab?.id !== undefined && sender.frameId === 0 && message.type.startsWith('inline:') && !sender.url?.startsWith(chrome.runtime.getURL(''))) {
+  if (sender.tab?.id !== undefined && sender.frameId === 0 && (message.type.startsWith('inline:') || message.type.startsWith('passkey:')) && !sender.url?.startsWith(chrome.runtime.getURL(''))) {
     reply(handleContent(message as ContentRequest, sender.tab))
     return true
   }
@@ -560,8 +701,9 @@ chrome.runtime.onMessage.addListener((message: Request | ContentRequest, sender,
 // Keep the inline script's registration in step with the setting, and with
 // the permission, which the person can withdraw in the browser's settings.
 async function syncInline() {
-  const want = (await inlineOn()) && (await chrome.permissions.contains({ origins: INLINE_ORIGINS }))
-  await setInline(want).catch(() => {})
+  const allowed = await chrome.permissions.contains({ origins: INLINE_ORIGINS })
+  await setInline((await inlineOn()) && allowed).catch(() => {})
+  await setPasskeys((await passkeysOn()) && allowed).catch(() => {})
 }
 chrome.runtime.onStartup.addListener(() => void syncInline())
 chrome.runtime.onInstalled.addListener(() => void syncInline())
