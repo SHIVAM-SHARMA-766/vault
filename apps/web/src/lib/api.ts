@@ -313,8 +313,8 @@ export const api = {
     members: (token: string, org: string) => request<{ members: OrgMember[]; pending: OrgPending[] }>('GET', `/api/orgs/${org}/members`, { token }),
     /** `withSignup`: in a business Vault, an address with no account also gets a
      *  sign-up code (decisions/0032). */
-    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin', groups: string[] = [], withSignup = false) =>
-      request<{ ok: true; signup?: { code: string; emailed: boolean; expiresAt: string }; warning?: string }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role, ...(groups.length ? { groups } : {}), ...(withSignup ? { withSignup } : {}) } }),
+    invite: (token: string, org: string, email: string, label: string, role: 'member' | 'admin' | 'guest', groups: string[] = [], withSignup = false, until?: string) =>
+      request<{ ok: true; signup?: { code: string; emailed: boolean; expiresAt: string }; warning?: string }>('POST', `/api/orgs/${org}/invites`, { token, body: { email, label, role, ...(groups.length ? { groups } : {}), ...(withSignup ? { withSignup } : {}), ...(until ? { until } : {}) } }),
     /** Add to company: an existing account, by id, for an admin who sees accounts. */
     inviteAccount: (token: string, org: string, userId: string, groups: string[] = []) =>
       request<{ ok: true }>('POST', `/api/orgs/${org}/invites`, { token, body: { userId, ...(groups.length ? { groups } : {}) } }),
@@ -522,13 +522,14 @@ export interface AdminOrg {
   id: string; hint: string; createdAt: string; ownerId: string | null; members: number; awaiting: number; pending: number
   collections: number; items: number; rotationDue: number; policies: OrgPolicies
 }
-export type OrgRole = 'owner' | 'admin' | 'member'
+/** 'guest' (decisions/0032, 2d): only the collections given, maybe until a date. */
+export type OrgRole = 'owner' | 'admin' | 'member' | 'guest'
 export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
-export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; recovery?: { createdAt: string; publicKey: string } | null; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null }
+export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; recovery?: { createdAt: string; publicKey: string } | null; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null; until?: string; ended?: boolean }
 export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
-export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[]; signingPublicKey?: string | null; currentSigningKey?: string | null; endorsement?: string | null }
-export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[] }
+export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[]; signingPublicKey?: string | null; currentSigningKey?: string | null; endorsement?: string | null; until?: string; ended?: boolean }
+export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[]; until?: string }
 export interface GroupRow { id: string; nameBlob: string; members: string[]; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean }[] }
 /** A named bundle of what someone may do in a collection (decisions/0032, 2b). */
 export interface PermissionSet { id: string; name: string; level: SharePermission; reveal: boolean; fill: boolean; export: boolean; builtin?: true }

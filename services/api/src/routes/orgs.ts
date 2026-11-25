@@ -35,7 +35,11 @@ import { enforce, type Limit } from '../ratelimit.js'
 import { streamAudit } from '../audit-stream.js'
 import { hasSecondFactor } from '../twofactor.js'
 
-export type OrgRole = 'owner' | 'admin' | 'member'
+/** 'guest' (decisions/0032, 2d): sees only the collections given to them, never
+ *  the other members or groups, cannot ask for more, and may have an end date. */
+export type OrgRole = 'owner' | 'admin' | 'member' | 'guest'
+const isStaff = (role: OrgRole) => role === 'owner' || role === 'admin'
+const MAX_GUEST_DAYS = 366
 export type Permission = 'view' | 'edit' | 'manage'
 const PERMISSIONS: readonly Permission[] = ['view', 'edit', 'manage']
 const RANK: Record<Permission, number> = { view: 1, edit: 2, manage: 3 }
@@ -45,6 +49,8 @@ const MAX_HINT = 80
 interface Member extends Item {
   userId: string
   role: OrgRole
+  /** A guest's access ends at this instant (ISO 8601), if set. */
+  until?: string
   status: 'accepted' | 'confirmed'
   label: string
   /** The public key as it was when the member accepted. What an admin
@@ -163,12 +169,16 @@ async function member(app: App, orgId: string, userId: string): Promise<Member |
 
 /** The caller as a member of the organization, or a 404 for anyone else —
  *  an organization you do not belong to is indistinguishable from none. */
+const guestEnded = (app: App, m: { role: OrgRole; until?: string }) => m.role === 'guest' && !!m.until && Date.parse(m.until) <= app.now()
+
 async function requireMember(app: App, orgId: string, userId: string, opts: { confirmed?: boolean; admin?: boolean; owner?: boolean } = {}): Promise<Member> {
   if (!isValidId(orgId)) throw notFound()
   const m = await member(app, orgId, userId)
   if (!m) throw notFound()
+  // A guest whose time is up gets nothing more from the organization.
+  if (guestEnded(app, m)) throw new HttpError(403, 'forbidden', 'Your guest access to this organization has ended.')
   if ((opts.confirmed || opts.admin || opts.owner) && m.status !== 'confirmed') throw forbidden()
-  if (opts.admin && m.role === 'member') throw forbidden()
+  if (opts.admin && !isStaff(m.role)) throw forbidden()
   if (opts.owner && m.role !== 'owner') throw forbidden()
   return m
 }
@@ -191,7 +201,7 @@ async function access(app: App, orgId: string, collectionId: string, userId: str
 /** The owner and admins who can act on a request or a sensitive-item alert. */
 async function managers(app: App, orgId: string, except?: string): Promise<string[]> {
   return ((await app.store.query(orgPk(orgId), ORG_MEMBER_PREFIX)) as Member[])
-    .filter((m) => m.status === 'confirmed' && m.role !== 'member' && m.userId !== except).map((m) => m.userId)
+    .filter((m) => m.status === 'confirmed' && isStaff(m.role) && m.userId !== except).map((m) => m.userId)
 }
 
 export interface Policies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
@@ -372,7 +382,9 @@ export async function myOrgs(app: App, userId: string): Promise<LambdaResponse> 
       id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', kind: meta['kind'] === 'direct' ? 'direct' : 'team', role: m.role, status: m.status, policies,
       recovery: meta['recovery'] ? { createdAt: (meta['recovery'] as Record<string, unknown>)['createdAt'], publicKey: (meta['recovery'] as Record<string, unknown>)['publicKey'] } : null,
       policyGap: m.status === 'confirmed' ? await policyGap(app, orgId, userId) : null,
-      ...(m.orgKeyBlob ? { orgKeyBlob: m.orgKeyBlob } : {}),
+      // A guest whose time is up sees the organization, and that it ended (2d).
+      ...(m.until ? { until: m.until } : {}),
+      ...(guestEnded(app, m) ? { ended: true } : m.orgKeyBlob ? { orgKeyBlob: m.orgKeyBlob } : {}),
     })
   }
   return json(200, { orgs })
@@ -470,8 +482,15 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
     digest = emailDigest(email, app.config.pepper)
     fallbackLabel = email.split('@')[0]!
   }
-  const role: OrgRole = b['role'] === 'admin' ? 'admin' : 'member'
+  const role: OrgRole = b['role'] === 'admin' ? 'admin' : b['role'] === 'guest' ? 'guest' : 'member'
   if (role === 'admin' && me.role !== 'owner') throw forbidden()
+  // A guest may be given an end date, up to a year ahead.
+  let until: string | undefined
+  if (role === 'guest' && b['until'] !== undefined && b['until'] !== null && b['until'] !== '') {
+    const t = Date.parse(String(b['until']))
+    if (!Number.isFinite(t) || t <= app.now() || t > app.now() + MAX_GUEST_DAYS * 86_400_000) throw badRequest(`until must be a date within ${MAX_GUEST_DAYS} days from now.`)
+    until = new Date(t).toISOString()
+  }
   const memberLabel = label(b['label']) || fallbackLabel
   const meta0 = await app.store.get(orgPk(orgId), ORG_META_SK)
   if (meta0?.['kind'] === 'direct') {
@@ -489,8 +508,8 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
   const at = now(app)
   // Both rows are written whether or not the address has an account: the
   // response is the same, and the invitation waits for them to sign in.
-  await app.store.put({ pk: orgPk(orgId), sk: orgPendingSk(digest), digest, role, label: memberLabel, invitedBy: userId, invitedAt: at, ...(groups.length ? { groups } : {}) })
-  await app.store.put({ pk: emailPk(digest), sk: orgInviteSk(orgId), orgId, role, label: memberLabel, hint: meta?.['hint'] ?? '', invitedAt: at })
+  await app.store.put({ pk: orgPk(orgId), sk: orgPendingSk(digest), digest, role, label: memberLabel, invitedBy: userId, invitedAt: at, ...(groups.length ? { groups } : {}), ...(until ? { until } : {}) })
+  await app.store.put({ pk: emailPk(digest), sk: orgInviteSk(orgId), orgId, role, label: memberLabel, hint: meta?.['hint'] ?? '', invitedAt: at, ...(until ? { until } : {}) })
   await orgEvent(app, orgId, userId, 'member.invite', { target: memberLabel })
   // If they already have an account, it shows in their notifications too.
   const pointer = await app.store.get(emailPk(digest), EMAIL_SK)
@@ -538,7 +557,8 @@ export async function acceptInvite(app: App, userId: string, orgId: string): Pro
   const publicKey = await publicKeyOf(app, userId)
   const pendingRow = await app.store.get(orgPk(orgId), orgPendingSk(digest))
   const pendingGroups = Array.isArray(pendingRow?.['groups']) ? (pendingRow!['groups'] as string[]) : []
-  const m: Member = { pk: orgPk(orgId), sk: orgMemberSk(userId), userId, role: inv['role'] === 'admin' ? 'admin' : 'member', status: 'accepted', label: String(inv['label'] ?? 'Member'), publicKey, joinedAt: now(app), ...(pendingGroups.length ? { pendingGroups } : {}) }
+  const role: OrgRole = inv['role'] === 'admin' ? 'admin' : inv['role'] === 'guest' ? 'guest' : 'member'
+  const m: Member = { pk: orgPk(orgId), sk: orgMemberSk(userId), userId, role, ...(role === 'guest' && typeof inv['until'] === 'string' ? { until: inv['until'] } : {}), status: 'accepted', label: String(inv['label'] ?? 'Member'), publicKey, joinedAt: now(app), ...(pendingGroups.length ? { pendingGroups } : {}) }
   try {
     await app.store.put(m, { mustNotExist: true })
   } catch (err) {
@@ -564,15 +584,18 @@ export async function declineInvite(app: App, userId: string, orgId: string): Pr
 export async function members(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
   const me = await requireMember(app, orgId, userId, { confirmed: true })
   const rows = await app.store.query(orgPk(orgId))
-  const memberRows = rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[]
+  // A guest sees only the owner and admins, and themselves (2d).
+  const memberRows = (rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[])
+    .filter((m) => me.role !== 'guest' || isStaff(m.role) || m.userId === userId)
   const current = new Map(await Promise.all(memberRows.map(async (m) => [m.userId, await signingKeyOf(app, m.userId)] as const)))
   const list = memberRows.map((m) => ({
     userId: m.userId, role: m.role, status: m.status, label: m.label, publicKey: m.publicKey, joinedAt: m.joinedAt, confirmedAt: m.confirmedAt ?? null,
     signingPublicKey: m.signingPublicKey ?? null, currentSigningKey: current.get(m.userId) ?? null, endorsement: m.endorsement ?? null,
-    pendingGroups: me.role === 'member' ? [] : (m.pendingGroups ?? []),
+    pendingGroups: !isStaff(me.role) ? [] : (m.pendingGroups ?? []),
+    ...(m.until ? { until: m.until, ...(guestEnded(app, m) ? { ended: true } : {}) } : {}),
   }))
-  const pending = me.role === 'member' ? [] : rows.filter((r) => r.sk.startsWith(ORG_PENDING_PREFIX))
-    .map((r) => ({ id: r['digest'], label: r['label'], role: r['role'], invitedAt: r['invitedAt'], groups: r['groups'] ?? [] }))
+  const pending = !isStaff(me.role) ? [] : rows.filter((r) => r.sk.startsWith(ORG_PENDING_PREFIX))
+    .map((r) => ({ id: r['digest'], label: r['label'], role: r['role'], invitedAt: r['invitedAt'], groups: r['groups'] ?? [], ...(r['until'] ? { until: r['until'] } : {}) }))
   return json(200, { members: list, pending })
 }
 
@@ -611,7 +634,7 @@ export async function setMemberRole(app: App, userId: string, event: LambdaEvent
 export async function removeMember(app: App, userId: string, orgId: string, target: string): Promise<LambdaResponse> {
   const me = await requireMember(app, orgId, userId)
   const self = target === userId
-  if (!self && (me.status !== 'confirmed' || me.role === 'member')) throw forbidden()
+  if (!self && (me.status !== 'confirmed' || !isStaff(me.role))) throw forbidden()
   const m = await member(app, orgId, target)
   if (!m) throw notFound()
   if (m.role === 'owner') throw new HttpError(409, 'conflict', 'The owner cannot be removed. Delete the organization instead.')
@@ -670,6 +693,8 @@ export async function collections(app: App, userId: string, orgId: string): Prom
   const out = []
   for (const c of all) {
     const a = await access(app, orgId, c.id, userId)
+    // A guest sees only what they were given (2d).
+    if (!a && me.role === 'guest') continue
     // Everyone confirmed sees every collection's name (they hold the org key
     // that seals it anyway), so a member can ask for one they lack (D7).
     const requested = !a && me.role === 'member' ? Boolean(await app.store.get(orgPk(orgId), requestSk(c.id, userId))) : false
@@ -710,7 +735,7 @@ export async function renameCollection(app: App, userId: string, event: LambdaEv
 
 export async function deleteCollection(app: App, userId: string, orgId: string, collectionId: string): Promise<LambdaResponse> {
   const { m } = await requireAccess(app, orgId, collectionId, userId, 'manage')
-  if (m.role === 'member') throw forbidden()
+  if (!isStaff(m.role)) throw forbidden()
   for (const i of await app.store.query(collectionItemsPk(orgId, collectionId))) await app.store.delete(i.pk, i.sk)
   for (const a of await app.store.query(orgPk(orgId), accessPrefix(collectionId))) await app.store.delete(a.pk, a.sk)
   await app.store.delete(orgPk(orgId), collectionSk(collectionId))
@@ -769,6 +794,7 @@ export const CHECKOUT_HOURS = [1, 8, 24, 72, 168] as const
  *  for good), or turns it down. */
 export async function requestAccess(app: App, userId: string, event: LambdaEvent, orgId: string, collectionId: string): Promise<LambdaResponse> {
   const me = await requireMember(app, orgId, userId, { confirmed: true })
+  if (me.role === 'guest') throw new HttpError(403, 'forbidden', 'Guests are given collections by an admin; they cannot ask for others.')
   await requireCompliant(app, orgId, userId)
   if (!isValidId(collectionId) || !(await app.store.get(orgPk(orgId), collectionSk(collectionId)))) throw notFound()
   if (await access(app, orgId, collectionId, userId)) throw conflict('You can already open this collection.')
@@ -890,7 +916,9 @@ async function revokeVia(app: App, orgId: string, groupId: string, collectionId?
 }
 
 export async function groups(app: App, userId: string, orgId: string): Promise<LambdaResponse> {
-  await requireMember(app, orgId, userId, { confirmed: true })
+  const me = await requireMember(app, orgId, userId, { confirmed: true })
+  // A guest does not see the organization's groups (2d).
+  if (me.role === 'guest') return json(200, { groups: [] })
   const rows = await app.store.query(orgPk(orgId))
   const gs = rows.filter((r) => r.sk.startsWith(GROUP_PREFIX)) as Group[]
   const ga = rows.filter((r) => r.sk.startsWith(GROUP_ACCESS_PREFIX)) as GroupAccess[]

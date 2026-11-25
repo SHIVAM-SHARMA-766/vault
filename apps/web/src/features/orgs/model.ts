@@ -66,6 +66,9 @@ export interface OrgView {
   name: string
   /** 'direct': a space between two people, made by "Share with a person" (D11). */
   kind: 'team' | 'direct'
+  /** A guest's end date, and whether it has passed (decisions/0032, 2d). */
+  until?: string
+  ended?: boolean
   /** For a direct share, the other person's address (sealed in the org's name). */
   peer?: string
   /** The organization recovery key's public half, when one is set (0026). */
@@ -152,7 +155,7 @@ export function useTeams(vaultKey: Uint8Array) {
       const colls: CollectionView[] = []
       const entries: SharedEntry[] = []
       for (const row of rows) {
-        const base = { id: row.id, kind: row.kind ?? 'team', recovery: row.recovery ?? null, role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap }
+        const base = { id: row.id, kind: row.kind ?? 'team', recovery: row.recovery ?? null, role: row.role, status: row.status, policies: row.policies, policyGap: row.policyGap, ...(row.until ? { until: row.until } : {}), ...(row.ended ? { ended: true } : {}) }
         if (row.status !== 'confirmed' || !row.orgKeyBlob) { views.push({ ...base, name: row.hint || 'Organization' }); continue }
         const key = await openOrgKey(me.privateKey, me.publicKey, row.orgKeyBlob, row.id)
         const meta = await openOrgMeta(row.id, row.nameBlob, key)
