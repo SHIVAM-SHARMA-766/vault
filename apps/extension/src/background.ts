@@ -12,7 +12,9 @@ import {
   type EntryContent,
   type KdfParams,
   SecretKeyFormatError,
+  costOf,
   deriveLoginKeys,
+  kdfProblem,
   fromBase64Url,
   generateTotp,
   openCollectionKey,
@@ -257,7 +259,9 @@ async function unlock(req: Extract<Request, { type: 'unlock' }>): Promise<Unlock
   const secretKey = held ?? typed
   if (kdf.version === 2 && !secretKey) return { ok: false, needSecretKey: true, error: 'This account uses a secret key. Enter it from your Emergency Kit; this browser keeps it after that.' }
 
-  const keys = await deriveLoginKeys(req.password, fromBase64Url(kdf.salt), kdf.iterations, kdf.version === 2 ? secretKey : undefined)
+  // Argon2id or PBKDF2, as the account says (decisions/0028), within limits.
+  if (kdfProblem(kdf)) return { ok: false, error: 'The server sent key settings Vault does not use, so nothing was derived.' }
+  const keys = await deriveLoginKeys(req.password, fromBase64Url(kdf.salt), costOf(kdf), kdf.version === 2 ? secretKey : undefined)
   if (held) held.fill(0)
   try {
     let res

@@ -312,6 +312,15 @@ this server's real address, so a look-alike phishing page gets nothing. Your fir
 comes with ten recovery codes; save them. Removing a key asks for your master password and a
 second factor. Your master password still unlocks the vault: a key protects signing in.
 
+### Upgrade key derivation
+
+Vault turns your master password into keys with **Argon2id**. Every guess costs 64 MiB of
+memory, which makes guessing far slower on graphics cards. Accounts made before that used PBKDF2.
+If yours did, **Settings → Security → Upgrade key derivation** asks for your master password
+once and re-derives your keys. The password stays the same and nothing in the vault changes.
+Other devices are signed out, as after a password change. Changing your master password upgrades
+it as well.
+
 ### Unlock with a passkey
 
 **Settings → Security → Unlock with a passkey → Add a passkey to unlock.** After that, the sign-in

@@ -71,8 +71,11 @@ without the passphrase yields neither the secrets nor the structure of the data.
 backup *with* the passphrase is equivalent to A2 plus the pepper: addresses could be tested
 against the digests, but vault contents remain encrypted under each user's own keys.
 
-Offline guessing against the wrapped Vault Key is bounded by PBKDF2 at 600,000
-iterations — tractable only against a weak master password, which is why a strength floor
+Offline guessing against the wrapped Vault Key is bounded by **Argon2id** at 64 MiB and three
+passes ([0028](../decisions/0028-argon2id.md)). Every guess needs that much memory, which blunts
+graphics cards and custom chips. Accounts made before it use PBKDF2 at 600,000 iterations until
+they upgrade (Settings → Security, or at the next password change). Either way, guessing is
+tractable only against a weak master password, which is why a strength floor
 is enforced at signup. An account with a **secret key** ([0027](../decisions/0027-secret-key.md),
 opt-in) is out of reach of this entirely: its master key also depends on 128 random bits kept
 on the person's devices, so a dump gives nothing to guess against. Its sign-in also refuses a
@@ -483,6 +486,6 @@ mistakes silence for coverage.
 | **Push access to `main` is equivalent to A3** (0008). No branch protection or required approval | Not available for private repositories on the free plan. One collaborator, two-factor authentication, and a CI key limited to one bucket |
 | Structural metadata leaks from a database dump — account count, entries per account, creation and modification times | Closing it requires the single-row model rejected in [0002](../decisions/0002-storage-and-data-model.md) |
 | Browser-delivered crypto is inherently weaker than a native client (A3) | Mitigated by CSP and SRI; the native Android client is the structural answer and is on the roadmap |
-| PBKDF2 rather than Argon2id | Avoids a WebAssembly dependency in the most sensitive code path; the versioned ciphertext format permits migration without a breaking change |
+| Argon2id runs as WebAssembly, so the policy allows `'wasm-unsafe-eval'` | The module is our own source (`packages/crypto/argon2/argon2.wat`), embedded in the bundle, and CI checks that its bytes match that source. The directive permits compiling WebAssembly only, not JavaScript `eval`. Accounts not yet upgraded keep PBKDF2 |
 | One host, no CDN, and an always-free instance that may be reclaimed for idleness | A personal vault whose data outlives the host. Downtime is an inconvenience, not data loss |
 | AES-GCM random-IV collision bound of roughly 2^32 encryptions | A personal vault performs on the order of 2^20; revisit if this ever becomes multi-tenant |

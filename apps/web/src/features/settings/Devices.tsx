@@ -102,6 +102,7 @@ const KIND: Record<string, string> = {
   'add-passkey': 'A passkey can now unlock the vault',
   'remove-passkey': 'A passkey no longer unlocks the vault',
   'change-password': 'Master password changed',
+  'upgrade-kdf': 'Key derivation upgraded to Argon2id',
   'add-secret-key': 'Secret key added',
   'remove-secret-key': 'Secret key removed',
   'reset-password-with-recovery-key': 'Master password reset with the recovery key',

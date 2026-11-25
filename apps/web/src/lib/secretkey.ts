@@ -10,7 +10,7 @@
 // stops: a server that drops the flag would otherwise receive an auth key
 // derived from the password alone, which it could attack offline.
 
-import { type KdfParams, deriveLoginKeys, fromBase64Url, normalizeEmail, toBase64Url } from '@vault/crypto'
+import { type KdfParams, costOf, deriveLoginKeys, fromBase64Url, normalizeEmail, toBase64Url } from '@vault/crypto'
 
 const DB = 'vault-device'
 const STORE = 'keys'
@@ -92,6 +92,6 @@ export async function secretKeyFor(email: string, kdf: KdfParams): Promise<Uint8
 export async function deriveForAccount(state: { email: string; kdf: KdfParams }, password: string) {
   const sk = await secretKeyFor(state.email, state.kdf)
   try {
-    return await deriveLoginKeys(password, fromBase64Url(state.kdf.salt), state.kdf.iterations, sk)
+    return await deriveLoginKeys(password, fromBase64Url(state.kdf.salt), costOf(state.kdf), sk)
   } finally { sk?.fill(0) }
 }

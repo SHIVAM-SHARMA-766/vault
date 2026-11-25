@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { UnsealError, changePassword, deriveRecoveryProof, unlockWithRecoveryKey } from '@vault/crypto'
 
 import { ApiError, type SecondFactor, api } from '../../lib/api.js'
+import { newKdfCost } from '../../lib/kdf.js'
 import * as session from '../../lib/session.js'
 import { loadSecretKey } from '../../lib/secretkey.js'
 import { IconAlert, IconArrowLeft } from '../../ui/icons.js'
@@ -99,7 +100,7 @@ export function Recover({ onCancel }: { onCancel: () => void }) {
       // A secret key this browser holds is kept; without it, the reset turns the
       // secret key off, which is how someone who lost it gets back in (0027).
       const held = await loadSecretKey(email)
-      const changed = await changePassword(next, step.vaultKey, undefined, held ?? undefined)
+      const changed = await changePassword(next, step.vaultKey, await newKdfCost(), held ?? undefined)
       held?.fill(0)
       const res = await api.changePassword(step.token, {
         recoveryAuthKey: step.proof, newAuthKey: changed.authKey, kdf: changed.kdf, wrappedVaultKey: changed.wrappedVaultKey,

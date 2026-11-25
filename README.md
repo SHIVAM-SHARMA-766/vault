@@ -192,7 +192,7 @@ Kit. A full copy of the server then gives nothing to guess against.
 ```mermaid
 flowchart LR
   subgraph browser["Your browser"]
-    pw["Master password"] --> keys["Keys derived here<br/>(PBKDF2 → HKDF)"]
+    pw["Master password"] --> keys["Keys derived here<br/>(Argon2id → HKDF)"]
     keys --> enc["Encrypt / decrypt<br/>AES-256-GCM"]
   end
   enc -- "ciphertext only" --> api["API"]

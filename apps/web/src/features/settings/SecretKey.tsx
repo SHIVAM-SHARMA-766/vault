@@ -7,9 +7,10 @@
 
 import { useState } from 'react'
 
-import { PBKDF2_ITERATIONS, changePassword, formatSecretKey, generateSecretKey } from '@vault/crypto'
+import { changePassword, formatSecretKey, generateSecretKey } from '@vault/crypto'
 
 import { ApiError, api } from '../../lib/api.js'
+import { newKdfCost } from '../../lib/kdf.js'
 import { forgetSecretKey, loadSecretKey, storeSecretKey } from '../../lib/secretkey.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconKey } from '../../ui/icons.js'
@@ -29,12 +30,11 @@ export function SecretKey({ state }: { state: session.Unlocked }) {
   const [kit, setKit] = useState('')
   const [saved, setSaved] = useState(false)
 
-  const iterations = Math.max(state.kdf.iterations, PBKDF2_ITERATIONS)
 
   /** Re-derive with or without a secret key and re-wrap the vault key. */
   async function rewrap(secretKey: Uint8Array | undefined) {
     const currentAuthKey = await proveCurrent(state, password)
-    const changed = await changePassword(password, state.vaultKey, iterations, secretKey)
+    const changed = await changePassword(password, state.vaultKey, await newKdfCost(), secretKey)
     const res = await api.changePassword(await session.token(), {
       currentAuthKey, newAuthKey: changed.authKey, kdf: changed.kdf, wrappedVaultKey: changed.wrappedVaultKey,
     })

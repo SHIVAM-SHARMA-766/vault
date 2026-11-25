@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
 import { createAccount, deriveRecoveryProof } from '@vault/crypto'
+
+import { newKdfCost } from '../../lib/kdf.js'
 import { belowMinimum } from '@vault/core'
 
 import { newIdentity } from '../../lib/identity.js'
@@ -53,7 +55,7 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
       // salt. The server receives none of them — only an auth key derived
       // through a branch it cannot work backwards, and two wrapped copies of
       // a key it cannot unwrap.
-      const account = await createAccount(password)
+      const account = await createAccount(password, await newKdfCost())
       const recoveryProof = await deriveRecoveryProof(account.recoveryKey)
       // The key pair other people will share with. Made here, with the vault
       // key, so every new account has one from the start.

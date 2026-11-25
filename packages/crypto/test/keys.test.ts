@@ -202,11 +202,11 @@ test('unicode passwords normalise so that identical text derives identical keys'
   assert.equal(toHex(composed), toHex(decomposed))
 })
 
-test('the production iteration count is the OWASP floor', async () => {
+test('new accounts use Argon2id at OWASP\'s setting; PBKDF2 keeps its floor', async () => {
   const { PBKDF2_ITERATIONS } = await import('../src/index.js')
   assert.equal(PBKDF2_ITERATIONS, 600_000)
   const account = await createAccount('a-long-enough-master-password')
-  assert.equal(account.kdf.iterations, 600_000)
+  assert.deepEqual({ ...account.kdf, salt: '' }, { algorithm: 'argon2id', m: 65_536, t: 3, p: 1, salt: '' })
   assert.equal(toBase64Url(fromBase64Url(account.kdf.salt)), account.kdf.salt)
 })
 

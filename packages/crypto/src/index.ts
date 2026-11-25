@@ -60,6 +60,14 @@ export {
 export {
   KEY_BYTES,
   PBKDF2_ITERATIONS,
+  ARGON2_DEFAULT,
+  KDF_LIMITS,
+  type KdfCost,
+  type Pbkdf2Params,
+  type Argon2KdfParams,
+  costOf,
+  kdfIsOutdated,
+  kdfProblem,
   SALT_BYTES,
   type ChangedPassword,
   type KdfParams,
@@ -197,3 +205,5 @@ export {
   unwrapWithPasskey,
   wrapForPasskey,
 } from './passkey.js'
+
+export { type Argon2Params, argon2Supported, argon2id, blake2b } from './argon2.js'

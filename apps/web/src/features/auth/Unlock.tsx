@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { passwordStrength } from '@vault/core'
 
-import { SecretKeyFormatError, UnsealError, deriveLoginKeys, fromBase64Url, parseSecretKey, unwrapVaultKey, wipe } from '@vault/crypto'
+import { SecretKeyFormatError, UnsealError, costOf, deriveLoginKeys, kdfProblem, fromBase64Url, parseSecretKey, unwrapVaultKey, wipe } from '@vault/crypto'
 
 import { ApiError, type SecondFactor, type SecondFactorOffer, api } from '../../lib/api.js'
 import { useInstance } from '../../lib/instance.js'
@@ -126,9 +126,12 @@ export function Unlock({ onRegister, onRecover, onRequestAccess, onSigninHelp, f
         }
         secretKey = typedKey = typedEarly ?? await parseSecretKey(secretText)
       } else typedEarly?.fill(0)
-      // 2. Derive, on this device. 600,000 iterations — the pause before the
-      //    vault opens is the same pause an attacker faces per guess.
-      const keys = await deriveLoginKeys(password, fromBase64Url(kdf.salt), kdf.iterations, secretKey)
+      // 2. Derive, on this device: Argon2id at 64 MiB (or PBKDF2 for an
+      //    account not yet upgraded). The pause before the vault opens is the
+      //    pause an attacker faces per guess. Settings the server sends are
+      //    bounded, so it cannot ask for a weak or endless derivation.
+      if (kdfProblem(kdf)) throw new Error('The server sent key settings Vault does not use, so nothing was derived.')
+      const keys = await deriveLoginKeys(password, fromBase64Url(kdf.salt), costOf(kdf), secretKey)
       if (secretKey && secretKey !== typedKey) secretKey.fill(0)
       kek = keys.kek
       try {

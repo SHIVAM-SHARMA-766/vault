@@ -112,7 +112,7 @@ hierarchy. It is accepted knowingly; see A3 in the threat model.
 
 ```mermaid
 flowchart LR
-  pw["Master password<br/>+ per-user salt"] -- "PBKDF2-SHA256<br/>600,000 rounds" --> mk["Master Key"]
+  pw["Master password<br/>+ per-user salt"] -- "Argon2id 64 MiB, t=3<br/>(PBKDF2 600k before 0028)" --> mk["Master Key"]
   mk -- "HKDF vault.kek.v1" --> kek["KEK"]
   mk -- "HKDF vault.auth.v1" --> auth["Auth Key"]
   auth -- "sent; stored as<br/>scrypt verifier" --> server[("Server")]
@@ -129,7 +129,7 @@ flowchart LR
 
 ```
 Master Password + per-user salt
-        │ PBKDF2-SHA256, 600k
+        │ Argon2id, 64 MiB, t=3, p=1 (PBKDF2-SHA256 600k for accounts not yet upgraded)
         ▼
    Master Key ──┬── HKDF "vault.kek.v1"  ──► KEK ──► wraps Vault Key
                 └── HKDF "vault.auth.v1" ──► Auth Key ──► server (scrypt verifier)
@@ -310,7 +310,7 @@ sequenceDiagram
   B->>A: POST /api/auth/prelogin {email}
   A->>D: email pointer (by HMAC digest)
   A-->>B: KDF salt and rounds (a decoy if unknown)
-  Note over B: PBKDF2 → Master Key → KEK + Auth Key
+  Note over B: Argon2id (or PBKDF2) → Master Key → KEK + Auth Key
   B->>A: POST /api/auth/login {email, Auth Key, TOTP?}
   A->>D: verify scrypt(Auth Key), second factor
   A-->>B: access token (15 min), refresh token (30 days), wrapped Vault Key

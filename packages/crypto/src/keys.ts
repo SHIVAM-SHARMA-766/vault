@@ -20,6 +20,7 @@
 // not one entry is touched.
 
 import { fromRecoveryString, toBase64Url, toRecoveryString, utf8Encode } from './encoding.js'
+import { type Argon2Params, argon2id } from './argon2.js'
 import { hkdfSha256, pbkdf2Sha256 } from './primitives.js'
 import { randomBytes } from './random.js'
 import { seal, unseal } from './aead.js'
@@ -52,7 +53,11 @@ const INFO_RECOVERY_AUTH = 'vault.recovery.auth.v1'
 const AAD_WRAP_MASTER = 'vault.wrap.master.v1'
 const AAD_WRAP_RECOVERY = 'vault.wrap.recovery.v1'
 
-export interface KdfParams {
+/** How a master password is stretched, as stored per account. PBKDF2 for
+ *  accounts made before decisions/0028; Argon2id since. */
+export type KdfParams = Pbkdf2Params | Argon2KdfParams
+
+export interface Pbkdf2Params {
   algorithm: 'PBKDF2-HMAC-SHA256'
   iterations: number
   /** base64url. Generated per user; never derived from the email address, so
@@ -63,8 +68,57 @@ export interface KdfParams {
   version?: 2
 }
 
-function kdfParams(salt: Uint8Array, iterations: number, secretKey?: Uint8Array): KdfParams {
-  return { algorithm: 'PBKDF2-HMAC-SHA256', iterations, salt: toBase64Url(salt), ...(secretKey ? { version: 2 as const } : {}) }
+export interface Argon2KdfParams extends Argon2Params {
+  algorithm: 'argon2id'
+  salt: string
+  version?: 2
+}
+
+/** OWASP's interactive-login setting (decisions/0028): 64 MiB, three passes,
+ *  one lane. About half a second on a laptop, a second on a mid-range phone. */
+export const ARGON2_DEFAULT: Argon2Params = { m: 65_536, t: 3, p: 1 }
+
+/** What stretching costs: a PBKDF2 iteration count, or Argon2id parameters. */
+export type KdfCost = number | Argon2Params
+
+/** Limits on parameters read from a server or a file, so that neither can
+ *  ask for a uselessly weak derivation or one that never finishes. */
+export const KDF_LIMITS = {
+  pbkdf2: { minIterations: 100_000, maxIterations: 10_000_000 },
+  argon2: { minM: 19_456, maxM: 1_048_576, minT: 1, maxT: 10, minP: 1, maxP: 4, minMT: 38_912 },
+} as const
+
+/** Null when the parameters are within KDF_LIMITS; otherwise why not. */
+export function kdfProblem(kdf: unknown): string | null {
+  const k = kdf as { algorithm?: unknown; salt?: unknown; iterations?: number; m?: number; t?: number; p?: number } | null
+  if (!k || typeof k !== 'object' || typeof k.salt !== 'string') return 'missing key derivation settings'
+  if (k.algorithm === 'PBKDF2-HMAC-SHA256') {
+    const { minIterations, maxIterations } = KDF_LIMITS.pbkdf2
+    return Number.isInteger(k.iterations) && k.iterations! >= minIterations && k.iterations! <= maxIterations ? null : 'implausible PBKDF2 iteration count'
+  }
+  if (k.algorithm === 'argon2id') {
+    const L = KDF_LIMITS.argon2
+    const ok = [k.m, k.t, k.p].every(Number.isInteger) && k.m! >= L.minM && k.m! <= L.maxM && k.t! >= L.minT && k.t! <= L.maxT && k.p! >= L.minP && k.p! <= L.maxP && k.m! * k.t! >= L.minMT
+    return ok ? null : 'implausible Argon2id parameters'
+  }
+  return 'unknown key derivation algorithm'
+}
+
+/** The cost stored in a KdfParams, for deriveMasterKey and friends. */
+export function costOf(kdf: KdfParams): KdfCost {
+  return kdf.algorithm === 'argon2id' ? { m: kdf.m, t: kdf.t, p: kdf.p } : kdf.iterations
+}
+
+/** Whether an account's derivation is older than the current default. */
+export function kdfIsOutdated(kdf: KdfParams): boolean {
+  return kdf.algorithm !== 'argon2id' || kdf.m < ARGON2_DEFAULT.m || kdf.t < ARGON2_DEFAULT.t
+}
+
+function kdfParams(salt: Uint8Array, cost: KdfCost, secretKey?: Uint8Array): KdfParams {
+  const version = secretKey ? { version: 2 as const } : {}
+  return typeof cost === 'number'
+    ? { algorithm: 'PBKDF2-HMAC-SHA256', iterations: cost, salt: toBase64Url(salt), ...version }
+    : { algorithm: 'argon2id', m: cost.m, t: cost.t, p: cost.p, salt: toBase64Url(salt), ...version }
 }
 
 /** Case and surrounding whitespace must not produce different accounts. Applied
@@ -91,10 +145,14 @@ export { toRecoveryString as formatRecoveryKey, fromRecoveryString as parseRecov
 export async function deriveMasterKey(
   password: string,
   salt: Uint8Array,
-  iterations: number = PBKDF2_ITERATIONS,
+  cost: KdfCost = PBKDF2_ITERATIONS,
   secretKey?: Uint8Array,
 ): Promise<Uint8Array> {
-  const stretched = await pbkdf2Sha256(utf8Encode(password.normalize('NFKC')), salt, iterations, KEY_BYTES)
+  const pw = utf8Encode(password.normalize('NFKC'))
+  const stretched = typeof cost === 'number'
+    ? await pbkdf2Sha256(pw, salt, cost, KEY_BYTES)
+    : await argon2id(pw, salt, cost, KEY_BYTES)
+  pw.fill(0)
   if (!secretKey) return stretched
   const master = await mixSecretKey(stretched, secretKey)
   stretched.fill(0)
@@ -163,14 +221,14 @@ export interface NewAccount {
 
 export async function createAccount(
   password: string,
-  iterations: number = PBKDF2_ITERATIONS,
+  cost: KdfCost = ARGON2_DEFAULT,
   secretKey?: Uint8Array,
 ): Promise<NewAccount> {
   const salt = generateSalt()
   const vaultKey = generateVaultKey()
   const recoveryKey = generateRecoveryKey()
 
-  const masterKey = await deriveMasterKey(password, salt, iterations, secretKey)
+  const masterKey = await deriveMasterKey(password, salt, cost, secretKey)
   const [kek, authKey, recoveryKek, recoveryAuthKey] = await Promise.all([
     deriveKek(masterKey),
     deriveAuthKey(masterKey),
@@ -183,7 +241,7 @@ export async function createAccount(
   ])
 
   return {
-    kdf: kdfParams(salt, iterations, secretKey),
+    kdf: kdfParams(salt, cost, secretKey),
     authKey: toBase64Url(authKey),
     wrappedVaultKey,
     wrappedVaultKeyForRecovery,
@@ -223,10 +281,10 @@ export interface LoginKeys {
 export async function deriveLoginKeys(
   password: string,
   salt: Uint8Array,
-  iterations: number = PBKDF2_ITERATIONS,
+  cost: KdfCost = PBKDF2_ITERATIONS,
   secretKey?: Uint8Array,
 ): Promise<LoginKeys> {
-  const masterKey = await deriveMasterKey(password, salt, iterations, secretKey)
+  const masterKey = await deriveMasterKey(password, salt, cost, secretKey)
   const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
   return { authKey: toBase64Url(authKey), kek }
 }
@@ -243,7 +301,7 @@ export async function unlock(
   secretKey?: Uint8Array,
 ): Promise<Unlocked> {
   if (kdf.version === 2 && !secretKey) throw new Error('This account needs its secret key.')
-  const masterKey = await deriveMasterKey(password, salt, kdf.iterations, kdf.version === 2 ? secretKey : undefined)
+  const masterKey = await deriveMasterKey(password, salt, costOf(kdf), kdf.version === 2 ? secretKey : undefined)
   const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
   const vaultKey = await unwrapVaultKey(wrappedVaultKey, kek, 'master')
   return { vaultKey, authKey: toBase64Url(authKey) }
@@ -269,14 +327,14 @@ export interface ChangedPassword {
 export async function changePassword(
   newPassword: string,
   vaultKey: Uint8Array,
-  iterations: number = PBKDF2_ITERATIONS,
+  cost: KdfCost = ARGON2_DEFAULT,
   secretKey?: Uint8Array,
 ): Promise<ChangedPassword> {
   const salt = generateSalt()
-  const masterKey = await deriveMasterKey(newPassword, salt, iterations, secretKey)
+  const masterKey = await deriveMasterKey(newPassword, salt, cost, secretKey)
   const [kek, authKey] = await Promise.all([deriveKek(masterKey), deriveAuthKey(masterKey)])
   return {
-    kdf: kdfParams(salt, iterations, secretKey),
+    kdf: kdfParams(salt, cost, secretKey),
     authKey: toBase64Url(authKey),
     wrappedVaultKey: await wrapVaultKey(vaultKey, kek, 'master'),
   }

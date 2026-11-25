@@ -26,6 +26,7 @@ export type ActivityKind =
   | 'add-security-key'
   | 'remove-security-key'
   | 'add-passkey'
+  | 'upgrade-kdf'
   | 'remove-passkey'
   | 'passkey-login'
   | 'disable-2fa'

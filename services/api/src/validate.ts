@@ -72,38 +72,45 @@ export async function requireIdentity(value: unknown): Promise<Identity> {
   return { publicKey, wrappedPrivateKey }
 }
 
-export interface KdfParams {
-  algorithm: 'PBKDF2-HMAC-SHA256'
-  iterations: number
-  salt: string
-  /** 2 when the client mixes a secret key into the derivation (decisions/0027).
-   *  The server cannot check it; it only hands it back at sign-in. */
-  version?: 2
-}
+/** How the client stretches the master password: PBKDF2 for accounts made
+ *  before decisions/0028, Argon2id since. The server never runs either; it
+ *  stores the settings and hands them back at sign-in. `version: 2` means a
+ *  secret key is mixed in (decisions/0027), which the server cannot check. */
+export type KdfParams =
+  | { algorithm: 'PBKDF2-HMAC-SHA256'; iterations: number; salt: string; version?: 2 }
+  | { algorithm: 'argon2id'; m: number; t: number; p: number; salt: string; version?: 2 }
 
-/** The iteration floor is enforced here as well as in the client, because the
- *  client is the thing an attacker controls. A registration claiming 1,000
- *  iterations would weaken the vault against offline attack on the stored
- *  wrapped key. */
+/** Floors are enforced here as well as in the client, because the client is
+ *  the thing an attacker controls. A registration claiming 1,000 iterations
+ *  would weaken the vault against offline attack on the stored wrapped key. */
 export const MIN_ITERATIONS = 600_000
+/** Argon2id: at least OWASP's lowest setting (19 MiB with two passes, or
+ *  46 MiB with one), at most 1 GiB, 10 passes and 4 lanes. */
+export const ARGON2_LIMITS = { minM: 19_456, maxM: 1_048_576, minMT: 38_912, maxT: 10, maxP: 4 } as const
 
 export function requireKdf(value: unknown): KdfParams {
-  const kdf = value as Partial<KdfParams> | undefined
+  const kdf = value as Record<string, unknown> | undefined
   if (!kdf || typeof kdf !== 'object') throw badRequest('kdf is required.')
-  if (kdf.algorithm !== 'PBKDF2-HMAC-SHA256') {
-    throw badRequest('kdf.algorithm must be PBKDF2-HMAC-SHA256.')
+  if (kdf['version'] !== undefined && kdf['version'] !== 2) throw badRequest('kdf.version must be 2 when present.')
+  const salt = requireBase64UrlBytes(kdf['salt'], 32, 'kdf.salt')
+  const version = kdf['version'] === 2 ? { version: 2 as const } : {}
+  if (kdf['algorithm'] === 'argon2id') {
+    const [m, t, p] = [kdf['m'], kdf['t'], kdf['p']]
+    if (![m, t, p].every((x) => typeof x === 'number' && Number.isInteger(x))) throw badRequest('kdf.m, kdf.t and kdf.p must be integers.')
+    const L = ARGON2_LIMITS
+    if ((m as number) < L.minM || (m as number) > L.maxM || (t as number) < 1 || (t as number) > L.maxT || (p as number) < 1 || (p as number) > L.maxP || (m as number) * (t as number) < L.minMT) {
+      throw badRequest(`Argon2id settings must be ${L.minM}–${L.maxM} KiB, 1–${L.maxT} passes (memory × passes at least ${L.minMT}) and 1–${L.maxP} lanes.`)
+    }
+    return { algorithm: 'argon2id', m: m as number, t: t as number, p: p as number, salt, ...version }
   }
-  if (typeof kdf.iterations !== 'number' || !Number.isInteger(kdf.iterations)) {
+  if (kdf['algorithm'] !== 'PBKDF2-HMAC-SHA256') {
+    throw badRequest('kdf.algorithm must be argon2id or PBKDF2-HMAC-SHA256.')
+  }
+  if (typeof kdf['iterations'] !== 'number' || !Number.isInteger(kdf['iterations'])) {
     throw badRequest('kdf.iterations must be an integer.')
   }
-  if (kdf.iterations < MIN_ITERATIONS) {
+  if (kdf['iterations'] < MIN_ITERATIONS) {
     throw badRequest(`kdf.iterations must be at least ${MIN_ITERATIONS}.`)
   }
-  if (kdf.version !== undefined && kdf.version !== 2) throw badRequest('kdf.version must be 2 when present.')
-  return {
-    algorithm: 'PBKDF2-HMAC-SHA256',
-    iterations: kdf.iterations,
-    salt: requireBase64UrlBytes(kdf.salt, 32, 'kdf.salt'),
-    ...(kdf.version === 2 ? { version: 2 as const } : {}),
-  }
+  return { algorithm: 'PBKDF2-HMAC-SHA256', iterations: kdf['iterations'], salt, ...version }
 }
