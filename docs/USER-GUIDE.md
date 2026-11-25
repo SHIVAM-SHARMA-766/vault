@@ -374,6 +374,10 @@ Vault keeps using an organization apart from running one
    - **Editor**: add and change items;
    - **Manager**: also give others access.
 
+   **Password health** in the console shows weak, reused, old and breached passwords across the
+   collections you manage. It is worked out in your browser, and you fix items from your vault
+   under **Shared**.
+
    Make your own sets under **Permission sets**, choosing what items allow, whether passwords
    can be seen and copied, whether the browser extension may fill them, and whether items can
    go into backups or be moved out. These are rules the apps keep, not encryption: anyone who

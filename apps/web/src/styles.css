@@ -1103,3 +1103,16 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 5px; margin: 0 1px; 
 .set-level { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
 .set-level legend { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
 .set-hint { margin-top: 8px; }
+
+/* Team password health (decisions/0032, 2c) */
+.health-summary { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin: 4px 0 10px; }
+.health-score { display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%; border: 6px solid var(--line); }
+.health-score strong { font-size: 24px; line-height: 1; }
+.health-score.is-ok { border-color: var(--ok); }
+.health-score.is-warn { border-color: var(--warn); }
+.health-score.is-bad { border-color: var(--danger); }
+.health-counts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.health-counts .count { font-weight: 700; margin-left: 4px; }
+.health-ok { color: var(--ok-text, var(--ok)); display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.health-issues { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.health-collection { justify-content: space-between; }

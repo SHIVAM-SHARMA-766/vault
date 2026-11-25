@@ -372,7 +372,8 @@ people.
     newcomers.
   - [x] 2b: permission sets (*Use only*, Viewer, Editor, Manager, and custom sets of four
     rights: items level, see and copy passwords, fill, backups).
-  - [ ] 2c: team password health across the collections an admin manages.
+  - [x] 2c: team password health across the collections an admin manages (score, per
+    collection, items to fix, breach check), in the admin's browser.
   - [ ] 2d: guests limited to the collections they are given.
 - [ ] **Stage 3, the hosted edition:** business tenants, the operator console, tenant-scoped admin
   consoles, and the operator's responsibilities (uptime, abuse, terms).
