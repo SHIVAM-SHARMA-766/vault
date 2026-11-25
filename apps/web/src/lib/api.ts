@@ -339,19 +339,24 @@ export const api = {
     createGroup: (token: string, org: string, id: string, nameBlob: string) => request<{ id: string }>('POST', `/api/orgs/${org}/groups`, { token, body: { id, nameBlob } }),
     deleteGroup: (token: string, org: string, group: string) => request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/groups/${group}`, { token }),
     addToGroup: (token: string, org: string, group: string, user: string) =>
-      request<{ ok: true; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean }[] }>('PUT', `/api/orgs/${org}/groups/${group}/members/${user}`, { token }),
+      request<{ ok: true; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean; set?: string }[] }>('PUT', `/api/orgs/${org}/groups/${group}/members/${user}`, { token }),
     removeFromGroup: (token: string, org: string, group: string, user: string) =>
       request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/groups/${group}/members/${user}`, { token }),
-    grantGroup: (token: string, org: string, coll: string, group: string, body: { permission: SharePermission; hidePasswords: boolean; grants: { userId: string; keyBlob: string; signature?: string }[] }) =>
+    grantGroup: (token: string, org: string, coll: string, group: string, body: { set: string; grants: { userId: string; keyBlob: string; signature?: string }[] }) =>
       request<{ ok: true; granted: number }>('PUT', `/api/orgs/${org}/collections/${coll}/groups/${group}`, { token, body }),
     revokeGroup: (token: string, org: string, coll: string, group: string) =>
       request<{ ok: true; rotationNeeded: string[] }>('DELETE', `/api/orgs/${org}/collections/${coll}/groups/${group}`, { token }),
     rotate: (token: string, org: string, coll: string, body: { keyVersion: number; grants: { userId: string; keyBlob: string; signature?: string }[]; items: { id: string; blob: string }[]; drop?: string[]; recoveryBlob?: string }) =>
       request<{ keyVersion: number }>('POST', `/api/orgs/${org}/collections/${coll}/rotate`, { token, body }),
     access: (token: string, org: string, coll: string) =>
-      request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),
-    grant: (token: string, org: string, coll: string, user: string, body: { permission: SharePermission; hidePasswords: boolean; keyBlob?: string; viaGroup?: string; hours?: number; signature?: string }) =>
+      request<{ access: { userId: string; permission: SharePermission; hidePasswords: boolean; set: string; keyVersion: number }[] }>('GET', `/api/orgs/${org}/collections/${coll}/access`, { token }),
+    /** `set`: a permission set (2b); the older permission + hidePasswords still work. */
+    grant: (token: string, org: string, coll: string, user: string, body: ({ set: string } | { permission: SharePermission; hidePasswords: boolean }) & { keyBlob?: string; viaGroup?: string; hours?: number; signature?: string }) =>
       request<{ ok: true }>('PUT', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token, body }),
+    permissionSets: (token: string, org: string) => request<{ sets: PermissionSet[] }>('GET', `/api/orgs/${org}/permission-sets`, { token }),
+    putPermissionSet: (token: string, org: string, set: Omit<PermissionSet, 'builtin'>) =>
+      request<{ set: PermissionSet }>('PUT', `/api/orgs/${org}/permission-sets/${set.id}`, { token, body: { name: set.name, level: set.level, reveal: set.reveal, fill: set.fill, export: set.export } }),
+    deletePermissionSet: (token: string, org: string, id: string) => request<{ ok: true }>('DELETE', `/api/orgs/${org}/permission-sets/${id}`, { token }),
     revoke: (token: string, org: string, coll: string, user: string) =>
       request<{ ok: true }>('DELETE', `/api/orgs/${org}/collections/${coll}/access/${user}`, { token }),
     items: (token: string, org: string, coll: string) =>
@@ -525,9 +530,11 @@ export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; inv
 export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[]; signingPublicKey?: string | null; currentSigningKey?: string | null; endorsement?: string | null }
 export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[] }
 export interface GroupRow { id: string; nameBlob: string; members: string[]; collections: { collectionId: string; permission: SharePermission; hidePasswords: boolean }[] }
+/** A named bundle of what someone may do in a collection (decisions/0032, 2b). */
+export interface PermissionSet { id: string; name: string; level: SharePermission; reveal: boolean; fill: boolean; export: boolean; builtin?: true }
 export interface CollectionRow {
   id: string; nameBlob: string; keyVersion: number; rotationNeeded: boolean; recoveryCovered?: boolean
-  access: { keyBlob: string; keyVersion: number; permission: SharePermission; hidePasswords: boolean; until?: string; signature?: string; signedBy?: string } | null
+  access: { keyBlob: string; keyVersion: number; permission: SharePermission; hidePasswords: boolean; rights?: { set: string; reveal: boolean; fill: boolean; export: boolean }; until?: string; signature?: string; signedBy?: string } | null
   requested?: boolean
 }
 

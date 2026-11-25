@@ -367,9 +367,17 @@ Vault keeps using an organization apart from running one
    Confirm only if it matches what you see. This is what stops anyone, the server included,
    from slipping in a key of their own. Confirming also adds them to the groups chosen at
    invitation, with the groups' collections.
-4. In **Collections**, open a collection's **Access** and give confirmed members **Can view**, **Can edit** or
-   **Can manage** (manage lets them share it onward). **Hide passwords** lets someone use a
-   login without seeing its password in the app — a policy, not encryption.
+4. In **Collections**, open a collection's **Access** and give confirmed members, or a group,
+   a **permission set** ([0032](../decisions/0032-business-edition.md)):
+   - **Use only**: fill logins without seeing their passwords;
+   - **Viewer**: open items and see their passwords;
+   - **Editor**: add and change items;
+   - **Manager**: also give others access.
+
+   Make your own sets under **Permission sets**, choosing what items allow, whether passwords
+   can be seen and copied, whether the browser extension may fill them, and whether items can
+   go into backups or be moved out. These are rules the apps keep, not encryption: anyone who
+   can open a collection holds its key.
 
 **In a business Vault** ([0032](../decisions/0032-business-edition.md)) the server is one
 company. The owner creates it once, and the console's **People** section is where everyone is

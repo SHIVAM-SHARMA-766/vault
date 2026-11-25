@@ -210,7 +210,8 @@ test('shared collections: signed keys only, filled not copied when passwords are
     await s.manage(alice, 'Acme', 'Collections')
     await alice.locator('.collection-row', { hasText: 'Finance' }).getByRole('button', { name: 'Access' }).click()
     await alice.selectOption('select[aria-label="Member"]', { label: 'Bob' })
-    await alice.getByLabel('Hide passwords').check()
+    // "Use only" (decisions/0032): fill, never reveal.
+    await alice.selectOption('select[aria-label="Permission set"]', { label: 'Use only' })
     await alice.getByRole('button', { name: 'Share', exact: true }).click()
     await alice.waitForSelector('.access-list li:has-text("Bob")')
 

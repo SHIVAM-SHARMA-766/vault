@@ -370,7 +370,8 @@ people.
   - [x] 2a: one company per server; **People** replaces Members (account facts and actions for
     admins who manage accounts, *Add to company*); one invitation with a sign-up code for
     newcomers.
-  - [ ] 2b: permission sets (*Use only*, Viewer, Editor, Manager, custom).
+  - [x] 2b: permission sets (*Use only*, Viewer, Editor, Manager, and custom sets of four
+    rights: items level, see and copy passwords, fill, backups).
   - [ ] 2c: team password health across the collections an admin manages.
   - [ ] 2d: guests limited to the collections they are given.
 - [ ] **Stage 3, the hosted edition:** business tenants, the operator console, tenant-scoped admin

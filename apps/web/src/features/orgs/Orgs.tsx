@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { fingerprintOf, loadTrust, saveTrust } from './trust.js'
 
-import { type AdminUser, type OrgMember, type OrgPending, type SharePermission, api } from '../../lib/api.js'
+import { type AdminUser, type OrgMember, type OrgPending, type PermissionSet, type SharePermission, api } from '../../lib/api.js'
 import { useEdition } from '../../lib/instance.js'
 import { Link, href, navigate } from '../../lib/router.js'
 import { refreshScopes } from '../../lib/workspace.js'
@@ -101,6 +101,7 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
   const colls = teams.collections.filter((c) => c.orgId === org.id)
   const mine = colls.filter((c) => c.permission)
   const others = colls.filter((c) => !c.permission)
+  const { sets } = usePermissionSets(org.status === 'confirmed' ? org.id : undefined)
 
   if (org.status !== 'confirmed') {
     return (
@@ -127,12 +128,12 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
 
       <h3 className="small-head">Shared with you</h3>
       {mine.length === 0 ? <p className="muted small">Nothing yet. An admin gives you collections; ask for one below.</p> : (
-        <ul className="device-list">{mine.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} />)}</ul>
+        <ul className="device-list">{mine.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} sets={sets} />)}</ul>
       )}
       {others.length ? (
         <>
           <h3 className="small-head">Other collections</h3>
-          <ul className="device-list">{others.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} />)}</ul>
+          <ul className="device-list">{others.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={[]} groups={[]} manageable={false} sets={sets} />)}</ul>
         </>
       ) : null}
       {!admin ? <details className="org-more"><summary className="small">If every owner is locked out</summary><OrgRecovery org={org} teams={teams} /></details> : null}
@@ -382,6 +383,7 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
  *  collection with who can open it, then a new one. */
 export function OrgCollections({ org, teams, people }: { org: OrgView; teams: Teams; people: OrgPeople }) {
   const toast = useToast()
+  const { sets } = usePermissionSets(org.id)
   const [collName, setCollName] = useState('')
   const colls = teams.collections.filter((c) => c.orgId === org.id)
   return (
@@ -390,7 +392,7 @@ export function OrgCollections({ org, teams, people }: { org: OrgView; teams: Te
       <Requests org={org} teams={teams} members={people.members} />
       {colls.length === 0 ? <p className="muted small">No collections yet. A collection is a shared folder: items moved into it are encrypted to everyone you give it to.</p> : (
         <ul className="device-list">
-          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={people.members} groups={people.groups} />)}
+          {colls.map((c) => <CollectionRow key={c.id} c={c} teams={teams} members={people.members} groups={people.groups} sets={sets} />)}
         </ul>
       )}
       <form className="inline-form" onSubmit={async (e) => {
@@ -405,16 +407,91 @@ export function OrgCollections({ org, teams, people }: { org: OrgView; teams: Te
   )
 }
 
-export function CollectionRow({ c, teams, members, groups, manageable = true }: { c: CollectionView; teams: Teams; members: OrgMember[]; groups: { id: string; name: string }[]; manageable?: boolean }) {
+/** The console's Permission sets section (decisions/0032, 2b): the built-in
+ *  sets, and custom ones an admin makes from the same rights. */
+export function PermissionSets({ org }: { org: OrgView }) {
+  const toast = useToast()
+  const { sets, reload } = usePermissionSets(org.id)
+  const blank = { id: '', name: '', level: 'view' as SharePermission, reveal: true, fill: true, export: false }
+  const [draft, setDraft] = useState<typeof blank | null>(null)
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    if (!draft) return
+    try { await api.orgs.putPermissionSet(await session.token(), org.id, { ...draft, id: draft.id || crypto.randomUUID(), name: draft.name.trim() }); toast(`Saved ${draft.name.trim()}`); setDraft(null); await reload() }
+    catch (err) { toast(err instanceof Error ? err.message : 'Could not save it.', 'error') }
+  }
+  return (
+    <section className="settings-card org-card" aria-label={org.name}>
+      <div className="settings-card-head"><IconShield size={18} /><h2>{org.name}</h2><span className="muted small">{sets.length} set{sets.length === 1 ? '' : 's'}</span></div>
+      <ul className="device-list set-list">
+        {sets.map((x) => (
+          <li key={x.id} className="device-row set-row">
+            <div className="device-text">
+              <span className="device-name">{x.name}{x.builtin ? <span className="pill">Built in</span> : null}</span>
+              <span className="muted small">{describeSet(x)}</span>
+            </div>
+            {x.builtin ? null : (
+              <div className="device-actions">
+                <button className="btn btn-secondary btn-sm" onClick={() => setDraft({ id: x.id, name: x.name, level: x.level, reveal: x.reveal, fill: x.fill, export: x.export })}>Edit</button>
+                <button className="icon-btn icon-danger" aria-label={`Remove ${x.name}`} onClick={async () => {
+                  if (!window.confirm(`Remove the permission set ${x.name}?`)) return
+                  try { await api.orgs.deletePermissionSet(await session.token(), org.id, x.id); toast(`${x.name} removed`); await reload() }
+                  catch (err) { toast(err instanceof Error ? err.message : 'Could not remove it.', 'error') }
+                }}><IconX size={15} /></button>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+      {draft ? (
+        <form className="set-form" onSubmit={save} aria-label={draft.id ? `Edit ${draft.name}` : 'New permission set'}>
+          <div className="field"><label htmlFor="set-name">Name</label><input id="set-name" required maxLength={80} placeholder="e.g. Auditor" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></div>
+          <fieldset className="field set-level"><legend>Items</legend>
+            {(['view', 'edit', 'manage'] as SharePermission[]).map((l) => (
+              <label key={l} className="check"><input type="radio" name="set-level" checked={draft.level === l} onChange={() => setDraft({ ...draft, level: l })} />
+                <span>{l === 'view' ? 'Open and use them' : l === 'edit' ? 'Add and change them' : 'Add and change them, and give access'}</span></label>
+            ))}
+          </fieldset>
+          <label className="check"><input type="checkbox" checked={draft.reveal} onChange={(e) => setDraft({ ...draft, reveal: e.target.checked })} /><span>See and copy passwords (off: fill only)</span></label>
+          <label className="check"><input type="checkbox" checked={draft.fill} onChange={(e) => setDraft({ ...draft, fill: e.target.checked })} /><span>Fill pages with the browser extension</span></label>
+          <label className="check"><input type="checkbox" checked={draft.export} onChange={(e) => setDraft({ ...draft, export: e.target.checked })} /><span>Include items in organization backups</span></label>
+          <p className="hint">Changing a set changes it for everyone it was given to.</p>
+          <div className="settings-actions"><button type="button" className="btn btn-secondary btn-sm" onClick={() => setDraft(null)}>Cancel</button><button type="submit" className="btn btn-primary btn-sm" disabled={!draft.name.trim()}>Save set</button></div>
+        </form>
+      ) : <button className="btn btn-secondary btn-sm" onClick={() => setDraft(blank)}><IconPlus size={14} />New permission set</button>}
+    </section>
+  )
+}
+
+/** What a permission set lets someone do, in words. */
+export function describeSet(s: PermissionSet): string {
+  const level = s.level === 'view' ? 'open and use items' : s.level === 'edit' ? 'add and change items' : 'add and change items, and give access'
+  const parts = [level, s.reveal ? 'see and copy passwords' : 'fill passwords without seeing them']
+  if (!s.fill) parts.push('no filling in the browser extension')
+  if (s.export) parts.push('include items in backups')
+  return parts.join(' · ')
+}
+
+/** The organization's permission sets, built-in and custom (2b). */
+export function usePermissionSets(orgId: string | undefined) {
+  const [sets, setSets] = useState<PermissionSet[]>([])
+  const reload = async () => { if (orgId) setSets((await api.orgs.permissionSets(await session.token(), orgId)).sets) }
+  useEffect(() => { void reload().catch(() => setSets([])) }, [orgId])
+  return { sets, reload }
+}
+
+export function CollectionRow({ c, teams, members, groups, manageable = true, sets = [] }: { c: CollectionView; teams: Teams; members: OrgMember[]; groups: { id: string; name: string }[]; manageable?: boolean; sets?: PermissionSet[] }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
-  const [grants, setGrants] = useState<{ userId: string; permission: SharePermission; hidePasswords: boolean }[]>([])
+  const [grants, setGrants] = useState<{ userId: string; permission: SharePermission; hidePasswords: boolean; set: string }[]>([])
   const [who, setWho] = useState('')
-  const [perm, setPerm] = useState<SharePermission>('view')
-  const [hide, setHide] = useState(false)
+  const [setId, setSetId] = useState('viewer')
   const [group, setGroup] = useState('')
   const manage = manageable && c.permission === 'manage'
   const load = async () => setGrants((await api.orgs.access(await session.token(), c.orgId, c.id)).access)
+  const chosen = sets.find((x) => x.id === setId)
+  const setName = (id: string) => sets.find((x) => x.id === id)?.name ?? id
+  const mine = c.rights ? setName(c.rights.set) : c.permission ? PERMISSION_LABEL[c.permission] : null
 
   return (
     <li className="device-row collection-row">
@@ -423,7 +500,7 @@ export function CollectionRow({ c, teams, members, groups, manageable = true }: 
           {c.rotationNeeded ? <span className="pill pill-danger" title="Someone lost access; their copy of the key should be retired">Key rotation due</span> : null}
         </span>
         {c.untrusted ? <span className="pill pill-danger" title="Its signature did not check out against an admin you trust">Key not trusted</span> : null}
-        <span className="muted small">{c.permission ? PERMISSION_LABEL[c.permission] : 'You have no access'}{c.hidePasswords ? ' · passwords hidden' : ''}{c.until ? ` · until ${when(c.until)}` : ''}</span>
+        <span className="muted small">{mine ?? 'You have no access'}{c.hidePasswords ? ' · passwords hidden' : ''}{c.until ? ` · until ${when(c.until)}` : ''}</span>
         {!c.permission ? (
           c.requested ? <span className="pill">Access requested</span> : (
             <button className="btn btn-secondary btn-sm" onClick={async () => {
@@ -439,7 +516,7 @@ export function CollectionRow({ c, teams, members, groups, manageable = true }: 
             <ul className="access-list">
               {grants.map((g) => {
                 const m = members.find((x) => x.userId === g.userId)
-                return <li key={g.userId}><span>{m?.label ?? 'Member'}</span><span className="muted small">{PERMISSION_LABEL[g.permission]}{g.hidePasswords ? ' · passwords hidden' : ''}</span>
+                return <li key={g.userId}><span>{m?.label ?? 'Member'}</span><span className="muted small">{setName(g.set)}</span>
                   {m && m.role !== 'owner' ? <button className="icon-btn icon-sm icon-danger" aria-label={`Remove ${m.label}'s access`} onClick={async () => { await api.orgs.revoke(await session.token(), c.orgId, c.id, g.userId); await load(); await teams.load() }}><IconX size={13} /></button> : null}
                 </li>
               })}
@@ -447,23 +524,22 @@ export function CollectionRow({ c, teams, members, groups, manageable = true }: 
             <form className="inline-form" onSubmit={async (e) => {
               e.preventDefault()
               const m = members.find((x) => x.userId === who)!
-              try { await teams.grant(c.id, m.userId, m.publicKey, perm, hide); toast(`${m.label} can now ${perm} ${c.name}`); setWho(''); await load() }
+              try { await teams.grant(c.id, m.userId, m.publicKey, setId); toast(`${m.label}: ${chosen?.name ?? setId} in ${c.name}`); setWho(''); await load() }
               catch (err) { toast(err instanceof Error ? err.message : 'Could not share.', 'error') }
             }}>
               <select aria-label="Member" required value={who} onChange={(e) => setWho(e.target.value)}>
                 <option value="">Give access to…</option>
                 {members.filter((m) => m.status === 'confirmed' && !grants.some((g) => g.userId === m.userId)).map((m) => <option key={m.userId} value={m.userId}>{m.label}</option>)}
               </select>
-              <select aria-label="Permission" value={perm} onChange={(e) => setPerm(e.target.value as SharePermission)}>
-                {(['view', 'edit', 'manage'] as SharePermission[]).map((p) => <option key={p} value={p}>{PERMISSION_LABEL[p]}</option>)}
+              <select aria-label="Permission set" value={setId} onChange={(e) => setSetId(e.target.value)}>
+                {sets.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
               </select>
-              <label className="check"><input type="checkbox" checked={hide} onChange={(e) => setHide(e.target.checked)} /><span>Hide passwords</span></label>
               <button className="btn btn-secondary btn-sm" type="submit" disabled={!who}>Share</button>
             </form>
             {groups.length ? (
               <form className="inline-form" onSubmit={async (e) => {
                 e.preventDefault()
-                try { await teams.grantGroup(c.id, group, perm, hide); toast('Group given access'); setGroup(''); await load() }
+                try { await teams.grantGroup(c.id, group, setId); toast('Group given access'); setGroup(''); await load() }
                 catch (err) { toast(err instanceof Error ? err.message : 'Could not share.', 'error') }
               }}>
                 <select aria-label="Group" required value={group} onChange={(e) => setGroup(e.target.value)}>
@@ -473,7 +549,8 @@ export function CollectionRow({ c, teams, members, groups, manageable = true }: 
                 <button className="btn btn-secondary btn-sm" type="submit" disabled={!group}>Share with group</button>
               </form>
             ) : null}
-            <p className="hint">"Hide passwords" is a policy the app follows, not encryption: anyone who can open a collection holds its key.</p>
+            {chosen ? <p className="hint set-hint"><strong>{chosen.name}:</strong> {describeSet(chosen)}.</p> : null}
+            <p className="hint">Seeing passwords, filling and backups are kept by the apps, not by encryption: anyone who can open a collection holds its key.</p>
           </div>
         ) : null}
       </div>
@@ -667,7 +744,7 @@ export function Requests({ org, teams, members }: { org: OrgView; teams: Teams; 
                       {DURATIONS.map(([h, l]) => <option key={h} value={h}>{l}</option>)}
                     </select>
                     <button className="btn btn-primary btn-sm" onClick={async () => {
-                      try { await teams.grant(r.collectionId, m!.userId, m!.publicKey, pick.perm, false, undefined, pick.hours || undefined); toast(`${r.label} can open ${c!.name}${pick.hours ? ` for ${DURATIONS.find(([h]) => h === pick.hours)![1].replace('For ', '')}` : ''}`); await load(); await teams.load() }
+                      try { await teams.grant(r.collectionId, m!.userId, m!.publicKey, pick.perm === 'edit' ? 'editor' : 'viewer', undefined, pick.hours || undefined); toast(`${r.label} can open ${c!.name}${pick.hours ? ` for ${DURATIONS.find(([h]) => h === pick.hours)![1].replace('For ', '')}` : ''}`); await load(); await teams.load() }
                       catch (err) { toast(err instanceof Error ? err.message : 'Could not approve.', 'error') }
                     }}>Approve</button>
                   </>
@@ -696,7 +773,8 @@ export function OrgBackup({ org, teams }: { org: OrgView; teams: Teams }) {
   const [pw2, setPw2] = useState('')
   const [busy, setBusy] = useState(false)
   const colls = teams.collections.filter((c) => c.orgId === org.id)
-  const readable = colls.filter((c) => c.key)
+  // Only collections whose permission set allows backups (decisions/0032, 2b).
+  const readable = colls.filter((c) => c.key && (c.rights ? c.rights.export : c.permission !== 'view'))
   const items = teams.shared.filter((e) => e.orgId === org.id)
   if (!open) return <button className="link small org-backup-link" onClick={() => setOpen(true)}>Back up this organization…</button>
   return (

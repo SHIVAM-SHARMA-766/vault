@@ -25,7 +25,7 @@ export interface OrgRow {
 }
 export interface CollectionRow {
   id: string; nameBlob: string; keyVersion: number
-  access: { keyBlob: string; keyVersion: number; permission: string; hidePasswords: boolean; signature?: string; signedBy?: string } | null
+  access: { keyBlob: string; keyVersion: number; permission: string; hidePasswords: boolean; rights?: { set: string; reveal: boolean; fill: boolean; export: boolean }; signature?: string; signedBy?: string } | null
 }
 
 export interface Session { accessToken: string; refreshToken: string; expiresIn: number }
