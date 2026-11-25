@@ -65,6 +65,15 @@ for (const [name, m] of Object.entries(manifests)) {
 
 rmSync(dist, { recursive: true, force: true })
 
+/** The same source makes the same zip, byte for byte (stage 4): files in a
+ *  fixed order, one fixed timestamp, no extra attributes. So anyone can check
+ *  that a store package was built from a given commit. */
+function reproducibleZip(dir, out) {
+  const files = execFileSync('find', ['.', '-type', 'f'], { cwd: dir, encoding: 'utf8' }).split('\n').filter(Boolean).map((f) => f.replace(/^\.\//, '')).sort()
+  execFileSync('touch', ['-h', '-d', '1980-01-01T00:00:00Z', ...files], { cwd: dir })
+  execFileSync('zip', ['-q', '-X', '-D', '-9', out, '-@'], { cwd: dir, input: files.join('\n'), env: { ...process.env, TZ: 'UTC' } })
+}
+
 /** The background and popup are modules; the inline content script is a
  *  classic script, because the browser injects it into pages as one. The test
  *  build compiles with __VAULT_TEST__ (loopback-only inline permission, an open
@@ -89,7 +98,7 @@ for (const [name, manifest] of Object.entries(manifests)) {
   cpSync(`${root}src/popup/popup.css`, `${dir}/popup.css`)
   writeFileSync(`${dir}/manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`)
   if (name !== 'chrome-test') {
-    try { execFileSync('zip', ['-qr', `${dist}/vault-extension-${name}-${version}.zip`, '.'], { cwd: dir }) }
+    try { reproducibleZip(dir, `${dist}/vault-extension-${name}-${version}.zip`) }
     catch { /* zip is optional locally; the release job has it */ }
   }
 }

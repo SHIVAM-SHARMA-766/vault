@@ -400,8 +400,10 @@ Design: [0029](../decisions/0029-browser-extension.md). Built in stages.
 - [x] Shared collections, with the signed-grant checks; "hide passwords" fills but never copies; filling is reported to the organization (stage 2).
 - [x] Optional all-sites permission: inline icon, save and update on form submit, generator
   in the page; follows the account's auto-lock and generator preferences (stage 3).
-- [ ] Store packages: Firefox Add-ons (free); Chrome Web Store needs a one-time developer fee,
-  the operator's decision (stage 4).
+- [x] Store packages: reproducible Chrome and Firefox zips, the source zip for AMO, SHA256SUMS,
+  the listing and privacy policy, and a packaging workflow (stage 4). Submitting is the
+  operator's step: AMO and Edge are free; the Chrome Web Store's one-time fee is the operator's
+  decision ([docs/extension-stores.md](extension-stores.md)).
 - [ ] Passkey storage and use, after autofill is solid (stage 5).
 
 **Exit criteria:** fills and saves on the top sites in a test matrix; a phishing page on a

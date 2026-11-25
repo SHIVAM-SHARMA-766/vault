@@ -1,12 +1,13 @@
 {
   "name": "@vault/extension",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "The browser extension: fills logins from the person's own Vault server (decisions/0029).",
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/build.mjs",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "package": "node scripts/package.mjs"
   },
   "dependencies": {
     "@vault/core": "*",
