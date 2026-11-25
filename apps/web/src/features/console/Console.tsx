@@ -10,10 +10,11 @@ import { useEdition, useInstance } from '../../lib/instance.js'
 import { Link, type Route, href, navigate } from '../../lib/router.js'
 import * as session from '../../lib/session.js'
 import { type Scope, useScopes } from '../../lib/workspace.js'
-import { IconAlert, IconFolder, IconGrid, IconNote, IconShield, IconSliders, IconUser, IconUsers } from '../../ui/icons.js'
+import { IconAlert, IconPulse, IconFolder, IconGrid, IconNote, IconShield, IconSliders, IconUser, IconUsers } from '../../ui/icons.js'
 import { Shell } from '../../ui/Shell.js'
 import { type ServerTab, ServerSection, serverTabs } from '../admin/Admin.js'
 import { useTeams } from '../orgs/model.js'
+import { TeamHealth } from './TeamHealth.js'
 import { Activity, Groups, OrgBackup, OrgCollections, OrgMembers, OrgRecovery, PermissionSets, PoliciesForm, useOrgPeople } from '../orgs/Orgs.js'
 
 type ConsoleRoute = Extract<Route, { name: 'console' }>
@@ -22,6 +23,7 @@ const ORG_SECTIONS = [
   { id: 'members', label: 'People', Icon: IconUser, intro: 'Everyone in the organization: who is waiting for you to confirm them, who is invited, and inviting more.' },
   { id: 'groups', label: 'Groups', Icon: IconUsers, intro: 'Teams of members, to give collections to several people at once.' },
   { id: 'collections', label: 'Collections', Icon: IconFolder, intro: 'Shared folders, who can open each, and requests for access.' },
+  { id: 'health', label: 'Password health', Icon: IconPulse, intro: 'Weak, reused, old and breached passwords in the collections you manage, worked out in this browser.' },
   { id: 'sets', label: 'Permission sets', Icon: IconShield, intro: 'What people may do in a collection: the built-in sets, and your own.' },
   { id: 'policies', label: 'Policies', Icon: IconSliders, intro: 'Rules every member must meet before the collections open for them.' },
   { id: 'activity', label: 'Activity', Icon: IconNote, intro: 'Who did what, for a year. Opening, copying and filling are reported by members’ apps.' },
@@ -182,6 +184,7 @@ function OrgScope({ state, orgId, fallbackName, section }: { state: session.Unlo
           {tab === 'members' ? <OrgMembers org={org} teams={teams} selfId={state.userId} people={people} /> : null}
           {tab === 'groups' ? <Groups org={org} teams={teams} people={people} /> : null}
           {tab === 'collections' ? <OrgCollections org={org} teams={teams} people={people} /> : null}
+          {tab === 'health' ? <TeamHealth org={org} teams={teams} /> : null}
           {tab === 'sets' ? <PermissionSets org={org} /> : null}
           {tab === 'policies' ? <section className="settings-card org-card" aria-label={org.name}><PoliciesForm org={org} teams={teams} always /></section> : null}
           {tab === 'activity' ? <section className="settings-card org-card" aria-label={org.name}><Activity org={org} teams={teams} members={people.members} always /></section> : null}

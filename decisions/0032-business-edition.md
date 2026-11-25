@@ -1,6 +1,6 @@
 # 0032: The business edition
 
-Status: Accepted by the operator on 2026-11-23; 2a and 2b built, 2c–2d to come
+Status: Accepted by the operator on 2026-11-23; 2a–2c built, 2d to come
 Date: 2026-11-23
 Implements: [0030](0030-editions.md) stage 2. Builds on [0031](0031-two-workspaces.md).
 
@@ -87,11 +87,22 @@ rights:
 - "See history" and "share by link" were considered and left out: shared items have no history
   yet, and share links are made only from personal items.
 
-### 2c — Team password health (planned)
+### 2c — Team password health (built)
 
-An admin's console computes weak, reused, old and breached passwords across the collections the
-admin manages, in the admin's browser, as the personal health check does. The server never sees
-a password or a score. The report lists items, not people.
+The console's **Password health** section runs the personal health check (`analyse` in
+`@vault/core`) over the items in the collections the admin **manages**. Collections the admin can
+only open are left out, and the report says how many. It runs in the admin's browser.
+
+The report shows:
+- a score out of 100, with counts per issue as filters;
+- one line per collection, with how many of its items need attention;
+- the items to fix, each with its issues and when the password last changed;
+- *Check for breaches*, the same k-anonymity check as the personal one (0019), where the server
+  allows it;
+- passwords that someone who left could see (B9).
+
+Reuse is counted within the organization's items only. The server never sees a password or a
+score, no password is displayed, and the report lists items, not people.
 
 ### 2d — Guests (planned)
 
