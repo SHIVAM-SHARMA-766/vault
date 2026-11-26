@@ -5,7 +5,7 @@ the effect is, why it is the way it is, and what would change it. Plans live in
 [ROADMAP.md](ROADMAP.md); the adversaries behind the security items are in
 [threat-model.md](threat-model.md).
 
-Last revised: 2026-11-07 (phase 3.5 review)
+Last revised: 2026-11-25 (passkey unlock, Argon2id, single sign-on)
 
 | Severity | Meaning |
 |---|---|
@@ -44,18 +44,16 @@ write that one bucket and nothing else.
 </details>
 
 <details>
-<summary>🔴 <b>PBKDF2, not Argon2id; no secret key mixed into the KDF</b></summary>
+<summary>🟡 <b>Accounts made before Argon2id keep PBKDF2 until upgraded</b></summary>
 
-**Effect.** After a database breach, offline guessing of a weak master password costs
-600,000 SHA-256 rounds per guess — strong against strong passwords, weaker than a
-memory-hard function against weak ones.
+**Effect.** New accounts and every password change use Argon2id at 64 MiB
+([0028](../decisions/0028-argon2id.md)). An older account stays on PBKDF2 (600,000 rounds)
+until its owner upgrades from Settings → Security or changes the master password. PBKDF2 is
+strong against strong passwords and weaker than a memory-hard function against weak ones.
 
-**Why.** PBKDF2 is in WebCrypto; Argon2id needs WebAssembly in the crypto package, against its
-no-dependency rule. A 1Password-style secret key makes a stolen database useless for guessing
-but makes every new device need that key. Both are open decisions.
+**Why.** Upgrading needs the master password, which only the person has.
 
-**Changes when** either decision is taken. The ciphertext format is versioned, so migrating
-needs no breaking change.
+**Changes when** each account upgrades. The settings card asks until it does.
 </details>
 
 <details>
@@ -102,10 +100,18 @@ criterion asks for real files from three managers.
 </details>
 
 <details>
-<summary>🟡 <b>Passkeys are a second factor, not yet a way to unlock</b></summary>
+<summary>🟠 <b>Single sign-on: the browser extension and organization-level rules</b></summary>
 
-Security keys and passkeys work as a second factor at sign-in ([0022](../decisions/0022-passkeys.md)).
-Unlocking with a passkey alone (the WebAuthn PRF extension) is the next part of that decision.
+**Effect.** Single sign-on ([0021](../decisions/0021-sso.md)) is one identity provider per
+server, required server-wide or not at all. When it is required, the browser extension cannot
+sign in for anyone but an owner, because it has no way through the provider yet. On the hosted
+edition, a tenant cannot bring its own provider.
+
+**Why.** The first stage covers a company's own server (the business edition), where one
+provider and one rule are what is needed.
+
+**Changes when** the extension gets a sign-in through the provider, and when per-organization
+providers are designed (a later stage of 0021).
 </details>
 
 <details>

@@ -310,6 +310,40 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
 
+  sso:
+    name: sso — against a real Keycloak
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+
+      # decisions/0021: the OIDC client is tested against a provider we did
+      # not write. The realm (one client, one user) is imported at start.
+      - name: Keycloak
+        run: |
+          docker run -d --name kc -p 127.0.0.1:8089:8080 \
+            -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+            -v "$PWD/tests/keycloak:/opt/keycloak/data/import:ro" \
+            quay.io/keycloak/keycloak:26.0.7 start-dev --import-realm --http-port=8080
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:8089/realms/vault/.well-known/openid-configuration >/dev/null && exit 0
+            sleep 2
+          done
+          docker logs kc; exit 1
+
+      - name: Sign in through Keycloak
+        run: node --test tests/keycloak/
+        env:
+          KEYCLOAK_URL: http://localhost:8089
+          CHROME_PATH: /usr/bin/google-chrome
+
   audit:
     name: dependency audit
     runs-on: ubuntu-latest

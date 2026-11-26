@@ -323,6 +323,24 @@ master password for that vault, and is opt-in per passkey.
 - **What the person must weigh:** a synced passkey is as strong as the account it syncs
   through.
 
+### A21c — Single sign-on
+
+With an identity provider configured ([0021](../decisions/0021-sso.md)), the provider says *who*
+someone is. It never holds or releases a key.
+
+- **A compromised provider** can produce a ticket for anyone. Signing in still needs the master
+  password (and Vault's own second factor), so the provider alone opens no vault. "Require
+  single sign-on" adds the provider to sign-in; it never replaces the password.
+- **The ID token** is checked by the server itself: the signature against the provider's
+  published keys (asymmetric algorithms only), and issuer, audience, expiry and the nonce
+  bound to this browser's start. The code exchange uses PKCE and the client secret.
+- **Tickets** are 256 random bits, single use, five minutes, and stored hashed. They travel in
+  the URL fragment, so they never reach a server log or a Referer.
+- **Owners are exempt from the requirement**, so a provider outage or misconfiguration cannot
+  lock the server's operators out.
+- **Provisioning**, when on, lets the provider decide who may create an account. Turn it on
+  only for a provider whose addresses are all yours.
+
 ### A22 — The organization recovery key
 
 The recovery key ([0026](../decisions/0026-organization-recovery-key.md)) is the secret half of a

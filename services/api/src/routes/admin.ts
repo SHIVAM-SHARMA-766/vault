@@ -40,7 +40,7 @@ import { BREACH_LIMIT } from '../breach.js'
 import { PUBLIC_LIMIT } from './desk.js'
 import { RUN_LIMIT } from './backups.js'
 import { CREATE_LIMIT, OPEN_LIMIT } from './shares.js'
-import { API_LIMIT, AUTH_LIMIT, enforce, type Limit } from '../ratelimit.js'
+import { API_LIMIT, AUTH_LIMIT, SSO_LIMIT, enforce, type Limit } from '../ratelimit.js'
 import {
   GRANTABLE_ROLES,
   type GrantableRole,
@@ -350,6 +350,7 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
     // A list that shuts out the person saving it would lock them out at their next refresh.
     const ip = event.requestContext.http.sourceIp
     if (!allowedFrom(policy.allowedNetworks, ip)) throw badRequest(`Your own address (${ip}) is not in the sign-in list. Add it first, or you would be signed out.`)
+    if (policy.requireSso && !app.config.oidc) throw badRequest('Single sign-on is not set up on this server (OIDC_ISSUER), so it cannot be required.')
     await audit(app, actor, 'settings.policy', undefined, describePolicy(policy))
   }
   let templates = current.templates
@@ -374,6 +375,7 @@ export function requirePolicy(value: unknown): ServerPolicy {
     const choices = POLICY_CHOICES[k] as readonly unknown[]
     if (!choices.includes(v[k])) throw badRequest(`policy.${k} must be one of: ${choices.map((c) => c ?? 'null').join(', ')}.`)
   }
+  if (v['requireSso'] !== undefined && typeof v['requireSso'] !== 'boolean') throw badRequest('policy.requireSso must be true or false.')
   return { ...readPolicy(v), allowedNetworks: requireNetworks(v['allowedNetworks'] ?? []) }
 }
 
@@ -387,6 +389,7 @@ function describePolicy(p: ServerPolicy): string {
     `audit=${p.auditDays}d`,
     p.shareLinks ? `links<=${p.shareLinkMaxDays}d` : 'no-links',
     p.allowedNetworks.length ? `networks=${p.allowedNetworks.join(',')}` : null,
+    p.requireSso ? 'sso' : null,
   ].filter(Boolean).join(' ')
 }
 
@@ -450,6 +453,8 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
     minPasswordScore: policy.minPasswordScore,
     // A new server waiting for its owner: the sign-in screen offers the setup code.
     firstRun,
+    // Single sign-on (decisions/0021): the button's label, and whether it is required.
+    sso: app.config.oidc ? { name: app.config.oidc.name, required: policy.requireSso, provision: app.config.oidc.provision } : null,
   })
 }
 
@@ -641,6 +646,7 @@ export function limitsRoute(): LambdaResponse {
   return json(200, {
     limits: [
       row('Sign-in attempts', 'address and account', AUTH_LIMIT, 'Counted for each network address and for each account, separately.'),
+      row('Single sign-on round trips', 'address', SSO_LIMIT, 'Going to the identity provider and back; the sign-in that follows counts as a sign-in attempt.'),
       row('Requests while signed in', 'account', API_LIMIT, 'Every vault, settings and sharing request.'),
       row('Admin panel requests', 'staff account', ADMIN_LIMIT, ''),
       row('Access and sign-in help requests', 'address', PUBLIC_LIMIT, 'The no-account forms on the sign-in page.'),

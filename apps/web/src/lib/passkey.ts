@@ -58,13 +58,13 @@ export async function enrolPasskey(state: session.Unlocked, authKey: string, nam
 }
 
 /** Signs in with whichever Vault passkey the person picks, and opens the vault. */
-export async function signInWithPasskey(): Promise<void> {
+export async function signInWithPasskey(ssoTicket?: string): Promise<void> {
   const { options } = await api.passkeyLogin.options()
   const got = await getWithExtensions(options, prfRequest())
   const out = got.prf.first
   if (!out) throw new NoPrfError()
   try {
-    const r = await api.passkeyLogin.finish(got.response)
+    const r = await api.passkeyLogin.finish(got.response, ssoTicket)
     const { vaultKey, email } = await unwrapWithPasskey(r, out, r.credentialId)
     session.unlock({
       userId: '', email, vaultKey,

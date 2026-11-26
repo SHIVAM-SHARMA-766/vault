@@ -61,6 +61,7 @@ const app = {
     version: 'dev', updateCheck: { enabled: false, url: '' },
     breachCheck: { enabled: Boolean(process.env.BREACH_CHECK_URL), url: process.env.BREACH_CHECK_URL ?? '' },
     metricsToken: process.env.METRICS_TOKEN ?? '', auditWebhook: { url: '', secret: '' },
+    oidc: process.env.OIDC_ISSUER ? { issuer: process.env.OIDC_ISSUER.replace(/\/+$/, ''), clientId: process.env.OIDC_CLIENT_ID ?? '', clientSecret: process.env.OIDC_CLIENT_SECRET ?? '', name: process.env.OIDC_NAME || 'SSO', provision: process.env.OIDC_PROVISION === 'true', requireVerifiedEmail: process.env.OIDC_REQUIRE_VERIFIED_EMAIL !== 'false' } : null,
     mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
     db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',

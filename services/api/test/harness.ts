@@ -8,6 +8,7 @@ import { join } from 'node:path'
 
 import { dispatch } from '../src/app.js'
 import type { App } from '../src/context.js'
+import type { Config } from '../src/config.js'
 import type { LambdaEvent, LambdaResponse } from '../src/http.js'
 import { emailDigest } from '../src/identity.js'
 import type { Message } from '../src/mail.js'
@@ -40,7 +41,7 @@ export interface Parsed {
   body: Record<string, unknown>
 }
 
-export function harness(options: { edition?: 'personal' | 'business' | 'hosted'; allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string; metricsToken?: string; auditWebhook?: string; auditSecret?: string } = {}): Harness {
+export function harness(options: { edition?: 'personal' | 'business' | 'hosted'; allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string; metricsToken?: string; auditWebhook?: string; auditSecret?: string; oidc?: Config['oidc'] } = {}): Harness {
   const store = new MemoryStore()
   const outbox: Message[] = []
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
@@ -67,6 +68,7 @@ export function harness(options: { edition?: 'personal' | 'business' | 'hosted';
       breachCheck: { enabled: Boolean(options.breachUrl), url: options.breachUrl ?? '' },
       metricsToken: options.metricsToken ?? '',
       auditWebhook: { url: options.auditWebhook ?? '', secret: options.auditSecret ?? '' },
+      oidc: options.oidc ?? null,
       mail: { host: options.mail ? 'smtp.test' : '', port: 587, user: '', password: '', from: 'Vault <vault@vault.test>', signInNotices: true },
       db: {
         driver: 'mysql',

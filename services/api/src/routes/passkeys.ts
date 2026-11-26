@@ -25,6 +25,7 @@ import { assertEnabled, getSettings, touchLogin } from '../system.js'
 import { requireSealed } from '../validate.js'
 import { recordActivity } from './activity.js'
 import { type Profile, issueSession, profileWithPassword } from './auth.js'
+import { ssoGate, useTicket } from './sso.js'
 import type { WebauthnCredential } from './webauthn.js'
 
 export interface UnlockPasskey extends WebauthnCredential {
@@ -178,6 +179,9 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   }
   await assertNetwork(app, profile.userId, event.requestContext.http.sourceIp)
   await assertEnabled(app, profile.userId)
+  // A server that requires single sign-on requires it here too (decisions/0021).
+  const sso = await ssoGate(app, profile, (b as { ssoTicket?: unknown }).ssoTicket)
+  if (sso && !(await useTicket(app, sso))) throw new HttpError(401, 'sso_invalid', 'That single sign-on was already used. Sign in again.')
 
   const fresh = ((await app.store.get(userPk(profile.userId), PROFILE_SK)) as WithPasskeys | null) ?? profile
   await app.store.put({

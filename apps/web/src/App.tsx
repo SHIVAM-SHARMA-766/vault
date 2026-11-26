@@ -9,6 +9,7 @@ import { api } from './lib/api.js'
 import { newIdentity, newSigningKey } from './lib/identity.js'
 import { BrandMark, SupportContact, useInstance } from './lib/instance.js'
 import { useRoute } from './lib/router.js'
+import { ssoErrorMessage, takeSsoReturn } from './lib/sso.js'
 import * as prefs from './lib/prefs.js'
 import * as session from './lib/session.js'
 import { IconArrowLeft, IconLock } from './ui/icons.js'
@@ -103,6 +104,19 @@ function AuthScreen() {
   // An emailed invitation (/app/?invite=CODE) does the same for a new member.
   const [inviteCode] = useState(() => new URLSearchParams(location.search).get('invite') ?? '')
   const [view, setView] = useState<AuthView>(setupCode || inviteCode ? 'register' : 'unlock')
+  // Back from the identity provider (decisions/0021): a ticket for an
+  // account asks for its master password; one for a newcomer, where the
+  // operator allows it, opens account creation with the address fixed.
+  const [sso, setSso] = useState<{ ticket: string; email: string } | null>(null)
+  const [ssoError, setSsoError] = useState(() => { const e = takeSsoReturn().error; return e ? ssoErrorMessage(e) : '' })
+  useEffect(() => {
+    const ticket = takeSsoReturn().ticket
+    if (!ticket) return
+    void api.ssoTicket(ticket).then((info) => {
+      setSso({ ticket, email: info.email })
+      if (!info.exists) setView('register')
+    }).catch(() => setSsoError(ssoErrorMessage('expired')))
+  }, [])
   // /app/admin is the admin panel's address. Signing in there is the same
   // sign-in, but the page should say where it leads.
   const forAdmin = location.pathname.startsWith('/app/admin') || location.pathname.startsWith('/app/console')
@@ -120,7 +134,7 @@ function AuthScreen() {
              ciphertext and holds no key that opens it.</p>
           <ul className="auth-points">
             <li><IconLock size={16} /> The master password never leaves this browser</li>
-            <li><IconLock size={16} /> AES-256-GCM, with keys derived from 600,000 PBKDF2 rounds</li>
+            <li><IconLock size={16} /> AES-256-GCM, with keys derived by Argon2id in this browser</li>
             <li><IconLock size={16} /> Names, tags and folders are encrypted too</li>
           </ul>
         </div>
@@ -139,14 +153,15 @@ function AuthScreen() {
           </nav>
           {view === 'unlock' ? (
             <Unlock forAdmin={forAdmin} onRegister={() => setView('register')} onRecover={() => setView('recover')}
-                    onRequestAccess={() => setView('request-access')} onSigninHelp={() => setView('signin-help')} />
+                    onRequestAccess={() => setView('request-access')} onSigninHelp={() => setView('signin-help')}
+                    sso={sso} ssoError={ssoError} onSsoCancel={() => { setSso(null); setSsoError('') }} />
           ) : view === 'register' ? (
-            <Register setupCode={setupCode} inviteCode={inviteCode} onCancel={() => setView('unlock')}
+            <Register setupCode={setupCode} inviteCode={inviteCode} sso={sso} onCancel={() => { setSso(null); setView('unlock') }}
                       onDone={() => { if (setupCode || inviteCode) history.replaceState(null, '', '/app/'); setView('unlock') }} />
           ) : view === 'request-access' || view === 'signin-help' ? (
             <PublicRequest kind={view === 'request-access' ? 'access' : 'signin'} onCancel={() => setView('unlock')} />
           ) : (
-            <Recover onCancel={() => setView('unlock')} />
+            <Recover sso={sso} onCancel={() => setView('unlock')} />
           )}
           <SupportContact className="muted small auth-support" />
         </div>

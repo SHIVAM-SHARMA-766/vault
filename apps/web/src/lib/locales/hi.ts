@@ -2,6 +2,7 @@
 export const hi: Record<string, string> = {
   // Sign-in
   'or': 'या',
+  'Sign in with': 'इससे साइन इन करें:',
   'Sign in with a passkey': 'पासकी से साइन इन करें',
   'Unlock your vault': 'अपना वॉल्ट खोलें',
   'Enter your email and master password. Decryption happens in this browser.': 'अपना ईमेल और मास्टर पासवर्ड डालें। डिक्रिप्शन इसी ब्राउज़र में होता है।',

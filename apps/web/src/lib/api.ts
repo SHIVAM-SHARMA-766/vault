@@ -105,7 +105,7 @@ export interface InstanceProfile { name: string; supportEmail: string; supportUr
 /** Editions (decisions/0030): which features this server includes. */
 export type Edition = 'personal' | 'business' | 'hosted'
 export interface Features { organizations: boolean; invitations: boolean; serviceDesk: boolean; website: boolean; staffRoles: boolean; emergencyAccess: boolean }
-export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean; edition?: Edition; features?: Features; companiesInvited?: boolean }
+export interface Instance extends InstanceProfile { registration: RegistrationMode; mail: boolean; firstRun: boolean; minPasswordScore: number; breachCheck: boolean; edition?: Edition; features?: Features; companiesInvited?: boolean; sso?: { name: string; required: boolean; provision: boolean } | null }
 /** Server-wide rules set by an administrator (G1, G3, G7). */
 export interface ShareRow {
   id: string
@@ -127,6 +127,8 @@ export interface ServerPolicy {
   shareLinks: boolean
   shareLinkMaxDays: number
   allowedNetworks: string[]
+  /** Every sign-in needs the identity provider first (decisions/0021); owners exempt. */
+  requireSso?: boolean
 }
 
 export type TemplateKind = 'invite' | 'signIn'
@@ -178,8 +180,14 @@ export const api = {
     wrappedVaultKey: string
     wrappedVaultKeyForRecovery: string
     inviteCode?: string
+    /** A provisioning ticket from single sign-on (decisions/0021). */
+    ssoTicket?: string
     identity?: Identity
   }) => request<Session & { userId: string }>('POST', '/api/auth/register', { body }),
+
+  /** Which account a single sign-on ticket is for (decisions/0021). */
+  ssoTicket: (ticket: string) =>
+    request<{ email: string; exists: boolean; kdf?: KdfParams }>('POST', '/api/auth/sso/ticket', { body: { ticket } }),
 
   /** Enrol an identity key pair on an account that has none (decisions/0009). */
   setSigningKey: (token: string, body: { signingPublicKey: string; wrappedSigningKey: string }) =>
@@ -189,21 +197,21 @@ export const api = {
 
   /** `second` is the two-factor code, when the server has asked for one
    *  (ApiError code 'two_factor_required'). */
-  login: (email: string, authKey: string, second?: SecondFactor) =>
+  login: (email: string, authKey: string, second?: SecondFactor, ssoTicket?: string) =>
     request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(
-      'POST', '/api/auth/login', { body: { email, authKey, ...second } },
+      'POST', '/api/auth/login', { body: { email, authKey, ...second, ...(ssoTicket ? { ssoTicket } : {}) } },
     ),
 
-  recoveryLogin: (email: string, recoveryAuthKey: string, second?: SecondFactor) =>
+  recoveryLogin: (email: string, recoveryAuthKey: string, second?: SecondFactor, ssoTicket?: string) =>
     request<Session & { wrappedVaultKeyForRecovery: string }>(
-      'POST', '/api/auth/recovery-login', { body: { email, recoveryAuthKey, ...second } },
+      'POST', '/api/auth/recovery-login', { body: { email, recoveryAuthKey, ...second, ...(ssoTicket ? { ssoTicket } : {}) } },
     ),
 
   // Unlock with a passkey (decisions/0034).
   passkeyLogin: {
     options: () => request<{ options: Record<string, unknown> }>('POST', '/api/auth/passkey-login/options', { body: {} }),
-    finish: (response: Record<string, unknown>) =>
-      request<Session & { credentialId: string; wrappedVaultKey: string; sealedEmail: string; kdf: KdfParams }>('POST', '/api/auth/passkey-login', { body: { response } }),
+    finish: (response: Record<string, unknown>, ssoTicket?: string) =>
+      request<Session & { credentialId: string; wrappedVaultKey: string; sealedEmail: string; kdf: KdfParams }>('POST', '/api/auth/passkey-login', { body: { response, ...(ssoTicket ? { ssoTicket } : {}) } }),
   },
   passkeys: {
     options: (token: string, currentAuthKey: string) =>

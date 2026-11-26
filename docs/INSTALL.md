@@ -274,6 +274,33 @@ cosign verify ghcr.io/shivam-sharma-766/vault:1.0.0 \
 docker buildx imagetools inspect ghcr.io/shivam-sharma-766/vault:1.0.0 --format '{{ json .SBOM }}'
 ```
 
+## Single sign-on
+
+People can sign in with your identity provider: Microsoft Entra ID, Google Workspace, Okta,
+Keycloak or Authentik. The provider proves who they are, and their master password still opens
+their vault ([decision 0021](../decisions/0021-sso.md)).
+
+1. Register an application (a confidential OIDC client) with the provider:
+   - redirect URI: `https://vault.example.com/api/auth/sso/callback`;
+   - scopes: `openid email profile`.
+2. Add to `.env` and restart:
+
+   ```sh
+   OIDC_ISSUER=https://login.microsoftonline.com/<tenant-id>/v2.0   # or your Okta / Keycloak issuer
+   OIDC_CLIENT_ID=...
+   OIDC_CLIENT_SECRET=...
+   OIDC_NAME=Microsoft              # the button says "Sign in with Microsoft"
+   # OIDC_REQUIRE_VERIFIED_EMAIL=false   # Entra ID never sends email_verified
+   # OIDC_PROVISION=true                 # let the provider's people create accounts without an invitation
+   ```
+
+3. Test it from a private window. Then, if you want, turn on **Require single sign-on** in
+   the console (Server → Policies). Owners can still sign in with their master password alone,
+   so a broken provider cannot lock you out.
+
+Accounts are matched by email address. Someone who already has an account signs in with the
+provider and their usual master password.
+
 ## Behind your own reverse proxy
 
 If you already run nginx, Traefik or another proxy with TLS, skip Caddy: run only the

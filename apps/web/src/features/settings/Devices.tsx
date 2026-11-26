@@ -97,6 +97,7 @@ export function Devices() {
 const KIND: Record<string, string> = {
   'register': 'Account created',
   'login': 'Signed in',
+  'sso-login': 'Signed in with single sign-on',
   'recovery-login': 'Signed in with the recovery key',
   'passkey-login': 'Signed in with a passkey',
   'add-passkey': 'A passkey can now unlock the vault',

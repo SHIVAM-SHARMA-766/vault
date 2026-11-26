@@ -72,6 +72,8 @@ export interface ServerPolicy {
   shareLinkMaxDays: number
   /** Where accounts may sign in from (G2): addresses or CIDR ranges; empty for anywhere. Owners are exempt. */
   allowedNetworks: string[]
+  /** Every sign-in needs the identity provider first (decisions/0021). Owners are exempt. */
+  requireSso: boolean
 }
 
 export const POLICY_CHOICES = {
@@ -84,7 +86,7 @@ export const POLICY_CHOICES = {
 } as const
 
 export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
-  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [],
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false,
 })
 
 /** A stored policy, with anything missing or out of range taken from the
@@ -103,6 +105,7 @@ export function readPolicy(value: unknown): ServerPolicy {
     shareLinks: v['shareLinks'] !== false,
     shareLinkMaxDays: pick('shareLinkMaxDays'),
     allowedNetworks: Array.isArray(v['allowedNetworks']) ? (v['allowedNetworks'] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 50) : [],
+    requireSso: v['requireSso'] === true,
   }
 }
 

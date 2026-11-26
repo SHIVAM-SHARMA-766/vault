@@ -17,8 +17,8 @@ import { Check, CopyButton, PasswordInput, StrengthMeter } from '../../ui/kit.js
  *  are doing work rather than papering over a guessable secret. */
 const MIN_LENGTH = 12
 
-export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited = '' }: { onDone: () => void; onCancel: () => void; setupCode?: string; inviteCode?: string }) {
-  const [email, setEmail] = useState('')
+export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited = '', sso = null }: { onDone: () => void; onCancel: () => void; setupCode?: string; inviteCode?: string; sso?: { ticket: string; email: string } | null }) {
+  const [email, setEmail] = useState(sso?.email ?? '')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [busy, setBusy] = useState(false)
@@ -68,7 +68,8 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
         kdf: account.kdf,
         wrappedVaultKey: account.wrappedVaultKey,
         wrappedVaultKeyForRecovery: account.wrappedVaultKeyForRecovery,
-        ...(inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
+        ...(inviteCode.trim() && !sso ? { inviteCode: inviteCode.trim() } : {}),
+        ...(sso ? { ssoTicket: sso.ticket } : {}),
         identity,
       })
 
@@ -143,10 +144,11 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
       </p>
 
       {/* An open server needs no code; any other needs one (GET /api/instance). */}
-      {!owner && mode === 'open' && !invited && !showInvite ? (
+      {!owner && !sso && mode === 'open' && !invited && !showInvite ? (
         <p className="hint"><button type="button" className="link" onClick={() => setShowInvite(true)}>I have an invitation code</button></p>
       ) : null}
-      {owner || (mode === 'open' && !invited && !showInvite) ? null : <div className="field">
+      {sso ? <p className="alert alert-info"><span>Your identity provider signed you in as <strong>{sso.email}</strong>. Choose a master password: it, not the provider, is what opens your vault.</span></p> : null}
+      {owner || sso || (mode === 'open' && !invited && !showInvite) ? null : <div className="field">
         <label htmlFor="r-invite">Invitation code</label>
         <input id="r-invite" autoComplete="off" spellCheck={false} className="mono" required={mode !== undefined && mode !== 'open'}
                placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
@@ -157,7 +159,7 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
 
       <div className="field">
         <label htmlFor="r-email">Email</label>
-        <input id="r-email" type="email" autoComplete="username" required autoFocus
+        <input id="r-email" type="email" autoComplete="username" required autoFocus={!sso} readOnly={!!sso}
                placeholder="you@example.com"
                value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>

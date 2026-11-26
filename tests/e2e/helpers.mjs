@@ -27,11 +27,11 @@ const freePort = () => new Promise((resolve) => {
 /** `edition`: personal, business or hosted (decisions/0030). Left out, the
  *  stack runs as an install that never set EDITION: every feature, and anyone
  *  may create an organization. */
-export async function start({ owner = 'owner@example.test', edition } = {}) {
+export async function start({ owner = 'owner@example.test', edition, env = {} } = {}) {
   const port = await freePort()
   const base = `http://localhost:${port}`
   const stack = spawn(process.execPath, [`${ROOT}scripts/dev-stack.mjs`], {
-    env: { ...process.env, PORT: String(port), OWNER_EMAIL: owner, ...(edition ? { EDITION: edition } : {}) }, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PORT: String(port), OWNER_EMAIL: owner, ...(edition ? { EDITION: edition } : {}), ...env }, stdio: ['ignore', 'pipe', 'pipe'],
   })
   let log = ''
   stack.stdout.on('data', (d) => { log += d })
