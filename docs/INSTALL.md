@@ -60,8 +60,9 @@ as it was.
   Caddy, which gets a certificate automatically if:
   - a DNS name (e.g. `vault.example.com`) points at the machine, and
   - ports **80 and 443** reach it from the internet.
-  For a server only reachable on your network, see
-  [Behind your own reverse proxy](#behind-your-own-reverse-proxy).
+  No domain? A free DuckDNS name, Tailscale or a Cloudflare tunnel gives you HTTPS without
+  buying one: see [Running Vault without buying a domain](no-domain.md). For a server only
+  reachable on your network, see [Behind your own reverse proxy](#behind-your-own-reverse-proxy).
 
 ## Quick install
 

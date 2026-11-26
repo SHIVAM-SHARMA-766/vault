@@ -1,0 +1,11 @@
+# For running Vault behind Tailscale or a Cloudflare tunnel on the same machine
+# (docs/no-domain.md). Publishes the container on the loopback address only, so
+# the local proxy is the one way in and TRUST_PROXY=true stays safe. Start only
+# the vault service:
+#
+#   docker compose -f compose.yml -f ../no-domain/local-port.yml up -d vault
+
+services:
+  vault:
+    ports:
+      - "127.0.0.1:${LOCAL_PORT:-8080}:8080"
