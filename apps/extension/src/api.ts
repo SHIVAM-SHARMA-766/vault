@@ -65,6 +65,13 @@ export const api = (server: string) => ({
   prelogin: (email: string) => request<{ kdf: KdfParams }>(server, 'POST', '/api/auth/prelogin', { body: { email } }),
   login: (email: string, authKey: string, second?: Record<string, string>) =>
     request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(server, 'POST', '/api/auth/login', { body: { email, authKey, ...second } }),
+  /** Signing in in two steps (decisions/0036). */
+  accountPrelogin: (email: string) => request<{ account: { salt: string; m: number; t: number; p: number } }>(server, 'POST', '/api/auth/account/prelogin', { body: { email } }),
+  accountLogin: (email: string, accountProof: string, second?: Record<string, string>) =>
+    request<{ accountToken: string; kdf: KdfParams }>(server, 'POST', '/api/auth/account/login', { body: { email, accountProof, ...second } }),
+  unlockVault: (accountToken: string, authKey: string) =>
+    request<Session & { accountToken: string; wrappedVaultKey: string; kdf: KdfParams }>(server, 'POST', '/api/auth/unlock', { body: { accountToken, authKey } }),
+  accountSignOut: (accountToken: string) => request<{ ok: true }>(server, 'POST', '/api/auth/account/signout', { body: { accountToken } }),
   refresh: (refreshToken: string) => request<Session>(server, 'POST', '/api/auth/refresh', { body: { refreshToken } }),
   logout: (token: string) => request<{ ok: true }>(server, 'POST', '/api/auth/logout', { token, body: {} }),
   me: (token: string) => request<Me>(server, 'GET', '/api/auth/me', { token }),

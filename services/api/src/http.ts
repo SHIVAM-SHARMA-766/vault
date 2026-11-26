@@ -38,6 +38,7 @@ export const ERROR_CODES = {
   invalid_two_factor: 'The TOTP or recovery code is wrong or already used.',
   forbidden: 'Signed in, but not permitted (role, disabled account, closed registration).',
   network_not_allowed: 'The server\'s sign-in allow-list does not include this address.',
+  account_password_required: 'This account signs in with its account password first (decisions/0036); the master password alone is not enough.',
   sso_required: 'This server requires single sign-on (decisions/0021): sign in with the identity provider first and send its ticket.',
   sso_invalid: 'The single sign-on ticket is unknown, expired, used, or for another account.',
   not_found: 'No such route or item.',

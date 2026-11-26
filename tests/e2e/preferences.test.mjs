@@ -56,7 +56,7 @@ test('the theme switches at once, survives a reload before unlock, and follows t
 
     // The sign-in screen after a reload is already dark.
     await page.reload()
-    await page.waitForSelector('#email')
+    await page.waitForSelector('#password')
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
 
     // A fresh browser (no local storage) picks it up from the server on unlock.
@@ -115,7 +115,7 @@ test('locking on a hidden tab, when chosen', async () => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
       document.dispatchEvent(new Event('visibilitychange'))
     })
-    await page.waitForSelector('#email')
+    await page.waitForSelector('#password')
   } finally {
     await s.stop()
   }

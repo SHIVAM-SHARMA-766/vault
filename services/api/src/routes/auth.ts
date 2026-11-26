@@ -71,6 +71,7 @@ import {
 import { assertNetwork } from '../networks.js'
 import { loginOptions, verifyLogin } from './webauthn.js'
 import { provisionTicket, readTicket, ssoGate, useTicket } from './sso.js'
+import { accountStatus, registerAccount, requireAccountInput } from './accounts.js'
 
 export interface Profile extends Item {
   userId: string
@@ -92,7 +93,7 @@ export interface Profile extends Item {
   updatedAt: string
 }
 
-async function limitAuth(app: App, event: LambdaEvent, email: string): Promise<void> {
+export async function limitAuth(app: App, event: LambdaEvent, email: string): Promise<void> {
   const digest = emailDigest(email, app.config.pepper)
   // Both, so that one attacker cannot spread guesses across addresses and one
   // address cannot be attacked from many hosts.
@@ -114,7 +115,7 @@ export interface SessionRecord extends Item {
 
 /** When a device signed in at `createdAt` must sign in again under the
  *  server's session policy (epoch seconds), or undefined when it sets none. */
-async function sessionDeadline(app: App, createdAt: string): Promise<number | undefined> {
+export async function sessionDeadline(app: App, createdAt: string): Promise<number | undefined> {
   const days = (await getSettings(app)).policy.sessionDays
   return days ? Math.floor(Date.parse(createdAt) / 1000) + days * 86_400 : undefined
 }
@@ -145,15 +146,20 @@ export async function issueSession(app: App, userId: string, event: LambdaEvent,
 }
 
 /** Fire and forget: the address is in this request and nowhere else. */
-function sendSignInNotice(app: App, email: string, event: LambdaEvent, recovery: boolean): void {
+export function sendSignInNotice(app: App, email: string, event: LambdaEvent, recovery: boolean): void {
   if (!app.mailer) return
   const at = new Date(app.now()).toUTCString()
   void notify(app, { to: email, ...signInNotice(app.config.origin, describeDevice(event.requestContext.http.userAgent), event.requestContext.http.sourceIp, at, recovery) })
 }
 
-export async function revokeAllSessions(app: App, userId: string): Promise<void> {
+/** Ends every vault session, and unless told otherwise every account
+ *  sign-in too (decisions/0036). A new master password keeps the account
+ *  sign-ins: the old password no longer unlocks anything through them. */
+export async function revokeAllSessions(app: App, userId: string, opts: { accounts?: boolean } = {}): Promise<void> {
   const sessions = await app.store.query(userPk(userId), SESSION_PREFIX)
   for (const s of sessions) await app.store.delete(s.pk, s.sk)
+  if (opts.accounts === false) return
+  for (const s of await app.store.query(userPk(userId), 'ACCTSESS#')) await app.store.delete(s.pk, s.sk)
 }
 
 /** The salt a client needs before it can derive anything.
@@ -225,6 +231,9 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     body['wrappedVaultKeyForRecovery'], 'wrappedVaultKeyForRecovery', 4096,
   )
   const identity = body['identity'] === undefined ? undefined : await requireIdentity(body['identity'])
+  // The account password, chosen with the master password (decisions/0036).
+  const accountInput = body['account'] === undefined ? undefined : requireAccountInput(body['account'])
+  if (accountInput && body['masterCheck'] !== undefined && body['masterCheck'] === body['authKey']) throw badRequest('The account password must differ from the master password.')
 
   const digest = emailDigest(email, app.config.pepper)
   const userId = randomUUID()
@@ -273,12 +282,14 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     hashAuthKey(recoveryAuthKey),
   ])
 
+  const acct = accountInput ? await registerAccount(app, userId, accountInput, event) : null
   const profile: Profile = {
     pk: userPk(userId), sk: PROFILE_SK,
     userId, emailDigest: digest, kdf,
     authVerifier, recoveryVerifier,
     wrappedVaultKey, wrappedVaultKeyForRecovery: wrappedForRecovery,
     ...(identity ? { publicKey: identity.publicKey, wrappedPrivateKey: identity.wrappedPrivateKey } : {}),
+    ...(acct ? { account: acct.account } : {}),
     createdAt: at, updatedAt: at,
   }
   await app.store.put(profile)
@@ -293,7 +304,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   })
 
   await recordActivity(app, userId, 'register', event)
-  return json(201, { userId, ...(await issueSession(app, userId, event)) })
+  return json(201, { userId, ...(acct ? { accountToken: acct.accountToken } : {}), ...(await issueSession(app, userId, event)) })
 }
 
 export async function login(app: App, event: LambdaEvent): Promise<LambdaResponse> {
@@ -315,6 +326,9 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   await assertEnabled(app, profile.userId)
   // Single sign-on, when used or required (decisions/0021). The ticket is
   // checked now and used up only once the second factor is in too.
+  // Once an account password is set, the master password alone no longer
+  // signs in (decisions/0036). Said only after it was proved.
+  if ((profile as { account?: unknown }).account) throw new HttpError(403, 'account_password_required', 'Sign in with your account password first, then your master password.')
   const sso = await ssoGate(app, profile, body['ssoTicket'])
   await requireSecondFactor(app, profile, body, event)
   if (sso && !(await useTicket(app, sso))) throw new HttpError(401, 'sso_invalid', 'That single sign-on was already used. Sign in again.')
@@ -327,6 +341,8 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,
     kdf: profile.kdf,
+    // This account has no account password yet: the app asks for one now.
+    needsAccountPassword: true,
     ...(await issueSession(app, profile.userId, event)),
   })
 }
@@ -356,7 +372,8 @@ export async function recoveryLogin(app: App, event: LambdaEvent): Promise<Lambd
 
   // A recovery key in use means the master password is believed lost. Every
   // existing session is dropped, because the next step is to set a new one.
-  await revokeAllSessions(app, profile.userId)
+  // The account sign-ins stay: the account password was not lost.
+  await revokeAllSessions(app, profile.userId, { accounts: false })
   await recordActivity(app, profile.userId, 'recovery-login', event)
   sendSignInNotice(app, email, event, true)
 
@@ -378,8 +395,9 @@ export async function refresh(app: App, event: LambdaEvent): Promise<LambdaRespo
     // The token verified but its session is gone: either it was already
     // rotated away, or it was revoked. A replayed refresh token is the
     // signature of a stolen one, so every session is dropped rather than just
-    // this one.
-    await revokeAllSessions(app, payload.sub)
+    // this one. (A vault session's token: the account sign-ins stay, as a
+    // lock racing a refresh in a closing tab looks the same, decisions/0036.)
+    await revokeAllSessions(app, payload.sub, { accounts: false })
     throw unauthorized()
   }
 
@@ -454,6 +472,8 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
       enabled: hasSecondFactor(profile as unknown as Record<string, unknown>), totp: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0,
       keys: ((profile as { webauthn?: { id: string; name: string; createdAt: string; lastUsedAt?: string }[] }).webauthn ?? []).map((k) => ({ id: k.id, name: k.name, createdAt: k.createdAt, lastUsedAt: k.lastUsedAt ?? null })),
     },
+    // The account password (decisions/0036): whether one is set.
+    account: accountStatus(profile),
     // Passkeys that unlock the vault (decisions/0034): names and dates only.
     passkeys: ((profile as { passkeys?: { id: string; name: string; createdAt: string; lastUsedAt?: string }[] }).passkeys ?? []).map((k) => ({ id: k.id, name: k.name, createdAt: k.createdAt, lastUsedAt: k.lastUsedAt ?? null })),
     // What the server asks of this account, and what it still misses.
@@ -528,7 +548,7 @@ export async function changePassword(
   await app.store.put({ pk: emailPk(profile.emailDigest), sk: EMAIL_SK, userId, kdf })
 
   // Every other session was authenticated with the old password.
-  await revokeAllSessions(app, userId)
+  await revokeAllSessions(app, userId, { accounts: false })
   // Adding or removing a secret key is a re-derivation too (decisions/0027).
   const before = profile.kdf?.version === 2, after = kdf.version === 2
   // The client says when a re-derivation keeps the password (decisions/0028);
@@ -567,7 +587,7 @@ export async function rotateRecovery(
   return json(200, { ok: true })
 }
 
-async function profileByEmail(app: App, email: string): Promise<Profile | null> {
+export async function profileByEmail(app: App, email: string): Promise<Profile | null> {
   const pointer = await app.store.get(emailPk(emailDigest(email, app.config.pepper)), EMAIL_SK)
   if (!pointer || typeof pointer['userId'] !== 'string') return null
   return (await app.store.get(userPk(pointer['userId']), PROFILE_SK)) as Profile | null
@@ -576,7 +596,7 @@ async function profileByEmail(app: App, email: string): Promise<Profile | null> 
 /** A real verifier over a value nobody holds. Used so that a login for an
  *  unknown address does the same work as one for a known address, and the two
  *  cannot be told apart by how long the response takes. */
-const DUMMY_VERIFIER =
+export const DUMMY_VERIFIER =
   'scrypt$32768$8$1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 
 // ── Two-factor sign-in ─────────────────────────────────────────────────────

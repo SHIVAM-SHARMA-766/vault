@@ -22,7 +22,7 @@ test('sign in through Keycloak, then the master password', { skip: !KC && 'KEYCL
     await s.setRegistration(true)
     const person = await s.person()
     await s.register(person, 'kc-person@example.test')
-    await person.getByRole('button', { name: 'Lock vault' }).click()
+    await s.menu(person, 'Sign out of this device')
 
     await person.getByRole('link', { name: 'Sign in with Keycloak' }).click()
     // Keycloak's own login page.
@@ -32,8 +32,9 @@ test('sign in through Keycloak, then the master password', { skip: !KC && 'KEYCL
     await person.fill('#password', 'keycloak-test-password')
     await person.click('#kc-login')
 
-    await person.waitForSelector('.sso-banner', { timeout: 30_000 })
-    assert.match(await person.textContent('.sso-banner'), /Keycloak signed you in as kc-person@example\.test/)
+    // Keycloak did the account step (decisions/0036); the master password opens the vault.
+    await person.waitForSelector('.account-line', { timeout: 30_000 })
+    assert.match(await person.textContent('.account-line'), /kc-person@example\.test/)
     await person.fill('#password', PASSWORD)
     await person.click('button[type=submit]')
     await person.waitForSelector('.topbar', { timeout: 60_000 })

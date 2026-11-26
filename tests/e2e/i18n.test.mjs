@@ -42,7 +42,7 @@ test('a Spanish browser starts in Spanish', async () => {
   try {
     const page = await s.person({ locale: 'es-ES' })
     await page.goto(`${s.base}/app/`)
-    await page.waitForSelector('text=Abre tu bóveda')
+    await page.waitForSelector('text=Inicia sesión en tu cuenta')
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'es')
   } finally {
     await s.stop()

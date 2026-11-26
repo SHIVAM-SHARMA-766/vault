@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, start } from './helpers.mjs'
 
 test('an admin sets policies; sign-up enforces the password floor; gaps are shown and listed', async () => {
   const s = await start()
@@ -29,6 +29,8 @@ test('an admin sets policies; sign-up enforces the password floor; gaps are show
     await asha.goto(`${s.base}/app/`)
     await asha.getByRole('button', { name: 'Create an account' }).click()
     await asha.fill('#r-email', 'asha@example.test')
+    await asha.fill('#r-account', ACCOUNT_PASSWORD)
+    await asha.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await asha.fill('#r-password', 'password1234')
     await asha.fill('#r-confirm', 'password1234')
     await asha.click('button[type=submit]')

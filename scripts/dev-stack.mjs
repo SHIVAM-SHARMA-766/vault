@@ -72,6 +72,9 @@ const app = {
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',
   },
 }
+// DEV_MAIL=1: mail is "sent" into a list a test can read at /__dev/outbox.
+const outbox = []
+if (process.env.DEV_MAIL) app.mailer = { send: async (m) => { outbox.push({ to: m.to, subject: m.subject, text: m.text }) } }
 const router = buildRouter(app)
 await publishToDisk(app, app.site)
 const { ensureSetup } = await import(join(API, 'system.js'))
@@ -87,6 +90,11 @@ createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://local')
     const p = decodeURIComponent(url.pathname)
     if (p.includes('..')) { res.writeHead(400); return res.end() }
+
+    if (p === '/__dev/outbox' && process.env.DEV_MAIL) {
+      res.setHeader('content-type', 'application/json')
+      return res.end(JSON.stringify(outbox))
+    }
 
     if (p === '/__dev/registration' && req.method === 'POST') {
       app.allowRegistration = url.searchParams.get('open') === '1'

@@ -317,6 +317,17 @@ particular device maker, and needs no metadata service). Admin and help-desk two
 clear keys as well as the authenticator app, after the verification those flows already require
 (A13).
 
+### A21a — Two steps: the account, then the master password
+
+Since [0036](../decisions/0036-account-then-master-password.md) the master password alone does not
+sign in. The account step comes first: an account password, which reaches the server only as an
+Argon2id-derived proof, plus two-factor. It leaves a long-lived account token in the browser. That
+token is good only for asking to unlock, which also needs the master password's proof, so a
+stolen token gives guesses under the per-account limit and nothing else. The token is replaced on
+every unlock; a replayed one ends every sign-in of the account. The account password can be reset
+by email, which therefore protects the account step only; the vault still needs the master
+password, which nobody can reset.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

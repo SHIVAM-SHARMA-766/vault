@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 
 import { generateTotp } from '@vault/crypto'
 
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 // A code for a later time step: the server refuses a step it has already
 // accepted, so the code used to turn 2FA on cannot sign in again.
@@ -33,10 +33,11 @@ test('turn on two-factor, then sign in with a code and with a recovery code', as
     await page.getByRole('button', { name: 'Done' }).click()
     await page.waitForSelector('.settings-card .pill-ok')
 
-    // The password alone is not enough any more.
-    await page.getByRole('button', { name: 'Lock vault' }).click()
+    // The password alone is not enough any more (the second factor belongs to
+    // the account step, decisions/0036).
+    await s.menu(page, 'Sign out of this device')
     await page.fill('#email', 'grace@example.test')
-    await page.fill('#password', PASSWORD)
+    await page.fill('#account-password', ACCOUNT_PASSWORD)
     await page.click('button[type=submit]')
     await page.waitForSelector('#tf-code', { timeout: 60_000 })
     await page.fill('#tf-code', '000000')
@@ -44,17 +45,24 @@ test('turn on two-factor, then sign in with a code and with a recovery code', as
     await page.waitForSelector('.alert-error')
     await page.fill('#tf-code', await codeAt(secret, 1))
     await page.getByRole('button', { name: 'Continue' }).click()
+    // The account is in; the master password opens the vault.
+    await page.waitForSelector('.account-line', { timeout: 60_000 })
+    await page.fill('#password', PASSWORD)
+    await page.click('button[type=submit]')
     await page.waitForSelector('.topbar', { timeout: 60_000 })
 
     // A recovery code works once.
-    await page.getByRole('button', { name: 'Lock vault' }).click()
+    await s.menu(page, 'Sign out of this device')
     await page.fill('#email', 'grace@example.test')
-    await page.fill('#password', PASSWORD)
+    await page.fill('#account-password', ACCOUNT_PASSWORD)
     await page.click('button[type=submit]')
     await page.waitForSelector('#tf-code', { timeout: 60_000 })
     await page.getByRole('button', { name: /Use a recovery code/ }).click()
     await page.fill('#tf-code', codes[0])
     await page.getByRole('button', { name: 'Continue' }).click()
+    await page.waitForSelector('.account-line', { timeout: 60_000 })
+    await page.fill('#password', PASSWORD)
+    await page.click('button[type=submit]')
     await page.waitForSelector('.topbar', { timeout: 60_000 })
 
     assert.deepEqual(s.errors, [])

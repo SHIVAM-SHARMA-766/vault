@@ -321,6 +321,23 @@ this server's real address, so a look-alike phishing page gets nothing. Your fir
 comes with ten recovery codes; save them. Removing a key asks for your master password and a
 second factor. Your master password still unlocks the vault: a key protects signing in.
 
+### Signing in: account password, then master password
+
+Signing in has two steps:
+1. **Your account:** your email and **account password**, plus your two-factor code if it is on.
+2. **Your vault:** your **master password**, which opens it in this browser.
+
+This browser remembers step 1, so after a lock or a reload you type only the master password.
+**Account menu → Sign out of this device** makes it forget, and the next sign-in starts with
+the account again. The two passwords must be different.
+
+- **Forgot the account password?** Use *Forgot your account password?* on the sign-in page. A
+  link arrives by email. If the server sends no email, ask the person who runs it.
+- **Forgot the master password?** Only your recovery key can help.
+- **Change the account password** in Settings → Security. Other devices then sign in again.
+- **An account from before account passwords:** use *First sign-in since accounts were added?*
+  once, with your master password. Vault then asks you to choose an account password.
+
 ### Signing in with your company account (single sign-on)
 
 If your administrator set it up, the sign-in screen offers **Sign in with** your company's

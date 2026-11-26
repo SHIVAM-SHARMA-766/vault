@@ -11,6 +11,8 @@ import { chromium } from 'playwright-core'
 
 const ROOT = new URL('../../', import.meta.url).pathname
 export const PASSWORD = 'a long and unguessable passphrase'
+/** The account password (decisions/0036): step one of signing in. */
+export const ACCOUNT_PASSWORD = 'a different account passphrase'
 
 function chromePath() {
   const candidates = [process.env.CHROME_PATH, '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser']
@@ -70,6 +72,8 @@ export async function start({ owner = 'owner@example.test', edition, env = {} } 
       await page.fill('#r-invite', inviteCode)
     }
     await page.fill('#r-email', email)
+    await page.fill('#r-account', ACCOUNT_PASSWORD)
+    await page.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await page.fill('#r-password', PASSWORD)
     await page.fill('#r-confirm', PASSWORD)
     await page.click('button[type=submit]')
@@ -81,11 +85,24 @@ export async function start({ owner = 'owner@example.test', edition, env = {} } 
     return recoveryKey
   }
 
-  async function unlock(page, email, password = PASSWORD) {
-    await page.fill('#email', email)
+  /** Signs in (decisions/0036): the account step when this browser is not
+   *  signed in to that account, then the master password. */
+  async function unlock(page, email, password = PASSWORD, { accountPassword = ACCOUNT_PASSWORD, wait = true } = {}) {
+    await page.waitForSelector('#account-password, .account-line', { timeout: 30_000 })
+    if (await page.locator('.account-line').count()) {
+      const who = (await page.textContent('.account-line strong'))?.trim()
+      if (who !== email) { await page.getByRole('button', { name: 'Not you? Sign out' }).click(); await page.waitForSelector('#account-password') }
+    }
+    if (await page.locator('#account-password').count()) {
+      await page.fill('#email', email)
+      await page.fill('#account-password', accountPassword)
+      await page.click('button[type=submit]')
+      await page.locator('.account-line, .alert-error, #tf-code').or(page.getByText('Use your passkey or security key')).first().waitFor({ timeout: 60_000 })
+      if (!(await page.locator('.account-line').count())) return
+    }
     await page.fill('#password', password)
     await page.click('button[type=submit]')
-    await page.waitForSelector('.topbar', { timeout: 60_000 })
+    if (wait) await page.waitForSelector('.topbar', { timeout: 60_000 })
   }
 
   /** Opens a screen from the account menu (Vault, Account settings, Admin

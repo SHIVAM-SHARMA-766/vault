@@ -17,6 +17,7 @@ import { ToastProvider } from './ui/kit.js'
 import { Recover } from './features/auth/Recover.js'
 import { Register } from './features/auth/Register.js'
 import { Unlock } from './features/auth/Unlock.js'
+import { ResetAccountPassword } from './features/auth/AccountSteps.js'
 import { PublicRequest } from './features/desk/PublicRequest.js'
 import { Vault } from './features/vault/Vault.js'
 import { t, useLocale } from './lib/i18n.js'
@@ -32,7 +33,7 @@ const Orgs = lazy(() => import('./features/orgs/Orgs.js').then((m) => ({ default
 const ShareView = lazy(() => import('./features/share/ShareView.js').then((m) => ({ default: m.ShareView })))
 const Loading = () => <div className="boot">Loading…</div>
 
-type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-help'
+type AuthView = 'unlock' | 'register' | 'recover' | 'request-access' | 'signin-help' | 'account-reset'
 
 export function App() {
   const [unlocked, setUnlocked] = useState(session.get())
@@ -103,7 +104,14 @@ function AuthScreen() {
   const [setupCode] = useState(() => new URLSearchParams(location.search).get('setup') ?? '')
   // An emailed invitation (/app/?invite=CODE) does the same for a new member.
   const [inviteCode] = useState(() => new URLSearchParams(location.search).get('invite') ?? '')
-  const [view, setView] = useState<AuthView>(setupCode || inviteCode ? 'register' : 'unlock')
+  // An emailed account-password reset link (decisions/0036): /app/#account-reset=CODE&email=…
+  const [reset] = useState(() => {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const code = h.get('account-reset'), email = h.get('email')
+    if (code && email) history.replaceState(null, '', location.pathname + location.search)
+    return code && email ? { code, email } : null
+  })
+  const [view, setView] = useState<AuthView>(reset ? 'account-reset' : setupCode || inviteCode ? 'register' : 'unlock')
   // Back from the identity provider (decisions/0021): a ticket for an
   // account asks for its master password; one for a newcomer, where the
   // operator allows it, opens account creation with the address fixed.
@@ -122,7 +130,7 @@ function AuthScreen() {
   const forAdmin = location.pathname.startsWith('/app/admin') || location.pathname.startsWith('/app/console')
   const place = forAdmin ? 'Admin console' : 'Vault'
   const instance = useInstance()
-  const step = view === 'unlock' ? 'Sign in' : view === 'register' ? 'Create account' : view === 'request-access' ? 'Request access' : view === 'signin-help' ? 'Help signing in' : 'Recover'
+  const step = view === 'unlock' ? 'Sign in' : view === 'register' ? 'Create account' : view === 'request-access' ? 'Request access' : view === 'signin-help' ? 'Help signing in' : view === 'account-reset' ? 'Reset account password' : 'Recover'
 
   return (
     <div className="auth">
@@ -158,6 +166,8 @@ function AuthScreen() {
           ) : view === 'register' ? (
             <Register setupCode={setupCode} inviteCode={inviteCode} sso={sso} onCancel={() => { setSso(null); setView('unlock') }}
                       onDone={() => { if (setupCode || inviteCode) history.replaceState(null, '', '/app/'); setView('unlock') }} />
+          ) : view === 'account-reset' && reset ? (
+            <ResetAccountPassword email={reset.email} code={reset.code} onDone={() => setView('unlock')} />
           ) : view === 'request-access' || view === 'signin-help' ? (
             <PublicRequest kind={view === 'request-access' ? 'access' : 'signin'} onCancel={() => setView('unlock')} />
           ) : (

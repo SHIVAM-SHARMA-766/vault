@@ -6,7 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { mockIdp } from './mock-idp.mjs'
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 test('sign in with the provider, then the master password; "require SSO" folds the password away', async () => {
   const idp = await mockIdp()
@@ -17,14 +17,16 @@ test('sign in with the provider, then the master password; "require SSO" folds t
     await s.setRegistration(true)
     const person = await s.person()
     await s.register(person, 'person@example.test')
-    await person.getByRole('button', { name: 'Lock vault' }).click()
+    // The account step is where the provider comes in (decisions/0036): sign
+    // this device out of the account to see it.
+    await s.menu(person, 'Sign out of this device')
 
-    // Through the provider and back: the address is fixed, the password still asked.
+    // Through the provider and back: the account is signed in, the master password still asked.
     idp.email = 'person@example.test'
     await person.getByRole('link', { name: 'Sign in with Okta' }).click()
-    await person.waitForSelector('.sso-banner')
+    await person.waitForSelector('.account-line', { timeout: 60_000 })
     assert.equal(new URL(person.url()).hash, '', 'the ticket is gone from the address bar')
-    assert.equal(await person.inputValue('#email'), 'person@example.test')
+    assert.equal((await person.textContent('.account-line strong'))?.trim(), 'person@example.test')
     await person.fill('#password', PASSWORD)
     await person.click('button[type=submit]')
     await person.waitForSelector('.topbar', { timeout: 60_000 })
@@ -36,24 +38,26 @@ test('sign in with the provider, then the master password; "require SSO" folds t
     await owner.locator('form[aria-labelledby=policy-title]').getByRole('button', { name: 'Save' }).click()
     await owner.waitForSelector('text=Policies saved', { state: 'attached' })
 
-    // Now the sign-in screen offers only the provider; a password alone is refused.
-    await person.getByRole('button', { name: 'Lock vault' }).click()
+    // Now the account step offers only the provider; the account password alone is refused.
+    await s.menu(person, 'Sign out of this device')
     await person.reload()
     await person.getByRole('link', { name: 'Sign in with Okta' }).waitFor()
-    assert.equal(await person.locator('#password').count(), 0)
-    await person.getByRole('button', { name: /Server owner\? Sign in with your master password/ }).click()
-    await s.unlock(person, 'person@example.test').catch(() => {})
+    assert.equal(await person.locator('#account-password').count(), 0)
+    await person.getByRole('button', { name: /Server owner\? Sign in with your account password/ }).click()
+    await person.fill('#email', 'person@example.test')
+    await person.fill('#account-password', ACCOUNT_PASSWORD)
+    await person.click('button[type=submit]')
     await person.waitForSelector('text=This server requires signing in with Okta first.')
     // Through the provider it works.
     await person.reload()
     await person.getByRole('link', { name: 'Sign in with Okta' }).click()
-    await person.waitForSelector('.sso-banner')
+    await person.waitForSelector('.account-line', { timeout: 60_000 })
     await person.fill('#password', PASSWORD)
     await person.click('button[type=submit]')
     await person.waitForSelector('.topbar', { timeout: 60_000 })
 
     // The owner is exempt.
-    await owner.getByRole('button', { name: 'Lock vault' }).click()
+    await s.menu(owner, 'Sign out of this device')
     await owner.reload()
     await owner.getByRole('button', { name: /Server owner\?/ }).click()
     await s.unlock(owner, 'owner@example.test')
@@ -77,6 +81,8 @@ test('with provisioning, a newcomer the provider signs in creates an account for
     await newcomer.waitForSelector('text=Your identity provider signed you in as')
     assert.equal(await newcomer.inputValue('#r-email'), 'newcomer@example.test')
     assert.equal(await newcomer.locator('#r-invite').count(), 0, 'no invitation needed')
+    await newcomer.fill('#r-account', ACCOUNT_PASSWORD)
+    await newcomer.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await newcomer.fill('#r-password', PASSWORD)
     await newcomer.fill('#r-confirm', PASSWORD)
     await newcomer.click('button[type=submit]')

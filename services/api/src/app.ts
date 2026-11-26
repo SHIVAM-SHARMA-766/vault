@@ -24,6 +24,7 @@ import * as attachments from './routes/attachments.js'
 import * as webauthn from './routes/webauthn.js'
 import * as passkeys from './routes/passkeys.js'
 import * as sso from './routes/sso.js'
+import * as accounts from './routes/accounts.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
 import { metricsRoute, recordRequest } from './metrics.js'
@@ -45,6 +46,13 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/prelogin', ({ event }) => auth.prelogin(app, event), 'KDF parameters for an address (a decoy for unknown ones)')
   router.post('/api/auth/register', ({ event }) => auth.register(app, event), 'Create an account')
   router.post('/api/auth/login', ({ event }) => auth.login(app, event), 'Sign in with the auth key (and second factor)')
+  router.post('/api/auth/account/prelogin', ({ event }) => accounts.prelogin(app, event), 'The account password\'s settings (a decoy for an unknown address)')
+  router.post('/api/auth/account/login', ({ event }) => accounts.login(app, event), 'Sign in to the account (account password, second factor): an account token')
+  router.post('/api/auth/account/session', ({ event }) => accounts.session(app, event), 'Check an account sign-in; returns its replacement and the KDF settings')
+  router.post('/api/auth/account/signout', ({ event }) => accounts.signOut(app, event), 'End an account sign-in')
+  router.post('/api/auth/account/forgot', ({ event }) => accounts.forgot(app, event), 'Email a link to reset the account password')
+  router.post('/api/auth/account/reset', ({ event }) => accounts.reset(app, event), 'Set a new account password with the emailed code')
+  router.post('/api/auth/unlock', ({ event }) => accounts.unlock(app, event), 'Unlock with the master password\'s proof and an account token: a vault session')
   router.get('/api/auth/sso/start', ({ event }) => sso.start(app, event), 'Single sign-on: redirect to the identity provider (decisions/0021)')
   router.get('/api/auth/sso/callback', ({ event }) => sso.callback(app, event), 'Single sign-on: the identity provider\'s answer; redirects to the app with a ticket')
   router.post('/api/auth/sso/ticket', ({ event }) => sso.ticketInfo(app, event), 'Which account a single sign-on ticket is for')
@@ -83,6 +91,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/account/delete', authed((u, e) => account.deleteOwnAccount(app, u, e)), 'Delete my own account (master password and second factor required)')
   router.put('/api/keys/identity', authed((u, e) => auth.setIdentity(app, u, e)), 'Store the identity key pair (once)')
   router.post('/api/auth/identity/signing', authed((u, e) => auth.setSigningKey(app, u, e)), 'Enrol my signing key (once)')
+  router.put('/api/auth/account/password', authed((u, e) => accounts.setPassword(app, u, e)), 'Set (first time) or change the account password')
   router.post('/api/auth/2fa/setup', authed((u, e) => auth.setupTwoFactor(app, u, e)), 'Start TOTP enrolment')
   router.post('/api/auth/2fa/enable', authed((u, e) => auth.enableTwoFactor(app, u, e)), 'Confirm TOTP enrolment; returns recovery codes')
   router.post('/api/auth/2fa/disable', authed((u, e) => auth.disableTwoFactor(app, u, e)), 'Turn two-factor sign-in off')
@@ -218,6 +227,7 @@ export function buildRouter(app: App): Router {
   router.put('/api/admin/users/:id/disabled', admined('users.write', (u, e, id, r) => admin.setDisabled(app, u, r, e, id)), 'Disable or enable an account')
   router.post('/api/admin/users/:id/offboard', admined('users.write', (u, _e, id, r) => admin.offboard(app, u, r, id)), 'Offboard an account: disable, sign out, remove from organizations')
   router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)), 'Sign an account out everywhere')
+  router.post('/api/admin/users/:id/reset-account-password', admined('users.write', (u, _e, id, r) => admin.resetAccountPassword(app, u, r, id)), 'Clear an account\'s account password, so they set a new one after signing in with the master password')
   router.post('/api/admin/users/:id/reset-2fa', admined('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)), 'Turn off an account\'s two-factor sign-in')
   router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)), 'Delete an account and its vault')
   router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)), 'Registration mode and instance profile')

@@ -26,6 +26,7 @@ import { Backups } from './Backups.js'
 import { DeleteAccount } from './DeleteAccount.js'
 import { Emergency } from './Emergency.js'
 import { ShareLinks } from './ShareLinks.js'
+import { AccountPassword } from './AccountPassword.js'
 import { KdfUpgrade } from './KdfUpgrade.js'
 import { PasskeyUnlock, type UnlockPasskey } from './PasskeyUnlock.js'
 import { SecurityKeys } from './SecurityKeys.js'
@@ -47,7 +48,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id']
 
 export function Settings({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
-  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus; passkeys: UnlockPasskey[]; policy: { minPasswordScore: number }; policyGap: string | null } | null>(null)
+  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus; passkeys: UnlockPasskey[]; account: { set: boolean; setAt?: string }; policy: { minPasswordScore: number }; policyGap: string | null } | null>(null)
   const [version, setVersion] = useState(0)
   // Emergency access needs a second account (decisions/0030).
   const { features } = useEdition()
@@ -61,7 +62,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
       try {
         const info = await api.me(await session.token())
         const fingerprint = info.identity ? await fingerprintOf(info.identity.publicKey, info.identity.signingPublicKey ?? null) : null
-        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor, passkeys: info.passkeys ?? [], policy: info.policy, policyGap: info.policyGap })
+        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor, passkeys: info.passkeys ?? [], account: info.account ?? { set: false }, policy: info.policy, policyGap: info.policyGap })
         // Turning on two-factor here may close a policy gap; the vault's
         // banner follows.
         session.patch({ policyGap: info.policyGap })
@@ -124,6 +125,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
           </> : null}
 
           {tab === 'security' ? <>
+            <AccountPassword state={state} status={me?.account ?? null} reload={() => setVersion((v) => v + 1)} />
             <KdfUpgrade state={state} />
             <PasskeyUnlock state={state} passkeys={me?.passkeys ?? null} reload={() => setVersion((v) => v + 1)} />
             <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />

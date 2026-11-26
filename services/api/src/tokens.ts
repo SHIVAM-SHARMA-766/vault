@@ -16,7 +16,9 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 export const ACCESS_TTL_SECONDS = 15 * 60
 export const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60
 
-export type TokenType = 'access' | 'refresh'
+/** `account`: the long-lived account sign-in (decisions/0036), good only for
+ *  unlocking with the master password; it is never an access token. */
+export type TokenType = 'access' | 'refresh' | 'account'
 
 export interface TokenPayload {
   sub: string
@@ -93,7 +95,7 @@ export function verifyToken(
 
   if (typeof payload.sub !== 'string' || payload.typ !== expected) return null
   if (typeof payload.exp !== 'number' || payload.exp <= Math.floor(now / 1000)) return null
-  if (expected === 'refresh' && typeof payload.jti !== 'string') return null
+  if ((expected === 'refresh' || expected === 'account') && typeof payload.jti !== 'string') return null
 
   return payload
 }

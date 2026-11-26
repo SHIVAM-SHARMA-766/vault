@@ -105,6 +105,15 @@ criterion asks for real files from three managers.
 </details>
 
 <details>
+<summary>🟡 <b>The extension asks for both passwords each time it unlocks</b></summary>
+
+The web app keeps the account sign-in, so a lock asks only for the master password
+([0036](../decisions/0036-account-then-master-password.md)). The extension keeps nothing beyond
+session memory, so each unlock there asks for the account password, the master password and
+two-factor. Keeping an account sign-in in the extension is a later step.
+</details>
+
+<details>
 <summary>🟠 <b>Single sign-on: the browser extension and organization-level rules</b></summary>
 
 **Effect.** Single sign-on ([0021](../decisions/0021-sso.md)) is one identity provider per

@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { signOutAccount } from '../lib/account.js'
 import * as session from '../lib/session.js'
 import { Link, navigate, useRoute } from '../lib/router.js'
 import { useScopes } from '../lib/workspace.js'
@@ -107,6 +108,8 @@ function AccountMenu({ state }: { state: session.Unlocked }) {
           ) : null}
           <div className="menu-sep" />
           <button role="menuitem" className="menu-item" onClick={session.lock}><IconLock size={15} />Lock now</button>
+          {/* Ends the account sign-in on this browser too (decisions/0036): next time, account password first. */}
+          <button role="menuitem" className="menu-item" onClick={() => { void signOutAccount(); session.lock() }}><IconLock size={15} />{t('Sign out of this device')}</button>
         </div>
       ) : null}
     </div>

@@ -350,6 +350,14 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - ✅ G1 Session policy (sign in again after N days, longest auto-lock, require two-factor) · ✅ G2 IP allow-list (sign-in, recovery and refresh; owners exempt) · ✅ G3 Password policy (weakest master password, checked at sign-up and change) · ✅ G4 Sharing policy (share links on/off and longest life)
 - ✅ G5 Rate limits in the UI (read-only, in words) · ✅ G6 Editable email templates (subject and a message; security text fixed) · ✅ G7 Data retention (activity, audit and organization logs; shortening applies at once)
 
+### Signing in in two steps ([0036](../decisions/0036-account-then-master-password.md))
+
+- [x] Account first (email, account password, two-factor or single sign-on), then the master
+  password, both checked by the server. The account sign-in is kept per device, so a lock asks
+  only for the master password.
+- [x] Existing accounts choose an account password at their next sign-in; the account password is
+  reset by email or by an administrator; changing it signs other devices out.
+
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
 Started 2026-11-21, after the operator chose three editions. Each stage makes one edition fit its

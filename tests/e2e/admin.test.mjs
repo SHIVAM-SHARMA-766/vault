@@ -4,7 +4,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, start } from './helpers.mjs'
 
 async function invite(page, label, role) {
   await page.getByRole('button', { name: 'Invitations' }).first().click()
@@ -35,6 +35,8 @@ test('roles see what they should, and a marketing edit goes live escaped', async
     await stranger.waitForSelector('.auth-switch:has-text("Have an invitation?")')
     await stranger.getByRole('button', { name: 'Create an account' }).click()
     await stranger.fill('#r-email', 'stranger@example.test')
+    await stranger.fill('#r-account', ACCOUNT_PASSWORD)
+    await stranger.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await stranger.fill('#r-password', 'a long and unguessable passphrase')
     await stranger.fill('#r-confirm', 'a long and unguessable passphrase')
     await stranger.click('button[type=submit]')
@@ -87,6 +89,8 @@ test('signing in at /app/admin says where it leads, and switching back to the va
     assert.equal(await page.getAttribute('.auth-home', 'href'), '/')
     await page.getByRole('button', { name: 'Create an account' }).click()
     await page.fill('#r-email', 'owner@example.test')
+    await page.fill('#r-account', ACCOUNT_PASSWORD)
+    await page.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await page.fill('#r-password', 'a long and unguessable passphrase')
     await page.fill('#r-confirm', 'a long and unguessable passphrase')
     await page.click('button[type=submit]')

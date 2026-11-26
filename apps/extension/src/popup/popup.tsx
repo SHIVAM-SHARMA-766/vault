@@ -77,6 +77,8 @@ function Unlock({ state, onDone }: { state: StateReply; onDone: () => void }) {
   const [code, setCode] = useState('')
   const [useRecovery, setUseRecovery] = useState(false)
   const [refused, setRefused] = useState(false)
+  // Step one of signing in (decisions/0036).
+  const [accountPassword, setAccountPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -91,10 +93,10 @@ function Unlock({ state, onDone }: { state: StateReply; onDone: () => void }) {
     try {
       const recovery = useRecovery || (second !== null && !second.includes('totp'))
       const factor: SecondFactorInput | undefined = second && code.trim() ? (recovery ? { recoveryCode: code.trim() } : { totpCode: code.replace(/\s+/g, '') }) : undefined
-      const res = await ask({ type: 'unlock', email, password, ...(secretKey.trim() ? { secretKey } : {}), ...(factor ? { second: factor } : {}) })
+      const res = await ask({ type: 'unlock', email, password, ...(accountPassword ? { accountPassword } : {}), ...(secretKey.trim() ? { secretKey } : {}), ...(factor ? { second: factor } : {}) })
       if (res.ok) {
         await chrome.storage.local.set({ lastEmail: email.trim() })
-        setPassword(''); setSecretKey(''); setCode('')
+        setPassword(''); setAccountPassword(''); setSecretKey(''); setCode('')
         onDone()
         return
       }
@@ -115,6 +117,9 @@ function Unlock({ state, onDone }: { state: StateReply; onDone: () => void }) {
       <h1>Unlock</h1>
       <label htmlFor="email">Email</label>
       <input id="email" type="email" autoComplete="username" required autoFocus={!email} value={email} onChange={(e) => { setEmail(e.target.value); setRefused(false) }} />
+      <label htmlFor="account-password">Account password</label>
+      <input id="account-password" type="password" autoComplete="current-password" value={accountPassword} onChange={(e) => setAccountPassword(e.target.value)} />
+      <p className="muted small hint-tight">Leave it empty only if your account has none yet.</p>
       <label htmlFor="password">Master password</label>
       <input id="password" type="password" autoComplete="current-password" required autoFocus={!!email} value={password} onChange={(e) => setPassword(e.target.value)} />
       {needKey ? <>

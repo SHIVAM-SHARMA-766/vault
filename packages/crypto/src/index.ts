@@ -207,3 +207,5 @@ export {
 } from './passkey.js'
 
 export { type Argon2Params, argon2Supported, argon2id, blake2b } from './argon2.js'
+
+export { ACCOUNT_KDF, type AccountParams, deriveAccountProof, newAccountParams } from './account.js'
