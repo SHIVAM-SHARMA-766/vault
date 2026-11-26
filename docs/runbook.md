@@ -182,6 +182,22 @@ every account has to be registered again.
 **`token-signing-key`: rotating it logs everyone out and costs nothing else.** Safe at any
 time, and the right response to any suspicion that it leaked.
 
+## Mail (Gmail)
+
+Invitations, sign-in alerts and account-password resets are sent through
+`support.dev2ops@gmail.com` with a Gmail **app password**. Turn on 2-Step Verification on that
+Google account, then create one under Security → App passwords. Put it in creds as
+`VAULT_SMTP_PASSWORD` (and `VAULT_SMTP_USER`), open SSH, and run:
+
+```sh
+set -a; . ~/shivam/creds/.env; set +a
+./scripts/set-mail.sh <host>
+```
+
+The script writes the `SMTP_*` and `MAIL_FROM` lines into `secrets.env`, restarts `vault-api` and
+checks that `/api/instance` reports mail as on. Gmail allows about 500 messages a day. To stop
+mail, remove those lines and restart.
+
 ## Opening registration for the first account
 
 Day to day, registration is controlled from the admin panel (**Overview → Registration**:

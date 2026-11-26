@@ -1,455 +1,463 @@
 {
- "global": {
-  "banner": {
-   "enabled": false,
-   "text": "",
-   "linkText": "",
-   "linkHref": "",
-   "tone": "info"
+  "global": {
+    "banner": {
+      "enabled": false,
+      "text": "",
+      "linkText": "",
+      "linkHref": "",
+      "tone": "info"
+    },
+    "cta": {
+      "title": "Your secrets, readable only by you.",
+      "text": "Open your vault in the browser. Nothing to install.",
+      "primary": "Open vault",
+      "secondary": "Security details"
+    },
+    "footer": {
+      "tagline": "A zero-knowledge password manager. Encrypted on your device, unreadable on the server.",
+      "note": "No cookies. No analytics. No third-party requests."
+    }
   },
-  "cta": {
-   "title": "Your secrets, readable only by you.",
-   "text": "Open your vault in the browser. Nothing to install.",
-   "primary": "Open vault",
-   "secondary": "Security details"
+  "home": {
+    "seo": {
+      "title": "Vault — a password manager that cannot read your passwords",
+      "description": "Vault encrypts every password on your device before it is saved. The server stores ciphertext and holds no key that opens it.",
+      "image": null
+    },
+    "hero": {
+      "eyebrow": "Zero-knowledge encryption",
+      "titleStart": "A password manager that",
+      "titleAccent": "cannot read",
+      "titleEnd": "your passwords.",
+      "lede": "Every entry is encrypted on your device before it is saved. The server stores ciphertext and holds no key that opens it — not your master password, not a copy of it, not anything that can be turned back into it.",
+      "primary": "Open your vault",
+      "secondary": "See how it works",
+      "note": "Accounts are currently opened by invitation.",
+      "image": null,
+      "imageAlt": "The Vault app: a sidebar of filters, a list of saved logins, and the details of one login with its username, a masked password, a one-time code, and its website."
+    },
+    "why": {
+      "kicker": "Why Vault",
+      "title": "Built on one assumption: the server is the target",
+      "text": "Most breaches start on the server. Vault is designed so that winning there gets an attacker nothing they can read.",
+      "cards": [
+        {
+          "icon": "shield",
+          "title": "Zero-knowledge by design",
+          "text": "Encryption happens in your browser. The server receives ciphertext and a login key that cannot be turned back into your password."
+        },
+        {
+          "icon": "eye",
+          "title": "Nothing to see, even in a breach",
+          "text": "Entry names, usernames, websites and tags are encrypted along with the passwords. A stolen database does not list which sites you use."
+        },
+        {
+          "icon": "grid",
+          "title": "Everything you use every day",
+          "text": "Search, favourites, one-click copy, two-factor codes and a password generator — in a fast, clean app that works on any device."
+        }
+      ]
+    },
+    "steps": {
+      "kicker": "How it works",
+      "title": "Your password never leaves the browser",
+      "text": "The server checks that you are you without ever learning the secret that proves it.",
+      "items": [
+        {
+          "title": "You type your master password",
+          "text": "Your browser stretches it with 600,000 rounds of PBKDF2 into a master key. That pause before the vault opens is the same pause an attacker pays for every guess.",
+          "where": "device"
+        },
+        {
+          "title": "Two keys split off",
+          "text": "One key unlocks your vault and stays put. A second, separate key — one that cannot be worked back to the first — is what the server sees to confirm it is you.",
+          "where": "device"
+        },
+        {
+          "title": "Only ciphertext is stored",
+          "text": "Entries are sealed before upload. The server keeps encrypted blobs and a hash of the login key. A full breach of it yields nothing readable.",
+          "where": "server"
+        }
+      ]
+    },
+    "honest": {
+      "title": "Honest about its limits",
+      "text": "A security page that lists only strengths is a marketing page. Vault publishes the risks it does not protect against — including the biggest one — alongside the ones it does."
+    }
   },
-  "footer": {
-   "tagline": "A zero-knowledge password manager. Encrypted on your device, unreadable on the server.",
-   "note": "No cookies. No analytics. No third-party requests."
+  "features": {
+    "seo": {
+      "title": "Features — Vault",
+      "description": "Encrypted on your device, with search, favourites, two-factor codes, a password generator and clipboard clearing built in.",
+      "image": null
+    },
+    "hero": {
+      "kicker": "Features",
+      "title": "Everything you need. Nothing it can see.",
+      "lede": "The parts of a password manager you reach for every day, each one built so that the server never learns what you store."
+    },
+    "core": {
+      "title": "Security you do not have to think about",
+      "cards": [
+        {
+          "icon": "shield",
+          "title": "Encrypted on your device",
+          "text": "AES-256-GCM with a fresh nonce for every write. Keys are derived in the browser and never cross the network."
+        },
+        {
+          "icon": "note",
+          "title": "Names and tags too",
+          "text": "Not just passwords. Entry names, usernames, websites, notes and tags are all encrypted, so a stolen database does not even list which sites you use."
+        },
+        {
+          "icon": "clock",
+          "title": "Two-factor codes built in",
+          "text": "Store authenticator keys alongside the login they belong to and get live one-time codes, generated locally to the RFC 6238 standard."
+        },
+        {
+          "icon": "refresh",
+          "title": "Strong passwords, generated",
+          "text": "A generator drawing from the browser's cryptographic random source, with a strength meter on every password you save."
+        },
+        {
+          "icon": "copy",
+          "title": "Copy that cleans up",
+          "text": "Copy a username, password or code in one click. Secrets are cleared from the clipboard after thirty seconds."
+        },
+        {
+          "icon": "lock",
+          "title": "Locks itself",
+          "text": "Keys live in memory only — never in browser storage or cookies. Close the tab, reload, or step away for fifteen minutes and the vault is locked."
+        }
+      ]
+    },
+    "split": {
+      "kicker": "Organised",
+      "title": "Find anything in a keystroke",
+      "lede": "Your whole vault is decrypted in memory once you unlock it, so search and filtering are instant — and happen entirely on your device. The server could not search your vault if it tried.",
+      "bullets": [
+        {
+          "strong": "Seven entry types",
+          "rest": "— logins, secure notes, cards, identities, bank accounts, SSH keys and Wi-Fi"
+        },
+        {
+          "strong": "Instant search",
+          "rest": "across names, usernames, websites and tags. Press / from anywhere"
+        },
+        {
+          "strong": "Favourites and tags",
+          "rest": "for the things you open most"
+        },
+        {
+          "strong": "Filters by type",
+          "rest": "with live counts"
+        }
+      ],
+      "image": null,
+      "imageAlt": "The Vault app, showing filters by type, a searchable list of entries, and the detail of one login."
+    },
+    "details": {
+      "kicker": "The details",
+      "title": "Small things, done properly",
+      "cards": [
+        {
+          "icon": "star",
+          "title": "A generator you can trust",
+          "text": "Passwords drawn from the browser's cryptographic random source with no bias between characters. Choose the length and character sets."
+        },
+        {
+          "icon": "tag",
+          "title": "Strength at a glance",
+          "text": "Every saved password shows a strength meter, so weak ones stand out when you open them."
+        },
+        {
+          "icon": "search",
+          "title": "No icon lookups",
+          "text": "Entries get a coloured initial instead of a website icon. Fetching icons would tell a third party which sites you use."
+        },
+        {
+          "icon": "moon",
+          "title": "Light and dark",
+          "text": "Follows your system theme, with a layout designed for both rather than one inverted from the other."
+        },
+        {
+          "icon": "phone",
+          "title": "Works on any screen",
+          "text": "Three panes on a desktop, two on a tablet, one on a phone. Nothing to install — it runs in the browser."
+        },
+        {
+          "icon": "shield",
+          "title": "Locks itself",
+          "text": "Keys never touch browser storage. Reloading, closing the tab, or fifteen idle minutes locks the vault."
+        }
+      ]
+    }
+  },
+  "how": {
+    "seo": {
+      "title": "How it works — Vault",
+      "description": "How Vault derives your keys on your device, what it sends to the server, and why a breach of the server reveals nothing readable.",
+      "image": null
+    },
+    "hero": {
+      "kicker": "How it works",
+      "title": "Your password never leaves the browser",
+      "lede": "Signing in proves who you are without sending the secret that proves it. Here is what happens, step by step, and what ends up where."
+    },
+    "steps": {
+      "items": [
+        {
+          "title": "You type your master password",
+          "text": "Your browser stretches it with 600,000 rounds of PBKDF2 into a master key. That pause before the vault opens is the same pause an attacker pays for every guess.",
+          "where": "device"
+        },
+        {
+          "title": "Two keys split off",
+          "text": "One key unlocks your vault and stays put. A second, separate key — one that cannot be worked back to the first — is what the server sees to confirm it is you.",
+          "where": "device"
+        },
+        {
+          "title": "Only ciphertext is stored",
+          "text": "Entries are sealed before upload. The server keeps encrypted blobs and a hash of the login key. A full breach of it yields nothing readable.",
+          "where": "server"
+        }
+      ]
+    },
+    "holds": {
+      "kicker": "What the server holds",
+      "title": "Built so a breach is boring",
+      "stores": [
+        {
+          "text": "Encrypted entries it holds no key for"
+        },
+        {
+          "text": "A hash of your login key — not of your password"
+        },
+        {
+          "text": "Your vault key, locked with keys only you can derive"
+        },
+        {
+          "text": "Your email as a keyed hash, not in plain text"
+        }
+      ],
+      "never": [
+        {
+          "text": "Your master password"
+        },
+        {
+          "text": "Your recovery key"
+        },
+        {
+          "text": "The names of the sites you use"
+        },
+        {
+          "text": "Any password, note, or code in your vault"
+        }
+      ]
+    },
+    "recovery": {
+      "title": "There is no password reset. That is the point.",
+      "text": "Because the server cannot read your vault, it cannot let you back in either. When you sign up you get a recovery key, shown once and never sent anywhere. It is the only other way in. Keep it somewhere safe and offline.\n\nLose both the master password and the recovery key, and nobody — including whoever runs the server — can open the vault."
+    }
+  },
+  "get": {
+    "seo": {
+      "title": "Run your own Vault — install in one command",
+      "description": "Vault is self-hosted: one command installs it on your own server, for yourself, your family or your company. Zero-knowledge: the server cannot read it.",
+      "image": null
+    },
+    "hero": {
+      "kicker": "Run your own",
+      "title": "Your own Vault, on your own server",
+      "lede": "Vault is software you run yourself — for you, your family, or your whole company. Your vault is encrypted on each device, and the server you run holds nothing that opens it."
+    },
+    "install": {
+      "title": "One command",
+      "text": "On a Linux machine with Docker, this asks for the address people will use, generates every secret, starts Vault with HTTPS, and prints the link that creates your owner account.",
+      "command": "curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh | sh",
+      "note": "Prefer to read it first? The installer is a short, commented shell script in the repository. Running it again upgrades Vault, after taking a backup."
+    },
+    "steps": {
+      "title": "What happens",
+      "items": [
+        {
+          "title": "It asks three questions",
+          "text": "Personal or business, the address (a DNS name pointing at the machine, or localhost to try it), and where to install."
+        },
+        {
+          "title": "It writes the configuration",
+          "text": "Fresh secrets are generated on your machine and saved where only you can read them. Nothing is sent anywhere."
+        },
+        {
+          "title": "It starts Vault behind HTTPS",
+          "text": "Caddy obtains a certificate automatically. Vault creates its database and is ready in a minute or two."
+        },
+        {
+          "title": "You open the setup link",
+          "text": "It creates the owner account. From the admin panel you invite people, set your support address and check backups."
+        }
+      ]
+    },
+    "profiles": {
+      "title": "Personal or business",
+      "items": [
+        {
+          "title": "Personal",
+          "for": "You, your family, a small team",
+          "text": "Vault on SQLite, plus Caddy for HTTPS. One data volume to back up. Runs on 1 GB of RAM — a Raspberry Pi works."
+        },
+        {
+          "title": "Business",
+          "for": "A company",
+          "text": "Vault on PostgreSQL, plus Caddy. A database your team can back up, monitor and replicate. Organizations, groups, policies and an audit log included."
+        }
+      ]
+    },
+    "needs": {
+      "title": "What you need",
+      "items": [
+        {
+          "text": "A Linux machine with Docker and Docker Compose v2 — amd64 or arm64, 1 GB RAM"
+        },
+        {
+          "text": "A DNS name pointing at it, with ports 80 and 443 open (or localhost to try it out)"
+        },
+        {
+          "text": "Ten minutes"
+        },
+        {
+          "text": "Optional: an SMTP server, to email invitations and sign-in notices"
+        },
+        {
+          "text": "Optional: an S3-compatible bucket, for off-site copies of the server backup"
+        }
+      ]
+    }
+  },
+  "faq": {
+    "seo": {
+      "title": "FAQ — Vault",
+      "description": "Answers about accounts, recovery, encryption, and what the server can and cannot see.",
+      "image": null
+    },
+    "hero": {
+      "kicker": "FAQ",
+      "title": "Questions worth asking",
+      "lede": "Straight answers about what Vault does, what it does not, and why."
+    },
+    "list": {
+      "items": [
+        {
+          "q": "How do I get an account?",
+          "a": "Accounts are currently opened by invitation. The person who runs this Vault creates a single-use code for you; enter it when you sign up. Codes expire, and each one works exactly once."
+        },
+        {
+          "q": "What happens if I forget my master password?",
+          "a": "Use the recovery key you were shown at sign-up. It is the only other way in. There is no password reset, because the server cannot read your vault and so cannot let you back into it."
+        },
+        {
+          "q": "Can the people who run Vault read my passwords?",
+          "a": "No. The admin panel can see that an account exists, when it was created and last used, and how many items it holds — but not what they are, and not even your email address, which is stored only as a keyed hash."
+        },
+        {
+          "q": "If the server is hacked, what does the attacker get?",
+          "a": "Encrypted entries, a hash of each user's login key, and vault keys that are themselves encrypted. To read anything they would have to guess a master password, paying 600,000 rounds of key stretching per guess, per account."
+        },
+        {
+          "q": "Why does unlocking take a second?",
+          "a": "That is the key stretching happening on your device. It is deliberately slow, so that guessing passwords is slow too."
+        },
+        {
+          "q": "Why don't my entries show website icons?",
+          "a": "Fetching an icon means asking someone else's server for it, which tells them which sites you have accounts with. Vault shows a coloured initial instead and makes no request to any third party."
+        },
+        {
+          "q": "Why do I have to unlock again after reloading the page?",
+          "a": "Your keys are kept in memory and nowhere else — not in local storage, not in a cookie. A closed tab leaves nothing behind for someone with your laptop to find."
+        },
+        {
+          "q": "Does the page load anything from other companies?",
+          "a": "No. No analytics, no fonts, no CDNs, no trackers. A strict Content-Security-Policy blocks the page from loading anything that does not come from this server."
+        },
+        {
+          "q": "Is there anything it does not protect against?",
+          "a": "Yes, and it is stated plainly on the security page: a web app is only as trustworthy as the code it is served, and that rests on the operator's control of its registered domain."
+        }
+      ]
+    }
+  },
+  "about": {
+    "seo": {
+      "title": "About — Vault",
+      "description": "Why Vault exists, the principles it is built on, and what it runs on.",
+      "image": null
+    },
+    "hero": {
+      "kicker": "About",
+      "title": "A password manager that assumes the worst about itself",
+      "lede": "Vault is built and run by one person, on infrastructure that costs nothing, with the goal that compromising it would be pointless."
+    },
+    "story": {
+      "title": "Why it exists",
+      "text": "An earlier version of this product claimed to be zero-knowledge and was not: the master password travelled to the server and was hashed there. Vault is the rewrite, started from an empty directory, with the claim made true first and everything else built around it.\n\nThe test it is held to is simple. If someone took a complete copy of the server — its disk, its database, its backups — they should get ciphertext and nothing more."
+    },
+    "principles": {
+      "kicker": "Principles",
+      "title": "What Vault will and will not do",
+      "cards": [
+        {
+          "icon": "shield",
+          "title": "Encrypt first",
+          "text": "Nothing readable leaves your device. Features that would need the server to see your data are not built."
+        },
+        {
+          "icon": "eye",
+          "title": "Track nothing",
+          "text": "No analytics, no cookies, no fonts or scripts from other companies. The page talks to this server and nowhere else."
+        },
+        {
+          "icon": "scale",
+          "title": "Say what is not covered",
+          "text": "Known risks are published, not buried. The security page lists them next to the protections."
+        }
+      ]
+    },
+    "runs": {
+      "kicker": "What it runs on",
+      "title": "Small, deliberate, and free to run",
+      "text": "The whole system is small enough to hold in your head — which is part of the security.",
+      "cards": [
+        {
+          "icon": "server",
+          "title": "One server",
+          "text": "A single always-free cloud instance serves this site, the app and the API, behind a web server that sets every security header."
+        },
+        {
+          "icon": "cloud",
+          "title": "A managed database",
+          "text": "Holds ciphertext only, on a private network. It is never on the web server's disk."
+        },
+        {
+          "icon": "heart",
+          "title": "Daily encrypted backups",
+          "text": "Exported every day to private storage, with restores tested. A backup holds the same ciphertext as the database."
+        }
+      ]
+    },
+    "maker": {
+      "kicker": "Who builds it",
+      "name": "Shivam Sharma",
+      "role": "DevOps engineer · dev2ops.in",
+      "text": "Vault is designed, built and run by one person: the code, the cryptography, the infrastructure and this site. I work as a DevOps engineer, and I build things like Vault to do security and operations properly end to end, at no cost to run.\n\nMy other projects, my work history and how to reach me are on my portfolio.",
+      "linkLabel": "Visit my portfolio",
+      "linkHref": "https://portfolio.dev2ops.in"
+    }
+  },
+  "security": {
+    "seo": {
+      "title": "Security — Vault",
+      "description": "How Vault derives keys, what it encrypts, what the server stores, and the risks it does not protect against.",
+      "image": null
+    }
   }
- },
- "home": {
-  "seo": {
-   "title": "Vault — a password manager that cannot read your passwords",
-   "description": "Vault encrypts every password on your device before it is saved. The server stores ciphertext and holds no key that opens it.",
-   "image": null
-  },
-  "hero": {
-   "eyebrow": "Zero-knowledge encryption",
-   "titleStart": "A password manager that",
-   "titleAccent": "cannot read",
-   "titleEnd": "your passwords.",
-   "lede": "Every entry is encrypted on your device before it is saved. The server stores ciphertext and holds no key that opens it — not your master password, not a copy of it, not anything that can be turned back into it.",
-   "primary": "Open your vault",
-   "secondary": "See how it works",
-   "note": "Accounts are currently opened by invitation.",
-   "image": null,
-   "imageAlt": "The Vault app: a sidebar of filters, a list of saved logins, and the details of one login with its username, a masked password, a one-time code, and its website."
-  },
-  "why": {
-   "kicker": "Why Vault",
-   "title": "Built on one assumption: the server is the target",
-   "text": "Most breaches start on the server. Vault is designed so that winning there gets an attacker nothing they can read.",
-   "cards": [
-    {
-     "icon": "shield",
-     "title": "Zero-knowledge by design",
-     "text": "Encryption happens in your browser. The server receives ciphertext and a login key that cannot be turned back into your password."
-    },
-    {
-     "icon": "eye",
-     "title": "Nothing to see, even in a breach",
-     "text": "Entry names, usernames, websites and tags are encrypted along with the passwords. A stolen database does not list which sites you use."
-    },
-    {
-     "icon": "grid",
-     "title": "Everything you use every day",
-     "text": "Search, favourites, one-click copy, two-factor codes and a password generator — in a fast, clean app that works on any device."
-    }
-   ]
-  },
-  "steps": {
-   "kicker": "How it works",
-   "title": "Your password never leaves the browser",
-   "text": "The server checks that you are you without ever learning the secret that proves it.",
-   "items": [
-    {
-     "title": "You type your master password",
-     "text": "Your browser stretches it with 600,000 rounds of PBKDF2 into a master key. That pause before the vault opens is the same pause an attacker pays for every guess.",
-     "where": "device"
-    },
-    {
-     "title": "Two keys split off",
-     "text": "One key unlocks your vault and stays put. A second, separate key — one that cannot be worked back to the first — is what the server sees to confirm it is you.",
-     "where": "device"
-    },
-    {
-     "title": "Only ciphertext is stored",
-     "text": "Entries are sealed before upload. The server keeps encrypted blobs and a hash of the login key. A full breach of it yields nothing readable.",
-     "where": "server"
-    }
-   ]
-  },
-  "honest": {
-   "title": "Honest about its limits",
-   "text": "A security page that lists only strengths is a marketing page. Vault publishes the risks it does not protect against — including the biggest one — alongside the ones it does."
-  }
- },
- "features": {
-  "seo": {
-   "title": "Features — Vault",
-   "description": "Encrypted on your device, with search, favourites, two-factor codes, a password generator and clipboard clearing built in.",
-   "image": null
-  },
-  "hero": {
-   "kicker": "Features",
-   "title": "Everything you need. Nothing it can see.",
-   "lede": "The parts of a password manager you reach for every day, each one built so that the server never learns what you store."
-  },
-  "core": {
-   "title": "Security you do not have to think about",
-   "cards": [
-    {
-     "icon": "shield",
-     "title": "Encrypted on your device",
-     "text": "AES-256-GCM with a fresh nonce for every write. Keys are derived in the browser and never cross the network."
-    },
-    {
-     "icon": "note",
-     "title": "Names and tags too",
-     "text": "Not just passwords. Entry names, usernames, websites, notes and tags are all encrypted, so a stolen database does not even list which sites you use."
-    },
-    {
-     "icon": "clock",
-     "title": "Two-factor codes built in",
-     "text": "Store authenticator keys alongside the login they belong to and get live one-time codes, generated locally to the RFC 6238 standard."
-    },
-    {
-     "icon": "refresh",
-     "title": "Strong passwords, generated",
-     "text": "A generator drawing from the browser's cryptographic random source, with a strength meter on every password you save."
-    },
-    {
-     "icon": "copy",
-     "title": "Copy that cleans up",
-     "text": "Copy a username, password or code in one click. Secrets are cleared from the clipboard after thirty seconds."
-    },
-    {
-     "icon": "lock",
-     "title": "Locks itself",
-     "text": "Keys live in memory only — never in browser storage or cookies. Close the tab, reload, or step away for fifteen minutes and the vault is locked."
-    }
-   ]
-  },
-  "split": {
-   "kicker": "Organised",
-   "title": "Find anything in a keystroke",
-   "lede": "Your whole vault is decrypted in memory once you unlock it, so search and filtering are instant — and happen entirely on your device. The server could not search your vault if it tried.",
-   "bullets": [
-    {
-     "strong": "Seven entry types",
-     "rest": "— logins, secure notes, cards, identities, bank accounts, SSH keys and Wi-Fi"
-    },
-    {
-     "strong": "Instant search",
-     "rest": "across names, usernames, websites and tags. Press / from anywhere"
-    },
-    {
-     "strong": "Favourites and tags",
-     "rest": "for the things you open most"
-    },
-    {
-     "strong": "Filters by type",
-     "rest": "with live counts"
-    }
-   ],
-   "image": null,
-   "imageAlt": "The Vault app, showing filters by type, a searchable list of entries, and the detail of one login."
-  },
-  "details": {
-   "kicker": "The details",
-   "title": "Small things, done properly",
-   "cards": [
-    {
-     "icon": "star",
-     "title": "A generator you can trust",
-     "text": "Passwords drawn from the browser's cryptographic random source with no bias between characters. Choose the length and character sets."
-    },
-    {
-     "icon": "tag",
-     "title": "Strength at a glance",
-     "text": "Every saved password shows a strength meter, so weak ones stand out when you open them."
-    },
-    {
-     "icon": "search",
-     "title": "No icon lookups",
-     "text": "Entries get a coloured initial instead of a website icon. Fetching icons would tell a third party which sites you use."
-    },
-    {
-     "icon": "moon",
-     "title": "Light and dark",
-     "text": "Follows your system theme, with a layout designed for both rather than one inverted from the other."
-    },
-    {
-     "icon": "phone",
-     "title": "Works on any screen",
-     "text": "Three panes on a desktop, two on a tablet, one on a phone. Nothing to install — it runs in the browser."
-    },
-    {
-     "icon": "shield",
-     "title": "Locks itself",
-     "text": "Keys never touch browser storage. Reloading, closing the tab, or fifteen idle minutes locks the vault."
-    }
-   ]
-  }
- },
- "how": {
-  "seo": {
-   "title": "How it works — Vault",
-   "description": "How Vault derives your keys on your device, what it sends to the server, and why a breach of the server reveals nothing readable.",
-   "image": null
-  },
-  "hero": {
-   "kicker": "How it works",
-   "title": "Your password never leaves the browser",
-   "lede": "Signing in proves who you are without sending the secret that proves it. Here is what happens, step by step, and what ends up where."
-  },
-  "steps": {
-   "items": [
-    {
-     "title": "You type your master password",
-     "text": "Your browser stretches it with 600,000 rounds of PBKDF2 into a master key. That pause before the vault opens is the same pause an attacker pays for every guess.",
-     "where": "device"
-    },
-    {
-     "title": "Two keys split off",
-     "text": "One key unlocks your vault and stays put. A second, separate key — one that cannot be worked back to the first — is what the server sees to confirm it is you.",
-     "where": "device"
-    },
-    {
-     "title": "Only ciphertext is stored",
-     "text": "Entries are sealed before upload. The server keeps encrypted blobs and a hash of the login key. A full breach of it yields nothing readable.",
-     "where": "server"
-    }
-   ]
-  },
-  "holds": {
-   "kicker": "What the server holds",
-   "title": "Built so a breach is boring",
-   "stores": [
-    {
-     "text": "Encrypted entries it holds no key for"
-    },
-    {
-     "text": "A hash of your login key — not of your password"
-    },
-    {
-     "text": "Your vault key, locked with keys only you can derive"
-    },
-    {
-     "text": "Your email as a keyed hash, not in plain text"
-    }
-   ],
-   "never": [
-    {
-     "text": "Your master password"
-    },
-    {
-     "text": "Your recovery key"
-    },
-    {
-     "text": "The names of the sites you use"
-    },
-    {
-     "text": "Any password, note, or code in your vault"
-    }
-   ]
-  },
-  "recovery": {
-   "title": "There is no password reset. That is the point.",
-   "text": "Because the server cannot read your vault, it cannot let you back in either. When you sign up you get a recovery key, shown once and never sent anywhere. It is the only other way in. Keep it somewhere safe and offline.\n\nLose both the master password and the recovery key, and nobody — including whoever runs the server — can open the vault."
-  }
- },
- "get": {
-  "seo": {
-   "title": "Run your own Vault — install in one command",
-   "description": "Vault is self-hosted: one command installs it on your own server, for yourself, your family or your company. Zero-knowledge: the server cannot read it.",
-   "image": null
-  },
-  "hero": {
-   "kicker": "Run your own",
-   "title": "Your own Vault, on your own server",
-   "lede": "Vault is software you run yourself — for you, your family, or your whole company. Your vault is encrypted on each device, and the server you run holds nothing that opens it."
-  },
-  "install": {
-   "title": "One command",
-   "text": "On a Linux machine with Docker, this asks for the address people will use, generates every secret, starts Vault with HTTPS, and prints the link that creates your owner account.",
-   "command": "curl -fsSL https://raw.githubusercontent.com/SHIVAM-SHARMA-766/vault/main/deploy/install.sh | sh",
-   "note": "Prefer to read it first? The installer is a short, commented shell script in the repository. Running it again upgrades Vault, after taking a backup."
-  },
-  "steps": {
-   "title": "What happens",
-   "items": [
-    {
-     "title": "It asks three questions",
-     "text": "Personal or business, the address (a DNS name pointing at the machine, or localhost to try it), and where to install."
-    },
-    {
-     "title": "It writes the configuration",
-     "text": "Fresh secrets are generated on your machine and saved where only you can read them. Nothing is sent anywhere."
-    },
-    {
-     "title": "It starts Vault behind HTTPS",
-     "text": "Caddy obtains a certificate automatically. Vault creates its database and is ready in a minute or two."
-    },
-    {
-     "title": "You open the setup link",
-     "text": "It creates the owner account. From the admin panel you invite people, set your support address and check backups."
-    }
-   ]
-  },
-  "profiles": {
-   "title": "Personal or business",
-   "items": [
-    {
-     "title": "Personal",
-     "for": "You, your family, a small team",
-     "text": "Vault on SQLite, plus Caddy for HTTPS. One data volume to back up. Runs on 1 GB of RAM — a Raspberry Pi works."
-    },
-    {
-     "title": "Business",
-     "for": "A company",
-     "text": "Vault on PostgreSQL, plus Caddy. A database your team can back up, monitor and replicate. Organizations, groups, policies and an audit log included."
-    }
-   ]
-  },
-  "needs": {
-   "title": "What you need",
-   "items": [
-    {
-     "text": "A Linux machine with Docker and Docker Compose v2 — amd64 or arm64, 1 GB RAM"
-    },
-    {
-     "text": "A DNS name pointing at it, with ports 80 and 443 open (or localhost to try it out)"
-    },
-    {
-     "text": "Ten minutes"
-    },
-    {
-     "text": "Optional: an SMTP server, to email invitations and sign-in notices"
-    },
-    {
-     "text": "Optional: an S3-compatible bucket, for off-site copies of the server backup"
-    }
-   ]
-  }
- },
- "faq": {
-  "seo": {
-   "title": "FAQ — Vault",
-   "description": "Answers about accounts, recovery, encryption, and what the server can and cannot see.",
-   "image": null
-  },
-  "hero": {
-   "kicker": "FAQ",
-   "title": "Questions worth asking",
-   "lede": "Straight answers about what Vault does, what it does not, and why."
-  },
-  "list": {
-   "items": [
-    {
-     "q": "How do I get an account?",
-     "a": "Accounts are currently opened by invitation. The person who runs this Vault creates a single-use code for you; enter it when you sign up. Codes expire, and each one works exactly once."
-    },
-    {
-     "q": "What happens if I forget my master password?",
-     "a": "Use the recovery key you were shown at sign-up. It is the only other way in. There is no password reset, because the server cannot read your vault and so cannot let you back into it."
-    },
-    {
-     "q": "Can the people who run Vault read my passwords?",
-     "a": "No. The admin panel can see that an account exists, when it was created and last used, and how many items it holds — but not what they are, and not even your email address, which is stored only as a keyed hash."
-    },
-    {
-     "q": "If the server is hacked, what does the attacker get?",
-     "a": "Encrypted entries, a hash of each user's login key, and vault keys that are themselves encrypted. To read anything they would have to guess a master password, paying 600,000 rounds of key stretching per guess, per account."
-    },
-    {
-     "q": "Why does unlocking take a second?",
-     "a": "That is the key stretching happening on your device. It is deliberately slow, so that guessing passwords is slow too."
-    },
-    {
-     "q": "Why don't my entries show website icons?",
-     "a": "Fetching an icon means asking someone else's server for it, which tells them which sites you have accounts with. Vault shows a coloured initial instead and makes no request to any third party."
-    },
-    {
-     "q": "Why do I have to unlock again after reloading the page?",
-     "a": "Your keys are kept in memory and nowhere else — not in local storage, not in a cookie. A closed tab leaves nothing behind for someone with your laptop to find."
-    },
-    {
-     "q": "Does the page load anything from other companies?",
-     "a": "No. No analytics, no fonts, no CDNs, no trackers. A strict Content-Security-Policy blocks the page from loading anything that does not come from this server."
-    },
-    {
-     "q": "Is there anything it does not protect against?",
-     "a": "Yes, and it is stated plainly on the security page: a web app is only as trustworthy as the code it is served, and that rests on the operator's control of its registered domain."
-    }
-   ]
-  }
- },
- "about": {
-  "seo": {
-   "title": "About — Vault",
-   "description": "Why Vault exists, the principles it is built on, and what it runs on.",
-   "image": null
-  },
-  "hero": {
-   "kicker": "About",
-   "title": "A password manager that assumes the worst about itself",
-   "lede": "Vault is built and run by one person, on infrastructure that costs nothing, with the goal that compromising it would be pointless."
-  },
-  "story": {
-   "title": "Why it exists",
-   "text": "An earlier version of this product claimed to be zero-knowledge and was not: the master password travelled to the server and was hashed there. Vault is the rewrite, started from an empty directory, with the claim made true first and everything else built around it.\n\nThe test it is held to is simple. If someone took a complete copy of the server — its disk, its database, its backups — they should get ciphertext and nothing more."
-  },
-  "principles": {
-   "kicker": "Principles",
-   "title": "What Vault will and will not do",
-   "cards": [
-    {
-     "icon": "shield",
-     "title": "Encrypt first",
-     "text": "Nothing readable leaves your device. Features that would need the server to see your data are not built."
-    },
-    {
-     "icon": "eye",
-     "title": "Track nothing",
-     "text": "No analytics, no cookies, no fonts or scripts from other companies. The page talks to this server and nowhere else."
-    },
-    {
-     "icon": "scale",
-     "title": "Say what is not covered",
-     "text": "Known risks are published, not buried. The security page lists them next to the protections."
-    }
-   ]
-  },
-  "runs": {
-   "kicker": "What it runs on",
-   "title": "Small, deliberate, and free to run",
-   "text": "The whole system is small enough to hold in your head — which is part of the security.",
-   "cards": [
-    {
-     "icon": "server",
-     "title": "One server",
-     "text": "A single always-free cloud instance serves this site, the app and the API, behind a web server that sets every security header."
-    },
-    {
-     "icon": "cloud",
-     "title": "A managed database",
-     "text": "Holds ciphertext only, on a private network. It is never on the web server's disk."
-    },
-    {
-     "icon": "heart",
-     "title": "Daily encrypted backups",
-     "text": "Exported every day to private storage, with restores tested. A backup holds the same ciphertext as the database."
-    }
-   ]
-  }
- },
- "security": {
-  "seo": {
-   "title": "Security — Vault",
-   "description": "How Vault derives keys, what it encrypts, what the server stores, and the risks it does not protect against.",
-   "image": null
-  }
- }
 }
