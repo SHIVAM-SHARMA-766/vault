@@ -35,7 +35,7 @@ function rateLimited(err: unknown): string | null {
   return wait ? `Too many attempts. Try again in ${wait} minute(s).` : err.message
 }
 
-function PasskeyButton({ busy, onError, ssoTicket }: { busy: boolean; onError: (m: string) => void; ssoTicket?: string }) {
+function PasskeyButton({ busy, onError }: { busy: boolean; onError: (m: string) => void }) {
   const [offered, setOffered] = useState(false)
   useEffect(() => { void passkeysOffered().then(setOffered) }, [])
   if (!offered) return null
@@ -43,7 +43,7 @@ function PasskeyButton({ busy, onError, ssoTicket }: { busy: boolean; onError: (
     <>
       <div className="auth-or"><span>{t('or')}</span></div>
       <button type="button" className="btn btn-secondary btn-block" disabled={busy} onClick={() => {
-        signInWithPasskey(ssoTicket).catch((err: unknown) => onError(
+        signInWithPasskey().catch((err: unknown) => onError(
           err instanceof NoPrfError ? err.message
             : err instanceof DOMException ? 'No passkey was used. If you have not added one, sign in and add it in Settings → Security.'
             : err instanceof ApiError ? err.message : 'The passkey did not open the vault.'))
@@ -52,15 +52,33 @@ function PasskeyButton({ busy, onError, ssoTicket }: { busy: boolean; onError: (
   )
 }
 
+/** Signing in with a passkey: one of the other ways to sign in. Nothing shows
+ *  in a browser that cannot use one. */
+export function PasskeyOption({ busy, onError }: { busy: boolean; onError: (m: string) => void }) {
+  const [offered, setOffered] = useState(false)
+  useEffect(() => { void passkeysOffered().then(setOffered) }, [])
+  if (!offered) return null
+  return (
+    <button type="button" className="auth-option" disabled={busy} onClick={() => {
+      signInWithPasskey().catch((err: unknown) => onError(
+        err instanceof NoPrfError ? err.message
+          : err instanceof DOMException ? 'No passkey was used. If you have not added one, sign in and add it in Settings → Security.'
+          : err instanceof ApiError ? err.message : 'The passkey did not open the vault.'))
+    }}>
+      <IconFingerprint size={18} />
+      <span><strong>{t('Sign in with a passkey')}</strong><small>{t('Face, fingerprint or security key, if you added one')}</small></span>
+    </button>
+  )
+}
+
 // ── Step 1: the account ────────────────────────────────────────────────────
 
-export function AccountSignIn({ forAdmin, sso, ssoError, onSsoCancel, onLegacy, onForgot, onRegister, onRecover, onRequestAccess, onSigninHelp }: {
+export function AccountSignIn({ forAdmin, sso, ssoError, onSsoCancel, onForgot, onOther, onRegister }: {
   forAdmin: boolean; sso: { ticket: string; email: string } | null; ssoError: string; onSsoCancel?: () => void
-  onLegacy: () => void; onForgot: () => void; onRegister: () => void; onRecover: () => void; onRequestAccess: () => void; onSigninHelp: () => void
+  onForgot: () => void; onOther: () => void; onRegister: () => void
 }) {
   const instance = useInstance()
   const mode = instance?.registration
-  const deskOn = instance?.features?.serviceDesk ?? true
   const ssoOffer = instance?.sso ?? null
   const [ownerPath, setOwnerPath] = useState(false)
   const ssoOnly = !!ssoOffer?.required && !sso && !ownerPath
@@ -82,7 +100,7 @@ export function AccountSignIn({ forAdmin, sso, ssoError, onSsoCancel, onLegacy, 
   function explain(err: unknown) {
     const limited = rateLimited(err)
     if (limited) setError(limited)
-    else if (err instanceof ApiError && err.status === 401 && err.code === 'invalid_credentials') setError('Wrong email or account password. Signing in for the first time since accounts were added? Use your master password once, below.')
+    else if (err instanceof ApiError && err.status === 401 && err.code === 'invalid_credentials') setError('Wrong email or account password. Signing in for the first time since accounts were added? Choose “Other ways to sign in”, then your master password.')
     else if (err instanceof ApiError && err.status === 403 && err.code === 'forbidden') setError('This account has been disabled. Contact the person who runs this vault.')
     else setError(err instanceof Error ? err.message : 'Something went wrong.')
   }
@@ -152,30 +170,23 @@ export function AccountSignIn({ forAdmin, sso, ssoError, onSsoCancel, onLegacy, 
                  value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="field">
-          <label htmlFor="account-password">{t('Account password')}</label>
+          <div className="label-row">
+            <label htmlFor="account-password">{t('Account password')}</label>
+            <button type="button" className="link small" onClick={onForgot}>{t('Forgot password?')}</button>
+          </div>
           <PasswordInput id="account-password" autoComplete="current-password" required value={password} onChange={setPassword} />
         </div>
         <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email || !password}>
           {busy ? <><span className="spinner" />{t('Signing in…')}</> : t('Continue')}
         </button>
-        <PasskeyButton busy={busy} onError={setError} />
       </>}
 
-      <p className="auth-forgot">
-        <button type="button" className="link" onClick={onForgot}>{t('Forgot your account password?')}</button><br />
-        <button type="button" className="link" onClick={onLegacy}>{t('First sign-in since accounts were added? Use your master password')}</button><br />
-        <button type="button" className="link" onClick={onRecover}>{t('Forgot your master password? Use your recovery key')}</button>
-        {deskOn ? <><br /><button type="button" className="link" onClick={onSigninHelp}>{t('Lost your authenticator, or can\'t sign in? Ask for help')}</button></> : null}
-      </p>
-      <p className="auth-switch">
-        {/* With mail, anyone can make an account and then create or ask for a vault (decisions/0037). */}
-        {instance?.mail && (instance.features?.invitations ?? true) && !instance.firstRun ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
-          : mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
-          : mode === 'closed' && instance?.firstRun ? <>New server? <button type="button" className="link" onClick={onRegister}>Create the owner account</button> with the setup code from its log</>
-          : mode === 'closed' ? (deskOn ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></> : null)
-          : <>{mode === 'invite' ? 'Have an invitation?' : 'New here?'} <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button>
-            {' · '}<button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></>}
-      </p>
+      {/* Everything else (passkey, master password, recovery key, an
+          invitation code, help) is one page away, so this one stays simple. */}
+      <p className="auth-forgot"><button type="button" className="link" onClick={onOther}>{t('Other ways to sign in')}</button></p>
+      {mode === 'closed' && instance?.firstRun
+        ? <p className="auth-switch">New server? <button type="button" className="link" onClick={onRegister}>Create the owner account</button> with the setup code from its log</p>
+        : null}
     </form>
   )
 }

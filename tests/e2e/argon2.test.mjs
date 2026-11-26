@@ -30,7 +30,8 @@ test('a new account uses Argon2id; a PBKDF2 account upgrades and keeps its items
     await p2.goto(`${s.base}/app/`)
     // An account from before account passwords (decisions/0036): the master
     // password once, then it chooses an account password.
-    await p2.getByRole('button', { name: /First sign-in since accounts were added/ }).click()
+    await p2.getByRole('button', { name: 'Other ways to sign in' }).click()
+    await p2.getByRole('button', { name: /Use my master password/ }).click()
     await p2.fill('#email', 'old@example.test')
     await p2.fill('#password', PASSWORD)
     await p2.click('button[type=submit]')

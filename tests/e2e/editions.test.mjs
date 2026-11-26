@@ -57,8 +57,11 @@ test('a personal Vault shows only what one person needs', async () => {
     await other.goto(`${s.base}/app/`)
     await other.waitForSelector('#email')
     assert.equal(await other.getByRole('button', { name: 'Create an account' }).count(), 0)
-    assert.equal(await other.getByRole('button', { name: 'Request access' }).count(), 0)
+    await other.getByRole('button', { name: 'Other ways to sign in' }).click()
+    await other.waitForSelector('.auth-options')
+    assert.equal(await other.getByRole('button', { name: /Request access/ }).count(), 0)
     assert.equal(await other.getByRole('button', { name: /Ask for help/ }).count(), 0)
+    assert.equal(await other.getByRole('button', { name: /invitation code/ }).count(), 0)
     assert.deepEqual(s.errors, [])
   } finally {
     await s.stop()

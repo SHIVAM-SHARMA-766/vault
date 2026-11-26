@@ -48,7 +48,7 @@ test('lock asks only the master password; sign out asks the account; change and 
 
     // Forgotten: an emailed link sets another, and every device signs in again.
     await s.menu(page, 'Sign out of this device')
-    await page.getByRole('button', { name: 'Forgot your account password?' }).click()
+    await page.getByRole('button', { name: 'Forgot password?' }).click()
     await page.fill('#forgot-email', 'dana@example.test')
     await page.getByRole('button', { name: 'Send the link' }).click()
     await page.waitForSelector('text=a link to reset its account password is on its way')
@@ -87,7 +87,8 @@ test('an administrator clears an account password; the person signs in once with
     await owner.getByRole('button', { name: 'Reset account password' }).first().click()
     await owner.waitForSelector('text=Account password cleared', { state: 'attached' })
 
-    await eve.getByRole('button', { name: /First sign-in since accounts were added/ }).click()
+    await eve.getByRole('button', { name: 'Other ways to sign in' }).click()
+    await eve.getByRole('button', { name: /Use my master password/ }).click()
     await eve.fill('#email', 'eve@example.test')
     await eve.fill('#password', PASSWORD)
     await eve.click('button[type=submit]')

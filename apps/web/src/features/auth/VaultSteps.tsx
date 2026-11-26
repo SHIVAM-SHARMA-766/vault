@@ -26,7 +26,7 @@ const MIN_MASTER = 12
 
 // ── Sign up ────────────────────────────────────────────────────────────────
 
-export function AccountSignup({ onBack }: { onBack: () => void }) {
+export function AccountSignup() {
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [code, setCode] = useState('')
@@ -59,9 +59,9 @@ export function AccountSignup({ onBack }: { onBack: () => void }) {
   if (!sent) {
     return (
       <form onSubmit={(e) => void send(e)}>
-        <button type="button" className="back-link" onClick={onBack}><IconArrowLeft size={16} />{t('Back to sign in')}</button>
         <h2 className="auth-title">{t('Create your account')}</h2>
-        <p className="auth-sub">Your email is your username. We send a code to it, to make sure it is yours. A vault comes after, with its own master password.</p>
+        <p className="auth-sub">{t('Your email is your username. We send a code to it to check it is yours; your vault comes next.')}</p>
+        <SocialSignup />
         <div className="field"><label htmlFor="su-email">{t('Email')}</label><input id="su-email" type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
         <button type="submit" className="btn btn-primary btn-block" disabled={busy || !email}>{busy ? <span className="spinner" /> : null}{t('Send me a code')}</button>
@@ -82,6 +82,40 @@ export function AccountSignup({ onBack }: { onBack: () => void }) {
     </form>
   )
 }
+
+/** Signing up with Google or Microsoft: shown, not offered yet. */
+function SocialSignup() {
+  return (
+    <>
+      <div className="social-signup">
+        <button type="button" className="btn btn-secondary btn-block social-btn" disabled aria-describedby="social-soon">
+          <GoogleMark />{t('Continue with Google')}<span className="soon">{t('Coming soon')}</span>
+        </button>
+        <button type="button" className="btn btn-secondary btn-block social-btn" disabled aria-describedby="social-soon">
+          <MicrosoftMark />{t('Continue with Microsoft')}<span className="soon">{t('Coming soon')}</span>
+        </button>
+        <p id="social-soon" className="visually-hidden">{t('Not available yet. Use your email below.')}</p>
+      </div>
+      <div className="auth-or"><span>{t('or with your email')}</span></div>
+    </>
+  )
+}
+
+const GoogleMark = () => (
+  <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z" />
+    <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z" />
+    <path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z" />
+    <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z" />
+  </svg>
+)
+
+const MicrosoftMark = () => (
+  <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true">
+    <rect x="1" y="1" width="9" height="9" fill="#F25022" /><rect x="12" y="1" width="9" height="9" fill="#7FBA00" />
+    <rect x="1" y="12" width="9" height="9" fill="#00A4EF" /><rect x="12" y="12" width="9" height="9" fill="#FFB900" />
+  </svg>
+)
 
 // ── Signed in, no vault ────────────────────────────────────────────────────
 

@@ -68,8 +68,10 @@ test('sign-in offers only the ways in this server has', async () => {
     // Open registration (the dev stack's default): create, no request form, code behind a link.
     const page = await s.person()
     await page.goto(`${s.base}/app/`)
-    await page.waitForSelector('.auth-switch button')
-    assert.deepEqual(await page.locator('.auth-switch button').allTextContents(), ['Create an account'])
+    await page.getByRole('button', { name: 'Other ways to sign in' }).click()
+    await page.waitForSelector('.auth-options')
+    assert.equal(await page.getByRole('button', { name: /Request access/ }).count(), 0)
+    await page.getByRole('button', { name: 'Back to sign in' }).click()
     await page.getByRole('button', { name: 'Create an account' }).click()
     await page.waitForSelector('button:has-text("I have an invitation code")')
     assert.equal(await page.locator('#r-invite').count(), 0)
@@ -86,8 +88,10 @@ test('sign-in offers only the ways in this server has', async () => {
     await s.register(first, 'first@example.test')
     await s.setRegistration(false)
     await page.goto(`${s.base}/app/`)
-    await page.waitForSelector('.auth-switch button')
-    assert.deepEqual(await page.locator('.auth-switch button').allTextContents(), ['Request access'])
+    await page.waitForSelector('#account-password')
+    assert.equal(await page.getByRole('button', { name: 'Create an account' }).count(), 0)
+    await page.getByRole('button', { name: 'Other ways to sign in' }).click()
+    await page.getByRole('button', { name: /Request access/ }).waitFor()
   } finally {
     await s.stop()
   }
