@@ -71,7 +71,9 @@ import {
 import { assertNetwork } from '../networks.js'
 import { loginOptions, verifyLogin } from './webauthn.js'
 import { provisionTicket, readTicket, ssoGate, useTicket } from './sso.js'
-import { accountStatus, registerAccount, requireAccountInput } from './accounts.js'
+import { accountStatus, issueAccountToken, registerAccount, requireAccountInput } from './accounts.js'
+import { dropPending, pendingForVault } from './signup.js'
+import { sealEmail } from '../identity.js'
 
 export interface Profile extends Item {
   userId: string
@@ -212,13 +214,17 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     throw new HttpError(403, 'forbidden', 'This is a personal Vault: it has one account, and no one else can join.')
   }
   const open = !setup && (app.allowRegistration || mode === 'open')
+  // An account made first (decisions/0037), creating its vault: an
+  // administrator's approval lets it through as an invitation would.
+  const pre = body['accountToken'] !== undefined ? await pendingForVault(app, body['accountToken'], requireEmail(body['email'])) : null
+  const approved = pre?.approved === true
   // Someone the identity provider just signed in, with no account here, when
   // the operator lets the provider's people join (decisions/0021).
   const ssoTicket = body['ssoTicket']
   const viaSso = !open && !setup && app.config.oidc?.provision === true && typeof body['email'] === 'string'
     && (await readTicket(app, ssoTicket))?.emailDigest === emailDigest(requireEmail(body['email']), app.config.pepper)
-  if (!open && !setup && mode !== 'invite' && !viaSso) throw registrationRefused()
-  if (!open && !usable && !viaSso) throw registrationRefused()
+  if (!open && !setup && mode !== 'invite' && !viaSso && !approved) throw registrationRefused()
+  if (!open && !usable && !viaSso && !approved) throw registrationRefused()
 
   const email = requireEmail(body['email'])
   await limitAuth(app, event, email)
@@ -236,7 +242,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   if (accountInput && body['masterCheck'] !== undefined && body['masterCheck'] === body['authKey']) throw badRequest('The account password must differ from the master password.')
 
   const digest = emailDigest(email, app.config.pepper)
-  const userId = randomUUID()
+  const userId = pre?.userId ?? randomUUID()
   const at = new Date(app.now()).toISOString()
 
   // The pointer is written first, with a condition. Two concurrent
@@ -264,7 +270,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     await app.store.delete(emailPk(digest), EMAIL_SK)
     throw registrationRefused()
   }
-  if ((!open && !viaSso) || (usable && pending!['company'] === true)) {
+  if ((!open && !viaSso && !approved) || (usable && pending!['company'] === true)) {
     const invite = await claimInvite(app, inviteCode, userId)
     if (!invite) {
       // Lost a race for the same code. Give the address back.
@@ -282,7 +288,8 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     hashAuthKey(recoveryAuthKey),
   ])
 
-  const acct = accountInput ? await registerAccount(app, userId, accountInput, event) : null
+  const acct = pre ? { account: pre.account, accountToken: await issueAccountToken(app, userId, event) }
+    : accountInput ? await registerAccount(app, userId, accountInput, event) : null
   const profile: Profile = {
     pk: userPk(userId), sk: PROFILE_SK,
     userId, emailDigest: digest, kdf,
@@ -301,7 +308,10 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
     ...(inviteId ? { inviteId } : {}),
     ...(role ? { role } : {}),
     ...(company ? { companyGrant: true } : {}),
+    // The address is the username (decisions/0037), kept sealed.
+    emailSealed: sealEmail(app.config.pepper, email),
   })
+  if (pre) await dropPending(app, pre)
 
   await recordActivity(app, userId, 'register', event)
   return json(201, { userId, ...(acct ? { accountToken: acct.accountToken } : {}), ...(await issueSession(app, userId, event)) })

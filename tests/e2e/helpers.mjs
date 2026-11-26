@@ -65,6 +65,10 @@ export async function start({ owner = 'owner@example.test', edition, env = {} } 
   async function register(page, email, inviteCode) {
     await page.goto(`${base}/app/`)
     await page.getByRole('button', { name: 'Create an account' }).click()
+    // With mail (DEV_MAIL), an account comes first, checked by an emailed code
+    // (decisions/0037), then the vault.
+    await page.locator('#su-email, #r-email').first().waitFor()
+    if (await page.locator('#su-email').count()) return signupThenVault(page, email, inviteCode)
     if (inviteCode) {
       // On an open server the field is behind a link.
       await page.waitForSelector('#r-invite, button:has-text("I have an invitation code")')
@@ -87,6 +91,41 @@ export async function start({ owner = 'owner@example.test', edition, env = {} } 
 
   /** Signs in (decisions/0036): the account step when this browser is not
    *  signed in to that account, then the master password. */
+  /** The newest sign-up code sent to an address (dev-stack outbox). */
+  async function codeFor(email) {
+    for (let i = 0; i < 40; i++) {
+      const mail = (await (await fetch(`${base}/__dev/outbox`)).json()).filter((m) => m.to === email && /sign-up code/.test(m.subject)).at(-1)
+      if (mail) return /\b(\d{6})\b/.exec(mail.text)[1]
+      await new Promise((r) => setTimeout(r, 100))
+    }
+    throw new Error(`no sign-up code for ${email}`)
+  }
+
+  async function signupThenVault(page, email, inviteCode) {
+    await page.fill('#su-email', email)
+    await page.getByRole('button', { name: 'Send me a code' }).click()
+    await page.waitForSelector('#su-code')
+    await page.fill('#su-code', await codeFor(email))
+    await page.fill('#su-pw', ACCOUNT_PASSWORD)
+    await page.fill('#su-confirm', ACCOUNT_PASSWORD)
+    await page.getByRole('button', { name: 'Create my account' }).click()
+    await page.locator('#cv-pw, #vr-note').or(page.getByText('Your request was sent')).first().waitFor({ timeout: 60_000 })
+    if (!(await page.locator('#cv-pw').count())) {
+      if (!inviteCode) return null
+      await page.getByRole('button', { name: 'I have an invitation code' }).click()
+      await page.fill('#cv-code', inviteCode)
+    }
+    await page.fill('#cv-pw', PASSWORD)
+    await page.fill('#cv-confirm', PASSWORD)
+    await page.getByRole('button', { name: 'Create my vault' }).click()
+    await page.waitForSelector('.recovery-key', { timeout: 60_000 })
+    const recoveryKey = (await page.textContent('.recovery-key code'))?.trim()
+    await page.check('.check input')
+    await page.getByRole('button', { name: 'Open my vault' }).click()
+    await page.waitForSelector('.topbar', { timeout: 60_000 })
+    return recoveryKey
+  }
+
   async function unlock(page, email, password = PASSWORD, { accountPassword = ACCOUNT_PASSWORD, wait = true } = {}) {
     await page.waitForSelector('#account-password, .account-line', { timeout: 30_000 })
     if (await page.locator('.account-line').count()) {
@@ -144,5 +183,5 @@ export async function start({ owner = 'owner@example.test', edition, env = {} } 
     stack.kill()
   }
 
-  return { base, person, register, unlock, menu, manage, settings, setRegistration, errors, stop, log: () => log }
+  return { base, person, register, unlock, codeFor, signupThenVault, menu, manage, settings, setRegistration, errors, stop, log: () => log }
 }

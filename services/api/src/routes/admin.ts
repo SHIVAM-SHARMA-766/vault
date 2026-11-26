@@ -12,8 +12,9 @@ import { emailDigest } from '../identity.js'
 import { featuresOf } from '../edition.js'
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
-import { type TemplateKind, TEMPLATE_KINDS, applyTemplate, inviteMessage, notify, signInNotice } from '../mail.js'
+import { type TemplateKind, TEMPLATE_KINDS, accountResetMessage, applyTemplate, inviteMessage, notify, signInNotice, vaultApprovedMessage, verifyMessage } from '../mail.js'
 import { clearPassword } from './accounts.js'
+import { openEmail } from '../identity.js'
 import { openTicketCount } from './desk.js'
 import { leaveAllOrgs, purgeOrg } from './orgs.js'
 import { requireEmail } from '../validate.js'
@@ -92,6 +93,7 @@ export async function guard(app: App, userId: string, permission: Permission): P
 
 interface UserSummary {
   userId: string
+  email: string | null
   label: string | null
   createdAt: string
   lastLoginAt: string | null
@@ -112,6 +114,8 @@ async function summarize(app: App, reg: RegistryEntry, policy: ServerPolicy): Pr
   const now = Math.floor(app.now() / 1000)
   return {
     userId: reg.userId,
+    // The username (decisions/0037); null for an account not signed in since.
+    email: emailOf(app, reg),
     label: reg.label ?? null,
     createdAt: reg.createdAt,
     lastLoginAt: reg.lastLoginAt ?? null,
@@ -195,7 +199,14 @@ function fieldsOf(reg: RegistryEntry): RegistryFields {
     ...(reg.disabled ? { disabled: true } : {}),
     ...(reg.inviteId ? { inviteId: reg.inviteId } : {}),
     ...(reg.role ? { role: reg.role } : {}),
+    ...(reg.emailSealed ? { emailSealed: reg.emailSealed } : {}),
   }
+}
+
+/** A registry entry's address, opened for staff; null when not kept. */
+export function emailOf(app: App, reg: RegistryEntry): string | null {
+  if (!reg.emailSealed) return null
+  try { return openEmail(app.config.pepper, reg.emailSealed) } catch { return null }
 }
 
 /** Loads the account an action targets and checks the actor may touch it: not
@@ -657,6 +668,7 @@ export function limitsRoute(): LambdaResponse {
   return json(200, {
     limits: [
       row('Sign-in attempts', 'address and account', AUTH_LIMIT, 'Counted for each network address and for each account, separately.'),
+      row('Sign-up codes and reset links', 'address', { max: 20, windowSeconds: 900 }, 'Also at most 5 to any one inbox in 15 minutes (decisions/0037).'),
       row('Single sign-on round trips', 'address', SSO_LIMIT, 'Going to the identity provider and back; the sign-in that follows counts as a sign-in attempt.'),
       row('Requests while signed in', 'account', API_LIMIT, 'Every vault, settings and sharing request.'),
       row('Admin panel requests', 'staff account', ADMIN_LIMIT, ''),
@@ -697,9 +709,12 @@ export async function previewTemplate(app: App, event: LambdaEvent): Promise<Lam
   if (!(TEMPLATE_KINDS as readonly unknown[]).includes(kind)) throw badRequest(`kind must be one of: ${TEMPLATE_KINDS.join(', ')}.`)
   const t = requireTemplates({ [kind]: { subject: b.subject ?? '', message: b.message ?? '' } })[kind]
   const { profile } = await getSettings(app)
-  const sample = kind === 'invite'
-    ? inviteMessage(app.config.origin, 'SAMPLE-CODE', 'Asha (finance)', new Date(app.now() + 7 * 86_400_000).toUTCString())
-    : signInNotice(app.config.origin, 'Firefox on Windows', '203.0.113.7', new Date(app.now()).toUTCString(), false)
+  const o = app.config.origin
+  const sample = kind === 'invite' ? inviteMessage(o, 'SAMPLE-CODE', 'Asha (finance)', new Date(app.now() + 7 * 86_400_000).toUTCString())
+    : kind === 'verify' ? verifyMessage(o, '482913')
+    : kind === 'vaultApproved' ? vaultApprovedMessage(o)
+    : kind === 'accountReset' ? accountResetMessage(o, 'asha@example.com', 'SAMPLE-CODE')
+    : signInNotice(o, 'Firefox on Windows', '203.0.113.7', new Date(app.now()).toUTCString(), false)
   const { template: _t, ...msg } = applyTemplate(sample, t, profile.name || 'Vault')
   return json(200, msg)
 }

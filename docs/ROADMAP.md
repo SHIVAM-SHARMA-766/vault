@@ -358,6 +358,11 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
 - [x] Existing accounts choose an account password at their next sign-in; the account password is
   reset by email or by an administrator; changing it signs other devices out.
 
+- [x] An account first, a vault later ([0037](../decisions/0037-account-first.md)): sign-up with an
+  emailed code; open servers create the vault at once, invitation-only servers take requests that
+  an administrator approves in the console; the email address is the username; editable emails
+  for the code, the approval and the reset link.
+
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
 Started 2026-11-21, after the operator chose three editions. Each stage makes one edition fit its

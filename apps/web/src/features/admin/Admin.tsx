@@ -89,7 +89,7 @@ export function ServerSection({ state, tab, onGo }: { state: session.Unlocked; t
       {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
       {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
       {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} canInvite={perms.has('invites.write')} /> : null}
-      {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
+      {tab === 'invites' && perms.has('invites.read') ? <><VaultRequests canWrite={perms.has('invites.write')} /><Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /></> : null}
       {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
       {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
     </>
@@ -517,7 +517,9 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                         </form>
                       ) : (
                         <div className="acct">
-                          <span className="acct-name">{u.label || <span className="muted">Unlabelled</span>}
+                          {/* The address is the username (decisions/0037); the label is a note beside it. */}
+                          <span className="acct-name">{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
+                            {u.email && u.label ? <span className="muted small"> · {u.label}</span> : null}
                             {self ? <span className="pill">You</span> : null}
                           </span>
                           <code className="acct-id">{u.userId.slice(0, 8)}…</code>
@@ -709,6 +711,38 @@ function BulkInvite({ canRoles, onDone }: { canRoles: boolean; onDone: () => Pro
         </button>
       </div>
     </form>
+  )
+}
+
+/** Requests for a vault from accounts that have none (decisions/0037).
+ *  Approving emails the person, who then creates their vault. */
+function VaultRequests({ canWrite }: { canWrite: boolean }) {
+  const toast = useToast()
+  const [rows, setRows] = useState<{ userId: string; email: string; note: string; requestedAt: string }[] | null>(null)
+  const load = async () => { try { setRows((await api.admin.vaultRequests(await session.token())).requests) } catch { setRows([]) } }
+  useEffect(() => { void load() }, [])
+  if (!rows) return null
+  return (
+    <section className="admin-card admin-card-wide" aria-labelledby="vault-requests-title">
+      <div className="admin-card-head"><span className={`dot ${rows.length ? 'dot-warn' : 'dot-muted'}`} /><h2 id="vault-requests-title">Requests for a vault</h2>{rows.length ? <span className="pill pill-warn">{rows.length}</span> : null}</div>
+      <p className="muted small">People who created an account and asked for a vault, while registration is by invitation. Approving emails them; they then create the vault with their own master password.</p>
+      {rows.length ? (
+        <ul className="device-list">
+          {rows.map((r) => (
+            <li key={r.userId} className="device-row vault-request">
+              <div className="device-text"><span className="device-name">{r.email || 'Address unreadable'}</span>
+                <span className="muted small">asked {when(r.requestedAt)}{r.note ? ` · “${r.note}”` : ''}</span></div>
+              {canWrite ? (
+                <div className="device-actions">
+                  <button className="btn btn-secondary btn-sm" onClick={async () => { if (await run(toast, (t) => api.admin.decideVaultRequest(t, r.userId, false), 'Request declined')) await load() }}>Decline</button>
+                  <button className="btn btn-primary btn-sm" aria-label={`Approve ${r.email}`} onClick={async () => { if (await run(toast, (t) => api.admin.decideVaultRequest(t, r.userId, true), `Approved; ${r.email} was emailed`)) await load() }}>Approve</button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : <p className="muted small">No requests waiting.</p>}
+    </section>
   )
 }
 

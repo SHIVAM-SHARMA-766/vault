@@ -19,7 +19,8 @@ test('an invitation is delivered over STARTTLS to a real SMTP server', { skip: !
   })
   const mailer = await createMailer(config)
   assert.ok(mailer)
-  const to = `live-${Date.now()}@example.test`
+  // Not a reserved name: those are never sent (decisions/0037). The CI server keeps it.
+  const to = `live-${Date.now()}@vault-ci.dev`
   await mailer.send({ to, ...inviteMessage(config.origin, 'ABCD-EFGH-JKLM-NPQR-STUV-WXYZ', 'Live test', '2026-12-01T00:00:00Z') })
   if (!api) return
   const found = await fetch(`${api}/api/v1/search?query=${encodeURIComponent(`to:${to}`)}`).then((r) => r.json()) as { messages: { Subject: string }[] }
@@ -33,5 +34,5 @@ test('a server that does not offer STARTTLS is refused, not used in plain text',
     SMTP_HOST: host ?? '127.0.0.1', SMTP_PORT: process.env['SMTP_TEST_PLAIN_PORT']!, MAIL_FROM: 'Vault <vault@vault.example>',
   })
   const mailer = (await createMailer(config))!
-  await assert.rejects(mailer.send({ to: 'x@example.test', subject: 's', text: 't' }))
+  await assert.rejects(mailer.send({ to: 'x@vault-ci.dev', subject: 's', text: 't' }))
 })

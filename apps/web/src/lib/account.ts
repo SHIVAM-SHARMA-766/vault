@@ -7,7 +7,7 @@ import { ACCOUNT_KDF, type AccountParams, costOf, deriveAccountProof, deriveLogi
 
 import { type KdfParams, api } from './api.js'
 
-export interface AccountSession { email: string; accountToken: string; kdf: KdfParams }
+export interface AccountSession { email: string; accountToken: string; /** null: an account with no vault yet (decisions/0037). */ kdf: KdfParams | null }
 
 const KEY = 'vault.account.v1'
 const listeners = new Set<() => void>()
@@ -16,7 +16,7 @@ export function loadAccount(): AccountSession | null {
   try {
     const raw = localStorage.getItem(KEY)
     const v = raw ? JSON.parse(raw) as AccountSession : null
-    return v && typeof v.email === 'string' && typeof v.accountToken === 'string' && v.kdf ? v : null
+    return v && typeof v.email === "string" && typeof v.accountToken === "string" && v.kdf !== undefined ? v : null
   } catch { return null }
 }
 

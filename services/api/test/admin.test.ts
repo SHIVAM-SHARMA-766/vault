@@ -45,7 +45,7 @@ test('me says whether the account is an admin', async () => {
   assert.equal((await h.request('GET', '/api/auth/me', { token: userToken })).body['isAdmin'], false)
 })
 
-test('the user list carries counts, never addresses or content', async () => {
+test('the user list carries counts and the address (the username, decisions/0037), never digests or content', async () => {
   const { h, ownerToken, userToken } = await setup()
   await h.request('PUT', '/api/vault/entries/entry-0001', { token: userToken, body: { blob: sealedBlob('e1') } })
   const res = await h.request('GET', '/api/admin/users', { token: ownerToken })
@@ -55,8 +55,9 @@ test('the user list carries counts, never addresses or content', async () => {
   const someone = users.find((u) => u['isAdmin'] === false)!
   assert.equal(someone['entries'], 1)
   const text = JSON.stringify(res.body)
-  assert.ok(!text.includes('someone@example.com'))
+  assert.ok(users.some((u) => u['email'] === 'someone@example.com'), 'the username is shown to staff')
   assert.ok(!text.includes('emailDigest'))
+  assert.ok(!text.includes('emailSealed'))
   assert.ok(!text.includes(sealedBlob('e1')))
 })
 

@@ -321,6 +321,17 @@ this server's real address, so a look-alike phishing page gets nothing. Your fir
 comes with ten recovery codes; save them. Removing a key asks for your master password and a
 second factor. Your master password still unlocks the vault: a key protects signing in.
 
+### Creating an account
+
+On the sign-in page, choose **Create an account**:
+1. Type your email. It is your username.
+2. We email a 6-digit code. Type it, and choose an **account password**.
+3. That makes your account. Your vault comes next:
+   - if the server is open to everyone, choose a **master password** and save your recovery key;
+   - if it is by invitation, **send a request for a vault** (with a note, if you like), or enter
+     an invitation code. You get an email when the request is approved; sign in again and create
+     your vault.
+
 ### Signing in: account password, then master password
 
 Signing in has two steps:

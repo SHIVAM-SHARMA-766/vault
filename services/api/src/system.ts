@@ -5,6 +5,7 @@
 //
 // See decisions/0006-admin-panel.md.
 
+import { openEmail, sealEmail } from './identity.js'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 
 import type { App } from './context.js'
@@ -114,7 +115,7 @@ export interface Settings {
   profile: InstanceProfile
   policy: ServerPolicy
   /** An admin's subject and message per email (G6); missing means the default. */
-  templates: Partial<Record<'invite' | 'signIn', { subject: string; message: string }>>
+  templates: Partial<Record<'invite' | 'signIn' | 'verify' | 'vaultApproved' | 'accountReset', { subject: string; message: string }>>
   updatedAt?: string
 }
 
@@ -175,8 +176,25 @@ export interface RegistryFields {
   /** A staff role granted by an owner: admin, marketing or viewer. Absent
    *  means a plain user. Owner is never stored; see roles.ts. */
   role?: string
+  /** The account's email address, its username (decisions/0037), sealed under
+   *  a key from the server pepper. Absent on accounts that have not signed in
+   *  since addresses were kept. */
+  emailSealed?: string
 }
 export type RegistryEntry = Item & RegistryFields
+
+/** Keeps the address on the registry entry (sealed), when it is missing or
+ *  changed. Best effort: it never fails the sign-in that brought it. */
+export async function rememberEmail(app: App, userId: string, email: string): Promise<void> {
+  try {
+    const entry = await getRegistry(app, userId)
+    if (!entry) return
+    const normalized = email.trim().toLowerCase()
+    if (entry.emailSealed && openEmail(app.config.pepper, entry.emailSealed) === normalized) return
+    const { pk: _p, sk: _s, ...fields } = entry
+    await putRegistry(app, { ...fields, emailSealed: sealEmail(app.config.pepper, normalized) })
+  } catch { /* the address is kept next time */ }
+}
 
 export async function getRegistry(app: App, userId: string): Promise<RegistryEntry | null> {
   return (await app.store.get(SYSTEM_PK, registrySk(userId))) as RegistryEntry | null

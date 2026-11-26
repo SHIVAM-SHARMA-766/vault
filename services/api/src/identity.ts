@@ -1,7 +1,7 @@
 // How an email address becomes a database key, and what an unknown address
 // gets back.
 
-import { createHmac } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto'
 
 /** Case and surrounding whitespace must not produce different accounts. The
  *  client applies the same rule before deriving anything. */
@@ -46,4 +46,28 @@ export function decoyUsesArgon2(email: string, pepper: string): boolean {
 
 export function decoyHasSecretKey(email: string, pepper: string): boolean {
   return createHmac('sha256', pepper).update(`secret-key-decoy|${normalizeEmail(email)}`).digest()[0]! < 32
+}
+
+// ── The address itself (decisions/0037) ────────────────────────────────────
+// The email address is the username, shown to the person and to staff, so it
+// is kept: sealed with AES-256-GCM under a key from the pepper, which lives
+// outside the database. A database dump alone does not yield addresses.
+
+
+const emailKey = (pepper: string) => createHmac('sha256', pepper).update('vault.email-at-rest.v1').digest()
+
+export function sealEmail(pepper: string, email: string): string {
+  const iv = randomBytes(12)
+  const c = createCipheriv('aes-256-gcm', emailKey(pepper), iv)
+  const body = Buffer.concat([c.update(email.trim().toLowerCase(), 'utf8'), c.final(), c.getAuthTag()])
+  return `e1.${iv.toString('base64url')}.${body.toString('base64url')}`
+}
+
+export function openEmail(pepper: string, sealed: string): string {
+  const [v, iv, body] = sealed.split('.')
+  if (v !== 'e1' || !iv || !body) throw new Error('unreadable address')
+  const raw = Buffer.from(body, 'base64url')
+  const d = createDecipheriv('aes-256-gcm', emailKey(pepper), Buffer.from(iv, 'base64url'))
+  d.setAuthTag(raw.subarray(raw.length - 16))
+  return Buffer.concat([d.update(raw.subarray(0, raw.length - 16)), d.final()]).toString('utf8')
 }

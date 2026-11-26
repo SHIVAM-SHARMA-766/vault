@@ -368,6 +368,106 @@
         }
       }
     },
+    "/api/auth/account/signup": {
+      "post": {
+        "summary": "Start creating an account: a 6-digit code by email (decisions/0037)",
+        "operationId": "postAuthAccountSignup",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/account/signup/verify": {
+      "post": {
+        "summary": "Finish creating an account with the emailed code; no vault yet",
+        "operationId": "postAuthAccountSignupVerify",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/vault/status": {
+      "post": {
+        "summary": "For an account with no vault: approved, requested, and the registration setting",
+        "operationId": "postAuthVaultStatus",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/vault/request": {
+      "post": {
+        "summary": "Ask the operator for a vault",
+        "operationId": "postAuthVaultRequest",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/unlock": {
       "post": {
         "summary": "Unlock with the master password's proof and an account token: a vault session",
@@ -5329,6 +5429,116 @@
           }
         ],
         "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/vault-requests": {
+      "get": {
+        "summary": "Requests for a vault from accounts without one",
+        "operationId": "getAdminVaultRequests",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/vault-requests/{id}/approve": {
+      "post": {
+        "summary": "Approve a request for a vault; the person is emailed",
+        "operationId": "postAdminVaultRequestsIdApprove",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "invites.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/vault-requests/{id}/decline": {
+      "post": {
+        "summary": "Decline a request for a vault",
+        "operationId": "postAdminVaultRequestsIdDecline",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "invites.write",
         "responses": {
           "2XX": {
             "description": "Success. JSON."
