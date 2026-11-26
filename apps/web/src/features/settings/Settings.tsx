@@ -10,6 +10,8 @@ import { useEffect, useState } from 'react'
 import { belowMinimum, passwordStrength } from '@vault/core'
 import { changePassword, rotateRecoveryKey } from '@vault/crypto'
 
+import { newKdfCost } from '../../lib/kdf.js'
+
 import { ApiError, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { href, navigate } from '../../lib/router.js'
@@ -24,6 +26,7 @@ import { Backups } from './Backups.js'
 import { DeleteAccount } from './DeleteAccount.js'
 import { Emergency } from './Emergency.js'
 import { ShareLinks } from './ShareLinks.js'
+import { KdfUpgrade } from './KdfUpgrade.js'
 import { PasskeyUnlock, type UnlockPasskey } from './PasskeyUnlock.js'
 import { SecurityKeys } from './SecurityKeys.js'
 import { Preferences } from './Preferences.js'
@@ -121,6 +124,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
           </> : null}
 
           {tab === 'security' ? <>
+            <KdfUpgrade state={state} />
             <PasskeyUnlock state={state} passkeys={me?.passkeys ?? null} reload={() => setVersion((v) => v + 1)} />
             <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
             <SecurityKeys state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
@@ -160,7 +164,7 @@ function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore
       // Only the vault key is rewrapped. No entry is re-encrypted (decisions/0001).
       // The secret key, if the account has one, stays (decisions/0027).
       const sk = await secretKeyFor(state.email, state.kdf)
-      const changed = await changePassword(next, state.vaultKey, undefined, sk)
+      const changed = await changePassword(next, state.vaultKey, await newKdfCost(), sk)
       sk?.fill(0)
       const res = await api.changePassword(await session.token(), {
         currentAuthKey, newAuthKey: changed.authKey, kdf: changed.kdf, wrappedVaultKey: changed.wrappedVaultKey,

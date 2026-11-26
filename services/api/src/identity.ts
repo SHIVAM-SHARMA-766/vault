@@ -36,6 +36,14 @@ export function decoySalt(email: string, pepper: string): string {
  *  Real accounts with one answer `version: 2`; if no decoy ever did, that
  *  answer alone would prove an account exists. About one decoy in eight says
  *  so too, chosen per address and stable, so asking twice tells nothing. */
+/** Which algorithm an unknown address's decoy claims (decisions/0028). New
+ *  accounts use Argon2id and older ones PBKDF2 until they upgrade, so decoys
+ *  say both, about half and half, stably per address. Otherwise the
+ *  algorithm alone would say whether an account exists. */
+export function decoyUsesArgon2(email: string, pepper: string): boolean {
+  return createHmac('sha256', pepper).update(`kdf-decoy|${normalizeEmail(email)}`).digest()[0]! < 128
+}
+
 export function decoyHasSecretKey(email: string, pepper: string): boolean {
   return createHmac('sha256', pepper).update(`secret-key-decoy|${normalizeEmail(email)}`).digest()[0]! < 32
 }

@@ -3,7 +3,7 @@
 // network. Built from the same crypto and item packages as the app, so it
 // decrypts exactly as the app does. The page's own policy allows no requests.
 
-import { fromBase64Url, openEntry, openFolder, parseSecretKey, unlock, wipe, type EntryContent, type KdfParams } from '@vault/crypto'
+import { fromBase64Url, kdfProblem, openEntry, openFolder, parseSecretKey, unlock, wipe, type EntryContent, type KdfParams } from '@vault/crypto'
 import { folderPath, readField, typeSpec } from '@vault/core'
 
 interface OfflineFile {
@@ -40,7 +40,7 @@ $('#unlock').addEventListener('submit', async (ev) => {
   err.textContent = ''
   ;($('#go') as HTMLButtonElement).disabled = true
   try {
-    if (data.kdf.iterations < 600_000 || data.kdf.iterations > 10_000_000) throw new Error('bad kdf')
+    if (data.kdf.algorithm === 'PBKDF2-HMAC-SHA256' ? data.kdf.iterations < 600_000 || data.kdf.iterations > 10_000_000 : kdfProblem(data.kdf) !== null) throw new Error('bad kdf')
     const sk = data.kdf.version === 2 ? await parseSecretKey(($('#sk') as HTMLInputElement).value) : undefined
     const { vaultKey } = await unlock(pw, data.kdf, data.wrappedVaultKey, fromBase64Url(data.kdf.salt), sk)
     try {

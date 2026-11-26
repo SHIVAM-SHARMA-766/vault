@@ -28,7 +28,9 @@ export async function buildOfflineCopy(email: string): Promise<string> {
   // The bundle must not close its own <script> element early.
   const safe = script.replace(/<\/script/gi, '<\\/script')
   const hash = await sha256b64(safe)
-  const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'`
+  // 'wasm-unsafe-eval': Argon2id runs as WebAssembly (decisions/0028); it
+  // compiles bytes inside the script and loads nothing.
+  const csp = `default-src 'none'; script-src 'sha256-${hash}' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'`
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="${csp}">

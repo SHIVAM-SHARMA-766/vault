@@ -10,13 +10,10 @@
  *  the API needs no separate CSRF defence. */
 const AUTH_HEADER = 'x-vault-auth'
 
-export interface KdfParams {
-  algorithm: 'PBKDF2-HMAC-SHA256'
-  iterations: number
-  salt: string
-  /** 2 when the account mixes in a secret key (decisions/0027). */
-  version?: 2
-}
+/** How the account's master password is stretched: PBKDF2, or Argon2id
+ *  since decisions/0028. The same type the crypto package uses. */
+export type { KdfParams } from '@vault/crypto'
+import type { KdfParams } from '@vault/crypto'
 
 export interface Session {
   accessToken: string
@@ -249,6 +246,8 @@ export const api = {
     recoveryAuthKey?: string
     newAuthKey: string
     kdf: KdfParams
+    /** Labels a re-derivation that keeps the password (decisions/0028). */
+    purpose?: 'upgrade-kdf'
     wrappedVaultKey: string
   }) => request<Session>('POST', '/api/auth/change-password', { token, body }),
 

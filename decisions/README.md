@@ -47,7 +47,7 @@ someone who would otherwise assume it was an oversight.
 | [0025](0025-signed-key-grants.md) | Signed key grants: a signing key per account, grants signed by admins, members verify (closes A15) |
 | [0026](0026-organization-recovery-key.md) | Organization recovery key: org key escrowed to a key the owner keeps offline |
 | [0027](0027-secret-key.md) | Opt-in secret key mixed into key derivation, with an Emergency Kit |
-| [0028](0028-argon2id.md) | Argon2id (64 MiB, t=3) via vendored WASM, migrated at the next password change |
+| [0028](0028-argon2id.md) | Argon2id (64 MiB, t=3) in our own WebAssembly; new accounts, password changes and a one-click upgrade |
 | [0029](0029-browser-extension.md) | The browser extension: fill on request, matched by origin, keys in session memory |
 | [0030](0030-editions.md) | Three editions from one codebase: personal, business, hosted |
 | [0031](0031-two-workspaces.md) | Two workspaces: My vault and the Admin console |

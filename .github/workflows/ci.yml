@@ -37,6 +37,11 @@ jobs:
       - name: Test
         run: npm test --workspace @vault/crypto
 
+      # The Argon2id WebAssembly is committed as bytes; they must be exactly
+      # what argon2.wat assembles to with the pinned wabt (decisions/0028).
+      - name: Argon2 module matches its source
+        run: node scripts/build-argon2.mjs --check
+
       # @vault/core is held to the same rule: no runtime dependencies, and its
       # QR encoder is checked against vectors from an independent library.
       - name: Test the core package

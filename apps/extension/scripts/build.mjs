@@ -33,7 +33,7 @@ const base = {
   commands: {
     'fill-login': { suggested_key: { default: 'Ctrl+Shift+L', mac: 'Command+Shift+L' }, description: 'Fill the login for this page' },
   },
-  content_security_policy: { extension_pages: "script-src 'self'; object-src 'none'" },
+  content_security_policy: { extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'" },
 }
 
 const manifests = {
@@ -59,7 +59,7 @@ for (const [name, m] of Object.entries(manifests)) {
   if (m.externally_connectable) problems.push('externally_connectable')
   if (m.web_accessible_resources) problems.push('web_accessible_resources')
   if (m.permissions.some((p) => !['storage', 'alarms', 'activeTab', 'scripting'].includes(p))) problems.push(`permissions ${m.permissions}`)
-  if (m.content_security_policy.extension_pages !== "script-src 'self'; object-src 'none'") problems.push('content_security_policy')
+  if (m.content_security_policy.extension_pages !== "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'") problems.push('content_security_policy')
   if (problems.length) throw new Error(`${name} manifest: ${problems.join(', ')} (decisions/0029)`)
 }
 

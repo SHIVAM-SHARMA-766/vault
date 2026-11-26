@@ -51,7 +51,9 @@ write_files:
         }
 
         header {
-          # No unsafe-inline and no unsafe-eval anywhere. The build must emit
+          # No unsafe-inline and no unsafe-eval anywhere. 'wasm-unsafe-eval' lets
+          # Argon2id compile its WebAssembly (decisions/0028); it allows no JavaScript eval.
+          # Otherwise: The build must emit
           # external scripts and stylesheets only; an inline <script> is
           # blocked rather than silently trusted.
           #
@@ -59,7 +61,7 @@ write_files:
           # from a third party would tell that third party which services the
           # vault holds accounts for, which is most of what the encryption is
           # protecting.
-          Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+          Content-Security-Policy "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
           Strict-Transport-Security "max-age=63072000; includeSubDomains"
           X-Content-Type-Options "nosniff"
           X-Frame-Options "DENY"

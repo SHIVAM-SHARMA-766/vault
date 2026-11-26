@@ -9,6 +9,7 @@ import {
   type KdfParams,
   fromBase64Url,
   isExportFile,
+  kdfProblem,
   isWithinSizeLimit,
   openEntry,
   openExport,
@@ -116,7 +117,7 @@ export interface OpenedBackup {
  *  recovery key — that was current when it was made. Nothing is sent
  *  anywhere. Throws UnsealError when the secret is wrong. */
 export async function openPersonalBackup(text: string, secret: string, how: 'password' | 'recovery', email?: string): Promise<OpenedBackup> {
-  let file: { format?: string; version?: number; createdAt?: string; kdf?: { algorithm: string; iterations: number; salt: string }; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[]; attachments?: { id: string; blob: string }[] }
+  let file: { format?: string; version?: number; createdAt?: string; kdf?: KdfParams; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[]; attachments?: { id: string; blob: string }[] }
   try { file = JSON.parse(text) } catch { throw new Error('This backup file is damaged: it is not valid JSON.') }
   if (file.format !== 'vault-personal-backup' || file.version !== 1) throw new Error('This is not a Vault personal backup, or it is from a newer version.')
   let key: Uint8Array
@@ -127,7 +128,7 @@ export async function openPersonalBackup(text: string, secret: string, how: 'pas
     if (!file.kdf || !file.wrappedVaultKey) throw new Error('This backup file is damaged: its key is missing.')
     // A file is something anyone could hand you: refuse a key-stretching
     // setting that would freeze this tab, or one too weak to be ours.
-    if (file.kdf.algorithm !== 'PBKDF2-HMAC-SHA256' || !Number.isInteger(file.kdf.iterations) || file.kdf.iterations < 600_000 || file.kdf.iterations > 10_000_000) {
+    if (file.kdf.algorithm === 'PBKDF2-HMAC-SHA256' ? !Number.isInteger(file.kdf.iterations) || file.kdf.iterations < 600_000 || file.kdf.iterations > 10_000_000 : kdfProblem(file.kdf) !== null) {
       throw new Error('This backup file uses key settings Vault does not create, so it was not opened.')
     }
     // A backup made with a secret key (decisions/0027) needs it: this

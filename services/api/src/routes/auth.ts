@@ -22,7 +22,7 @@ import {
 } from '../http.js'
 import { describeDevice } from '../device.js'
 import { notify, signInNotice } from '../mail.js'
-import { decoyHasSecretKey, decoySalt, emailDigest } from '../identity.js'
+import { decoyHasSecretKey, decoySalt, decoyUsesArgon2, emailDigest } from '../identity.js'
 import {
   EMAIL_SK,
   PROFILE_SK,
@@ -171,8 +171,9 @@ export async function prelogin(app: App, event: LambdaEvent): Promise<LambdaResp
   }
   return json(200, {
     kdf: {
-      algorithm: 'PBKDF2-HMAC-SHA256',
-      iterations: 600_000,
+      ...(decoyUsesArgon2(email, app.config.pepper)
+        ? { algorithm: 'argon2id', m: 65_536, t: 3, p: 1 }
+        : { algorithm: 'PBKDF2-HMAC-SHA256', iterations: 600_000 }),
       salt: decoySalt(email, app.config.pepper),
       ...(decoyHasSecretKey(email, app.config.pepper) ? { version: 2 } : {}),
     },
@@ -514,8 +515,12 @@ export async function changePassword(
   await revokeAllSessions(app, userId)
   // Adding or removing a secret key is a re-derivation too (decisions/0027).
   const before = profile.kdf?.version === 2, after = kdf.version === 2
+  // The client says when a re-derivation keeps the password (decisions/0028);
+  // the server cannot tell, so this only labels the activity entry.
+  const upgrade = body['purpose'] === 'upgrade-kdf' && profile.kdf?.algorithm !== kdf.algorithm
   const what = byRecovery ? 'reset-password-with-recovery-key'
-    : before === after ? 'change-password' : after ? 'add-secret-key' : 'remove-secret-key'
+    : before !== after ? (after ? 'add-secret-key' : 'remove-secret-key')
+    : upgrade ? 'upgrade-kdf' : 'change-password'
   await recordActivity(app, userId, what, event)
 
   return json(200, await issueSession(app, userId, event))

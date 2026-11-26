@@ -116,8 +116,9 @@ test('prelogin returns a decoy salt for an unknown address', async () => {
   })
   assert.equal(res.status, 200)
   const kdf = res.body['kdf'] as Record<string, unknown>
-  assert.equal(kdf['algorithm'], 'PBKDF2-HMAC-SHA256')
-  assert.equal(kdf['iterations'], 600_000)
+  // Either algorithm, as real accounts have (decisions/0028), with its settings.
+  if (kdf['algorithm'] === 'argon2id') assert.deepEqual([kdf['m'], kdf['t'], kdf['p']], [65_536, 3, 1])
+  else { assert.equal(kdf['algorithm'], 'PBKDF2-HMAC-SHA256'); assert.equal(kdf['iterations'], 600_000) }
   assert.match(String(kdf['salt']), /^[A-Za-z0-9_-]+$/)
   assert.equal(Buffer.from(String(kdf['salt']), 'base64url').length, 32)
 })

@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "axe-core": "^4.10.2",
-    "playwright-core": "1.55.0"
+    "playwright-core": "1.55.0",
+    "wabt": "1.0.39"
   }
 }
