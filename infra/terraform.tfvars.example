@@ -9,7 +9,7 @@ fingerprint  = "aa:bb:cc:..."
 #         --sort-by TIMECREATED --query 'data[0].id' --raw-output
 instance_image_ocid = "ocid1.image.oc1.ap-mumbai-1.<yours>"
 
-duckdns_hostname = "your-name.duckdns.org"
+duckdns_hostname = "vault.example.com"   # any DNS name pointing at the host
 acme_email       = "you@example.com"
 
 # Empty by default, which means SSH is unreachable. Set to a single address

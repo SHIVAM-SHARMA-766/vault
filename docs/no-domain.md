@@ -22,7 +22,7 @@ Choose an address you will keep. A domain you buy later can be added in front: s
 
 ## DuckDNS + Caddy
 
-The reference instance runs this way. You need a machine whose ports 80 and 443 reach the
+The reference instance ran this way until it moved to its own domain. You need a machine whose ports 80 and 443 reach the
 internet: a cloud VM, or a home server with port forwarding and a public IPv4 address. Not
 behind CGNAT.
 

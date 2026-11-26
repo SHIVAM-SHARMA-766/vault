@@ -381,7 +381,7 @@
     },
     {
      "q": "Is there anything it does not protect against?",
-     "a": "Yes, and it is stated plainly on the security page: a web app is only as trustworthy as the code it is served, and today that rests on a free dynamic-DNS name."
+     "a": "Yes, and it is stated plainly on the security page: a web app is only as trustworthy as the code it is served, and that rests on the operator's control of its registered domain."
     }
    ]
   }

@@ -6,7 +6,7 @@ Last updated: 2026-11-07
 
 ## Right now
 
-**The client is live at https://vault-shivam.duckdns.org.** Registration, unlock, and
+**The client is live at https://vault.dev2ops.in.** Registration, unlock, and
 entry CRUD, served from the same origin as the API by Caddy on one always-free OCI
 instance, with MySQL HeatWave behind it.
 

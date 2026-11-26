@@ -155,9 +155,10 @@
             <p>Any web-based password manager is only as trustworthy as the code it is served. Whoever
                controls this site's address could serve modified code that captures a master password
                as it is typed — and that would bypass everything above.</p>
-            <p>Today the address is a free dynamic-DNS name, which places that control with a third-party
-               service. Moving to a registered domain is planned. Until then, this is the largest risk,
-               and it is accepted knowingly rather than hidden.</p>
+            <p>The address is a registered domain, held by the operator with two-factor authentication
+               at the registrar. Certificates for it may come only from Let's Encrypt (a CAA record), and
+               the browser extension, installed from a store, checks the address before it fills
+               anything.</p>
           </div>
         </div>
 

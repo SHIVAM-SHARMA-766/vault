@@ -44,9 +44,37 @@ terraform apply
 terraform output public_ip
 ```
 
-**Point the DuckDNS record at that address before the instance finishes booting.** Caddy
+**Point the DNS record (`vault.dev2ops.in`, an A record at the domain's DNS host) at that
+address before the instance finishes booting.** Caddy
 requests a certificate on first start, and the ACME challenge fails if the name does not
 resolve to the host. If it does fail, fix the record and `systemctl restart caddy`.
+
+## Changing the address
+
+The address lives in two places on the host, both written by `scripts/deploy.sh`:
+- `/etc/vault/release.env`, read by the API, the pull timer and the probe;
+- `/etc/systemd/system/caddy.service.d/10-vault.conf`, read by Caddy.
+
+It is **not** changed through Terraform: the hostname is in cloud-init, and editing it
+replaces the instance. The value in `terraform.tfvars` matters only for the first boot of a
+rebuilt host.
+
+The move from `vault-shivam.duckdns.org` to `vault.dev2ops.in` (2026-11-26), in order:
+
+1. **DNS:** an A record `vault` → the host's public IP, with DNS only and no proxy, because
+   the TLS must end on our host. Add a CAA record `dev2ops.in CAA 0 issue "letsencrypt.org"`.
+   Wait until `dig +short vault.dev2ops.in` answers with the IP.
+2. **Host:** open SSH for your address (below), then:
+   `VAULT_HOSTNAME=vault.dev2ops.in ./scripts/deploy.sh <ip>`, then
+   `sudo systemctl restart vault-api caddy`. Caddy obtains the certificate in seconds.
+3. **Release:** merge the change that sets the new defaults. Its Caddyfile also makes the old
+   name redirect, so keep the DuckDNS record pointing here until nobody uses it.
+4. **People:**
+   - Sign in at the new address. Sessions, the secret key held in the browser, and the
+     extension's server address all belong to the old origin.
+   - Security keys and passkeys are bound to the hostname, so add them again (Settings →
+     Security), then remove the old ones.
+5. Close SSH again.
 
 ## Applying infrastructure changes
 
@@ -76,19 +104,17 @@ truth. On a NAT64 network especially, trust the real client over the probe.
 built by a script that has since changed is a host nobody can reason about — but three
 things follow, and forgetting any of them leaves the site down:
 
-1. **The public IP changes.** Repoint the DuckDNS record, or Caddy cannot get a
-   certificate:
+1. **The public IP changes.** Change the A record for `vault.dev2ops.in` at the DNS host, or
+   Caddy cannot get a certificate:
 
    ```sh
    cd infra && terraform output -raw public_ip
-   curl "https://www.duckdns.org/update?domains=<name>&token=<token>&ip=<new ip>"
    ```
 
    Caddy retries the ACME challenge with backoff, so it recovers on its own once DNS is
-   right. There is no need to restart anything.
-
-   **Always pass `ip=`.** A DuckDNS update without it sets the record to whatever address
-   the request came from — which, run from a laptop, points the vault at that laptop.
+   right. There is no need to restart anything. While the old DuckDNS name still redirects,
+   repoint it too (`curl "https://www.duckdns.org/update?domains=vault-shivam&token=<token>&ip=<new ip>"`,
+   always with `ip=`).
 
 2. **The disk is gone**, so the secrets file has to be installed again (below) and the
    code redeployed.
@@ -354,7 +380,7 @@ curl -s https://<hostname>/api/health
 ```
 
 A 502 from Caddy means the API is down; a connection refused means Caddy is. A
-certificate error usually means the DuckDNS record is pointing somewhere else.
+certificate error usually means the DNS record is pointing somewhere else.
 
 ## Alerts
 
@@ -378,7 +404,7 @@ every six hours while an alarm stays firing, and a "resolved" mail follows when 
 |---|---|---|
 | `heartbeat` | no report for 10 minutes | OCI console: is the instance running? Then `systemctl status vault-probe.timer` |
 | `api-down` | `/api/health` failing for 10 minutes | `journalctl -u vault-api -n 100` |
-| `site-down` | `/` or `/app/` not 200 for 10 minutes | `journalctl -u caddy -n 50`; is DuckDNS pointing at the instance? |
+| `site-down` | `/` or `/app/` not 200 for 10 minutes | `journalctl -u caddy -n 50`; does `vault.dev2ops.in` resolve to the instance? |
 | `certificate` | under 14 days left | `journalctl -u caddy \| grep -i acme` — Caddy renews at 30 |
 | `backup-stale` | no verified backup for 30 hours | `journalctl -u vault-backup -n 100`, then `sudo systemctl start vault-backup` |
 | `disk` | boot disk over 85% | `sudo journalctl --vacuum-size=200M`; `du -sh /srv/vault/*` |

@@ -117,3 +117,11 @@
 	header @assets Cache-Control "public, max-age=31536000, immutable"
 	header @not-assets Cache-Control "no-store"
 }
+
+# The reference instance's previous address (2026-11-06 to 2026-11-26). Kept
+# for a while so old bookmarks, emailed links and share links still arrive:
+# every request moves to the same path on the current address. Remove once
+# the DuckDNS record is retired.
+vault-shivam.duckdns.org {
+	redir https://{$VAULT_HOSTNAME}{uri} permanent
+}
