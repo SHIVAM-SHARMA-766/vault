@@ -357,7 +357,7 @@
         },
         {
           "q": "Can the people who run Vault read my passwords?",
-          "a": "No. The admin panel can see that an account exists, when it was created and last used, and how many items it holds — but not what they are, and not even your email address, which is stored only as a keyed hash."
+          "a": "No. The admin panel can see that an account exists, when it was created and last used, and how many items it holds — but not what they are. Staff see your email address, because it is your username; it is stored encrypted."
         },
         {
           "q": "If the server is hacked, what does the attacker get?",

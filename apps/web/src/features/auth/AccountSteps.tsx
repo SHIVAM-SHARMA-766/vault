@@ -168,7 +168,9 @@ export function AccountSignIn({ forAdmin, sso, ssoError, onSsoCancel, onLegacy, 
         {deskOn ? <><br /><button type="button" className="link" onClick={onSigninHelp}>{t('Lost your authenticator, or can\'t sign in? Ask for help')}</button></> : null}
       </p>
       <p className="auth-switch">
-        {mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
+        {/* With mail, anyone can make an account and then create or ask for a vault (decisions/0037). */}
+        {instance?.mail && (instance.features?.invitations ?? true) && !instance.firstRun ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
+          : mode === 'open' ? <>New here? <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button></>
           : mode === 'closed' && instance?.firstRun ? <>New server? <button type="button" className="link" onClick={onRegister}>Create the owner account</button> with the setup code from its log</>
           : mode === 'closed' ? (deskOn ? <>New here? <button type="button" className="link" onClick={onRequestAccess}>{t('Request access')}</button></> : null)
           : <>{mode === 'invite' ? 'Have an invitation?' : 'New here?'} <button type="button" className="link" onClick={onRegister}>{t('Create an account')}</button>
@@ -180,7 +182,7 @@ export function AccountSignIn({ forAdmin, sso, ssoError, onSsoCancel, onLegacy, 
 
 // ── Step 2: the master password ────────────────────────────────────────────
 
-export function MasterUnlock({ account, forAdmin, onRecover }: { account: AccountSession; forAdmin: boolean; onRecover: () => void }) {
+export function MasterUnlock({ account, forAdmin, onRecover }: { account: AccountSession & { kdf: KdfParams }; forAdmin: boolean; onRecover: () => void }) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -198,6 +200,8 @@ export function MasterUnlock({ account, forAdmin, onRecover }: { account: Accoun
     let live = true
     void api.account.session(account.accountToken).then((r) => {
       if (!live) return
+      // No vault behind this account (yet): the vault steps instead.
+      if (!r.kdf) { saveAccount({ ...account, kdf: null }); return }
       setKdf(r.kdf)
       setChecked(true)
     }).catch((err: unknown) => {

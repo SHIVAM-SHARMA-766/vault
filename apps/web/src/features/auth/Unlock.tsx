@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react'
 
 import { currentAccount, onAccountChange } from '../../lib/account.js'
 import { AccountSignIn, ForgotAccountPassword, MasterUnlock } from './AccountSteps.js'
+import { AccountSignup, VaultGate } from './VaultSteps.js'
+import { useInstance } from '../../lib/instance.js'
 import { LegacySignIn } from './LegacySignIn.js'
 
 export function Unlock(props: {
@@ -15,17 +17,26 @@ export function Unlock(props: {
 }) {
   const [account, setAccount] = useState(currentAccount)
   useEffect(() => onAccountChange(() => setAccount(currentAccount())), [])
-  const [screen, setScreen] = useState<'account' | 'legacy' | 'forgot'>('account')
+  const [screen, setScreen] = useState<'account' | 'legacy' | 'forgot' | 'signup'>('account')
+  const instance = useInstance()
   const forAdmin = props.forAdmin ?? false
   const sso = props.sso ?? null
 
   // Signed in to the account (after single sign-on too, once its ticket did the account step).
-  if (account && (!sso || account.email === sso.email)) return <MasterUnlock key={account.email} account={account} forAdmin={forAdmin} onRecover={props.onRecover} />
+  if (account && (!sso || account.email === sso.email)) {
+    // An account with no vault yet (decisions/0037): create or ask for one.
+    if (account.kdf === null) return <VaultGate key={account.email} account={account} />
+    return <MasterUnlock key={account.email} account={{ ...account, kdf: account.kdf }} forAdmin={forAdmin} onRecover={props.onRecover} />
+  }
+  if (screen === 'signup') return <AccountSignup onBack={() => setScreen('account')} />
   if (screen === 'legacy') return <LegacySignIn {...props} onBack={() => setScreen('account')} />
   if (screen === 'forgot') return <ForgotAccountPassword onBack={() => setScreen('account')} />
   return (
     <AccountSignIn forAdmin={forAdmin} sso={sso} ssoError={props.ssoError ?? ''} {...(props.onSsoCancel ? { onSsoCancel: props.onSsoCancel } : {})}
-      onLegacy={() => setScreen('legacy')} onForgot={() => setScreen('forgot')} onRegister={props.onRegister}
+      onLegacy={() => setScreen('legacy')} onForgot={() => setScreen('forgot')}
+      // With mail, an account comes first and its address is checked by a
+      // code (decisions/0037); without it, the old sign-up with an invitation.
+      onRegister={instance?.mail ? () => setScreen('signup') : props.onRegister}
       onRecover={props.onRecover} onRequestAccess={props.onRequestAccess} onSigninHelp={props.onSigninHelp} />
   )
 }

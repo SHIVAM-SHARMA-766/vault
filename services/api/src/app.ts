@@ -25,6 +25,7 @@ import * as webauthn from './routes/webauthn.js'
 import * as passkeys from './routes/passkeys.js'
 import * as sso from './routes/sso.js'
 import * as accounts from './routes/accounts.js'
+import * as signup from './routes/signup.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
 import { metricsRoute, recordRequest } from './metrics.js'
@@ -52,6 +53,10 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/account/signout', ({ event }) => accounts.signOut(app, event), 'End an account sign-in')
   router.post('/api/auth/account/forgot', ({ event }) => accounts.forgot(app, event), 'Email a link to reset the account password')
   router.post('/api/auth/account/reset', ({ event }) => accounts.reset(app, event), 'Set a new account password with the emailed code')
+  router.post('/api/auth/account/signup', ({ event }) => signup.signup(app, event), 'Start creating an account: a 6-digit code by email (decisions/0037)')
+  router.post('/api/auth/account/signup/verify', ({ event }) => signup.verify(app, event), 'Finish creating an account with the emailed code; no vault yet')
+  router.post('/api/auth/vault/status', ({ event }) => signup.status(app, event), 'For an account with no vault: approved, requested, and the registration setting')
+  router.post('/api/auth/vault/request', ({ event }) => signup.requestVault(app, event), 'Ask the operator for a vault')
   router.post('/api/auth/unlock', ({ event }) => accounts.unlock(app, event), 'Unlock with the master password\'s proof and an account token: a vault session')
   router.get('/api/auth/sso/start', ({ event }) => sso.start(app, event), 'Single sign-on: redirect to the identity provider (decisions/0021)')
   router.get('/api/auth/sso/callback', ({ event }) => sso.callback(app, event), 'Single sign-on: the identity provider\'s answer; redirects to the app with a ticket')
@@ -227,6 +232,9 @@ export function buildRouter(app: App): Router {
   router.put('/api/admin/users/:id/disabled', admined('users.write', (u, e, id, r) => admin.setDisabled(app, u, r, e, id)), 'Disable or enable an account')
   router.post('/api/admin/users/:id/offboard', admined('users.write', (u, _e, id, r) => admin.offboard(app, u, r, id)), 'Offboard an account: disable, sign out, remove from organizations')
   router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)), 'Sign an account out everywhere')
+  router.get('/api/admin/vault-requests', admined('users.read', () => signup.listRequests(app)), 'Requests for a vault from accounts without one')
+  router.post('/api/admin/vault-requests/:id/approve', admined('invites.write', (u, _e, id) => signup.decide(app, u, id, true)), 'Approve a request for a vault; the person is emailed')
+  router.post('/api/admin/vault-requests/:id/decline', admined('invites.write', (u, _e, id) => signup.decide(app, u, id, false)), 'Decline a request for a vault')
   router.post('/api/admin/users/:id/reset-account-password', admined('users.write', (u, _e, id, r) => admin.resetAccountPassword(app, u, r, id)), 'Clear an account\'s account password, so they set a new one after signing in with the master password')
   router.post('/api/admin/users/:id/reset-2fa', admined('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)), 'Turn off an account\'s two-factor sign-in')
   router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)), 'Delete an account and its vault')

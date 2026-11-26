@@ -22,7 +22,7 @@ import { PROFILE_SK, userPk } from '../keys.js'
 import { accountResetMessage, notify } from '../mail.js'
 import { assertNetwork } from '../networks.js'
 import { AUTH_LIMIT, enforce } from '../ratelimit.js'
-import { assertEnabled, touchLogin } from '../system.js'
+import { assertEnabled, getSettings, rememberEmail, touchLogin } from '../system.js'
 import { issueToken, verifyToken } from '../tokens.js'
 import { requireBase64UrlBytes, requireEmail } from '../validate.js'
 import { hashAuthKey, verifyAuthKey } from '../verifier.js'
@@ -32,6 +32,7 @@ import {
   sendSignInNotice, sessionDeadline,
 } from './auth.js'
 import { readTicket, ssoGate, useTicket } from './sso.js'
+import { limitMail, pendingById, pendingByEmail, pendingStatus, savePending } from './signup.js'
 
 export interface AccountPassword { salt: string; m: number; t: number; p: number; verifier: string; setAt: string }
 type WithAccount = Profile & { account?: AccountPassword }
@@ -101,10 +102,11 @@ export async function prelogin(app: App, event: LambdaEvent): Promise<LambdaResp
   const email = requireEmail(parseJsonBody<{ email?: unknown }>(event).email)
   // Per address only: it checks no secret, and its decoys say nothing. The
   // per-account limit counts what guesses a password: login and unlock.
-  await enforce(app.store, 'auth-ip', event.requestContext.http.sourceIp, AUTH_LIMIT, app.now())
+  await enforce(app.store, 'prelogin-ip', event.requestContext.http.sourceIp, { max: 60, windowSeconds: 15 * 60 }, app.now())
   const profile = (await profileByEmail(app, email)) as WithAccount | null
-  if (profile?.account) {
-    const { salt, m, t, p } = profile.account
+  const known = profile?.account ?? (profile ? undefined : (await pendingByEmail(app, email))?.account)
+  if (known) {
+    const { salt, m, t, p } = known
     return json(200, { account: { salt, m, t, p } })
   }
   // An unknown address, and an account that has not set one yet, get the same
@@ -120,6 +122,16 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   const email = requireEmail(body['email'])
   await limitAuth(app, event, email)
   const profile = (await profileByEmail(app, email)) as WithAccount | null
+  // An account with no vault yet (decisions/0037): it signs in to choose or
+  // ask for one. No second factor can be set before there is a vault.
+  if (!profile && body['accountProof'] !== undefined) {
+    const pending = await pendingByEmail(app, email)
+    if (pending) {
+      const proofP = requireBase64UrlBytes(body['accountProof'], 32, 'accountProof')
+      if (!(await verifyAuthKey(proofP, pending.account.verifier))) throw invalidCredentials()
+      return json(200, { accountToken: await issueAccountToken(app, pending.userId, event), kdf: null, ...pendingStatus(pending), registration: await mode(app) })
+    }
+  }
   // With a single sign-on ticket for this account, the identity provider has
   // done the account step (decisions/0021, 0036); otherwise the account password.
   const viaSso = body['accountProof'] === undefined && body['ssoTicket'] !== undefined
@@ -139,7 +151,9 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   await touchLogin(app, profile.userId, profile)
   if (app.config.mail.signInNotices && profile['signInAlerts'] !== false) sendSignInNotice(app, email, event, false)
   await recordActivity(app, profile.userId, sso ? 'sso-login' : 'login', event)
-  return json(200, { accountToken: await issueAccountToken(app, profile.userId, event), kdf: profile.kdf })
+  // The address is the username (decisions/0037): kept, sealed, for staff to see.
+  await rememberEmail(app, profile.userId, email)
+  return json(200, { accountToken: await issueAccountToken(app, profile.userId, event), kdf: profile.kdf, vault: true })
 }
 
 /** Is this account sign-in still good, and what does the master password
@@ -152,8 +166,12 @@ export async function session(app: App, event: LambdaEvent): Promise<LambdaRespo
   await assertEnabled(app, payload.sub)
   await assertNetwork(app, payload.sub, event.requestContext.http.sourceIp)
   const profile = (await app.store.get(userPk(payload.sub), PROFILE_SK)) as WithAccount | null
-  if (!profile) throw unauthorized()
-  return json(200, { kdf: profile.kdf })
+  if (!profile) {
+    const pending = await pendingById(app, payload.sub)
+    if (!pending) throw unauthorized()
+    return json(200, { kdf: null, ...pendingStatus(pending), registration: await mode(app) })
+  }
+  return json(200, { kdf: profile.kdf, vault: true })
 }
 
 // ── Step 3: the vault ─────────────────────────────────────────────────────
@@ -165,7 +183,11 @@ export async function unlock(app: App, event: LambdaEvent): Promise<LambdaRespon
   const authKey = requireBase64UrlBytes(body['authKey'], 32, 'authKey')
   const { userId, createdAt } = await takeAccountToken(app, body['accountToken'])
   const profile = (await app.store.get(userPk(userId), PROFILE_SK)) as WithAccount | null
-  if (!profile) throw unauthorized()
+  if (!profile) {
+    // No vault yet: hand the account sign-in back unchanged in effect.
+    if (await pendingById(app, userId)) return json(409, { error: 'conflict', message: 'This account has no vault yet.', accountToken: await issueAccountToken(app, userId, event, createdAt) })
+    throw unauthorized()
+  }
   await enforce(app.store, 'auth-email', profile.emailDigest, AUTH_LIMIT, app.now())
   await assertEnabled(app, userId)
   await assertNetwork(app, userId, event.requestContext.http.sourceIp)
@@ -216,11 +238,12 @@ const resetSk = (code: string) => `ACCTRESET#${createHash('sha256').update(code)
 /** Always the same answer, so it says nothing about the address. */
 export async function forgot(app: App, event: LambdaEvent): Promise<LambdaResponse> {
   const email = requireEmail(parseJsonBody<{ email?: unknown }>(event).email)
-  await limitAuth(app, event, email)
+  await limitMail(app, event, email)
   const profile = (await profileByEmail(app, email)) as WithAccount | null
-  if (profile?.account && app.mailer) {
+  const owner = profile?.account ? profile.userId : profile ? null : (await pendingByEmail(app, email))?.userId ?? null
+  if (owner && app.mailer) {
     const code = randomBytes(24).toString('base64url')
-    await app.store.put({ pk: userPk(profile.userId), sk: resetSk(code), expiresAt: Math.floor(app.now() / 1000) + RESET_MINUTES * 60 })
+    await app.store.put({ pk: userPk(owner), sk: resetSk(code), expiresAt: Math.floor(app.now() / 1000) + RESET_MINUTES * 60 })
     void notify(app, { to: email, ...accountResetMessage(app.config.origin, email, code) })
   }
   return json(200, { ok: true, mail: Boolean(app.mailer) })
@@ -233,11 +256,19 @@ export async function reset(app: App, event: LambdaEvent): Promise<LambdaRespons
   const code = typeof body['code'] === 'string' && body['code'].length <= 64 ? body['code'] : ''
   const input = requireAccountInput(body['account'])
   const profile = (await profileByEmail(app, email)) as WithAccount | null
-  const row = profile && code ? await app.store.get(userPk(profile.userId), resetSk(code)) : null
-  if (!profile || !row || Number(row['expiresAt']) < Math.floor(app.now() / 1000)) {
+  const pending = profile ? null : await pendingByEmail(app, email)
+  const owner = profile?.userId ?? pending?.userId
+  const row = owner && code ? await app.store.get(userPk(owner), resetSk(code)) : null
+  if (!owner || !row || Number(row['expiresAt']) < Math.floor(app.now() / 1000)) {
     throw new HttpError(400, 'bad_request', 'That reset link has expired or was already used. Ask for a new one.')
   }
   await app.store.delete(row.pk, row.sk)
+  if (pending) {
+    await savePending(app, { ...pending, account: await storedAccount(input, app.now()) })
+    for (const s of await app.store.query(userPk(pending.userId), ACCT_PREFIX)) await app.store.delete(s.pk, s.sk)
+    return json(200, { ok: true })
+  }
+  if (!profile) throw unauthorized()
   await refuseSameAsMaster(body, profile)
   await app.store.put({ ...profile, account: await storedAccount(input, app.now()), updatedAt: new Date(app.now()).toISOString() })
   await revokeAllSessions(app, profile.userId)
@@ -254,6 +285,10 @@ export async function clearPassword(app: App, userId: string): Promise<void> {
   const { account: _a, ...rest } = profile
   await app.store.put({ ...rest, updatedAt: new Date(app.now()).toISOString() } as Profile)
   for (const s of await app.store.query(userPk(userId), ACCT_PREFIX)) await app.store.delete(s.pk, s.sk)
+}
+
+async function mode(app: App): Promise<string> {
+  return app.allowRegistration ? 'open' : (await getSettings(app)).registration
 }
 
 /** What /api/auth/me says about it. */

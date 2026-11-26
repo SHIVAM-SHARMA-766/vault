@@ -44,8 +44,8 @@ Placeholder-looking secrets (`changeme…`, `test…`, `secret…`, `placeholder
 
 Optional. With SMTP configured, admins can email invitations, everyone gets a notice on each
 sign-in (and always when their recovery key is used), and the admin panel can send a test
-message. Vault stores no addresses — only keyed digests — so mail is sent only when a request
-carries the address, and the address is not kept.
+message. The email address is the username (decisions/0037): it is kept encrypted with each
+account, so the server can send sign-up codes, approvals and reset links.
 
 | Variable | Default | Secret | What it does |
 |---|---|---|---|

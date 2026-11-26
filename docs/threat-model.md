@@ -328,6 +328,15 @@ every unlock; a replayed one ends every sign-in of the account. The account pass
 by email, which therefore protects the account step only; the vault still needs the master
 password, which nobody can reset.
 
+### A21a2 — Email addresses are kept (decisions/0037)
+
+Since [0037](../decisions/0037-account-first.md) the email address is the username. It is shown to
+the person and to staff, and it is used to send sign-up codes, approvals and reset links. It is
+kept on the account, sealed with AES-256-GCM under a key derived from SERVER_PEPPER, which lives
+outside the database. A database dump alone does not reveal addresses; the dump plus the pepper
+does. Before 0037 only a keyed digest was stored. Vault contents are untouched by this: they
+remain readable only with each person's master password.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

@@ -73,7 +73,7 @@
             <tr><td>Passwords, usernames, websites</td><td>AES-256-GCM ciphertext</td></tr>
             <tr><td>Entry names, notes, tags, folders</td><td>AES-256-GCM ciphertext</td></tr>
             <tr><td>Two-factor (TOTP) secrets</td><td>AES-256-GCM ciphertext</td></tr>
-            <tr><td>Your email address</td><td>HMAC under a server-side secret kept outside the database</td></tr>
+            <tr><td>Your email address</td><td>It is your username: looked up by an HMAC, and kept encrypted (AES-256-GCM) under a key derived from a server-side secret outside the database</td></tr>
             <tr><td>Master password</td><td>Never received</td></tr>
             <tr><td>Recovery key</td><td>Never received</td></tr>
           </tbody>
@@ -102,7 +102,7 @@
         <table class="table">
           <thead><tr><th>The admin panel can</th><th>It cannot</th></tr></thead>
           <tbody>
-            <tr><td>See that an account exists, when it was created and last signed in</td><td>See its email address — only a keyed hash is stored</td></tr>
+            <tr><td>See an account's email address (its username), when it was created and last signed in</td><td>See anything in the vault: entries, names, notes, passwords</td></tr>
             <tr><td>See how many items an account holds</td><td>See what any item is, or its name</td></tr>
             <tr><td>Open or close registration, and issue single-use invitations</td><td>Reset a master password or unlock a vault</td></tr>
             <tr><td>Sign an account out everywhere, disable it, or delete it</td><td>Read, change or export anyone's entries</td></tr>

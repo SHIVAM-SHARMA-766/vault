@@ -134,7 +134,7 @@ export interface ServerPolicy {
   requireSso?: boolean
 }
 
-export type TemplateKind = 'invite' | 'signIn'
+export type TemplateKind = 'invite' | 'signIn' | 'verify' | 'vaultApproved' | 'accountReset'
 export type Templates = Partial<Record<TemplateKind, { subject: string; message: string }>>
 export interface BackupStatus {
   enabled: boolean
@@ -191,6 +191,8 @@ export const api = {
     inviteCode?: string
     /** A provisioning ticket from single sign-on (decisions/0021). */
     ssoTicket?: string
+    /** An account made first, creating its vault (decisions/0037). */
+    accountToken?: string
     identity?: Identity
     /** The account password (decisions/0036). */
     account?: Record<string, unknown>
@@ -202,11 +204,18 @@ export const api = {
     prelogin: (email: string) => request<{ account: { salt: string; m: number; t: number; p: number } }>('POST', '/api/auth/account/prelogin', { body: { email } }),
     /** No proof with a single sign-on ticket: the provider did the account step. */
     login: (email: string, accountProof: string | undefined, second?: SecondFactor, ssoTicket?: string) =>
-      request<{ accountToken: string; kdf: KdfParams }>('POST', '/api/auth/account/login', { body: { email, ...(accountProof ? { accountProof } : {}), ...second, ...(ssoTicket ? { ssoTicket } : {}) } }),
-    session: (accountToken: string) => request<{ kdf: KdfParams }>('POST', '/api/auth/account/session', { body: { accountToken } }),
+      request<{ accountToken: string; kdf: KdfParams | null; vault?: boolean }>('POST', '/api/auth/account/login', { body: { email, ...(accountProof ? { accountProof } : {}), ...second, ...(ssoTicket ? { ssoTicket } : {}) } }),
+    session: (accountToken: string) => request<{ kdf: KdfParams | null; vault?: boolean }>('POST', '/api/auth/account/session', { body: { accountToken } }),
     unlock: (accountToken: string, authKey: string) =>
       request<Session & { accountToken: string; wrappedVaultKey: string; kdf: KdfParams }>('POST', '/api/auth/unlock', { body: { accountToken, authKey } }),
     signOut: (accountToken: string) => request<{ ok: true }>('POST', '/api/auth/account/signout', { body: { accountToken } }),
+    /** An account first, a vault later (decisions/0037). */
+    signup: (email: string) => request<{ ok: true }>('POST', '/api/auth/account/signup', { body: { email } }),
+    verify: (email: string, code: string, account: object) =>
+      request<{ accountToken: string; vault: false; approved: boolean; requested: boolean; registration: RegistrationMode }>('POST', '/api/auth/account/signup/verify', { body: { email, code, account } }),
+    vaultStatus: (accountToken: string) =>
+      request<{ vault: boolean; approved: boolean; requested: boolean; registration: RegistrationMode }>('POST', '/api/auth/vault/status', { body: { accountToken } }),
+    requestVault: (accountToken: string, note: string) => request<{ ok: true }>('POST', '/api/auth/vault/request', { body: { accountToken, note } }),
     forgot: (email: string) => request<{ ok: true; mail: boolean }>('POST', '/api/auth/account/forgot', { body: { email } }),
     reset: (email: string, code: string, body: { account: object; masterCheck?: string }) =>
       request<{ ok: true }>('POST', '/api/auth/account/reset', { body: { email, code, ...body } }),
@@ -497,6 +506,9 @@ export const api = {
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/label`, { token, body: { label } }),
     setRole: (token: string, id: string, role: Role) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { token, body: { role } }),
+    vaultRequests: (token: string) => request<{ requests: { userId: string; email: string; note: string; requestedAt: string; createdAt: string }[] }>('GET', '/api/admin/vault-requests', { token }),
+    decideVaultRequest: (token: string, id: string, approve: boolean) =>
+      request<{ ok: true }>('POST', `/api/admin/vault-requests/${encodeURIComponent(id)}/${approve ? 'approve' : 'decline'}`, { token }),
     resetAccountPassword: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/reset-account-password`, { token }),
     resetTwoFactor: (token: string, id: string) =>
@@ -657,6 +669,8 @@ export interface AdminOverview {
 }
 
 export interface AdminUser {
+  /** The username (decisions/0037); null for an account not signed in since addresses were kept. */
+  email?: string | null
   userId: string
   label: string | null
   createdAt: string

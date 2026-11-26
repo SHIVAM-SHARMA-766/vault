@@ -54,7 +54,13 @@ function BackupCard({ canWrite }: { canWrite: boolean }) {
   )
 }
 
-const KINDS: { kind: TemplateKind; label: string }[] = [{ kind: 'invite', label: 'Invitation' }, { kind: 'signIn', label: 'New sign-in notice' }]
+const KINDS: { kind: TemplateKind; label: string }[] = [
+  { kind: 'verify', label: 'Sign-up code (OTP)' },
+  { kind: 'invite', label: 'Invitation' },
+  { kind: 'vaultApproved', label: 'Vault request approved' },
+  { kind: 'accountReset', label: 'Account password reset link' },
+  { kind: 'signIn', label: 'New sign-in notice' },
+]
 
 function TemplatesCard({ canWrite }: { canWrite: boolean }) {
   const toast = useToast()

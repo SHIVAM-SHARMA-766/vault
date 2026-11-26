@@ -56,6 +56,7 @@ someone who would otherwise assume it was an oversight.
 | [0034](0034-passkey-unlock.md) | Unlock with a passkey: PRF wraps the vault key in the browser; discoverable, user-verified, no second factor needed |
 | [0035](0035-passkeys-in-the-extension.md) | Passkeys for other sites kept in Vault, answered by the extension; origin from the browser, rpId checked, the person confirms |
 | [0036](0036-account-then-master-password.md) | Sign in to the account (account password, two-factor), then unlock with the master password; both checked by the server |
+| [0037](0037-account-first.md) | An account first (email code), a vault later (open, invitation or approved request); the email address is the username |
 
 ## A note on the numbering
 
