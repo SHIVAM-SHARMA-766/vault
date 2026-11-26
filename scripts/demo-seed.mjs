@@ -162,7 +162,11 @@ async function unlock(page, email, password) {
 
 /** The one-time sign-in of an account that has no account password yet. */
 async function legacy(page, email, password, accountPassword) {
-  await page.getByRole('button', { name: /First sign-in since accounts were added/ }).click()
+  // Behind "Other ways to sign in" since the sign-in page was simplified; the
+  // old link, on a server from before it.
+  const other = page.getByRole('button', { name: 'Other ways to sign in' })
+  if (await other.count()) { await other.click(); await page.getByRole('button', { name: /Use my master password/ }).click() }
+  else await page.getByRole('button', { name: /First sign-in since accounts were added/ }).click()
   await page.fill('#email', email)
   await page.fill('#password', password)
   await page.click('button[type=submit]')
