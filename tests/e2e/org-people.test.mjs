@@ -111,10 +111,13 @@ test('admin panel: offboard an account, send an invitation again, brand the serv
 
     await s.menu(owner, 'Admin panel')
     await owner.locator('.sidebar .side-item', { hasText: 'Users' }).click()
+    // Each account opens in a side panel that holds its actions.
+    await owner.getByRole('button', { name: 'Open dee@example.test' }).click()
     owner.once('dialog', (d) => d.accept())
-    await owner.getByRole('button', { name: /^Offboard/ }).first().click()
+    await owner.getByRole('button', { name: /^Offboard/ }).click()
     await owner.waitForSelector('text=Offboarded: disabled, signed out', { state: 'attached' })
-    await owner.waitForSelector('button:has-text("Enable")')
+    await owner.waitForSelector('.drawer button:has-text("Enable")')
+    await owner.keyboard.press('Escape')
 
     await owner.locator('.sidebar .side-item', { hasText: 'Invitations' }).click()
     await owner.fill('#inv-label', 'Eve')

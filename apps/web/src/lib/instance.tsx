@@ -7,9 +7,27 @@ import { type Edition, type Features, type Instance, api } from './api.js'
 import { IconShield } from '../ui/icons.js'
 
 let cached: Promise<Instance | null> | null = null
+/** The profile once loaded, so a screen that mounts later starts with it
+ *  instead of a frame without it. */
+let resolved: Instance | null = null
+let settled = false
+const STORE_KEY = 'vault.instance.v1'
+
+/** The profile from the last visit: public data (name, logo, which sign-up
+ *  this server offers), shown at once while the current one loads, so the
+ *  sign-in page does not change under the reader. */
+function remembered(): Instance | null {
+  try { const raw = localStorage.getItem(STORE_KEY); return raw ? JSON.parse(raw) as Instance : null } catch { return null }
+}
+resolved = remembered()
 
 function fetchOnce(): Promise<Instance | null> {
-  cached ??= api.instance().then((i) => { applyBranding(i); return i }, () => null)
+  cached ??= api.instance().then((i) => {
+    applyBranding(i)
+    resolved = i; settled = true
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(i)) } catch { /* no storage */ }
+    return i
+  }, () => { settled = true; return resolved })
   return cached
 }
 
@@ -51,13 +69,19 @@ export function useEdition(): { edition: Edition; features: Features; loaded: bo
 export function refresh(): void { cached = null }
 
 export function useInstance(): Instance | null {
-  const [v, setV] = useState<Instance | null>(null)
+  return useInstanceState().instance
+}
+
+/** The profile and whether the server has answered (or failed to): a screen
+ *  whose layout depends on it waits for that instead of redrawing. */
+export function useInstanceState(): { instance: Instance | null; settled: boolean } {
+  const [v, setV] = useState<{ instance: Instance | null; settled: boolean }>(() => ({ instance: resolved, settled }))
   useEffect(() => {
     let live = true
     void fetchOnce().then((i) => {
-      if (!live || !i) return
-      setV(i)
-      if (i.name && i.name !== 'Vault') document.title = i.name
+      if (!live) return
+      setV({ instance: i, settled: true })
+      if (i?.name && i.name !== 'Vault') document.title = i.name
     })
     return () => { live = false }
   }, [])

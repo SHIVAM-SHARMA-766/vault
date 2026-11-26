@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 
 import { currentAccount, onAccountChange } from '../../lib/account.js'
 import { t } from '../../lib/i18n.js'
-import { useInstance } from '../../lib/instance.js'
+import { useInstanceState } from '../../lib/instance.js'
 import { IconAlert, IconArrowLeft, IconHelp, IconKey, IconLock, IconTicket, IconUser } from '../../ui/icons.js'
 import { AccountSignIn, ForgotAccountPassword, MasterUnlock, PasskeyOption } from './AccountSteps.js'
 import { LegacySignIn } from './LegacySignIn.js'
@@ -32,7 +32,7 @@ export function Unlock(props: {
   const [account, setAccount] = useState(currentAccount)
   useEffect(() => onAccountChange(() => setAccount(currentAccount())), [])
   const [screen, setScreen] = useState<Screen>('signin')
-  const instance = useInstance()
+  const { instance, settled } = useInstanceState()
   const forAdmin = props.forAdmin ?? false
   const sso = props.sso ?? null
   const mode = instance?.registration
@@ -51,6 +51,9 @@ export function Unlock(props: {
     if (account.kdf === null) return <VaultGate key={account.email} account={account} />
     return <MasterUnlock key={account.email} account={{ ...account, kdf: account.kdf }} forAdmin={forAdmin} onRecover={props.onRecover} />
   }
+  // The first visit: wait for the server's profile (which sign-up it offers)
+  // rather than draw the form and then add tabs to it.
+  if (!instance && !settled) return <div className="skeletons" aria-busy="true" aria-label="Loading">{[0, 1, 2].map((i) => <div key={i} className="skeleton" />)}</div>
   const back = () => setScreen('signin')
   if (screen === 'legacy') return <LegacySignIn {...props} onBack={() => setScreen('other')} />
   if (screen === 'forgot') return <ForgotAccountPassword onBack={back} />

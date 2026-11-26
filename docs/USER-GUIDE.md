@@ -707,9 +707,31 @@ Overview checklist opens it again.
 </details>
 
 <details>
+<summary>Users: finding people and acting on many at once</summary>
+
+Admin console → **Users** lists every account, a page at a time (25 to 200 rows), so it stays
+quick on a server with thousands of people.
+
+- **Search** by email, label or account id.
+- **Status chips** with counts: Active, Disabled, *Inactive 90 days* and *Never signed in*.
+- **Filters** by role and by two-factor sign-in, and sort by newest, last sign-in or email.
+- **Select** rows (or a whole page) to disable, enable, sign out everywhere or reset two-factor
+  sign-in for all of them at once. Each one is checked and recorded in the audit log as if it
+  were done alone; the toast says which ones could not be done and why.
+- **Export CSV** downloads the accounts that match the current search and filters.
+- **Click an account** to open its panel. It shows its items, folders, devices and
+  organizations (as counts and names, never contents) and the staff actions that touched it.
+  The account's actions are there too: label, role, sign out everywhere, reset two-factor, reset
+  the account password, disable, offboard and delete.
+
+**Audit log** has the same kind of search, plus a filter by action and a date range; CSV and
+JSON still download the whole log.
+</details>
+
+<details>
 <summary>Someone leaves: Offboard</summary>
 
-Admin console → **Users** → **Offboard** does everything at once: the account is disabled,
+Admin console → **Users** → the account → **Offboard** does everything at once: the account is disabled,
 signed out on every device, and taken out of every organization. Each organization re-keys
 what they could open and lists the shared passwords they could see for colleagues to change.
 It is refused while the person owns an organization: hand it over or delete it first.

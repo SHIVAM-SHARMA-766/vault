@@ -40,7 +40,26 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(
+/** GETs in flight, by path and token: screens that mount together and ask
+ *  for the same thing (who am I, my organizations) share one request. Only
+ *  while it runs; nothing is cached after. */
+const inflight = new Map<string, Promise<unknown>>()
+
+function request<T>(
+  method: string,
+  path: string,
+  options: { body?: unknown; token?: string } = {},
+): Promise<T> {
+  if (method !== 'GET') return send<T>(method, path, options)
+  const key = `${path}\u0000${options.token ?? ''}`
+  const running = inflight.get(key)
+  if (running) return running as Promise<T>
+  const p = send<T>(method, path, options).finally(() => inflight.delete(key))
+  inflight.set(key, p)
+  return p
+}
+
+async function send<T>(
   method: string,
   path: string,
   options: { body?: unknown; token?: string } = {},
@@ -501,7 +520,21 @@ export const api = {
 
   admin: {
     overview: (token: string) => request<AdminOverview>('GET', '/api/admin/overview', { token }),
-    users: (token: string) => request<{ users: AdminUser[] }>('GET', '/api/admin/users', { token }),
+    /** One page of accounts, searched, filtered and sorted on the server. */
+    users: (token: string, query: AdminUserQuery = {}) =>
+      request<AdminUserPage>('GET', `/api/admin/users${qs(query)}`, { token }),
+    /** Every account, a page at a time (for screens that match members to accounts). */
+    allUsers: async (token: string) => {
+      const out: AdminUser[] = []
+      for (let offset = 0; ; offset += 200) {
+        const page = await request<AdminUserPage>('GET', `/api/admin/users${qs({ limit: 200, offset })}`, { token })
+        out.push(...page.users)
+        if (out.length >= page.total || page.users.length === 0) return { users: out }
+      }
+    },
+    user: (token: string, id: string) => request<AdminUserDetail>('GET', `/api/admin/users/${encodeURIComponent(id)}`, { token }),
+    bulkUsers: (token: string, action: 'disable' | 'enable' | 'signout' | 'reset-2fa', ids: string[]) =>
+      request<{ results: { id: string; ok: boolean; error?: string }[]; done: number }>('POST', '/api/admin/users/bulk', { token, body: { action, ids } }),
     setLabel: (token: string, id: string, label: string) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/label`, { token, body: { label } }),
     setRole: (token: string, id: string, role: Role) =>
@@ -568,7 +601,8 @@ export const api = {
       if (!res.ok) throw new ApiError(res.status, 'export_failed', 'Could not export the audit log.')
       return res.text()
     },
-    audit: (token: string) => request<{ records: AdminAudit[] }>('GET', '/api/admin/audit', { token }),
+    audit: (token: string, query: AdminAuditQuery = {}) =>
+      request<{ records: AdminAudit[]; total: number; offset: number; limit: number; actions: string[] }>('GET', `/api/admin/audit${qs(query)}`, { token }),
     site: (token: string) => request<SiteState>('GET', '/api/admin/site', { token }),
     saveDraft: (token: string, content: SiteContent) =>
       request<{ ok: true; content: SiteContent }>('PUT', '/api/admin/site/draft', { token, body: { content } }),
@@ -655,6 +689,8 @@ export interface AdminOverview {
   users: number
   disabledUsers: number
   policyGapUsers: number
+  twoFactorUsers: number
+  inactiveUsers: number
   entries: number
   activeSessions: number
   activeInvites: number
@@ -680,9 +716,36 @@ export interface AdminUser {
   role: Role
   twoFactor: boolean
   policyGap: boolean
+}
+
+export interface AdminUserQuery {
+  q?: string; role?: string; status?: '' | 'active' | 'disabled' | 'inactive' | 'never'; twoFactor?: '' | 'on' | 'off'
+  sort?: 'created' | 'lastLogin' | 'email'; dir?: 'asc' | 'desc'; offset?: number; limit?: number
+}
+
+export interface AdminUserPage {
+  users: AdminUser[]; total: number; offset: number; limit: number
+  counts: { all: number; active: number; disabled: number; inactive: number; never: number }
+}
+
+export interface AdminUserDetail {
+  user: AdminUser
   entries: number
   folders: number
-  sessions: number
+  accountPassword: boolean
+  sessions: { device: string; ip: string; createdAt: string; lastUsedAt: string }[]
+  orgs: { orgId: string; name: string; role: string; kind: string }[]
+  activity: { at: string; action: string; actor: string; actorLabel: string | null; detail: string | null }[]
+}
+
+export interface AdminAuditQuery { actor?: string; action?: string; q?: string; from?: string; to?: string; offset?: number; limit?: number }
+
+/** A query string from the set values of an object. */
+function qs(query: object): string {
+  const p = new URLSearchParams()
+  for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== '' && v !== null) p.set(k, String(v))
+  const s = p.toString()
+  return s ? `?${s}` : ''
 }
 
 export interface AdminInvite {

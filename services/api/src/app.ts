@@ -226,7 +226,9 @@ export function buildRouter(app: App): Router {
     }), { permission })
 
   router.get('/api/admin/overview', admined('overview.read', () => admin.overview(app)), 'Instance counts and health')
-  router.get('/api/admin/users', admined('users.read', () => admin.listUsers(app)), 'Accounts on this server')
+  router.get('/api/admin/users', admined('users.read', (_u, e) => admin.listUsers(app, e)), 'Accounts on this server: searched, filtered, sorted and paged')
+  router.post('/api/admin/users/bulk', admined('users.write', (u, e, _p, r) => admin.bulkUsers(app, u, r, e)), 'One action (disable, enable, sign out, reset two-factor) on many accounts')
+  router.get('/api/admin/users/:id', admined('users.read', (_u, _e, id) => admin.userDetail(app, id)), 'One account in full: devices, organizations, activity')
   router.put('/api/admin/users/:id/label', admined('users.write', (u, e, id, r) => admin.setLabel(app, u, r, e, id)), 'Label an account')
   router.put('/api/admin/users/:id/role', admined('roles.write', (u, e, id, r) => admin.setRole(app, u, r, e, id)), 'Change an account\'s staff role')
   router.put('/api/admin/users/:id/disabled', admined('users.write', (u, e, id, r) => admin.setDisabled(app, u, r, e, id)), 'Disable or enable an account')
@@ -254,7 +256,7 @@ export function buildRouter(app: App): Router {
   router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
   router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/update', admined('overview.read', (_u, e) => admin.updateRoute(app, e)), 'This version, and whether a newer release is out')
-  router.get('/api/admin/audit', admined('audit.read', () => admin.auditRoute(app)), 'Staff audit log')
+  router.get('/api/admin/audit', admined('audit.read', (_u, e) => admin.auditRoute(app, e)), 'Staff audit log, filtered and paged')
   router.get('/api/admin/audit/export', admined('audit.read', (_u, e) => admin.auditExport(app, e)), 'Download the audit log as CSV or JSON')
 
   router.get('/api/admin/desk', admined('desk.read', () => desk.queue(app)), 'The service desk queue')

@@ -53,7 +53,11 @@ test('the user list carries counts and the address (the username, decisions/0037
   const users = res.body['users'] as Array<Record<string, unknown>>
   assert.equal(users.length, 2)
   const someone = users.find((u) => u['isAdmin'] === false)!
-  assert.equal(someone['entries'], 1)
+  // Item counts read a whole vault: on the account's own page, not the list.
+  const detail = await h.request('GET', `/api/admin/users/${String(someone['userId'])}`, { token: ownerToken })
+  assert.equal(detail.status, 200)
+  assert.equal(detail.body['entries'], 1)
+  assert.ok(!JSON.stringify(detail.body).includes(sealedBlob('e1')))
   const text = JSON.stringify(res.body)
   assert.ok(users.some((u) => u['email'] === 'someone@example.com'), 'the username is shown to staff')
   assert.ok(!text.includes('emailDigest'))
@@ -198,4 +202,59 @@ test('an account from before the registry gets a row on its next sign-in', async
   await h.request('POST', '/api/auth/login', { body: { email: 'someone@example.com', authKey: fixtureB64('user-auth') } })
   users = (await h.request('GET', '/api/admin/users', { token: ownerToken })).body['users'] as Array<Record<string, unknown>>
   assert.ok(users.some((u) => u['userId'] === userId))
+})
+
+test('the users list is searched, filtered, sorted and paged on the server', async () => {
+  const h = harness({ adminEmails: [ADMIN], allowRegistration: true })
+  const owner = String((await h.request('POST', '/api/auth/register', { body: registration({ email: ADMIN, authKey: fixtureB64('owner') }) })).body['accessToken'])
+  for (let i = 0; i < 12; i++) {
+    await h.request('POST', '/api/auth/register', { ip: `198.51.100.${i + 10}`, body: registration({ email: `person${String(i).padStart(2, '0')}@example.com`, authKey: fixtureB64(`p${i}`) }) })
+  }
+  const page = async (query: string) => (await h.request('GET', `/api/admin/users?${query}`, { token: owner })).body as { users: { email: string; userId: string; disabled: boolean }[]; total: number; counts: Record<string, number> }
+
+  const first = await page('limit=5&sort=email&dir=asc')
+  assert.equal(first.total, 13)
+  assert.equal(first.users.length, 5)
+  assert.equal(first.counts['all'], 13)
+  assert.deepEqual(first.users.map((u) => u.email), ['owner@example.com', 'person00@example.com', 'person01@example.com', 'person02@example.com', 'person03@example.com'])
+  const second = await page('limit=5&offset=5&sort=email&dir=asc')
+  assert.deepEqual(second.users.map((u) => u.email)[0], 'person04@example.com')
+
+  const found = await page('q=PERSON1')
+  assert.deepEqual(found.users.map((u) => u.email).sort(), ['person10@example.com', 'person11@example.com'])
+  assert.equal((await page('role=owner')).total, 1)
+  assert.equal((await page('twoFactor=on')).total, 0)
+  assert.equal((await page('twoFactor=off')).total, 13)
+
+  // Bulk: disable three; the owner cannot be acted on by themselves.
+  const ids = found.users.map((u) => u.userId)
+  const ownerId = (await page('role=owner')).users[0]!.userId
+  const bulk = await h.request('POST', '/api/admin/users/bulk', { token: owner, body: { action: 'disable', ids: [...ids, ownerId] } })
+  assert.equal(bulk.status, 200)
+  assert.equal(bulk.body['done'], 2)
+  assert.equal((bulk.body['results'] as { id: string; ok: boolean }[]).find((r) => r.id === ownerId)!.ok, false)
+  const disabled = await page('status=disabled')
+  assert.equal(disabled.total, 2)
+  assert.equal(disabled.counts['disabled'], 2)
+  assert.equal((await h.request('POST', '/api/admin/users/bulk', { token: owner, body: { action: 'explode', ids } })).status, 400)
+
+  // The audit log, filtered: two disables, by action and by text.
+  const audit = async (query: string) => (await h.request('GET', `/api/admin/audit?${query}`, { token: owner })).body as { records: { action: string; detail: string | null }[]; total: number; actions: string[] }
+  assert.equal((await audit('action=user.disable')).total, 2)
+  assert.ok((await audit('')).actions.includes('user.disable'))
+  assert.equal((await audit('action=user.disable&q=person10')).total, 1)
+  assert.equal((await audit('action=user.disable&limit=1')).records.length, 1)
+  assert.equal((await audit('from=2999-01-01')).total, 0)
+})
+
+test('a label or role change keeps a company admin\'s right to create their company', async () => {
+  const h = harness({ adminEmails: [ADMIN], allowRegistration: true })
+  const owner = String((await h.request('POST', '/api/auth/register', { body: registration({ email: ADMIN, authKey: fixtureB64('owner') }) })).body['accessToken'])
+  const reg = await h.request('POST', '/api/auth/register', { body: registration({ email: 'boss@example.com', authKey: fixtureB64('boss') }) })
+  const id = String(reg.body['userId'])
+  const row = await h.app.store.get('SYSTEM', `USER#${id}`)
+  await h.app.store.put({ ...row!, companyGrant: true })
+  await h.request('PUT', `/api/admin/users/${id}/label`, { token: owner, body: { label: 'Acme' } })
+  await h.request('PUT', `/api/admin/users/${id}/role`, { token: owner, body: { role: 'viewer' } })
+  assert.equal((await h.app.store.get('SYSTEM', `USER#${id}`))!['companyGrant'], true)
 })

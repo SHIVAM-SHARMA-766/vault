@@ -363,6 +363,36 @@ are stable so work can be referred to by number. ✅ done · ⬜ open.
   an administrator approves in the console; the email address is the username; editable emails
   for the code, the approval and the reset link.
 
+### Admin console, production grade (asked for 2026-11-26)
+
+Measured against the Zoho Vault and 1Password Business consoles. Four phases, each its own
+pull requests with tests.
+
+- [x] **Phase 1: lists that scale, and acting on many accounts.**
+  - The users list is searched, filtered (status, role, two-factor), sorted and paged on the
+    server; a row costs two reads, not a whole vault.
+  - Each account opens in a side panel with its counts, devices, organizations, staff activity
+    and every action.
+  - Bulk disable, enable, sign out and reset two-factor; CSV export of the matching accounts.
+  - The audit log is filtered (action, text, dates) and paged.
+  - Overview counts that read every vault are kept for five minutes.
+  - UX fixes:
+    - the sign-in page no longer redraws when the server's profile arrives (it is remembered
+      from the last visit);
+    - identical requests in flight are shared.
+- [ ] **Phase 2: security dashboard and reports.**
+  - "Needs attention" on the overview, and sign-in charts.
+  - Reports: two-factor adoption, inactive accounts, admin actions, sign-ins, policy
+    compliance, access per organization, with CSV.
+  - A weekly digest to administrators.
+- [ ] **Phase 3: admin safety.**
+  - Confirm who you are again before sensitive actions.
+  - Two-factor sign-in required for staff roles.
+  - Alerts for a sign-in from a new device and for owner changes.
+- [ ] **Phase 4: hosted tenants.**
+  - A page per tenant, with seat limits and suspend / resume.
+  - Domain verification, so a company's addresses join its tenant.
+
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
 Started 2026-11-21, after the operator chose three editions. Each stage makes one edition fit its
