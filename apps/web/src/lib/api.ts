@@ -45,12 +45,24 @@ export class ApiError extends Error {
  *  while it runs; nothing is cached after. */
 const inflight = new Map<string, Promise<unknown>>()
 
+/** Asks the person to confirm their master password when a sensitive admin
+ *  action needs it (reauth_required, admin console phase 3); resolves true
+ *  once confirmed. Set by the screen that can show the prompt. */
+let reauthHandler: (() => Promise<boolean>) | null = null
+export function setReauthHandler(fn: (() => Promise<boolean>) | null): void { reauthHandler = fn }
+
 function request<T>(
   method: string,
   path: string,
   options: { body?: unknown; token?: string } = {},
 ): Promise<T> {
-  if (method !== 'GET') return send<T>(method, path, options)
+  if (method !== 'GET') {
+    return send<T>(method, path, options).catch(async (err: unknown) => {
+      // Confirmed, the same request goes again, once.
+      if (err instanceof ApiError && err.code === 'reauth_required' && reauthHandler && (await reauthHandler())) return send<T>(method, path, options)
+      throw err
+    })
+  }
   const key = `${path}\u0000${options.token ?? ''}`
   const running = inflight.get(key)
   if (running) return running as Promise<T>
@@ -153,6 +165,8 @@ export interface ServerPolicy {
   requireSso?: boolean
   /** A summary emailed to owners and admins once a week. */
   weeklyDigest?: boolean
+  /** Staff must sign in with two-factor to use the admin console. */
+  requireStaffTwoFactor?: boolean
 }
 
 export type TemplateKind = 'invite' | 'signIn' | 'verify' | 'vaultApproved' | 'accountReset'
@@ -196,6 +210,9 @@ export interface BackupState {
 
 export const api = {
   health: () => request<{ status: string }>('GET', '/api/health'),
+
+  /** Confirms the master password again for sensitive admin actions (ten minutes). */
+  reauth: (token: string, authKey: string) => send<{ until: string }>('POST', '/api/auth/reauth', { token, body: { authKey } }),
 
   /** The salt to derive with. An address with no account gets a decoy, so this
    *  answer does not reveal whether one exists. */

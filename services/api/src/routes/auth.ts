@@ -43,6 +43,7 @@ import {
 } from '../tokens.js'
 import { hashAuthKey, verifyAuthKey } from '../verifier.js'
 import { type KdfParams, requireBase64UrlBytes, requireEmail, requireIdentity, requireKdf, requireSealed } from '../validate.js'
+import { grantSudo } from '../sudo.js'
 import { recordActivity } from './activity.js'
 import {
   type TotpState,
@@ -140,6 +141,9 @@ export async function issueSession(app: App, userId: string, event: LambdaEvent,
     ...(family?.name ? { name: family.name } : {}),
   }
   await app.store.put(record)
+  // A fresh sign-in (not a refresh) counts as confirming who you are for
+  // sensitive admin actions, for ten minutes (sudo.ts).
+  if (!family) await grantSudo(app, userId, sid)
   return {
     accessToken: access,
     refreshToken: refresh.token,

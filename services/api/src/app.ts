@@ -9,6 +9,7 @@ import { requireLiveSession } from './context.js'
 import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './http.js'
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { countedSignIn } from './stats.js'
+import { reauth, requireSudo } from './sudo.js'
 import * as insights from './routes/insights.js'
 import { Router } from './router.js'
 import { openapi } from './openapi.js'
@@ -227,23 +228,31 @@ export function buildRouter(app: App): Router {
       return handler(userId, event, param, role)
     }), { permission })
 
+  // Sensitive admin actions also need a recent sign-in or the master password
+  // typed again (phase 3, sudo.ts).
+  const sensitive =
+    (permission: Permission,
+     handler: (userId: string, event: LambdaEvent, param: string, role: Role) => Promise<LambdaResponse>) =>
+    admined(permission, async (userId, event, param, role) => { await requireSudo(app, event); return handler(userId, event, param, role) })
+
+  router.post('/api/auth/reauth', authed((u, e) => reauth(app, u, e)), 'Confirm the master password again, for sensitive admin actions (ten minutes)')
   router.get('/api/admin/overview', admined('overview.read', () => admin.overview(app)), 'Instance counts and health')
   router.get('/api/admin/users', admined('users.read', (_u, e) => admin.listUsers(app, e)), 'Accounts on this server: searched, filtered, sorted and paged')
-  router.post('/api/admin/users/bulk', admined('users.write', (u, e, _p, r) => admin.bulkUsers(app, u, r, e)), 'One action (disable, enable, sign out, reset two-factor) on many accounts')
+  router.post('/api/admin/users/bulk', sensitive('users.write', (u, e, _p, r) => admin.bulkUsers(app, u, r, e)), 'One action (disable, enable, sign out, reset two-factor) on many accounts')
   router.get('/api/admin/users/:id', admined('users.read', (_u, _e, id) => admin.userDetail(app, id)), 'One account in full: devices, organizations, activity')
   router.put('/api/admin/users/:id/label', admined('users.write', (u, e, id, r) => admin.setLabel(app, u, r, e, id)), 'Label an account')
-  router.put('/api/admin/users/:id/role', admined('roles.write', (u, e, id, r) => admin.setRole(app, u, r, e, id)), 'Change an account\'s staff role')
+  router.put('/api/admin/users/:id/role', sensitive('roles.write', (u, e, id, r) => admin.setRole(app, u, r, e, id)), 'Change an account\'s staff role')
   router.put('/api/admin/users/:id/disabled', admined('users.write', (u, e, id, r) => admin.setDisabled(app, u, r, e, id)), 'Disable or enable an account')
-  router.post('/api/admin/users/:id/offboard', admined('users.write', (u, _e, id, r) => admin.offboard(app, u, r, id)), 'Offboard an account: disable, sign out, remove from organizations')
+  router.post('/api/admin/users/:id/offboard', sensitive('users.write', (u, _e, id, r) => admin.offboard(app, u, r, id)), 'Offboard an account: disable, sign out, remove from organizations')
   router.post('/api/admin/users/:id/revoke-sessions', admined('users.write', (u, _e, id, r) => admin.revokeSessions(app, u, r, id)), 'Sign an account out everywhere')
   router.get('/api/admin/vault-requests', admined('users.read', () => signup.listRequests(app)), 'Requests for a vault from accounts without one')
   router.post('/api/admin/vault-requests/:id/approve', admined('invites.write', (u, _e, id) => signup.decide(app, u, id, true)), 'Approve a request for a vault; the person is emailed')
   router.post('/api/admin/vault-requests/:id/decline', admined('invites.write', (u, _e, id) => signup.decide(app, u, id, false)), 'Decline a request for a vault')
-  router.post('/api/admin/users/:id/reset-account-password', admined('users.write', (u, _e, id, r) => admin.resetAccountPassword(app, u, r, id)), 'Clear an account\'s account password, so they set a new one after signing in with the master password')
-  router.post('/api/admin/users/:id/reset-2fa', admined('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)), 'Turn off an account\'s two-factor sign-in')
-  router.post('/api/admin/users/:id/delete', admined('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)), 'Delete an account and its vault')
+  router.post('/api/admin/users/:id/reset-account-password', sensitive('users.write', (u, _e, id, r) => admin.resetAccountPassword(app, u, r, id)), 'Clear an account\'s account password, so they set a new one after signing in with the master password')
+  router.post('/api/admin/users/:id/reset-2fa', sensitive('users.write', (u, _e, id, r) => admin.resetTwoFactor(app, u, r, id)), 'Turn off an account\'s two-factor sign-in')
+  router.post('/api/admin/users/:id/delete', sensitive('users.write', (u, e, id, r) => admin.deleteUser(app, u, r, e, id)), 'Delete an account and its vault')
   router.get('/api/admin/settings', admined('overview.read', () => admin.getSettingsRoute(app)), 'Registration mode and instance profile')
-  router.put('/api/admin/settings', admined('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode or the instance profile')
+  router.put('/api/admin/settings', sensitive('settings.write', (u, e) => admin.putSettingsRoute(app, u, e)), 'Change the registration mode or the instance profile')
   router.get('/api/admin/invites', admined('invites.read', () => admin.listInvitesRoute(app)), 'Open invitations')
   router.post('/api/admin/invites', admined('invites.write', (u, e, _p, r) => admin.createInviteRoute(app, u, r, e)), 'Create an invitation code')
   router.post('/api/admin/company-invites', admined('invites.write', (u, e) => admin.createCompanyInviteRoute(app, u, e)), 'Invite a company: the code lets its admin create one company (hosted)')
@@ -256,7 +265,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/backup/run', admined('settings.write', (u) => admin.requestBackup(app, u)), 'Ask the server to take a backup now')
   router.post('/api/admin/mail/test', admined('settings.write', (u, e) => admin.testMail(app, u, e)), 'Send a test email')
   router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
-  router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
+  router.delete('/api/admin/orgs/:org', sensitive('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/update', admined('overview.read', (_u, e) => admin.updateRoute(app, e)), 'This version, and whether a newer release is out')
   router.get('/api/admin/insights', admined('overview.read', () => insights.insights(app)), 'What needs attention, and sign-ins per day')
   router.get('/api/admin/reports', admined('audit.read', () => insights.reportList()), 'The reports on offer')

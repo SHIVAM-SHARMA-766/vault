@@ -89,7 +89,35 @@ const ADMIN_LIMIT: Limit = { max: 300, windowSeconds: 15 * 60 }
 export async function guard(app: App, userId: string, permission: Permission): Promise<Role> {
   const role = await requirePermission(app, userId, permission)
   await enforce(app.store, 'admin', userId, ADMIN_LIMIT, app.now())
+  // Staff must have two-factor sign-in, when the policy says so (phase 3).
+  // Turning it on in Settings → Security is not an admin route, so nobody is
+  // locked out of fixing it.
+  if ((await getSettings(app)).policy.requireStaffTwoFactor && !hasSecondFactor(await app.store.get(userPk(userId), PROFILE_SK))) {
+    throw new HttpError(403, 'staff_two_factor_required', 'This server requires staff to use two-factor sign-in. Turn it on in Settings → Security, then come back.')
+  }
   return role
+}
+
+/** Tells the other owners and admins about a change to who runs this server
+ *  or how (phase 3): a role, a policy, registration, a deleted account. Best
+ *  effort, after the change; the audit log is the record. */
+export async function alertStaff(app: App, actor: string, what: string): Promise<void> {
+  if (!app.mailer) return
+  try {
+    const registry = await listRegistry(app)
+    const by = registry.find((r) => r.userId === actor)
+    const who = (by && (emailOf(app, by) ?? by.label)) || 'An administrator'
+    const { profile } = await getSettings(app)
+    const name = profile.name || 'Vault'
+    const text = `${who} ${what} on ${name} (${app.config.origin}) at ${new Date(app.now()).toUTCString()}.\n\nIf you did not expect this, check Admin console → Audit log, and the account that did it.\n\nSent to every owner and admin of this server.`
+    for (const r of registry) {
+      if (r.userId === actor || r.disabled) continue
+      const role = roleFromDigest(app, r.emailDigest, r.role)
+      if (role !== 'owner' && role !== 'admin') continue
+      const to = emailOf(app, r)
+      if (to) void notify(app, { to, subject: `${name}: ${what}`, text })
+    }
+  } catch { /* the audit log has it */ }
 }
 
 interface UserSummary {
@@ -401,6 +429,7 @@ export async function setRole(app: App, actor: string, actorRole: Role, event: L
   await audit(app, actor, 'user.role', id, role)
   const { role: _old, ...rest } = fieldsOf(reg)
   await putRegistry(app, { ...rest, ...(role !== 'user' ? { role } : {}) })
+  void alertStaff(app, actor, `made ${emailOf(app, reg) ?? reg.label ?? 'an account'} ${role === 'user' ? 'a plain user' : `${/^[aeiou]/.test(role) ? 'an' : 'a'} ${role}`}`)
   return json(200, { ok: true })
 }
 
@@ -493,7 +522,9 @@ export async function deleteUser(app: App, actor: string, actorRole: Role, event
   const { owned } = await leaveAllOrgs(app, id, true)
   if (owned.length) throw new HttpError(409, 'conflict', `This account owns ${owned.length} organization(s) (${owned.join(', ')}). Delete them first under Organizations.`)
   await audit(app, actor, 'user.delete', id, reg.label)
+  const gone = emailOf(app, reg) ?? reg.label ?? 'an account'
   await eraseAccount(app, id, reg.emailDigest)
+  void alertStaff(app, actor, `deleted the account ${gone}`)
   return json(200, { ok: true })
 }
 
@@ -541,6 +572,9 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
     const ip = event.requestContext.http.sourceIp
     if (!allowedFrom(policy.allowedNetworks, ip)) throw badRequest(`Your own address (${ip}) is not in the sign-in list. Add it first, or you would be signed out.`)
     if (policy.requireSso && !app.config.oidc) throw badRequest('Single sign-on is not set up on this server (OIDC_ISSUER), so it cannot be required.')
+    if (policy.requireStaffTwoFactor && !current.policy.requireStaffTwoFactor && !hasSecondFactor(await app.store.get(userPk(actor), PROFILE_SK))) {
+      throw badRequest('Turn on two-factor sign-in for your own account first (Settings → Security), or this policy would shut you out of the admin console.')
+    }
     await audit(app, actor, 'settings.policy', undefined, describePolicy(policy))
   }
   let templates = current.templates
@@ -549,6 +583,8 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
     await audit(app, actor, 'settings.templates', undefined, Object.keys(templates).join(',') || 'defaults')
   }
   await putSettings(app, { registration, profile, policy, templates, updatedAt: new Date(app.now()).toISOString() })
+  if (registration !== current.registration) void alertStaff(app, actor, `changed registration to "${registration}"`)
+  if (body.policy !== undefined && describePolicy(policy) !== describePolicy(current.policy)) void alertStaff(app, actor, `changed the server policies (${describePolicy(policy)})`)
   // A shortened retention period takes effect now, not at the next pass.
   if (policy.activityDays < current.policy.activityDays || policy.auditDays < current.policy.auditDays) await applyRetention(app)
   return json(200, { ok: true })
@@ -565,7 +601,7 @@ export function requirePolicy(value: unknown): ServerPolicy {
     const choices = POLICY_CHOICES[k] as readonly unknown[]
     if (!choices.includes(v[k])) throw badRequest(`policy.${k} must be one of: ${choices.map((c) => c ?? 'null').join(', ')}.`)
   }
-  for (const k of ['requireSso', 'weeklyDigest']) if (v[k] !== undefined && typeof v[k] !== 'boolean') throw badRequest(`policy.${k} must be true or false.`)
+  for (const k of ['requireSso', 'weeklyDigest', 'requireStaffTwoFactor']) if (v[k] !== undefined && typeof v[k] !== 'boolean') throw badRequest(`policy.${k} must be true or false.`)
   return { ...readPolicy(v), allowedNetworks: requireNetworks(v['allowedNetworks'] ?? []) }
 }
 
@@ -581,6 +617,7 @@ function describePolicy(p: ServerPolicy): string {
     p.allowedNetworks.length ? `networks=${p.allowedNetworks.join(',')}` : null,
     p.requireSso ? 'sso' : null,
     p.weeklyDigest ? null : 'no-digest',
+    p.requireStaffTwoFactor ? 'staff-2fa' : null,
   ].filter(Boolean).join(' ')
 }
 

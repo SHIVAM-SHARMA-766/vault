@@ -1250,3 +1250,4 @@ table.data thead th { position: sticky; top: 0; background: var(--surface); z-in
 .report-card h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; line-height: 1.4; }
 .report-active { border-color: var(--accent); }
 .report-view { margin-top: 4px; }
+.reauth-backdrop { z-index: 60; }

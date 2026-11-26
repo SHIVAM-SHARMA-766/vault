@@ -387,10 +387,13 @@ pull requests with tests.
     compliance, sign-ins (90 days), staff actions (30 days), organizations.
   - A weekly digest to owners and admins (policy `weeklyDigest`, on by default).
   - The server keeps daily counters only (sign-ins, failed sign-ins, new vaults), for 400 days.
-- [ ] **Phase 3: admin safety.**
-  - Confirm who you are again before sensitive actions.
-  - Two-factor sign-in required for staff roles.
-  - Alerts for a sign-in from a new device and for owner changes.
+- [x] **Phase 3: admin safety.**
+  - Sensitive actions need the master password in the last ten minutes on that device
+    (a sign-in counts, a refresh does not); the console asks and retries.
+  - `requireStaffTwoFactor` keeps staff without two-factor out of the console; it cannot be
+    turned on by someone without it.
+  - Role, policy and registration changes and deletions are emailed to the other owners and
+    admins. (New-device sign-in emails already exist per account: Settings → sign-in email.)
 - [ ] **Phase 4: hosted tenants.**
   - A page per tenant, with seat limits and suspend / resume.
   - Domain verification, so a company's addresses join its tenant.
