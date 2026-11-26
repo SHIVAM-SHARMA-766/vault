@@ -16,7 +16,7 @@ import { createServer } from 'node:http'
 
 import { chromium } from 'playwright-core'
 
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 const ROOT = new URL('../../', import.meta.url).pathname
 const EXT = `${ROOT}apps/extension/dist/chrome-test`
@@ -74,6 +74,7 @@ async function connect(popup, s, email) {
   await popup.getByRole('button', { name: 'Connect' }).click()
   await popup.waitForSelector('h1:has-text("Unlock")')
   await popup.fill('#email', email)
+  await popup.fill('#account-password', ACCOUNT_PASSWORD)
   await popup.fill('#password', PASSWORD)
   await popup.getByRole('button', { name: 'Unlock' }).click()
 }
@@ -110,6 +111,7 @@ test('the extension connects, unlocks, fills the right site and nothing else, an
     await popup.getByRole('button', { name: 'Connect' }).click()
     await popup.waitForSelector('h1:has-text("Unlock")')
     await popup.fill('#email', EMAIL)
+    await popup.fill('#account-password', ACCOUNT_PASSWORD)
     await popup.fill('#password', PASSWORD)
     await popup.getByRole('button', { name: 'Unlock' }).click()
 
@@ -149,6 +151,7 @@ test('the extension connects, unlocks, fills the right site and nothing else, an
     await again.waitForSelector('h1:has-text("Unlock")')
 
     // Unlock again, then let the idle limit pass: the next look is locked.
+    await again.fill('#account-password', ACCOUNT_PASSWORD)
     await again.fill('#password', PASSWORD)
     await again.getByRole('button', { name: 'Unlock' }).click()
     await again.waitForSelector('section[aria-label="All items"]', { timeout: 60_000 })

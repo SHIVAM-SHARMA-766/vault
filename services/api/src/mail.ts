@@ -102,6 +102,15 @@ export function signInNotice(origin: string, device: string, ip: string, at: str
       }
 }
 
+/** An account-password reset link (decisions/0036). The link carries a
+ *  single-use code in its fragment, which never reaches a server log. */
+export function accountResetMessage(origin: string, email: string, code: string): Omit<Message, 'to'> {
+  return {
+    subject: 'Reset your Vault account password',
+    text: `Someone asked to reset the account password for ${email}. If it was you, open this link within 30 minutes:\n\n${origin}/app/#account-reset=${encodeURIComponent(code)}&email=${encodeURIComponent(email)}\n\nThis changes only the account password, the first step of signing in. Your vault still opens only with your master password, which nobody can reset.\nIf it was not you, ignore this message: nothing has changed.${footer(origin)}`,
+  }
+}
+
 export function inviteMessage(origin: string, code: string, label: string, expiresAt: string): Omit<Message, 'to'> {
   return {
     template: 'invite',

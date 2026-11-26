@@ -23,7 +23,6 @@ test('change the master password; the new one unlocks, the old one does not', as
     await page.waitForSelector('text=Master password changed', { timeout: 60_000 })
 
     await page.getByRole('button', { name: 'Lock vault' }).click()
-    await page.fill('#email', 'carol@example.test')
     await page.fill('#password', PASSWORD)
     await page.click('button[type=submit]')
     await page.waitForSelector('.alert-error', { timeout: 60_000 })

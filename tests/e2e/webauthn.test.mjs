@@ -5,7 +5,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 async function virtualKey(page) {
   const cdp = await page.context().newCDPSession(page)
@@ -33,13 +33,16 @@ test('add a security key, sign in with it, then remove it', async () => {
     await page.waitForSelector('section[aria-labelledby=s-keys] .device-row:has-text("YubiKey 5")')
 
     // Sign in again: the key is asked for, and answers.
-    await page.getByRole('button', { name: 'Lock vault' }).click()
+    await s.menu(page, 'Sign out of this device')
     await page.fill('#email', 'keys@example.test')
-    await page.fill('#password', PASSWORD)
+    await page.fill('#account-password', ACCOUNT_PASSWORD)
     await page.click('button[type=submit]')
     await page.waitForSelector('text=Use your passkey or security key')
     await page.getByRole('button', { name: 'Use my key' }).click()
-    await page.waitForSelector('.topbar')
+    await page.waitForSelector('.account-line', { timeout: 60_000 })
+    await page.fill('#password', PASSWORD)
+    await page.click('button[type=submit]')
+    await page.waitForSelector('.topbar', { timeout: 60_000 })
 
     // Remove it with the password and the key itself.
     await s.settings(page, 'Security')

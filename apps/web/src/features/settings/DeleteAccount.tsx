@@ -7,6 +7,7 @@ import { useState } from 'react'
 
 import { ApiError, api } from '../../lib/api.js'
 import { Link, href } from '../../lib/router.js'
+import { forgetAccount } from '../../lib/account.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconTrash } from '../../ui/icons.js'
 import { PasswordInput } from '../../ui/kit.js'
@@ -26,6 +27,7 @@ export function DeleteAccount({ state, twoFactor }: { state: session.Unlocked; t
     try {
       const currentAuthKey = await proveCurrent(state, password)
       await api.deleteAccount(await session.token(), { currentAuthKey, confirm: 'DELETE', ...(twoFactor ? { totpCode: code.replace(/\s+/g, '') } : {}) })
+      forgetAccount()
       session.lock()
     } catch (err) {
       setError(err instanceof ApiError && err.status === 401

@@ -50,6 +50,7 @@
     --warn: #fbbf24;
     --warn-soft: #2a2111;
     --ok: #4ade80;
+    --ok-text: #86efac;
     --shadow: 0 1px 2px rgb(0 0 0 / .4);
     --shadow-lg: 0 16px 40px rgb(0 0 0 / .5);
     color-scheme: dark;
@@ -73,6 +74,7 @@
   --warn: #fbbf24;
   --warn-soft: #2a2111;
   --ok: #4ade80;
+  --ok-text: #86efac;
   --shadow: 0 1px 2px rgb(0 0 0 / .4);
   --shadow-lg: 0 16px 40px rgb(0 0 0 / .5);
   color-scheme: dark;
@@ -671,6 +673,9 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); color: var(--text); }
 .menu-sep { height: 1px; margin: 4px 0; background: var(--line); }
 .boot { display: grid; place-items: center; height: 100%; color: var(--muted); }
+.pw-group { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 16px; }
+.pw-group legend { font-weight: 600; padding: 0 6px; font-size: 13px; }
+.pw-group > .hint { margin-top: 0; }
 .auth-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
 .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .auth-or + .btn svg { margin-right: 6px; vertical-align: -3px; }

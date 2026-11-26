@@ -13,6 +13,7 @@ import { featuresOf } from '../edition.js'
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { type TemplateKind, TEMPLATE_KINDS, applyTemplate, inviteMessage, notify, signInNotice } from '../mail.js'
+import { clearPassword } from './accounts.js'
 import { openTicketCount } from './desk.js'
 import { leaveAllOrgs, purgeOrg } from './orgs.js'
 import { requireEmail } from '../validate.js'
@@ -277,6 +278,16 @@ export async function resetTwoFactor(app: App, actor: string, actorRole: Role, i
   await audit(app, actor, 'user.reset-2fa', id)
   const { totp: _t, recoveryCodes: _r, pendingTotp: _p, webauthn: _w, pendingWebauthn: _pw, webauthnLogin: _wl, ...rest } = profile
   await app.store.put(rest as typeof profile)
+  return json(200, { ok: true })
+}
+
+/** Clears someone's account password (decisions/0036), when they forgot it
+ *  and the server has no mail. They sign in once with the master password
+ *  and choose a new one; their account sign-ins end. */
+export async function resetAccountPassword(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
+  await targetUser(app, actor, actorRole, id, false)
+  await audit(app, actor, 'user.reset-account-password', id)
+  await clearPassword(app, id)
   return json(200, { ok: true })
 }
 

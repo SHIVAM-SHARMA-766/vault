@@ -4,7 +4,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 test('the setup link creates the owner on a server with no accounts', async () => {
   const s = await start({ owner: '' })
@@ -17,6 +17,8 @@ test('the setup link creates the owner on a server with no accounts', async () =
     await page.waitForSelector('h2:has-text("Create the owner account")')
     assert.equal(await page.locator('#r-invite').count(), 0, 'the code is not asked for again')
     await page.fill('#r-email', 'founder@example.test')
+    await page.fill('#r-account', ACCOUNT_PASSWORD)
+    await page.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await page.fill('#r-password', PASSWORD)
     await page.fill('#r-confirm', PASSWORD)
     await page.click('button[type=submit]')
@@ -35,6 +37,8 @@ test('the setup link creates the owner on a server with no accounts', async () =
     const other = await s.person()
     await other.goto(`${s.base}/app/?setup=${encodeURIComponent(code)}`)
     await other.fill('#r-email', 'late@example.test')
+    await other.fill('#r-account', ACCOUNT_PASSWORD)
+    await other.fill('#r-account-confirm', ACCOUNT_PASSWORD)
     await other.fill('#r-password', PASSWORD)
     await other.fill('#r-confirm', PASSWORD)
     await other.click('button[type=submit]')

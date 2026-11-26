@@ -10,9 +10,7 @@ import { PASSWORD, start } from './helpers.mjs'
 
 async function signIn(page, s, email) {
   await page.goto(`${s.base}/app/`)
-  await page.fill('#email', email)
-  await page.fill('#password', PASSWORD)
-  await page.click('button[type=submit]')
+  await s.unlock(page, email, PASSWORD, { wait: false })
 }
 
 /** Settings → Account → Add a secret key; returns the key from the kit. */
@@ -79,18 +77,19 @@ test('a server that drops the flag is refused, and removing the key is honoured'
     await phone.waitForSelector('.topbar', { timeout: 60_000 })
 
     // The server claims the account has no secret key: nothing is sent.
-    await phone.route('**/api/auth/prelogin', async (route) => {
+    // (The master password's settings come with the account sign-in, decisions/0036.)
+    await phone.route('**/api/auth/account/session', async (route) => {
       const res = await route.fetch()
       const body = await res.json()
       delete body.kdf.version
       await route.fulfill({ response: res, json: body })
     })
     let sentLogin = false
-    phone.on('request', (r) => { if (r.url().endsWith('/api/auth/login')) sentLogin = true })
+    phone.on('request', (r) => { if (r.url().endsWith('/api/auth/unlock') || r.url().endsWith('/api/auth/login')) sentLogin = true })
     await signIn(phone, s, email)
     await phone.waitForSelector('text=the server says the account has none')
     assert.equal(sentLogin, false, 'no password-only auth key was sent')
-    await phone.unroute('**/api/auth/prelogin')
+    await phone.unroute('**/api/auth/account/session')
 
     // Removed on the laptop (still signed in); the phone is told and can forget it.
     await laptop.getByRole('button', { name: 'Remove the secret key' }).click()

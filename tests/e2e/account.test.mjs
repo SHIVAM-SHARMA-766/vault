@@ -4,7 +4,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 test('delete my account: password and typed DELETE, then it is gone', async () => {
   const s = await start()
@@ -27,11 +27,11 @@ test('delete my account: password and typed DELETE, then it is gone', async () =
 
     await page.fill('#del-pw', PASSWORD)
     await button.click()
-    await page.waitForSelector('#email', { timeout: 60_000 })
+    await page.waitForSelector('#account-password', { timeout: 60_000 })
 
     // The account no longer exists.
     await page.fill('#email', 'leaving@example.test')
-    await page.fill('#password', PASSWORD)
+    await page.fill('#account-password', ACCOUNT_PASSWORD)
     await page.click('button[type=submit]')
     await page.waitForSelector('.alert-error', { timeout: 60_000 })
   } finally {

@@ -26,7 +26,7 @@ test('sign up, add an entry, lock, unlock, and it is still there', async () => {
     await page.waitForSelector('.detail-head')
 
     await page.getByRole('button', { name: 'Lock vault' }).click()
-    await page.waitForSelector('#email')
+    await page.waitForSelector('#password')
     await s.unlock(page, 'alice@example.test')
     await page.waitForSelector('.row-item')
     assert.match(await page.textContent('.rows'), /GitHub/)
@@ -42,11 +42,10 @@ test('a wrong master password is refused without saying which part was wrong', a
     const page = await s.person()
     await s.register(page, 'bob@example.test')
     await page.getByRole('button', { name: 'Lock vault' }).click()
-    await page.fill('#email', 'bob@example.test')
     await page.fill('#password', 'not the passphrase at all')
     await page.click('button[type=submit]')
     await page.waitForSelector('.alert-error', { timeout: 60_000 })
-    assert.equal(await page.textContent('.alert-error'), 'Wrong email or master password.')
+    assert.equal(await page.textContent('.alert-error'), 'That master password is not right.')
   } finally {
     await s.stop()
   }

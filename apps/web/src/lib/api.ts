@@ -91,6 +91,9 @@ async function request<T>(
       Number.isFinite(retryAfter) ? retryAfter : undefined,
     )
     if (payload['details'] !== undefined) error.details = payload['details'] as NonNullable<ApiError['details']>
+    // A wrong master password at unlock hands back the account sign-in's
+    // replacement, which the app must keep (decisions/0036).
+    if (typeof payload['accountToken'] === 'string') error.details = { accountToken: payload['accountToken'] }
     throw error
   }
 
@@ -189,7 +192,27 @@ export const api = {
     /** A provisioning ticket from single sign-on (decisions/0021). */
     ssoTicket?: string
     identity?: Identity
-  }) => request<Session & { userId: string }>('POST', '/api/auth/register', { body }),
+    /** The account password (decisions/0036). */
+    account?: Record<string, unknown>
+    masterCheck?: string
+  }) => request<Session & { userId: string; accountToken?: string }>('POST', '/api/auth/register', { body }),
+
+  /** Signing in in two steps (decisions/0036): the account, then the vault. */
+  account: {
+    prelogin: (email: string) => request<{ account: { salt: string; m: number; t: number; p: number } }>('POST', '/api/auth/account/prelogin', { body: { email } }),
+    /** No proof with a single sign-on ticket: the provider did the account step. */
+    login: (email: string, accountProof: string | undefined, second?: SecondFactor, ssoTicket?: string) =>
+      request<{ accountToken: string; kdf: KdfParams }>('POST', '/api/auth/account/login', { body: { email, ...(accountProof ? { accountProof } : {}), ...second, ...(ssoTicket ? { ssoTicket } : {}) } }),
+    session: (accountToken: string) => request<{ kdf: KdfParams }>('POST', '/api/auth/account/session', { body: { accountToken } }),
+    unlock: (accountToken: string, authKey: string) =>
+      request<Session & { accountToken: string; wrappedVaultKey: string; kdf: KdfParams }>('POST', '/api/auth/unlock', { body: { accountToken, authKey } }),
+    signOut: (accountToken: string) => request<{ ok: true }>('POST', '/api/auth/account/signout', { body: { accountToken } }),
+    forgot: (email: string) => request<{ ok: true; mail: boolean }>('POST', '/api/auth/account/forgot', { body: { email } }),
+    reset: (email: string, code: string, body: { account: object; masterCheck?: string }) =>
+      request<{ ok: true }>('POST', '/api/auth/account/reset', { body: { email, code, ...body } }),
+    setPassword: (token: string, body: { account: object; masterCheck?: string; currentAccountProof?: string }) =>
+      request<{ accountToken: string }>('PUT', '/api/auth/account/password', { token, body }),
+  },
 
   /** Which account a single sign-on ticket is for (decisions/0021). */
   ssoTicket: (ticket: string) =>
@@ -204,7 +227,7 @@ export const api = {
   /** `second` is the two-factor code, when the server has asked for one
    *  (ApiError code 'two_factor_required'). */
   login: (email: string, authKey: string, second?: SecondFactor, ssoTicket?: string) =>
-    request<Session & { wrappedVaultKey: string; kdf: KdfParams }>(
+    request<Session & { wrappedVaultKey: string; kdf: KdfParams; needsAccountPassword?: boolean }>(
       'POST', '/api/auth/login', { body: { email, authKey, ...second, ...(ssoTicket ? { ssoTicket } : {}) } },
     ),
 
@@ -278,7 +301,7 @@ export const api = {
   /** Self-reported strength (0–4) of the master password, for organization policies. */
   passwordScore: (token: string, score: number) => request<{ ok: true }>('PUT', '/api/auth/password-score', { token, body: { score } }),
   me: (token: string) =>
-    request<{ userId: string; canCreateCompany?: boolean; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; passkeys?: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[]; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
+    request<{ userId: string; canCreateCompany?: boolean; kdf: KdfParams; wrappedVaultKey: string; createdAt: string; isAdmin: boolean; role: Role; permissions: Permission[]; identity: Identity | null; twoFactor: { enabled: boolean; totp: boolean; recoveryCodesLeft: number; keys: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[] }; passkeys?: { id: string; name: string; createdAt: string; lastUsedAt: string | null }[]; account?: { set: boolean; setAt?: string }; policy: Pick<ServerPolicy, 'requireTwoFactor' | 'minPasswordScore' | 'maxIdleMinutes' | 'shareLinks' | 'shareLinkMaxDays'>; policyGap: string | null }>(
       'GET', '/api/auth/me', { token },
     ),
 
@@ -474,6 +497,8 @@ export const api = {
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/label`, { token, body: { label } }),
     setRole: (token: string, id: string, role: Role) =>
       request<{ ok: true }>('PUT', `/api/admin/users/${encodeURIComponent(id)}/role`, { token, body: { role } }),
+    resetAccountPassword: (token: string, id: string) =>
+      request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/reset-account-password`, { token }),
     resetTwoFactor: (token: string, id: string) =>
       request<{ ok: true }>('POST', `/api/admin/users/${encodeURIComponent(id)}/reset-2fa`, { token }),
     setDisabled: (token: string, id: string, disabled: boolean) =>

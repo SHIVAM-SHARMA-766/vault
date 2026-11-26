@@ -13,6 +13,7 @@ import {
   type KdfParams,
   SecretKeyFormatError,
   costOf,
+  deriveAccountProof,
   deriveLoginKeys,
   kdfProblem,
   fromBase64Url,
@@ -246,8 +247,31 @@ async function unlock(req: Extract<Request, { type: 'unlock' }>): Promise<Unlock
   try { typed = req.secretKey?.trim() ? await parseSecretKey(req.secretKey) : undefined }
   catch (err) { return { ok: false, needSecretKey: true, error: err instanceof SecretKeyFormatError ? err.message : 'That is not a valid secret key.' } }
 
+  // The second factor, asked for by whichever step checks it.
+  const secondOrError = (err: unknown, wrong: string): UnlockReply => {
+    if (err instanceof ApiError && err.code === 'two_factor_required') {
+      const methods = ((err.details as { methods?: string[] } | undefined)?.methods ?? ['totp', 'recovery']).filter((m) => m !== 'webauthn')
+      return { ok: false, needSecond: methods, error: methods.includes('totp') ? 'Enter the code from your authenticator app.' : 'A security key cannot be used from the extension. Enter one of your recovery codes.' }
+    }
+    if (err instanceof ApiError && err.status === 401) return { ok: false, error: wrong, ...(req.second ? { needSecond: [] } : {}) }
+    return { ok: false, error: err instanceof Error ? err.message : 'Could not sign in.' }
+  }
+
+  // Step one (decisions/0036): the account, with its password and second
+  // factor. Without an account password, the old master-password sign-in,
+  // for accounts that have not set one yet.
   let kdf: KdfParams
-  try { ({ kdf } = await a.prelogin(email)) } catch (err) { return { ok: false, error: err instanceof Error ? err.message : 'Could not reach the server.' } }
+  let accountToken: string | undefined
+  if (req.accountPassword) {
+    try {
+      const { account } = await a.accountPrelogin(email)
+      const r = await a.accountLogin(email, await deriveAccountProof(req.accountPassword, account), req.second)
+      kdf = r.kdf
+      accountToken = r.accountToken
+    } catch (err) { return secondOrError(err, 'Wrong email or account password.') }
+  } else {
+    try { ({ kdf } = await a.prelogin(email)) } catch (err) { return { ok: false, error: err instanceof Error ? err.message : 'Could not reach the server.' } }
+  }
 
   // The web app's rule (decisions/0027): a secret key held here is always
   // used, and a server that says the account has none is not answered.
@@ -265,21 +289,19 @@ async function unlock(req: Extract<Request, { type: 'unlock' }>): Promise<Unlock
   if (held) held.fill(0)
   try {
     let res
-    try {
-      res = await a.login(email, keys.authKey, req.second)
-    } catch (err) {
-      if (err instanceof ApiError && err.code === 'two_factor_required') {
-        const methods = ((err.details as { methods?: string[] } | undefined)?.methods ?? ['totp', 'recovery']).filter((m) => m !== 'webauthn')
-        return {
-          ok: false, needSecond: methods,
-          error: methods.includes('totp') ? 'Enter the code from your authenticator app.'
-            : 'A security key cannot be used from the extension. Enter one of your recovery codes.',
-        }
+    if (accountToken) {
+      // Step two: the master password's proof, with the account sign-in.
+      try { res = await a.unlockVault(accountToken, keys.authKey) } catch (err) {
+        return { ok: false, error: err instanceof ApiError && err.status === 401 ? (kdf.version === 2 ? 'Wrong master password or secret key.' : 'Wrong master password.') : err instanceof Error ? err.message : 'Could not unlock.' }
       }
-      if (err instanceof ApiError && err.status === 401) {
-        return { ok: false, error: kdf.version === 2 ? 'Wrong email, master password or secret key.' : 'Wrong email or master password.', ...(req.second ? { needSecond: [] } : {}) }
+      // The extension keeps its own sign-in in session memory; the account
+      // sign-in is not needed again.
+      void a.accountSignOut(res.accountToken).catch(() => {})
+    } else {
+      try { res = await a.login(email, keys.authKey, req.second) } catch (err) {
+        if (err instanceof ApiError && err.code === 'account_password_required') return { ok: false, needAccountPassword: true, error: 'This account signs in with its account password first. Enter it above.' }
+        return secondOrError(err, kdf.version === 2 ? 'Wrong email, master password or secret key.' : 'Wrong email or master password.')
       }
-      return { ok: false, error: err instanceof Error ? err.message : 'Could not sign in.' }
     }
     const vaultKey = await unwrapVaultKey(res.wrappedVaultKey, keys.kek, 'master')
     if (typed && !held) await storeSecretKey(email, typed).catch(() => {})

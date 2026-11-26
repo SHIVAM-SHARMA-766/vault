@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
-import { createAccount, deriveRecoveryProof } from '@vault/crypto'
+import { createAccount, deriveAccountProof, deriveRecoveryProof, newAccountParams } from '@vault/crypto'
+
+import { saveAccount } from '../../lib/account.js'
 
 import { newKdfCost } from '../../lib/kdf.js'
 import { belowMinimum } from '@vault/core'
@@ -21,6 +23,9 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
   const [email, setEmail] = useState(sso?.email ?? '')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  // The account password (decisions/0036): the first step of every sign-in.
+  const [accountPw, setAccountPw] = useState('')
+  const [accountConfirm, setAccountConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [recoveryKey, setRecoveryKey] = useState('')
@@ -35,6 +40,18 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
     event.preventDefault()
     setError('')
 
+    if (accountPw.length < 10) {
+      setError('The account password must be at least 10 characters.')
+      return
+    }
+    if (accountPw !== accountConfirm) {
+      setError('The two account passwords do not match.')
+      return
+    }
+    if (accountPw === password) {
+      setError('Choose an account password different from the master password: one leaked password must not open both.')
+      return
+    }
     if (password.length < MIN_LENGTH) {
       setError(`The master password must be at least ${MIN_LENGTH} characters.`)
       return
@@ -60,6 +77,8 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
       // The key pair other people will share with. Made here, with the vault
       // key, so every new account has one from the start.
       const identity = await newIdentity(account.vaultKey)
+      const accountParams = newAccountParams()
+      const accountProof = await deriveAccountProof(accountPw, accountParams)
 
       const result = await api.register({
         email,
@@ -71,7 +90,10 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
         ...(inviteCode.trim() && !sso ? { inviteCode: inviteCode.trim() } : {}),
         ...(sso ? { ssoTicket: sso.ticket } : {}),
         identity,
+        account: { ...accountParams, proof: accountProof },
       })
+      // Signed in to the account already: next time only the master password.
+      if (result.accountToken) saveAccount({ email, accountToken: result.accountToken, kdf: account.kdf })
 
       // Shown once. It is never transmitted and cannot be recovered from the
       // server, so the vault stays locked behind this screen until it has been
@@ -164,6 +186,23 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
                value={email} onChange={(e) => setEmail(e.target.value)} />
       </div>
 
+      <fieldset className="pw-group">
+        <legend>Account password</legend>
+        <p className="hint">Step one of every sign-in, with your email (and two-factor, once you turn it on). It can be reset by email.</p>
+        <div className="field">
+          <label htmlFor="r-account">Account password</label>
+          <PasswordInput id="r-account" autoComplete="new-password" required value={accountPw} onChange={setAccountPw} />
+        </div>
+        <div className="field">
+          <label htmlFor="r-account-confirm">Confirm account password</label>
+          <PasswordInput id="r-account-confirm" autoComplete="new-password" required value={accountConfirm} onChange={setAccountConfirm} />
+          {accountConfirm && accountConfirm !== accountPw ? <p className="hint hint-error">The account passwords do not match yet.</p> : null}
+        </div>
+      </fieldset>
+
+      <fieldset className="pw-group">
+      <legend>Master password</legend>
+      <p className="hint">Step two: it opens your vault, in this browser. Different from the account password, and nobody can reset it.</p>
       <div className="field">
         <label htmlFor="r-password">Master password</label>
         <PasswordInput id="r-password" autoComplete="new-password" required
@@ -178,6 +217,7 @@ export function Register({ onDone, onCancel, setupCode = '', inviteCode: invited
                        value={confirm} onChange={setConfirm} />
         {mismatch ? <p className="hint hint-error">The passwords do not match yet.</p> : null}
       </div>
+      </fieldset>
 
       {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
 

@@ -6,7 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { createAccount } from '../../packages/crypto/dist/src/index.js'
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 test('a new account uses Argon2id; a PBKDF2 account upgrades and keeps its items', async () => {
   const s = await start()
@@ -28,7 +28,17 @@ test('a new account uses Argon2id; a PBKDF2 account upgrades and keeps its items
 
     const p2 = await s.person()
     await p2.goto(`${s.base}/app/`)
-    await s.unlock(p2, 'old@example.test')
+    // An account from before account passwords (decisions/0036): the master
+    // password once, then it chooses an account password.
+    await p2.getByRole('button', { name: /First sign-in since accounts were added/ }).click()
+    await p2.fill('#email', 'old@example.test')
+    await p2.fill('#password', PASSWORD)
+    await p2.click('button[type=submit]')
+    await p2.waitForSelector('#new-account', { timeout: 60_000 })
+    await p2.fill('#new-account', ACCOUNT_PASSWORD)
+    await p2.fill('#new-account-confirm', ACCOUNT_PASSWORD)
+    await p2.getByRole('button', { name: 'Save and open my vault' }).click()
+    await p2.waitForSelector('.topbar', { timeout: 60_000 })
     await p2.click('.topbar .btn-primary')
     await p2.fill('#f-name', 'Bank')
     await p2.fill('#f-password', 'a-long-strong-and-unique-password-1')

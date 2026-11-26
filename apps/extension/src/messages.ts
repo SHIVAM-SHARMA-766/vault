@@ -28,7 +28,7 @@ export type Request =
   | { type: 'state' }
   | { type: 'setServer'; url: string }
   | { type: 'forgetServer' }
-  | { type: 'unlock'; email: string; password: string; secretKey?: string; second?: SecondFactorInput }
+  | { type: 'unlock'; email: string; password: string; accountPassword?: string; secretKey?: string; second?: SecondFactorInput }
   | { type: 'forgetSecretKey'; email: string }
   | { type: 'items'; pageUrl?: string }
   | { type: 'reveal'; id: string; field: 'username' | 'password' | 'totp' }
@@ -42,7 +42,7 @@ export interface StateReply { server: string | null; serverName: string | null; 
 
 export type UnlockReply =
   | { ok: true }
-  | { ok: false; error: string; needSecretKey?: boolean; heldButRefused?: boolean; needSecond?: string[] }
+  | { ok: false; error: string; needSecretKey?: boolean; heldButRefused?: boolean; needSecond?: string[]; needAccountPassword?: boolean }
 
 /** `notice`: something the person should know, such as a shared collection
  *  whose key was refused (0025). */

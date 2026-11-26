@@ -558,6 +558,15 @@ function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boole
                           </button>
                         ) : null}
                         {!self ? (
+                          <button className="icon-btn" title="Reset account password" aria-label="Reset account password"
+                                  onClick={async () => {
+                                    if (!window.confirm(`Clear the account password of ${u.label || 'this account'}? They then sign in once with their master password and choose a new one. Use this when they forgot it and this server sends no email. It is recorded in the audit log.`)) return
+                                    await run(toast, (t) => api.admin.resetAccountPassword(t, u.userId), 'Account password cleared')
+                                  }}>
+                            <IconUser size={15} />
+                          </button>
+                        ) : null}
+                        {!self ? (
                           <>
                             <button className="btn btn-secondary btn-sm"
                                     onClick={async () => { if (await run(toast, (t) => api.admin.setDisabled(t, u.userId, !u.disabled), u.disabled ? 'Account enabled' : 'Account disabled')) await reload() }}>

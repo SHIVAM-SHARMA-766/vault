@@ -12,7 +12,7 @@ import { createServer } from 'node:http'
 import { chromium } from 'playwright-core'
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server'
 
-import { PASSWORD, start } from './helpers.mjs'
+import { ACCOUNT_PASSWORD, PASSWORD, start } from './helpers.mjs'
 
 const ROOT = new URL('../../', import.meta.url).pathname
 const EXT = `${ROOT}apps/extension/dist/chrome-test`
@@ -113,6 +113,7 @@ test('Vault saves a passkey a site offers, signs in with it, and keeps it in the
     await popup.getByRole('button', { name: 'Connect' }).click()
     await popup.waitForSelector('h1:has-text("Unlock")')
     await popup.fill('#email', EMAIL)
+    await popup.fill('#account-password', ACCOUNT_PASSWORD)
     await popup.fill('#password', PASSWORD)
     await popup.getByRole('button', { name: 'Unlock' }).click()
     await popup.getByLabel('Save and use passkeys in Vault').click({ timeout: 60_000 })
