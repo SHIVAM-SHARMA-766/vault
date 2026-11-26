@@ -21,46 +21,60 @@ import { chromium } from 'playwright-core'
 
 const BASE = (process.env.BASE ?? '').replace(/\/$/, '')
 const { OWNER_EMAIL, OWNER_PASSWORD, DEMO_PASSWORD } = process.env
+// The account password of every demo account (decisions/0036); the owner's is
+// OWNER_ACCOUNT_PASSWORD (or OWNER_PASSWORD, when the owner chose the same).
+const DEMO_ACCOUNT_PASSWORD = process.env.DEMO_ACCOUNT_PASSWORD ?? ''
+const OWNER_ACCOUNT_PASSWORD = process.env.OWNER_ACCOUNT_PASSWORD ?? OWNER_PASSWORD
 const OUT = process.env.DEMO_OUT ?? 'demo-accounts.json'
-if (!BASE || !OWNER_EMAIL || !OWNER_PASSWORD || !DEMO_PASSWORD) {
-  console.error('Set BASE, OWNER_EMAIL, OWNER_PASSWORD and DEMO_PASSWORD.')
+if (!BASE || !OWNER_EMAIL || !OWNER_PASSWORD || !DEMO_PASSWORD || !DEMO_ACCOUNT_PASSWORD) {
+  console.error('Set BASE, OWNER_EMAIL, OWNER_PASSWORD, DEMO_PASSWORD and DEMO_ACCOUNT_PASSWORD.')
   process.exit(2)
 }
 
 // ── Who ─────────────────────────────────────────────────────────────────────
 
-const PERSONAL = [
-  { email: 'priya@personal.example', name: 'Priya', items: [['Gmail', 'priya@gmail.example', 'https://mail.google.com'], ['Netflix', 'priya.s', 'https://netflix.com'], ['HDFC NetBanking', 'priya1990', 'https://netbanking.hdfcbank.com']] },
-  { email: 'rahul@personal.example', name: 'Rahul', items: [['GitHub', 'rahul-dev', 'https://github.com'], ['Amazon', 'rahul@mail.example', 'https://amazon.in']] },
+// Reserved .example addresses: the server never mails them (decisions/0037).
+const FIRST = ['Priya', 'Rahul', 'Aarav', 'Diya', 'Kabir', 'Meera', 'Rohan', 'Sara', 'Vikram', 'Ananya', 'Arjun', 'Isha', 'Nikhil', 'Pooja', 'Siddharth', 'Tanvi', 'Yash', 'Zoya', 'Dev', 'Neha']
+const SITES = [
+  ['Gmail', 'https://mail.google.com'], ['Netflix', 'https://netflix.com'], ['GitHub', 'https://github.com'], ['Amazon', 'https://amazon.in'],
+  ['HDFC NetBanking', 'https://netbanking.hdfcbank.com'], ['LinkedIn', 'https://linkedin.com'], ['Spotify', 'https://spotify.com'], ['Swiggy', 'https://swiggy.com'],
 ]
+// Twenty people with their own vaults, none in an organization.
+const PERSONAL = FIRST.map((name, i) => ({
+  email: `${name.toLowerCase()}@personal.example`, name,
+  items: [0, 1, 2].map((k) => { const [site, url] = SITES[(i + k * 3) % SITES.length]; return [site, `${name.toLowerCase()}${k ? `.${k}` : ''}@mail.example`, url] }),
+}))
 
-const TENANTS = [
-  {
-    org: 'Acme Corp',
-    admin: { email: 'anita@acme.example', name: 'Anita (admin)' },
-    members: [{ email: 'ben@acme.example', name: 'Ben' }, { email: 'chen@acme.example', name: 'Chen' }],
-    groups: [{ name: 'Engineering', members: ['ben@acme.example', 'chen@acme.example'] }],
-    collections: [
-      { name: 'Engineering', group: 'Engineering', perm: 'edit', items: [['AWS console', 'acme-ops', 'https://console.aws.amazon.com'], ['Grafana', 'admin', 'https://grafana.acme.example']] },
-      { name: 'Finance', people: [{ email: 'chen@acme.example', perm: 'view', hide: true }], items: [['Payroll portal', 'payroll@acme.example', 'https://payroll.acme.example']] },
-    ],
-    items: [['Acme Slack', 'anita@acme.example', 'https://acme.slack.com']],
-  },
-  {
-    org: 'Globex',
-    admin: { email: 'gita@globex.example', name: 'Gita (admin)' },
-    members: [{ email: 'hari@globex.example', name: 'Hari' }],
-    groups: [],
-    collections: [
-      { name: 'Operations', people: [{ email: 'hari@globex.example', perm: 'edit' }], items: [['Router admin', 'admin', 'https://192.168.1.1'], ['Office Wi-Fi portal', 'globex', 'https://wifi.globex.example']] },
-    ],
-    items: [],
-  },
+// Five companies of 5 to 8 people each. Nobody is also a personal account:
+// one address is one account (the server refuses a second).
+const COMPANIES = [
+  { org: 'Acme Corp', domain: 'acme.example', admin: 'Anita', people: ['Ben', 'Chen', 'Divya', 'Farhan', 'Gauri'] },
+  { org: 'Globex', domain: 'globex.example', admin: 'Gita', people: ['Hari', 'Irfan', 'Jaya', 'Karan'] },
+  { org: 'Initech', domain: 'initech.example', admin: 'Lata', people: ['Manoj', 'Nisha', 'Omar', 'Parul', 'Qasim', 'Ritu'] },
+  { org: 'Umbrella Health', domain: 'umbrella.example', admin: 'Sameer', people: ['Tara', 'Uday', 'Vani', 'Waseem', 'Ximena', 'Yusuf', 'Zara'] },
+  { org: 'Stark Logistics', domain: 'stark.example', admin: 'Aditi', people: ['Bharat', 'Chitra', 'Dhruv', 'Esha', 'Faisal'] },
 ]
+const TENANTS = COMPANIES.map((c) => {
+  const members = c.people.map((n) => ({ email: `${n.toLowerCase()}@${c.domain}`, name: n }))
+  const team = members.map((m) => m.email)
+  return {
+    org: c.org,
+    admin: { email: `${c.admin.toLowerCase()}@${c.domain}`, name: `${c.admin} (admin)` },
+    members,
+    groups: [{ name: 'Team', members: team }],
+    collections: [
+      { name: 'Team', group: 'Team', perm: 'edit', items: [['Slack', `team@${c.domain}`, `https://${c.org.split(' ')[0].toLowerCase()}.slack.com`], ['Grafana', 'admin', `https://grafana.${c.domain}`]] },
+      { name: 'Finance', people: [{ email: members[0].email, perm: 'view', hide: true }], items: [['Payroll portal', `payroll@${c.domain}`, `https://payroll.${c.domain}`]] },
+    ],
+    items: [['Company email', `${c.admin.toLowerCase()}@${c.domain}`, `https://mail.${c.domain}`]],
+  }
+})
 
 // ── State ───────────────────────────────────────────────────────────────────
 
 const state = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : { server: BASE, accounts: {}, tenants: {} }
+// The same server under a new address (a domain move) keeps its state.
+state.server = BASE
 const save = () => writeFileSync(OUT, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -109,11 +123,32 @@ async function rateLimited(page) {
   return true
 }
 
+/** Signs in (decisions/0036): the account, then the master password. An
+ *  account from before account passwords signs in once with the master
+ *  password and is given its account password. */
 async function unlock(page, email, password) {
   signIns.set(page, { email, password })
+  const accountPassword = email === OWNER_EMAIL ? OWNER_ACCOUNT_PASSWORD : DEMO_ACCOUNT_PASSWORD
   for (;;) {
     await go(page, `${BASE}/app/`)
-    await page.fill('#email', email)
+    await page.locator('#account-password, .account-line').first().waitFor({ timeout: 60_000 })
+    if (await page.locator('.account-line').count()) {
+      if ((await page.textContent('.account-line strong'))?.trim() !== email) { await page.getByRole('button', { name: 'Not you? Sign out' }).click(); continue }
+    } else {
+      await page.fill('#email', email)
+      await page.fill('#account-password', accountPassword)
+      await page.click('button[type=submit]')
+      const r = await Promise.race([
+        page.waitForSelector('.account-line', { timeout: 90_000 }).then(() => 'in'),
+        page.waitForSelector('.alert-error', { timeout: 90_000 }).then(() => 'error'),
+      ])
+      if (r === 'error') {
+        if ((await page.textContent('.alert-error'))?.includes('Wrong email or account password')) { await legacy(page, email, password, accountPassword); return }
+        if (await rateLimited(page)) continue
+        throw new Error(`${email}: ${await page.textContent('.alert-error')}`)
+      }
+    }
+    await page.locator('button[type=submit]:not([disabled])').first().waitFor({ timeout: 30_000 }).catch(() => {})
     await page.fill('#password', password)
     await page.click('button[type=submit]')
     const r = await Promise.race([
@@ -121,8 +156,23 @@ async function unlock(page, email, password) {
       page.waitForSelector('.alert-error', { timeout: 90_000 }).then(() => 'error'),
     ])
     if (r === 'ok') return
-    if (!(await rateLimited(page))) return
+    if (!(await rateLimited(page))) throw new Error(`${email}: ${await page.textContent('.alert-error')}`)
   }
+}
+
+/** The one-time sign-in of an account that has no account password yet. */
+async function legacy(page, email, password, accountPassword) {
+  await page.getByRole('button', { name: /First sign-in since accounts were added/ }).click()
+  await page.fill('#email', email)
+  await page.fill('#password', password)
+  await page.click('button[type=submit]')
+  await page.locator('#new-account').or(page.locator('.alert-error')).first().waitFor({ timeout: 90_000 })
+  if (await page.locator('.alert-error').count()) throw new Error(`${email}: ${await page.textContent('.alert-error')}`)
+  await page.fill('#new-account', accountPassword)
+  await page.fill('#new-account-confirm', accountPassword)
+  await page.getByRole('button', { name: 'Save and open my vault' }).click()
+  await page.waitForSelector('.topbar', { timeout: 90_000 })
+  log(`${email}: account password set`)
 }
 
 /** Who each page is signed in as, to unlock it again after the idle lock:
@@ -153,10 +203,16 @@ async function inviteCode(owner, label) {
 
 /** On a server where companies are invited (decisions/0033), the code that
  *  lets a tenant's admin create their company; elsewhere, a plain invitation. */
+let companiesInvited
 async function companyCode(owner, company) {
+  // Asked of the server, not read off the page: the console's sidebar draws a
+  // moment after it opens, and a plain invitation in its place makes an admin
+  // who can never create their company.
+  companiesInvited ??= (await (await fetch(`${BASE}/api/instance`)).json()).companiesInvited === true
+  if (!companiesInvited) return null
   await menu(owner, 'Admin')
   const tenants = owner.locator('.sidebar .side-item', { hasText: 'Tenants' })
-  if (!(await tenants.count())) return null
+  await tenants.waitFor({ timeout: 30_000 })
   await tenants.click()
   await owner.fill('input[aria-label="Company name"]', company)
   await owner.getByRole('button', { name: 'Create invitation' }).click()
@@ -165,12 +221,13 @@ async function companyCode(owner, company) {
 
 async function register(page, email, code) {
   for (;;) {
-    await go(page, `${BASE}/app/`)
-    await page.getByRole('button', { name: 'Create an account' }).first().click()
-    await page.waitForSelector('#r-invite, button:has-text("I have an invitation code")')
-    if (!(await page.locator('#r-invite').count())) await page.getByRole('button', { name: 'I have an invitation code' }).click()
-    await page.fill('#r-invite', code)
+    // The invitation link opens the one-step sign-up (account password and
+    // master password together): no emailed code to a .example address.
+    await go(page, `${BASE}/app/?invite=${encodeURIComponent(code)}`)
+    await page.waitForSelector('#r-email')
     await page.fill('#r-email', email)
+    await page.fill('#r-account', DEMO_ACCOUNT_PASSWORD)
+    await page.fill('#r-account-confirm', DEMO_ACCOUNT_PASSWORD)
     await page.fill('#r-password', DEMO_PASSWORD)
     await page.fill('#r-confirm', DEMO_PASSWORD)
     await page.click('button[type=submit]')
@@ -181,7 +238,7 @@ async function register(page, email, code) {
     if (r === 'ok') break
     const text = await page.locator('.alert-error').first().innerText()
     if (/could not be created/.test(text)) throw new Error(`${email}: ${text}`)
-    if (!(await rateLimited(page))) throw new Error(`could not register ${email}`)
+    if (!(await rateLimited(page))) throw new Error(`could not register ${email}: ${text}`)
   }
   await page.check('.check input')
   await page.getByRole('button', { name: 'Continue to sign in' }).click()
@@ -223,8 +280,34 @@ async function addItem(page, [name, username, url]) {
   await page.waitForSelector(`.detail h2:has-text("${name}")`)
 }
 
+/** Whether the vault list shows an item of this name. */
+async function inVault(page, name) {
+  await menu(page, 'Vault')
+  await page.waitForSelector('.topbar')
+  const all = page.locator('.sidebar .side-item', { hasText: 'All items' }).first()
+  if (await all.count()) await all.click()
+  await page.locator('.row-item').first().waitFor({ timeout: 5_000 }).catch(() => {})
+  return (await page.locator('.row-item', { hasText: name }).count()) > 0
+}
+
+/** Whether an item of this name is in a collection ("Org / Collection"):
+ *  its details carry the collection's badge. */
+async function inCollection(page, name, where) {
+  await menu(page, 'Vault')
+  await page.waitForSelector('.topbar')
+  const all = page.locator('.sidebar .side-item', { hasText: 'All items' }).first()
+  if (await all.count()) await all.click()
+  const row = page.locator('.row-item', { hasText: name }).first()
+  if (!(await row.waitFor({ timeout: 8_000 }).then(() => true, () => false))) return false
+  await row.click()
+  await page.waitForSelector(`.detail h2:has-text("${name}")`)
+  return (await page.locator('.detail', { hasText: where }).count()) > 0
+}
+
 async function moveTo(page, itemName, where) {
   await menu(page, 'Vault')
+  const all = page.locator('.sidebar .side-item', { hasText: 'All items' }).first()
+  if (await all.count()) await all.click()
   await page.locator('.row-item', { hasText: itemName }).first().click()
   await page.locator('.detail-actions').getByRole('button', { name: 'Share', exact: true }).click()
   await page.selectOption('select[aria-label="Collection"]', { label: where })
@@ -267,7 +350,27 @@ async function orgsPage(page) {
 /** Where an admin manages an organization: a section of the admin console
  *  (decisions/0031), or, on a server from before it, the Organizations page.
  *  Returns the card that holds that section's controls. */
-async function manage(page, org, section) {
+async function manage(page, org, section, tries = 0) {
+  const card = await openSection(page, org, section)
+  // Fast clicking can pass the per-account request limit (300 a minute): the
+  // page then says how long to wait. Wait that long and open it again.
+  const wait = await cooldown(page)
+  if (wait && tries < 5) {
+    await page.waitForTimeout((wait + 2) * 1000)
+    return manage(page, org, section, tries + 1)
+  }
+  await card.waitFor({ timeout: 30_000 })
+  return card
+}
+
+/** Seconds the page asks us to wait, if it shows the rate-limit message. */
+async function cooldown(page) {
+  const alert = page.locator('text=/Too many attempts\\. Wait \\d+ seconds/').first()
+  if (!(await alert.waitFor({ timeout: 2_000 }).then(() => true, () => false))) return 0
+  return Number(/Wait (\d+) seconds/.exec(await alert.innerText())?.[1] ?? 30)
+}
+
+async function openSection(page, org, section) {
   await menu(page, 'Vault')
   await page.waitForSelector('.topbar')
   if (await page.locator('.workspace-switch').count()) {
@@ -283,7 +386,7 @@ async function manage(page, org, section) {
     await page.waitForSelector('h1:has-text("Organizations")')
   }
   const card = page.locator(`.admin-main .org-card[aria-label="${org}"], main .org-card[aria-label="${org}"]`).first()
-  await card.waitFor({ timeout: 30_000 })
+  await card.waitFor({ timeout: 15_000 }).catch(() => {})
   return card
 }
 
@@ -307,20 +410,26 @@ try {
   log('owner signed in')
 
   for (const p of PERSONAL) {
-    const fresh = !state.accounts[p.email]
+    if (state.accounts[p.email]?.items) continue
     const page = await person(owner, p.email, p.name)
-    if (fresh) for (const it of p.items) await addItem(page, it)
+    for (const it of p.items) await addItem(page, it)
+    state.accounts[p.email].items = true; save()
+    // One page per person would be fifty browsers; close what is done.
+    await page.context().close(); pages.delete(p.email)
   }
 
   for (const t of TENANTS) {
     const done = state.tenants[t.org] ?? {}
     const admin = await person(owner, t.admin.email, t.admin.name, t.org)
     for (const m of t.members) await person(owner, m.email, m.name)
-    if (done.complete) { log(`${t.org}: already set up`); continue }
+    if (done.complete && done.members === t.members.length) { log(`${t.org}: already set up`); for (const m of [t.admin, ...t.members]) { await pages.get(m.email)?.context().close(); pages.delete(m.email) } continue }
 
     // The company, its recovery key, collections and groups.
     await orgsPage(admin)
     if (!done.created) {
+      if (!(await admin.locator('#o-name').waitFor({ timeout: 20_000 }).then(() => true, () => false))) {
+        throw new Error(`${t.admin.email} cannot create ${t.org}: the account was made without a company invitation. Delete it in the console and run again.`)
+      }
       await admin.fill('#o-name', t.org)
       await admin.getByRole('button', { name: 'Create', exact: true }).click()
       await admin.waitForSelector('#ork-title')
@@ -428,13 +537,25 @@ try {
       }
     }
 
-    // Items: the admin's own, and shared ones moved into each collection.
-    for (const it of t.items) await addItem(admin, it)
+    // Items: the admin's own, and shared ones moved into each collection
+    // (once: a re-run that adds members does not add them again).
+    // A company set up by an earlier version of this script already has its
+    // admin's items and, at Acme, the Finance collection's.
+    // What is there already is looked up, not assumed: a run that stopped
+    // half way, or a company made by an earlier version of this script.
+    done.coll ??= {}
+    if (!done.adminItems) {
+      for (const it of t.items) if (!(await inVault(admin, it[0]))) await addItem(admin, it)
+      done.adminItems = true; state.tenants[t.org] = done; save()
+    }
     for (const c of t.collections) {
+      if (done.coll[c.name]) continue
       for (const it of c.items) {
-        await addItem(admin, it)
+        if (await inCollection(admin, it[0], `${t.org} / ${c.name}`)) continue
+        if (!(await inVault(admin, it[0]))) await addItem(admin, it)
         await moveTo(admin, it[0], `${t.org} / ${c.name}`)
       }
+      done.coll[c.name] = true; state.tenants[t.org] = done; save()
     }
     // Check: each member opens at least one item shared with them.
     for (const c of t.collections) {
@@ -447,8 +568,10 @@ try {
       }
     }
     done.complete = true
+    done.members = t.members.length
     state.tenants[t.org] = done; save()
     log(`${t.org}: complete`)
+    for (const m of [t.admin, ...t.members]) { await pages.get(m.email)?.context().close(); pages.delete(m.email) }
   }
   log(`done. Accounts and organization recovery keys: ${OUT}`)
 } catch (err) {
