@@ -18,7 +18,7 @@ async function setup() {
   return { h, owner: String(owner['accessToken']), user: String(user['accessToken']), userRefresh: String(user['refreshToken']) }
 }
 
-const POLICY = { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [] as string[], requireSso: false }
+const POLICY = { requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [] as string[], requireSso: false, weeklyDigest: true }
 const setPolicy = (h: Awaited<ReturnType<typeof setup>>['h'], token: string, policy: Record<string, unknown>) =>
   h.request('PUT', '/api/admin/settings', { token, body: { policy: { ...POLICY, ...policy } } })
 
