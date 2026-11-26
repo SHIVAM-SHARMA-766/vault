@@ -754,7 +754,7 @@ staff actions; vault contents never appear, because the server cannot read them.
 
   A sign-in counts for ten minutes, and so does confirming. After that the console asks again
   and then carries on with what you were doing.
-- **Require two-factor sign-in for staff** (Overview → Policies). Staff accounts without it
+- **Staff must use two-factor sign-in** (Overview → Policies). Staff accounts without it
   cannot open the admin console until they turn it on in Settings → Security; their own vault
   still works. You can only turn it on once your own account has two-factor sign-in.
 - **Change alerts.** When someone changes a role, the policies or registration, or deletes an

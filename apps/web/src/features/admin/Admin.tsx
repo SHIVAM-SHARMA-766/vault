@@ -380,7 +380,7 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
       </label>
       <label className="check">
         <input type="checkbox" disabled={!canWrite} checked={form.requireStaffTwoFactor === true} onChange={(e) => setForm({ ...form, requireStaffTwoFactor: e.target.checked })} />
-        <span>Require two-factor sign-in for staff (owners, admins, support, marketing, viewers) before they can open the admin console</span>
+        <span>Staff (owners, admins, support, marketing, viewers) must use two-factor sign-in to open the admin console</span>
       </label>
       <label className="check">
         <input type="checkbox" disabled={!canWrite} checked={form.weeklyDigest !== false} onChange={(e) => setForm({ ...form, weeklyDigest: e.target.checked })} />
