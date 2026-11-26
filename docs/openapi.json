@@ -6214,6 +6214,82 @@
       }
     },
     "/api/admin/orgs/{org}": {
+      "get": {
+        "summary": "One company: seats, domains, accounts at its domains",
+        "operationId": "getAdminOrgsOrg",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Set a company's seat limit, or suspend or resume it (hosted)",
+        "operationId": "putAdminOrgsOrg",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "summary": "Delete an organization and everything in it (operator, audited)",
         "operationId": "deleteAdminOrgsOrg",
@@ -6223,6 +6299,142 @@
         "parameters": [
           {
             "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/orgs/{org}/domains": {
+      "post": {
+        "summary": "Claim a domain for a company: the DNS TXT record to add",
+        "operationId": "postAdminOrgsOrgDomains",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/orgs/{org}/domains/{domain}/verify": {
+      "post": {
+        "summary": "Check the domain's DNS TXT record; verified, it is this company's",
+        "operationId": "postAdminOrgsOrgDomainsDomainVerify",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/orgs/{org}/domains/{domain}": {
+      "delete": {
+        "summary": "Let a company's domain go",
+        "operationId": "deleteAdminOrgsOrgDomainsDomain",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "domain",
             "in": "path",
             "required": true,
             "schema": {

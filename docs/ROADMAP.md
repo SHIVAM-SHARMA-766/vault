@@ -394,9 +394,12 @@ pull requests with tests.
     turned on by someone without it.
   - Role, policy and registration changes and deletions are emailed to the other owners and
     admins. (New-device sign-in emails already exist per account: Settings → sign-in email.)
-- [ ] **Phase 4: hosted tenants.**
-  - A page per tenant, with seat limits and suspend / resume.
-  - Domain verification, so a company's addresses join its tenant.
+- [x] **Phase 4: hosted tenants.**
+  - A panel per tenant: seats used, a seat limit (members and open invitations), suspend and
+    resume (members keep their own vaults; the other owners and admins are told).
+  - Domain verification by a DNS TXT record (`_vault-verify.<domain>`). A verified domain is one
+    company's: sign-ups at it are approved for a vault at once and listed for its admins to
+    invite. Joining still takes an invitation and a fingerprint check.
 
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 

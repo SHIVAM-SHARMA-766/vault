@@ -28,6 +28,7 @@ import { requireEmail } from '../validate.js'
 import { hashAuthKey } from '../verifier.js'
 import { type AccountPassword, issueAccountToken, requireAccountInput } from './accounts.js'
 import { enforce } from '../ratelimit.js'
+import { companyForEmail } from './tenants.js'
 
 const PENDING_SK = 'PENDING'
 const ACCOUNT_SK = 'ACCOUNT'
@@ -165,6 +166,17 @@ export async function requestVault(app: App, event: LambdaEvent): Promise<Lambda
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : ''
   if (p.requestedAt) return json(200, { ok: true, already: true })
   const at = new Date(app.now()).toISOString()
+  // An address at a domain a company verified (admin console phase 4) is
+  // approved at once: that company vouches for its domain.
+  let email = ''
+  try { email = openEmail(app.config.pepper, p.emailSealed) } catch { /* unreadable */ }
+  const company = email ? await companyForEmail(app, email) : null
+  if (company) {
+    await savePending(app, { ...p, approved: true, requestedAt: at, ...(note ? { note } : {}) })
+    await audit(app, 'system', 'vault-request.auto-approve', p.userId, email.split('@')[1])
+    void notify(app, { to: email, ...vaultApprovedMessage(app.config.origin) })
+    return json(200, { ok: true, approved: true })
+  }
   await savePending(app, { ...p, requestedAt: at, ...(note ? { note } : {}) })
   await app.store.put({ pk: SYSTEM_PK, sk: `${REQUEST_PREFIX}${p.userId}`, userId: p.userId, at })
   return json(200, { ok: true })

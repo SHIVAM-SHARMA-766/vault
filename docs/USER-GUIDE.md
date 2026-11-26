@@ -763,6 +763,27 @@ staff actions; vault contents never appear, because the server cannot read them.
 </details>
 
 <details>
+<summary>Hosted: running companies (seats, suspend, domains)</summary>
+
+On a hosted server, Admin console → **Tenants** lists the companies. **Manage** opens one:
+
+- **Seats.** Members and open invitations each take a seat. Set a limit, and at it the company
+  can invite no one new until someone leaves or an invitation is withdrawn. Leave it empty for
+  no limit.
+- **Domains.** Add the company's domain (for example `acme.com`) and the panel shows a DNS TXT
+  record, `_vault-verify.acme.com` with a `vault-verify=…` value. Once it is added at the
+  domain's DNS, **Verify** checks it. A verified domain belongs to that company only.
+  - People who sign up with an address at it get their vault without waiting for approval.
+  - They are listed in the panel for the company's admins to invite.
+  - Joining the company itself still needs an invitation and a fingerprint check: the server
+    cannot hand anyone the company's keys.
+- **Suspend company.** Its members keep their own vaults but cannot open the company's
+  collections, and it takes no one new, until you **Resume** it. The other owners and admins
+  are told by email; suspending and resuming need your master password if you have not
+  confirmed it in the last ten minutes.
+</details>
+
+<details>
 <summary>Users: finding people and acting on many at once</summary>
 
 Admin console → **Users** lists every account, a page at a time (25 to 200 rows), so it stays

@@ -27,6 +27,7 @@ import { Desk } from './Desk.js'
 import { Users } from './Users.js'
 import { Audit } from './AuditLog.js'
 import { NeedsAttention, Reports } from './Insights.js'
+import { TenantPanel } from './Tenants.js'
 import { Website } from './Website.js'
 import { System } from './System.js'
 import { SetupWizard, wizardDone } from './SetupWizard.js'
@@ -743,6 +744,7 @@ function AdminOrgs({ canWrite, canInvite }: { canWrite: boolean; canInvite: bool
   const [company, setCompany] = useState('')
   const [email, setEmail] = useState('')
   const [issued, setIssued] = useState<{ code: string; label: string; expiresAt: string; emailed: boolean } | null>(null)
+  const [managing, setManaging] = useState<string | null>(null)
   return (
     <Section title={hosted ? 'Tenants' : 'Organizations'} sub={hosted
       ? 'The companies on this server. Each runs itself from its own Admin console; names, collections and items are encrypted for their members, and nobody here can open them.'
@@ -775,26 +777,28 @@ function AdminOrgs({ canWrite, canInvite }: { canWrite: boolean; canInvite: bool
       {!data ? <div className="skeletons"><div className="skeleton" /></div> : orgs.length === 0 ? <div className="empty"><h3>{hosted ? 'No tenants yet' : 'No organizations yet'}</h3><p>{hosted ? 'Invite a company above.' : 'Members create them from Account menu → My organizations.'}</p></div> : (
         <div className="table-wrap">
           <table className="data">
-            <thead><tr><th>Name (as typed by its creator)</th><th className="num">Members</th><th className="num">Collections</th><th className="num">Items</th><th>Policies</th><th>Created</th>{canWrite ? <th aria-label="Actions" /> : null}</tr></thead>
+            <thead><tr><th>Name (as typed by its creator)</th><th className="num">Members</th>{hosted ? <th>Seats</th> : null}<th className="num">Collections</th><th className="num">Items</th><th>Policies</th><th>Created</th>{canWrite || hosted ? <th aria-label="Actions" /> : null}</tr></thead>
             <tbody>
               {orgs.map((o) => (
                 <tr key={o.id}>
-                  <td>{o.hint || <span className="muted">Unnamed</span>}{o.rotationDue ? <span className="pill pill-danger" title="A collection key should be rotated by one of its managers">{o.rotationDue} key rotation due</span> : null}</td>
+                  <td>{o.hint || <span className="muted">Unnamed</span>}{o.suspended ? <span className="pill pill-danger"> Suspended</span> : null}{o.domains?.some((d) => d.verifiedAt) ? <span className="pill pill-ok" title={o.domains.filter((d) => d.verifiedAt).map((d) => d.domain).join(', ')}> Domain verified</span> : null}{o.rotationDue ? <span className="pill pill-danger" title="A collection key should be rotated by one of its managers">{o.rotationDue} key rotation due</span> : null}</td>
                   <td className="num" title={`${o.awaiting} awaiting confirmation, ${o.pending} invited`}>{o.members}{o.awaiting + o.pending ? <span className="muted"> +{o.awaiting + o.pending}</span> : null}</td>
+                  {hosted ? <td>{o.seatLimit === null || o.seatLimit === undefined ? <span className="muted">no limit</span> : `${o.members + o.awaiting + o.pending} / ${o.seatLimit}`}</td> : null}
                   <td className="num">{o.collections}</td>
                   <td className="num">{o.items}</td>
                   <td>{[o.policies.requireTwoFactor && '2FA', o.policies.minPasswordScore > 0 && 'password', o.policies.maxIdleMinutes && `${o.policies.maxIdleMinutes} min lock`].filter(Boolean).join(' · ') || <span className="muted">none</span>}</td>
                   <td>{when(o.createdAt)}</td>
-                  {canWrite ? <td><button className="icon-btn icon-danger" aria-label={`Delete ${o.hint}`} title="Delete organization" onClick={async () => {
+                  {canWrite || hosted ? <td><div className="row-actions">{hosted ? <button className="btn btn-secondary btn-sm" aria-label={`Manage ${o.hint || 'company'}`} onClick={() => setManaging(o.id)}>Manage</button> : null}{canWrite ? <button className="icon-btn icon-danger" aria-label={`Delete ${o.hint}`} title="Delete organization" onClick={async () => {
                     if (!window.confirm(`Delete "${o.hint}" and everything in it — its collections and their items — for all its members? This cannot be undone and is recorded in the audit log.`)) return
                     if (await run(toast, (t) => api.admin.deleteOrg(t, o.id), 'Organization deleted')) await reload()
-                  }}><IconTrash size={15} /></button></td> : null}
+                  }}><IconTrash size={15} /></button> : null}</div></td> : null}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      {managing ? <TenantPanel id={managing} canWrite={canWrite} onClose={() => setManaging(null)} onChanged={reload} /> : null}
       {directs ? <p className="muted small">Not listed: {directs} private share{directs === 1 ? '' : 's'} between two people.</p> : null}
     </Section>
   )

@@ -10,6 +10,7 @@ import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './ht
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { countedSignIn } from './stats.js'
 import { reauth, requireSudo } from './sudo.js'
+import * as tenants from './routes/tenants.js'
 import * as insights from './routes/insights.js'
 import { Router } from './router.js'
 import { openapi } from './openapi.js'
@@ -228,6 +229,15 @@ export function buildRouter(app: App): Router {
       return handler(userId, event, param, role)
     }), { permission })
 
+  // The same, for admin routes with several path parameters.
+  const adminedP =
+    (permission: Permission,
+     handler: (userId: string, event: LambdaEvent, params: string[], role: Role) => Promise<LambdaResponse>) =>
+    Object.assign(authedP(async (userId, event, params) => {
+      const role = await admin.guard(app, userId, permission)
+      return handler(userId, event, params, role)
+    }), { permission })
+
   // Sensitive admin actions also need a recent sign-in or the master password
   // typed again (phase 3, sudo.ts).
   const sensitive =
@@ -265,6 +275,11 @@ export function buildRouter(app: App): Router {
   router.post('/api/admin/backup/run', admined('settings.write', (u) => admin.requestBackup(app, u)), 'Ask the server to take a backup now')
   router.post('/api/admin/mail/test', admined('settings.write', (u, e) => admin.testMail(app, u, e)), 'Send a test email')
   router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
+  router.get('/api/admin/orgs/:org', admined('users.read', (_u, _e, o) => tenants.getTenant(app, o)), 'One company: seats, domains, accounts at its domains')
+  router.put('/api/admin/orgs/:org', sensitive('users.write', (u, e, o) => tenants.updateTenant(app, u, o, e)), 'Set a company\'s seat limit, or suspend or resume it (hosted)')
+  router.post('/api/admin/orgs/:org/domains', admined('users.write', (u, e, o) => tenants.claimDomain(app, u, o, e)), 'Claim a domain for a company: the DNS TXT record to add')
+  router.post('/api/admin/orgs/:org/domains/:domain/verify', adminedP('users.write', (u, _e, [o, d]) => tenants.verifyDomain(app, u, o!, d!)), 'Check the domain\'s DNS TXT record; verified, it is this company\'s')
+  router.delete('/api/admin/orgs/:org/domains/:domain', adminedP('users.write', (u, _e, [o, d]) => tenants.releaseDomain(app, u, o!, d!)), 'Let a company\'s domain go')
   router.delete('/api/admin/orgs/:org', sensitive('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/update', admined('overview.read', (_u, e) => admin.updateRoute(app, e)), 'This version, and whether a newer release is out')
   router.get('/api/admin/insights', admined('overview.read', () => insights.insights(app)), 'What needs attention, and sign-ins per day')
