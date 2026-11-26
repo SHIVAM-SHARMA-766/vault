@@ -137,6 +137,22 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
           </button>
         </div>
 
+        {(draft.passkeys ?? []).length ? (
+          <div className="field">
+            <span className="field-label">Passkeys</span>
+            <ul className="attachment-list passkey-list">
+              {(draft.passkeys ?? []).map((p) => (
+                <li key={p.credentialId}>
+                  <span className="truncate">{p.userDisplayName || p.userName} · {p.rpId}</span>
+                  <button type="button" className="icon-btn icon-sm" aria-label={`Remove the passkey for ${p.userName}`}
+                          onClick={() => set('passkeys', (draft.passkeys ?? []).filter((x) => x.credentialId !== p.credentialId))}><IconX size={14} /></button>
+                </li>
+              ))}
+            </ul>
+            <p className="hint">Removing one here does not remove it from the site: remove it in the site's security settings too.</p>
+          </div>
+        ) : null}
+
         {!shared ? (
           <div className="field attachments">
             <span className="field-label">{t('Attachments')}</span>

@@ -187,6 +187,20 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
         </div>
       ) : null}
 
+      {entry.passkeys?.length ? (
+        <div className="notes">
+          <span className="field-label">Passkey{entry.passkeys.length === 1 ? '' : 's'}</span>
+          <ul className="attachment-list passkey-list">
+            {entry.passkeys.map((p) => (
+              <li key={p.credentialId}>
+                <span className="truncate"><strong>{p.userDisplayName || p.userName}</strong> · {p.rpId}</span>
+                <span className="muted small">saved {when(p.createdAt)} by the browser extension</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {entry.notes ? (
         <div className="notes">
           <span className="field-label">{t('Notes')}</span>

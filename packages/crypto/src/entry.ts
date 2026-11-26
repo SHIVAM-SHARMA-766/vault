@@ -70,6 +70,10 @@ export interface EntryContent {
    *  kept here, inside the sealed entry; the server holds only the ciphertext,
    *  under the id. */
   attachments?: AttachmentRef[]
+  /** Passkeys for this login's site (decisions/0035), kept by the browser
+   *  extension. Each private key is encrypted with the rest of the entry.
+   *  Typed loosely here; packages/core's StoredPasskey is the shape. */
+  passkeys?: { credentialId: string; rpId: string; userHandle: string; userName: string; userDisplayName?: string; privateKey: string; publicKey: string; cosePublicKey: string; alg: -7; createdAt: string }[]
 }
 
 export interface AttachmentRef {

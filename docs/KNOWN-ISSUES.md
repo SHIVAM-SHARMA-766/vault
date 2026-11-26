@@ -91,7 +91,10 @@ criterion asks for real files from three managers.
 
 [0029](../decisions/0029-browser-extension.md) is built in stages. What is missing now:
 
-- It is not yet in the Chrome or Firefox store, so it is loaded unpacked from a release zip.
+- It is not in the stores until the operator submits the packages (docs/extension-stores.md).
+  Until then it is loaded unpacked from a release zip.
+- Passkeys are kept in your own items only, not in shared collections, and are not offered in
+  frames or in the browser's autofill dropdown ([0035](../decisions/0035-passkeys-in-the-extension.md)).
 - With the vault locked, a password you submit on a site is not offered for saving; unlock
   first.
 - It fills the top frame only, so a login form inside a same-site frame is not filled yet.
@@ -157,11 +160,11 @@ rotation is phase 3.5 work.
 </details>
 
 <details>
-<summary>🟠 <b>No browser extension, mobile app, or offline access</b></summary>
+<summary>🟠 <b>No mobile app</b></summary>
 
-The web client is the only client. It needs the server to unlock, and holds keys in memory
-only, so a reload means unlocking again — deliberately, so nothing is left in browser
-storage. Extension: phase 4. Android: phase 5.
+The web app and the browser extension are the clients. Both need the server to unlock, and
+hold keys in memory only, so a reload means unlocking again. That is deliberate, so nothing is
+left in browser storage. The offline copy (C4) opens without the server. Android is phase 5.
 </details>
 
 <details>

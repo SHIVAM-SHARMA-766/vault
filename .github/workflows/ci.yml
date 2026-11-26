@@ -128,10 +128,11 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # The API imports @vault/crypto (identity-key validation), whose types
-      # are its compiled output; a clean runner has none until this runs.
-      - name: Build the crypto package
-        run: npm run build --workspace @vault/crypto
+      # The API imports @vault/crypto (identity-key validation), and one test
+      # imports @vault/core (passkey formats, decisions/0035); their types are
+      # their compiled output, which a clean runner has none of until this runs.
+      - name: Build the crypto and core packages
+        run: npm run build --workspace @vault/crypto --workspace @vault/core
 
       - name: Typecheck
         run: npm run typecheck --workspace @vault/api

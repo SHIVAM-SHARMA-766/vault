@@ -41,7 +41,7 @@ someone who would otherwise assume it was an oversight.
 | [0019](0019-breach-check.md) | Breach check: k-anonymity, relayed by the server, on request |
 | [0020](0020-attachments-and-offline-copy.md) | File attachments with a key per file; an offline copy in one HTML file |
 | [0021](0021-sso.md) | Single sign-on (OIDC) for sign-in; the master password still unlocks |
-| [0022](0022-passkeys.md) | WebAuthn second factor; unlock with a passkey (built in 0034); storing passkeys with the extension |
+| [0022](0022-passkeys.md) | WebAuthn second factor; unlock with a passkey (built in 0034); storing passkeys (built in 0035) |
 | [0023](0023-crypto-hardening.md) | Signed key grants, an opt-in secret key, Argon2id, an organization recovery key |
 | [0024](0024-cloud-drive-backups.md) | Google Drive and OneDrive backups via operator-registered OAuth apps, narrowest scopes |
 | [0025](0025-signed-key-grants.md) | Signed key grants: a signing key per account, grants signed by admins, members verify (closes A15) |
@@ -54,6 +54,7 @@ someone who would otherwise assume it was an oversight.
 | [0032](0032-business-edition.md) | The business edition: one company, People, permission sets, team health, guests |
 | [0033](0033-hosted-edition.md) | The hosted edition: companies as tenants, invited by the operator |
 | [0034](0034-passkey-unlock.md) | Unlock with a passkey: PRF wraps the vault key in the browser; discoverable, user-verified, no second factor needed |
+| [0035](0035-passkeys-in-the-extension.md) | Passkeys for other sites kept in Vault, answered by the extension; origin from the browser, rpId checked, the person confirms |
 
 ## A note on the numbering
 

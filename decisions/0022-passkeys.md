@@ -1,6 +1,6 @@
 # 0022: Passkeys and security keys
 
-Status: Accepted by the operator on 2026-11-08; (a) built, (b) built in [0034](0034-passkey-unlock.md), (c) with the extension
+Status: Accepted by the operator on 2026-11-08; (a) built, (b) built in [0034](0034-passkey-unlock.md), (c) built in [0035](0035-passkeys-in-the-extension.md)
 Date: 2026-11-08
 Backlog: D9
 

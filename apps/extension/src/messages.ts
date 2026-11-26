@@ -36,8 +36,9 @@ export type Request =
   | { type: 'sync' }
   | { type: 'lock' }
   | { type: 'setInline'; on: boolean }
+  | { type: 'setPasskeys'; on: boolean }
 
-export interface StateReply { server: string | null; serverName: string | null; locked: boolean; email: string | null; inline: boolean }
+export interface StateReply { server: string | null; serverName: string | null; locked: boolean; email: string | null; inline: boolean; passkeys: boolean }
 
 export type UnlockReply =
   | { ok: true }
@@ -51,6 +52,7 @@ export type Reply<R extends Request> =
   R extends { type: 'state' } ? StateReply
   : R extends { type: 'setServer' } ? { ok: true; name: string } | { ok: false; error: string }
   : R extends { type: 'setInline' } ? { ok: true } | { ok: false; error: string }
+  : R extends { type: 'setPasskeys' } ? { ok: true } | { ok: false; error: string }
   : R extends { type: 'unlock' } ? UnlockReply
   : R extends { type: 'items' } ? ItemsReply
   : R extends { type: 'reveal' } ? { value: string | null; expiresIn?: number }

@@ -21,6 +21,9 @@ connects to **your** Vault server and fills your logins.
 - **No standing access to websites.** The extension touches a page only when you ask it to.
   The in-page icon and "save this login" are optional, and need a permission you grant
   separately.
+- **Passkeys too**, if you turn it on: when a site offers a passkey, Vault can keep it,
+  encrypted, on all your devices, and sign you in with it. It never offers one to a
+  different site.
 - **Copy usernames, passwords and two-factor codes (TOTP).** Search your vault and your
   shared collections.
 - **Locks itself** after the idle time your account sets, and when the browser closes.
@@ -42,7 +45,7 @@ Fill and save logins from the user's own Vault password manager server.
 | `storage` | Keep the server address and settings, and the unlocked keys in session storage (memory only, cleared when the browser closes). |
 | `alarms` | Lock the vault after the account's idle time. |
 | Optional host permission (one origin) | Reach the user's own Vault server, at the address the user enters at first run. Asked for then, for that origin only. |
-| Optional host permission (all sites) | Only if the user turns on the in-page icon and "save this login". Off by default. |
+| Optional host permission (all sites) | Only if the user turns on the in-page icon and "save this login", or "Save and use passkeys in Vault". Off by default. For passkeys, a small script wraps `navigator.credentials` on pages so that sites' passkey requests can be answered from the user's vault after the user confirms. |
 
 Remote code: **none**. Every script is in the package. The policy allows `'wasm-unsafe-eval'`
 only to compile the Argon2id WebAssembly module bundled in the package.

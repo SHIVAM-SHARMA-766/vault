@@ -75,7 +75,7 @@ No remote code, no `eval`, and no code from the server.
 4. Store packages: a signed Firefox add-on (AMO is free), and Chrome Web Store when the operator
    decides on its one-time developer fee. Until then, a release zip to load unpacked.
    *(built: packages ready; submitting is the operator's step)*
-5. Passkey storage, after autofill is solid (0022 (c)).
+5. Passkey storage, after autofill is solid (0022 (c)). *(built: [0035](0035-passkeys-in-the-extension.md))*
 
 ## Shared collections (stage 2)
 
