@@ -1,0 +1,57 @@
+name: Extension packages
+
+# Builds the store packages (decisions/0029, stage 4): the Chrome and Firefox
+# zips, the source zip AMO asks for, and SHA256SUMS. Run by hand for a look;
+# a pushed tag extension-v<version> also attaches them to a draft release,
+# which the operator reviews and submits to the stores (docs/extension-stores.md).
+# Nothing here publishes to a store.
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['extension-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: |
+          npm run build --workspace @vault/crypto
+          npm run build --workspace @vault/core
+          npm run build --workspace @vault/extension
+      - name: Package
+        run: npm run package --workspace @vault/extension
+      # The build is reproducible: building again must give the same bytes.
+      - name: Reproducible
+        run: |
+          cp apps/extension/dist/SHA256SUMS /tmp/first
+          npm run build --workspace @vault/extension
+          npm run package --workspace @vault/extension
+          diff /tmp/first apps/extension/dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vault-extension
+          path: |
+            apps/extension/dist/*.zip
+            apps/extension/dist/SHA256SUMS
+      - name: Draft release
+        if: startsWith(github.ref, 'refs/tags/extension-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${GITHUB_REF_NAME#extension-v}"
+          test "$v" = "$(node -p "require('./apps/extension/package.json').version")" || { echo "tag $GITHUB_REF_NAME does not match apps/extension/package.json"; exit 1; }
+          gh release create "$GITHUB_REF_NAME" --draft --title "Extension $v" \
+            --notes "Store packages for the Vault browser extension $v. Check SHA256SUMS, then submit as docs/extension-stores.md describes." \
+            apps/extension/dist/*.zip apps/extension/dist/SHA256SUMS

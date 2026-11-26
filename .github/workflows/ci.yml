@@ -305,6 +305,14 @@ jobs:
           npx playwright-core install chromium
           echo "EXT_CHROME_PATH=$(node -e "import('playwright-core').then(m => console.log(m.chromium.executablePath()))")" >> "$GITHUB_ENV"
 
+      # decisions/0029, stage 4: the store packages are byte-for-byte reproducible.
+      - name: Extension packages are reproducible
+        run: |
+          npm run package --workspace @vault/extension
+          cp apps/extension/dist/SHA256SUMS /tmp/first
+          npm run build --workspace @vault/extension && npm run package --workspace @vault/extension
+          diff /tmp/first apps/extension/dist/SHA256SUMS
+
       - name: Browser tests
         run: npm run test:e2e
         env:

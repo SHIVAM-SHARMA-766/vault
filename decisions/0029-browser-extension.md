@@ -74,6 +74,7 @@ No remote code, no `eval`, and no code from the server.
    the generator in the page. *(built)*
 4. Store packages: a signed Firefox add-on (AMO is free), and Chrome Web Store when the operator
    decides on its one-time developer fee. Until then, a release zip to load unpacked.
+   *(built: packages ready; submitting is the operator's step)*
 5. Passkey storage, after autofill is solid (0022 (c)).
 
 ## Shared collections (stage 2)
@@ -135,6 +136,26 @@ for three minutes, and only for the same site, so the next page after a sign-in 
 **Preferences.** The extension now reads the account's sealed preferences at unlock. The idle
 lock is the person's own auto-lock, shortened by the server's and organizations' policies, as in
 the web app. The generator follows the same defaults.
+
+## Store packages (stage 4)
+
+- **Reproducible zips.** `build.mjs` writes each zip with its files in a fixed order and one fixed
+  timestamp, so the same source gives the same bytes. `npm run package` adds the source zip AMO
+  asks for (the bundles are minified), with `store/BUILD-FOR-REVIEWERS.md`, and `SHA256SUMS`.
+  It was checked by rebuilding from the source zip on a clean copy: identical hashes. CI builds
+  twice and compares.
+- **The listing lives with the code** (`apps/extension/store/listing.md`): summary, description,
+  Chrome's single purpose and permission justifications, the data-use answers, and the privacy
+  policy (docs/extension-privacy.md).
+- **Where:**
+  - addons.mozilla.org, free;
+  - Microsoft Edge Add-ons, free, the Chrome package unchanged;
+  - Chrome Web Store, when the operator decides on its one-time fee.
+
+  docs/extension-stores.md has the steps. The *Extension packages* workflow builds the files,
+  and on an `extension-v*` tag attaches them to a draft release. It never publishes.
+- **Before each submission**, `web-ext lint` on the Firefox build is a manual step. It downloads
+  Mozilla's linter, which this repository does not pin.
 
 ## Tests
 
