@@ -69,6 +69,24 @@
       </div>
     </section>
 
+    <section class="section section-alt" id="maker">
+      <div class="wrap">
+        <div class="maker">
+          <div class="section-head">
+            <span class="kicker">{{about.maker.kicker}}</span>
+            <h2>{{about.maker.name}}</h2>
+            <p class="maker-role">{{about.maker.role}}</p>
+          </div>
+          <div class="maker-text">
+            {{paras about.maker.text}}
+{{#if about.maker.linkHref}}
+            <p><a class="btn btn-primary" href="{{href about.maker.linkHref}}" rel="noopener">{{about.maker.linkLabel}} →</a></p>
+{{/if}}
+          </div>
+        </div>
+      </div>
+    </section>
+
 <!-- include:cta -->
   </main>
 
