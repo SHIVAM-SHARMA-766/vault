@@ -215,6 +215,56 @@
         }
       }
     },
+    "/api/auth/passkey-login/options": {
+      "post": {
+        "summary": "Start signing in with a passkey (no account named)",
+        "operationId": "postAuthPasskeyLoginOptions",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkey-login": {
+      "post": {
+        "summary": "Sign in with a passkey; returns the passkey-wrapped vault key",
+        "operationId": "postAuthPasskeyLogin",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/recovery-login": {
       "post": {
         "summary": "Sign in with the recovery key's proof",
@@ -752,6 +802,103 @@
       "post": {
         "summary": "Remove a passkey or security key (password and second factor)",
         "operationId": "postAuth2faWebauthnIdRemove",
+        "tags": [
+          "auth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/options": {
+      "post": {
+        "summary": "Start adding a passkey that unlocks the vault (master password required)",
+        "operationId": "postAuthPasskeysOptions",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys": {
+      "post": {
+        "summary": "Finish adding a passkey, with the vault key it wraps",
+        "operationId": "postAuthPasskeys",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/passkeys/{id}": {
+      "delete": {
+        "summary": "Remove a passkey that unlocks the vault",
+        "operationId": "deleteAuthPasskeysId",
         "tags": [
           "auth"
         ],

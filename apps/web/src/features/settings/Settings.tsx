@@ -24,6 +24,7 @@ import { Backups } from './Backups.js'
 import { DeleteAccount } from './DeleteAccount.js'
 import { Emergency } from './Emergency.js'
 import { ShareLinks } from './ShareLinks.js'
+import { PasskeyUnlock, type UnlockPasskey } from './PasskeyUnlock.js'
 import { SecurityKeys } from './SecurityKeys.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
@@ -43,7 +44,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id']
 
 export function Settings({ state, tab: requested }: { state: session.Unlocked; tab: string | null }) {
-  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus; policy: { minPasswordScore: number }; policyGap: string | null } | null>(null)
+  const [me, setMe] = useState<{ createdAt: string; fingerprint: string | null; twoFactor: TwoFactorStatus; passkeys: UnlockPasskey[]; policy: { minPasswordScore: number }; policyGap: string | null } | null>(null)
   const [version, setVersion] = useState(0)
   // Emergency access needs a second account (decisions/0030).
   const { features } = useEdition()
@@ -57,7 +58,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
       try {
         const info = await api.me(await session.token())
         const fingerprint = info.identity ? await fingerprintOf(info.identity.publicKey, info.identity.signingPublicKey ?? null) : null
-        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor, policy: info.policy, policyGap: info.policyGap })
+        setMe({ createdAt: info.createdAt, fingerprint, twoFactor: info.twoFactor, passkeys: info.passkeys ?? [], policy: info.policy, policyGap: info.policyGap })
         // Turning on two-factor here may close a policy gap; the vault's
         // banner follows.
         session.patch({ policyGap: info.policyGap })
@@ -120,6 +121,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
           </> : null}
 
           {tab === 'security' ? <>
+            <PasskeyUnlock state={state} passkeys={me?.passkeys ?? null} reload={() => setVersion((v) => v + 1)} />
             <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
             <SecurityKeys state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
             <Devices />

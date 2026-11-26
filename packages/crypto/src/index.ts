@@ -189,3 +189,11 @@ export {
   verifyGrant,
   wrapSigningPrivateKey,
 } from './signing.js'
+
+export {
+  PASSKEY_PRF_SALT,
+  type PasskeyWrapping,
+  derivePasskeyKek,
+  unwrapWithPasskey,
+  wrapForPasskey,
+} from './passkey.js'

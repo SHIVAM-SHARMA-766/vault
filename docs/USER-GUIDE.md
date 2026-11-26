@@ -312,6 +312,22 @@ this server's real address, so a look-alike phishing page gets nothing. Your fir
 comes with ten recovery codes; save them. Removing a key asks for your master password and a
 second factor. Your master password still unlocks the vault: a key protects signing in.
 
+### Unlock with a passkey
+
+**Settings → Security → Unlock with a passkey → Add a passkey to unlock.** After that, the sign-in
+screen's **Sign in with a passkey** opens your vault with Touch ID, Windows Hello, your phone or
+a security key. You type no email and no master password. The passkey's secret opens the vault
+in your browser, and the server never sees it. Your master password keeps working.
+
+- **Anyone who can use the passkey can open your vault.** That means your device plus its PIN
+  or fingerprint. Add passkeys only on devices you alone use. A passkey synced to your Apple or
+  Google account is as safe as that account.
+- **It counts as two factors.** No authenticator code is asked for.
+- **Not every device can do it.** The passkey needs the PRF extension: current Chrome, Edge and
+  Safari, Windows Hello, Android, and recent security keys. If yours cannot, Vault says so and
+  saves nothing. Delete the passkey it just made from your device's list.
+- **Removing one** in the same card stops it opening the vault at once.
+
 ## Devices and activity
 
 <img src="images/devices.png" alt="Signed-in devices with this device marked, and the security activity list" width="820">

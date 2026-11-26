@@ -22,6 +22,7 @@ import * as prefs from './routes/prefs.js'
 import * as shares from './routes/shares.js'
 import * as attachments from './routes/attachments.js'
 import * as webauthn from './routes/webauthn.js'
+import * as passkeys from './routes/passkeys.js'
 import { breachRange } from './breach.js'
 import { listNotes, readNotes } from './inbox.js'
 import { metricsRoute, recordRequest } from './metrics.js'
@@ -43,6 +44,8 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/prelogin', ({ event }) => auth.prelogin(app, event), 'KDF parameters for an address (a decoy for unknown ones)')
   router.post('/api/auth/register', ({ event }) => auth.register(app, event), 'Create an account')
   router.post('/api/auth/login', ({ event }) => auth.login(app, event), 'Sign in with the auth key (and second factor)')
+  router.post('/api/auth/passkey-login/options', ({ event }) => passkeys.loginOptions(app, event), 'Start signing in with a passkey (no account named)')
+  router.post('/api/auth/passkey-login', ({ event }) => passkeys.login(app, event), 'Sign in with a passkey; returns the passkey-wrapped vault key')
   router.post('/api/auth/recovery-login', ({ event }) => auth.recoveryLogin(app, event), 'Sign in with the recovery key\'s proof')
   router.post('/api/auth/refresh', ({ event }) => auth.refresh(app, event), 'Rotate a refresh token for a new session pair')
   router.post('/api/desk/requests', ({ event }) => desk.publicRequest(app, event), 'Ask for access, or for help signing in (no account needed)')
@@ -82,6 +85,9 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/2fa/webauthn/options', authed((u, e) => webauthn.registerOptions(app, u, e)), 'Start adding a passkey or security key (master password required)')
   router.post('/api/auth/2fa/webauthn', authed((u, e) => webauthn.register(app, u, e)), 'Finish adding a passkey or security key')
   router.post('/api/auth/2fa/webauthn/:id/remove', authed((u, e, id) => webauthn.removeKey(app, u, e, id)), 'Remove a passkey or security key (password and second factor)')
+  router.post('/api/auth/passkeys/options', authed((u, e) => passkeys.enrolOptions(app, u, e)), 'Start adding a passkey that unlocks the vault (master password required)')
+  router.post('/api/auth/passkeys', authed((u, e) => passkeys.enrol(app, u, e)), 'Finish adding a passkey, with the vault key it wraps')
+  router.delete('/api/auth/passkeys/:id', authed((u, e, id) => passkeys.remove(app, u, e, id)), 'Remove a passkey that unlocks the vault')
   router.post('/api/auth/2fa/recovery-codes', authed((u, e) => auth.regenerateRecoveryCodes(app, u, e)), 'Replace the two-factor recovery codes')
 
   router.get('/api/sessions', authed((_u, e) => sessions.list(app, e)), 'Signed-in devices')

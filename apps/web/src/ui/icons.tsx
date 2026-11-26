@@ -49,6 +49,9 @@ export const IconGrid = (p: P) => (
 export const IconKey = (p: P) => (
   <Svg {...p}><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l3 3M14 9l2 2" /></Svg>
 )
+export const IconFingerprint = (p: P) => (
+  <Svg {...p}><path d="M12 11v3a8 8 0 0 1-1.5 4.7" /><path d="M8.5 7.5A5 5 0 0 1 17 11v2a12 12 0 0 1-.8 4.3" /><path d="M7 11a5 5 0 0 1 .3-1.7M7 14a11 11 0 0 1-1.2 3.6" /><path d="M5 5.5A9 9 0 0 1 21 11v1" /><path d="M3 9.5A9 9 0 0 1 3.6 8" /></Svg>
+)
 export const IconNote = (p: P) => (
   <Svg {...p}><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h7M9 17h5" /></Svg>
 )

@@ -669,6 +669,9 @@ a.brand:hover .brand-mark { filter: brightness(1.1); }
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); color: var(--text); }
 .menu-sep { height: 1px; margin: 4px 0; background: var(--line); }
 .boot { display: grid; place-items: center; height: 100%; color: var(--muted); }
+.auth-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.auth-or + .btn svg { margin-right: 6px; vertical-align: -3px; }
 .auth-forgot { margin: 14px 0 0; text-align: center; font-size: 13px; }
 .auth-forgot .link { font-weight: 500; }
 @media (max-width: 760px) { .account-button { display: flex; } }

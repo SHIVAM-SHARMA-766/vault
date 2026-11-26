@@ -118,7 +118,7 @@ async function sessionDeadline(app: App, createdAt: string): Promise<number | un
   return days ? Math.floor(Date.parse(createdAt) / 1000) + days * 86_400 : undefined
 }
 
-async function issueSession(app: App, userId: string, event: LambdaEvent, family?: SessionRecord) {
+export async function issueSession(app: App, userId: string, event: LambdaEvent, family?: SessionRecord) {
   const now = new Date(app.now()).toISOString()
   const refresh = issueRefreshToken(userId, app.config.tokenKey, app.now(), await sessionDeadline(app, family?.createdAt ?? now))
   // Sessions from before devices had ids keep their old token id as one.
@@ -437,6 +437,8 @@ export async function me(app: App, userId: string): Promise<LambdaResponse> {
       enabled: hasSecondFactor(profile as unknown as Record<string, unknown>), totp: Boolean(profile.totp), recoveryCodesLeft: profile.recoveryCodes?.length ?? 0,
       keys: ((profile as { webauthn?: { id: string; name: string; createdAt: string; lastUsedAt?: string }[] }).webauthn ?? []).map((k) => ({ id: k.id, name: k.name, createdAt: k.createdAt, lastUsedAt: k.lastUsedAt ?? null })),
     },
+    // Passkeys that unlock the vault (decisions/0034): names and dates only.
+    passkeys: ((profile as { passkeys?: { id: string; name: string; createdAt: string; lastUsedAt?: string }[] }).passkeys ?? []).map((k) => ({ id: k.id, name: k.name, createdAt: k.createdAt, lastUsedAt: k.lastUsedAt ?? null })),
     // What the server asks of this account, and what it still misses.
     policy: { requireTwoFactor: policy.requireTwoFactor, minPasswordScore: policy.minPasswordScore, maxIdleMinutes: policy.maxIdleMinutes, shareLinks: policy.shareLinks, shareLinkMaxDays: policy.shareLinkMaxDays },
     policyGap: serverPolicyGap(policy, profile),
