@@ -98,6 +98,10 @@ Each person can back up their own vault on their own schedule (Settings → Back
 |---|---|---|---|
 | `PERSONAL_BACKUP_REMOTE` | `true` | | `false` keeps personal backups on this server only: no outbound connections to people's S3 buckets or WebDAV folders |
 | `PERSONAL_BACKUP_ALLOW_PRIVATE` | `false` | | `true` lets destinations be private or loopback addresses, over plain http — for a NAS on the LAN. Leave off on a server reachable from the internet |
+| `GOOGLE_OAUTH_CLIENT_ID` | | | Google Drive as a destination ([decision 0024](../decisions/0024-cloud-drive-backups.md)): a Google Cloud OAuth client (Web application) with the Drive API on. Redirect URI `https://<your address>/api/backups/oauth/callback`, scope `drive.file` |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | | ✓ | Its secret |
+| `MS_OAUTH_CLIENT_ID` | | | OneDrive as a destination: a Microsoft Entra app registration for personal and work accounts. Same redirect URI; delegated `Files.ReadWrite.AppFolder` and `offline_access` |
+| `MS_OAUTH_CLIENT_SECRET` | | ✓ | Its secret |
 
 ### Single sign-on
 

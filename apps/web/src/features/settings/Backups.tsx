@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { UnsealError } from '@vault/crypto'
 
 import {
-  type BackupDestinationInput, type BackupFrequency, type BackupSchedule, type BackupState, ApiError, api,
+  type BackupDestinationInput, type BackupFrequency, type BackupSchedule, type BackupState, type CloudDrive, ApiError, api,
 } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
 import { IconAlert, IconCheck, IconClock, IconDownload, IconTrash, IconUpload } from '../../ui/icons.js'
@@ -22,12 +22,16 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const FREQ_LABELS: Record<BackupFrequency, string> = { off: 'Off — only when I press Back up now', daily: 'Every day', weekly: 'Every week', monthly: 'Every month (on the 1st)' }
 const size = (b: number) => (b < 1024 ? `${b} B` : b < 1024 * 1024 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`)
 const hourLabel = (h: number) => { const c = prefs.get().clock; return new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', ...(c === 'system' ? {} : { hour12: c === '12h' }) }) }
-const where = (d: string) => d === 'server' ? 'On this server' : d.startsWith('s3:') ? `S3 · ${d.slice(3)}` : `WebDAV · ${d.slice(7)}`
+const CLOUD_NAMES: Record<CloudDrive, string> = { gdrive: 'Google Drive', onedrive: 'OneDrive' }
+const where = (d: string) => d === 'server' ? 'On this server' : d.startsWith('s3:') ? `S3 · ${d.slice(3)}`
+  : d.startsWith('webdav:') ? `WebDAV · ${d.slice(7)}`
+  : d.startsWith('gdrive:') ? `Google Drive · ${d.slice(7) || 'connected'}` : d.startsWith('onedrive:') ? `OneDrive · ${d.slice(9) || 'connected'}` : d
 
 type DestForm =
   | { type: 'server' }
   | { type: 's3'; endpoint: string; region: string; bucket: string; prefix: string; accessKey: string; secretKey: string; hasSecret: boolean }
   | { type: 'webdav'; url: string; username: string; password: string; hasSecret: boolean }
+  | { type: CloudDrive; account: string; connected: boolean }
 
 const emptyS3 = (): DestForm => ({ type: 's3', endpoint: '', region: '', bucket: '', prefix: 'vault/', accessKey: '', secretKey: '', hasSecret: false })
 const emptyDav = (): DestForm => ({ type: 'webdav', url: '', username: '', password: '', hasSecret: false })
@@ -38,7 +42,22 @@ export function Backups() {
   const [error, setError] = useState('')
   const [schedule, setSchedule] = useState<BackupSchedule | null>(null)
   const [dest, setDest] = useState<DestForm>({ type: 'server' })
-  const [busy, setBusy] = useState<'' | 'save' | 'run'>('')
+  const [busy, setBusy] = useState<'' | 'save' | 'run' | 'connect'>('')
+  // Back from Google or Microsoft (decisions/0024): say how it went, once.
+  useEffect(() => {
+    const h = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const ok = h.get('cloud') as CloudDrive | null, bad = h.get('cloud-error')
+    if (!ok && !bad) return
+    history.replaceState(null, '', location.pathname + location.search)
+    if (ok && CLOUD_NAMES[ok]) toast(`${CLOUD_NAMES[ok]} connected. Backups now go there.`)
+    if (bad) setError(bad)
+  }, [toast])
+
+  async function connectDrive(provider: CloudDrive) {
+    setBusy('connect'); setError('')
+    try { location.assign((await api.backups.connect(await session.token(), provider)).url) }
+    catch (err) { setError(err instanceof Error ? err.message : 'Could not start connecting.'); setBusy('') }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -48,7 +67,8 @@ export function Backups() {
         ? { ...d.schedule, tzOffsetMinutes: -new Date().getTimezoneOffset() } : d.schedule)
       setDest(d.destination.type === 'server' ? { type: 'server' }
         : d.destination.type === 's3' ? { ...d.destination, secretKey: '', hasSecret: true }
-        : { ...d.destination, password: '', hasSecret: true })
+        : d.destination.type === 'webdav' ? { ...d.destination, password: '', hasSecret: true }
+        : { type: d.destination.type, account: d.destination.account, connected: true })
       setError('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load your backups.')
@@ -63,7 +83,9 @@ export function Backups() {
     try {
       const destination: BackupDestinationInput = dest.type === 'server' ? { type: 'server' }
         : dest.type === 's3' ? { type: 's3', endpoint: dest.endpoint, region: dest.region, bucket: dest.bucket, prefix: dest.prefix, accessKey: dest.accessKey, ...(dest.secretKey ? { secretKey: dest.secretKey } : {}) }
-        : { type: 'webdav', url: dest.url, username: dest.username, ...(dest.password ? { password: dest.password } : {}) }
+        : dest.type === 'webdav' ? { type: 'webdav', url: dest.url, username: dest.username, ...(dest.password ? { password: dest.password } : {}) }
+        : { type: dest.type }
+      if ((dest.type === 'gdrive' || dest.type === 'onedrive') && !dest.connected) { setError(`Connect ${CLOUD_NAMES[dest.type]} first.`); setBusy(''); return }
       // The hour is local to this browser; the server needs to know where that is.
       await api.backups.save(await session.token(), { schedule: { ...schedule, tzOffsetMinutes: -new Date().getTimezoneOffset() }, destination })
       toast('Backup settings saved')
@@ -102,7 +124,7 @@ export function Backups() {
         <dl className="facts">
           <div><dt>Last backup</dt><dd>{last ? <>{last.ok ? <span className="pill pill-ok">OK</span> : <span className="pill pill-warn">Failed</span>} {when(last.at)}</> : 'Never'}</dd></div>
           <div><dt>Next backup</dt><dd>{data.nextRunAt ? when(data.nextRunAt) : 'Not scheduled'}</dd></div>
-          <div><dt>Where</dt><dd>{where(data.destination.type === 'server' ? 'server' : data.destination.type === 's3' ? `s3:${data.destination.endpoint.replace(/^https?:\/\//, '')}/${data.destination.bucket}/${data.destination.prefix}` : `webdav:${data.destination.url.replace(/^https?:\/\//, '')}`)}</dd></div>
+          <div><dt>Where</dt><dd>{where(data.destination.type === 'server' ? 'server' : data.destination.type === 's3' ? `s3:${data.destination.endpoint.replace(/^https?:\/\//, '')}/${data.destination.bucket}/${data.destination.prefix}` : data.destination.type === 'webdav' ? `webdav:${data.destination.url.replace(/^https?:\/\//, '')}` : `${data.destination.type}:${data.destination.account}`)}</dd></div>
         </dl>
         {last && !last.ok ? <p className="alert alert-warn"><IconAlert size={16} /><span>The last backup failed: {last.error}</span></p> : null}
         {error ? <p className="alert alert-error"><IconAlert size={16} /><span>{error}</span></p> : null}
@@ -160,14 +182,15 @@ export function Backups() {
             <span><strong>My S3-compatible bucket</strong><span className="muted small">AWS S3, Cloudflare R2, Backblaze B2, Wasabi, MinIO…</span></span></label>
           <label className="radio"><input type="radio" name="dest" disabled={!data.remoteAllowed} checked={dest.type === 'webdav'} onChange={() => setDest(dest.type === 'webdav' ? dest : emptyDav())} />
             <span><strong>My WebDAV folder</strong><span className="muted small">Nextcloud, ownCloud, a NAS</span></span></label>
-          {/* Google Drive and OneDrive need the operator's OAuth apps (decisions/0024). */}
-          {(['Google Drive', 'Microsoft OneDrive'] as const).map((name) => (
-            <label key={name} className="radio radio-soon" title="Coming soon">
-              <input type="radio" name="dest" disabled aria-describedby="dest-soon" />
-              <span><strong>{name}</strong><span className="muted small">Coming soon</span></span>
+          {/* Google Drive and OneDrive, offered when the operator registered their apps (decisions/0024). */}
+          {(['gdrive', 'onedrive'] as const).filter((p) => data.cloud?.[p]).map((p) => (
+            <label key={p} className="radio">
+              <input type="radio" name="dest" disabled={!data.remoteAllowed} checked={dest.type === p}
+                     onChange={() => setDest(data.destination.type === p ? { type: p, account: data.destination.account, connected: true } : { type: p, account: '', connected: false })} />
+              <span><strong>{CLOUD_NAMES[p]}</strong><span className="muted small">{p === 'gdrive' ? 'Vault sees only the files it creates, in a "Vault backups" folder.' : 'Vault sees only its own app folder (Apps → Vault).'}</span></span>
             </label>
           ))}
-          <p id="dest-soon" className="hint">Google Drive and OneDrive are coming soon. Until then, Nextcloud, Synology or Koofr can reach them through the WebDAV option.</p>
+          {!data.cloud?.gdrive || !data.cloud?.onedrive ? <p className="hint">{data.cloud?.gdrive || data.cloud?.onedrive ? 'Other cloud drives' : 'Google Drive and OneDrive'} can be reached through the WebDAV option with Nextcloud, Synology or Koofr.</p> : null}
           {!data.remoteAllowed ? <p className="hint">This server keeps personal backups on the server only.</p> : null}
         </fieldset>
 
@@ -194,7 +217,18 @@ export function Backups() {
             </div>
           </div>
         ) : null}
-        {dest.type !== 'server' ? (
+        {dest.type === 'gdrive' || dest.type === 'onedrive' ? (
+          <div className="cloud-connect">
+            {dest.connected ? <p className="small"><IconCheck size={14} /> Connected{dest.account ? <> as <strong>{dest.account}</strong></> : null}.</p>
+              : <p className="small">Vault needs your permission at {CLOUD_NAMES[dest.type]} to write backups while you are away. You will sign in to Vault again when you come back.</p>}
+            <button type="button" className={`btn ${dest.connected ? 'btn-secondary' : 'btn-primary'} btn-sm`} disabled={busy !== ''} onClick={() => void connectDrive(dest.type as CloudDrive)}>
+              {busy === 'connect' ? <span className="spinner" /> : null}{dest.connected ? 'Connect another account' : `Connect ${CLOUD_NAMES[dest.type]}`}
+            </button>
+          </div>
+        ) : null}
+        {dest.type === 'gdrive' || dest.type === 'onedrive' ? (
+          <p className="hint">The server keeps the permission encrypted so it can back up while you are away. To end it, choose another destination here, then remove Vault from your {CLOUD_NAMES[dest.type]} account's connected apps.</p>
+        ) : dest.type !== 'server' ? (
           <p className="hint">The server keeps this secret encrypted so it can back up while you are away. Give it access to this one bucket or folder and nothing else.</p>
         ) : null}
 

@@ -4654,6 +4654,70 @@
         }
       }
     },
+    "/api/backups/connect/{provider}": {
+      "post": {
+        "summary": "Start connecting Google Drive (gdrive) or OneDrive (onedrive) for my backups",
+        "operationId": "postBackupsConnectProvider",
+        "tags": [
+          "backups"
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/backups/oauth/callback": {
+      "get": {
+        "summary": "The cloud drive's answer after the person allowed Vault; redirects to Settings",
+        "operationId": "getBackupsOauthCallback",
+        "tags": [
+          "backups"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/backups/run": {
       "post": {
         "summary": "Back up now",
