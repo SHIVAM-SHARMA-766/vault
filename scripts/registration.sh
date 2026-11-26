@@ -18,7 +18,7 @@ set -euo pipefail
 HOST="${1:?usage: registration.sh <host> open|close|status}"
 ACTION="${2:?usage: registration.sh <host> open|close|status}"
 KEY="${SSH_KEY:-$HOME/.ssh/oci-vault}"
-URL="${VAULT_URL:-https://vault-shivam.duckdns.org}"
+URL="${VAULT_URL:-https://vault.dev2ops.in}"
 DROPIN=/etc/systemd/system/vault-api.service.d/20-registration.conf
 
 ok()   { printf '  \033[1;32mok\033[0m    %s\n' "$1"; }

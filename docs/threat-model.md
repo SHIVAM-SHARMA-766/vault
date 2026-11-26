@@ -103,11 +103,14 @@ Controls:
 - The service runs unprivileged under systemd with `ProtectSystem=strict`, so a flaw in
   the API cannot rewrite the files Caddy serves.
 
-**The unmitigated part, stated plainly.** The hostname is a free dynamic-DNS name. Whoever
-controls that name — the dynamic-DNS operator, or anyone who takes over the account at it
-— can point it at their own server, obtain a valid certificate for it from any public CA,
-and serve whatever JavaScript they like. None of the controls above apply, because the
-browser is talking to them, legitimately, over a valid certificate.
+**The part no control above covers.** Whoever controls the hostname can point it at their
+own server, obtain a valid certificate, and serve whatever JavaScript they like. None of the
+controls above apply, because the browser is talking to them, legitimately, over a valid
+certificate. Since 2026-11-26 the reference instance is `vault.dev2ops.in`, a registered
+domain, instead of a free dynamic-DNS name (`vault-shivam.duckdns.org`, which now only
+redirects). Control sits with the registrar and DNS account. That account has two-factor
+authentication and a registrar lock, a CAA record limits certificates to Let's Encrypt, and
+DNSSEC is on where the DNS host offers it.
 
 That is materially worse than a compromise of this server, which yields only ciphertext
 and auth keys. Here the attacker gets the master password and therefore the vault.
@@ -116,20 +119,19 @@ and auth keys. Here the attacker gets the master password and therefore the vaul
 [0005](../decisions/0005-pull-based-releases.md) the host installs whatever the
 `vault-releases` bucket's `current` object points at. Whoever can write that bucket chooses
 the code browsers run. The host itself can only read it; write access belongs to the
-operator's OCI user alone, and that user's API key is therefore as sensitive as the DuckDNS
-account. The SHA-256 manifest guards against corruption, not against a writer.
+operator's OCI user alone, and that user's API key is therefore as sensitive as the domain's
+registrar account. The SHA-256 manifest guards against corruption, not against a writer.
 
 **And a third: `main`.** Since [0008](../decisions/0008-release-pipeline.md) every push to
 `main` is published by GitHub Actions as `vault-ci`, which can write the releases bucket.
 Whoever can push to `main`, take over the GitHub account, or read the repository's Actions
 secrets can therefore publish code. Two-factor authentication on GitHub carries the same
-weight as on DuckDNS; the CI key is limited to that one bucket, so a leak of it is bounded to
+weight as at the registrar; the CI key is limited to that one bucket, so a leak of it is bounded to
 publishing a release.
 
-This is accepted knowingly. It is the reason
-[0003](../decisions/0003-running-everything-on-oci.md) keeps buying a domain on the table
-as the cheapest available security improvement, and it is the strongest argument for the
-native Android client, which is not delivered over the web at all.
+This is accepted knowingly. It is the strongest argument for the browser extension (installed
+from a store, not served by the hostname) and the native Android client, which is not delivered
+over the web at all.
 
 ### A4 — Compromised server
 
@@ -515,7 +517,7 @@ mistakes silence for coverage.
 
 | Risk | Why accepted |
 |---|---|
-| **The dynamic-DNS name is the entire user-facing trust path (A3).** Whoever controls it can serve modified client code and obtain the master password | Buying a domain removes it for roughly ₹800 a year and remains the cheapest security improvement available. Re-confirmed 2026-11-06: accepted until a domain is bought, and stated on the public security page |
+| **The domain is the user-facing trust path (A3).** Whoever controls `dev2ops.in` at the registrar or DNS host can serve modified client code and obtain the master password | A registered domain since 2026-11-26 (it was a free DuckDNS name), with registrar two-factor authentication and lock, a CAA record, and DNSSEC where offered. The store-installed extension is the structural answer |
 | **Write access to the releases bucket is equivalent to A3.** Releases are hashed, not signed | One person holds write access. Signing releases with a key the host trusts is the step to take if that ever changes |
 | **Push access to `main` is equivalent to A3** (0008). No branch protection or required approval | Not available for private repositories on the free plan. One collaborator, two-factor authentication, and a CI key limited to one bucket |
 | Structural metadata leaks from a database dump — account count, entries per account, creation and modification times | Closing it requires the single-row model rejected in [0002](../decisions/0002-storage-and-data-model.md) |

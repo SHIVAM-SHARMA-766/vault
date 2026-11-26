@@ -89,7 +89,9 @@ variable "instance_image_ocid" {
 
 variable "duckdns_hostname" {
   description = <<-EOT
-    The name the browser connects to, for example vault-example.duckdns.org.
+    The name the browser connects to, for example vault.dev2ops.in (any DNS name; the
+    variable keeps its old name). Used by cloud-init on first boot only: changing it replaces
+    the instance. To move a running host, see docs/runbook.md, "Changing the address".
 
     This is the whole of the user-facing trust path: whoever controls this name
     can obtain a certificate for it and serve their own JavaScript. See the

@@ -16,7 +16,7 @@ HOST="${1:?usage: deploy.sh <host or ip>}"
 
 # Neither is secret: the hostname is public DNS and the address only receives
 # certificate expiry notices.
-VAULT_HOSTNAME="${VAULT_HOSTNAME:-vault-shivam.duckdns.org}"
+VAULT_HOSTNAME="${VAULT_HOSTNAME:-vault.dev2ops.in}"
 ACME_EMAIL="${ACME_EMAIL:-developer.shivamsharma@gmail.com}"
 RELEASE_BUCKET="${RELEASE_BUCKET:-vault-releases}"
 KEY="${SSH_KEY:-$HOME/.ssh/oci-vault}"

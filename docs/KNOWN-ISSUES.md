@@ -17,17 +17,19 @@ Last revised: 2026-11-25 (passkey unlock, Argon2id, single sign-on)
 ## Security risks accepted
 
 <details open>
-<summary>🔴 <b>The hostname is a free dynamic-DNS name (threat A3)</b></summary>
+<summary>🔴 <b>Whoever controls the domain controls the code (threat A3)</b></summary>
 
-**Effect.** Whoever controls `vault-shivam.duckdns.org` can obtain a certificate for it and
-serve modified JavaScript, which would see the master password. The key hierarchy cannot
-bound this: the code doing the encryption is the code being replaced.
+**Effect.** Whoever controls `dev2ops.in` can point `vault.dev2ops.in` elsewhere, obtain a
+certificate and serve modified JavaScript, which would see the master password. The key
+hierarchy cannot bound this: the code doing the encryption is the code being replaced.
 
-**Why.** Cost: a domain is about ₹800 a year and the instance is run at $0. Accepted by the
-operator on 2026-11-06 and stated on the public security page.
+**Why it is smaller now.** Since 2026-11-26 the address is a registered domain rather than a free
+DuckDNS name. Control sits with the registrar account, which has two-factor authentication and
+a registrar lock, a CAA record limits certificates to Let's Encrypt, and DNSSEC is on where the
+DNS host offers it.
 
-**Changes when** a domain is bought (phase 1, operator), and structurally with the browser
-extension (phase 4), whose code is installed from a store rather than served by the hostname.
+**Changes when** people use the store-installed browser extension, whose code does not come from
+the hostname, and with the Android client (phase 5).
 </details>
 
 <details>

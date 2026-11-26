@@ -10,7 +10,7 @@ Everything is encrypted in your browser; the server stores ciphertext it holds n
 ![Tests](https://img.shields.io/badge/tests-350%20unit%20%C2%B7%2020%20browser-16a34a)
 ![Running cost](https://img.shields.io/badge/running%20cost-%240%20a%20month-0ea5e9)
 
-[**Live instance**](https://vault-shivam.duckdns.org) · [Install your own](docs/INSTALL.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
+[**Live instance**](https://vault.dev2ops.in) · [Install your own](docs/INSTALL.md) · [User guide](docs/USER-GUIDE.md) · [Architecture](ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md)
 
 <img src="docs/images/vault.png" alt="The Vault web app: folders and types on the left, items in the middle, a login with a live one-time code on the right" width="900">
 
