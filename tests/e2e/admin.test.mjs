@@ -29,10 +29,9 @@ test('roles see what they should, and a marketing edit goes live escaped', async
     const viewerCode = await invite(owner, 'Investor', 'viewer')
 
     // Without a code, sign-up cannot be sent: on an invite-only server the
-    // code is required, and the sign-in screen says an invitation is needed.
+    // code is required.
     const stranger = await s.person()
     await stranger.goto(`${s.base}/app/`)
-    await stranger.waitForSelector('.auth-switch:has-text("Have an invitation?")')
     await stranger.getByRole('button', { name: 'Create an account' }).click()
     await stranger.fill('#r-email', 'stranger@example.test')
     await stranger.fill('#r-account', ACCOUNT_PASSWORD)

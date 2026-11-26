@@ -323,8 +323,10 @@ second factor. Your master password still unlocks the vault: a key protects sign
 
 ### Creating an account
 
-On the sign-in page, choose **Create an account**:
-1. Type your email. It is your username.
+The sign-in page has two tabs, **Sign in** and **Create an account**. Choose
+**Create an account**:
+1. Type your email. It is your username. (*Continue with Google* and *Continue with Microsoft*
+   are shown as coming soon; they are not available yet.)
 2. We email a 6-digit code. Type it, and choose an **account password**.
 3. That makes your account. Your vault comes next:
    - if the server is open to everyone, choose a **master password** and save your recovery key;
@@ -342,12 +344,16 @@ This browser remembers step 1, so after a lock or a reload you type only the mas
 **Account menu → Sign out of this device** makes it forget, and the next sign-in starts with
 the account again. The two passwords must be different.
 
-- **Forgot the account password?** Use *Forgot your account password?* on the sign-in page. A
+The sign-in tab holds only your email, account password and **Continue**. Every other way in is
+under **Other ways to sign in**: a passkey, your master password, your recovery key, an
+invitation code, a request for access, and help.
+
+- **Forgot the account password?** Use *Forgot password?* next to the account password field. A
   link arrives by email. If the server sends no email, ask the person who runs it.
 - **Forgot the master password?** Only your recovery key can help.
 - **Change the account password** in Settings → Security. Other devices then sign in again.
-- **An account from before account passwords:** use *First sign-in since accounts were added?*
-  once, with your master password. Vault then asks you to choose an account password.
+- **An account from before account passwords:** choose *Other ways to sign in → Use my master
+  password* once. Vault then asks you to choose an account password.
 
 ### Signing in with your company account (single sign-on)
 
@@ -604,11 +610,11 @@ or press **Ctrl+Shift+L** (⌘⇧L on a Mac) to fill the best match without open
 
 ## Help and support
 
-**No account yet, or locked out?** The sign-in screen has two links:
+**No account yet, or locked out?** On the sign-in screen, choose **Other ways to sign in**:
 
 - **Request access** — tell the people who run the server who you are. If they approve, you
   get an invitation by email.
-- **Lost your authenticator, or can't sign in? Ask for help** — they confirm it is really you
+- **Ask for help** (lost your authenticator, or still can't sign in) — they confirm it is really you
   (by phone or in person) and turn off two-factor sign-in so you can set it up again. Nobody
   can reset a forgotten master password; that is what the recovery key is for.
 

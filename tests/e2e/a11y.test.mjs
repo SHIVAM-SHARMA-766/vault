@@ -39,7 +39,9 @@ test('every screen passes axe-core WCAG 2.1 AA, light and dark', async () => {
       await s.setRegistration(false)
       await page.goto(`${s.base}/app/`)
       await audit(page, `${scheme} sign-in`, found)
-      await page.getByRole('button', { name: 'Request access' }).click()
+      await page.getByRole('button', { name: 'Other ways to sign in' }).click()
+      await audit(page, `${scheme} other ways to sign in`, found)
+      await page.getByRole('button', { name: /Request access/ }).click()
       await audit(page, `${scheme} request access`, found)
       // Open: sign-up.
       await s.setRegistration(true)

@@ -18,7 +18,8 @@ test('access request → approved with an invitation; support ticket → convers
     // A visitor without an account asks for access from the sign-in screen.
     const visitor = await s.person()
     await visitor.goto(`${s.base}/app/`)
-    await visitor.getByRole('button', { name: 'Request access' }).click()
+    await visitor.getByRole('button', { name: 'Other ways to sign in' }).click()
+    await visitor.getByRole('button', { name: /Request access/ }).click()
     await visitor.fill('#pr-name', 'Riya Sen')
     await visitor.fill('#pr-email', 'riya@example.test')
     await visitor.fill('#pr-message', 'Joining the finance team')
@@ -27,6 +28,7 @@ test('access request → approved with an invitation; support ticket → convers
 
     // Locked out: asks for sign-in help.
     await visitor.getByRole('button', { name: 'Back to sign in' }).click()
+    await visitor.getByRole('button', { name: 'Other ways to sign in' }).click()
     await visitor.getByRole('button', { name: /Lost your authenticator/ }).click()
     await visitor.waitForSelector('text=Nobody can reset a forgotten master password')
 
