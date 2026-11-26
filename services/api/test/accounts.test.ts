@@ -143,3 +143,9 @@ test('an administrator can clear an account password; the person then signs in w
   const legacy = await h.request('POST', '/api/auth/login', { ip: ip(), body: { email: EMAIL, authKey: AUTH } })
   assert.equal(legacy.body['needsAccountPassword'], true)
 })
+
+test('mail is never sent to reserved example and test names', async () => {
+  const { undeliverable } = await import('../src/mail.js')
+  for (const a of ['a@example.com', 'b@mail.example.org', 'c@acme.example', 'd@x.test', 'e@y.invalid', 'f@localhost']) assert.equal(undeliverable(a), true, a)
+  for (const a of ['a@gmail.com', 'b@dev2ops.in', 'c@examples.com', 'd@vault-ci.dev']) assert.equal(undeliverable(a), false, a)
+})
