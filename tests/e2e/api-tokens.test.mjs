@@ -13,6 +13,7 @@ test('an owner makes an API token, a script uses it, and revoking stops it', asy
     await s.register(owner, 'owner@example.test')
     await s.menu(owner, 'Admin console')
     await owner.locator('.console-layout .sidebar .side-item', { hasText: 'System' }).click()
+    await owner.getByRole('tab', { name: 'API & SCIM' }).click()
     await owner.waitForSelector('.api-tokens')
     assert.match(await owner.locator('.scim-url .recovery-key code').innerText(), /\/api\/scim\/v2$/)
 

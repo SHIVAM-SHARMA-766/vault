@@ -12,14 +12,32 @@ import { IconAlert, IconRefresh } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
 import { Section, ago, run } from './common.js'
 
+type SystemTab = 'backups' | 'emails' | 'api' | 'limits'
+
 export function System({ canWrite, canTokens = false }: { canWrite: boolean; canTokens?: boolean }) {
+  // One subject at a time rather than one long page; the choice survives a reload.
+  const tabs: { id: SystemTab; label: string }[] = [
+    { id: 'backups', label: 'Backups' }, { id: 'emails', label: 'Emails' },
+    ...(canTokens ? [{ id: 'api' as const, label: 'API & SCIM' }] : []), { id: 'limits', label: 'Sign-in limits' },
+  ]
+  const [tab, setTabState] = useState<SystemTab>(() => {
+    const saved = (() => { try { return sessionStorage.getItem('vault.system.tab') } catch { return null } })()
+    return tabs.some((t) => t.id === saved) ? (saved as SystemTab) : 'backups'
+  })
+  const setTab = (t: SystemTab) => { setTabState(t); try { sessionStorage.setItem('vault.system.tab', t) } catch { /* storage blocked */ } }
   return (
-    <Section title="System" sub="Server backups, the emails Vault sends, and the limits that protect sign-in.">
-      <div className="admin-grid">
-        <BackupCard canWrite={canWrite} />
-        <TemplatesCard canWrite={canWrite} />
-        {canTokens ? <ApiTokensCard /> : null}
-        <LimitsCard />
+    <Section title="System" sub="Server backups, the emails Vault sends, API access, and the limits that protect sign-in.">
+      <div className="segmented section-tabs" role="tablist" aria-label="System">
+        {tabs.map((t) => (
+          <button key={t.id} type="button" role="tab" id={`sys-tab-${t.id}`} aria-selected={tab === t.id} aria-controls="sys-panel"
+                  className={tab === t.id ? 'seg-active' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      <div className="admin-grid" id="sys-panel" role="tabpanel" aria-labelledby={`sys-tab-${tab}`}>
+        {tab === 'backups' ? <BackupCard canWrite={canWrite} /> : null}
+        {tab === 'emails' ? <TemplatesCard canWrite={canWrite} /> : null}
+        {tab === 'api' && canTokens ? <ApiTokensCard /> : null}
+        {tab === 'limits' ? <LimitsCard /> : null}
       </div>
     </Section>
   )
