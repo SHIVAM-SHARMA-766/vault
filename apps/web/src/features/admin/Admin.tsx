@@ -22,7 +22,7 @@ import {
   api,
 } from '../../lib/api.js'
 import { STRENGTH_LABELS, describeMinutes } from '@vault/core'
-import { ErrorBox, ROLE_LABELS, Section, ago, run, useAdminData, when } from './common.js'
+import { EmptyState, ErrorBox, ROLE_LABELS, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
 import { Users } from './Users.js'
 import { Audit } from './AuditLog.js'
@@ -81,7 +81,7 @@ export function ServerSection({ state, tab, onGo }: { state: session.Unlocked; t
       {tab === 'website' && perms.has('site.read') ? <Website canWrite={perms.has('site.write')} canPublish={perms.has('site.publish')} /> : null}
       {tab === 'users' && perms.has('users.read') ? <Users selfId={state.userId} canWrite={perms.has('users.write')} canRoles={perms.has('roles.write')} /> : null}
       {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} canInvite={perms.has('invites.write')} /> : null}
-      {tab === 'invites' && perms.has('invites.read') ? <><VaultRequests canWrite={perms.has('invites.write')} /><Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /></> : null}
+      {tab === 'invites' && perms.has('invites.read') ? <Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /> : null}
       {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
       {tab === 'reports' && perms.has('audit.read') ? <Reports /> : null}
       {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} canTokens={perms.has('roles.write')} /> : null}
@@ -580,9 +580,10 @@ function VaultRequests({ canWrite }: { canWrite: boolean }) {
   const [rows, setRows] = useState<{ userId: string; email: string; note: string; requestedAt: string }[] | null>(null)
   const load = async () => { try { setRows((await api.admin.vaultRequests(await session.token())).requests) } catch { setRows([]) } }
   useEffect(() => { void load() }, [])
-  if (!rows) return null
+  // Only when someone is waiting: an empty card is noise on a busy page.
+  if (!rows || !rows.length) return null
   return (
-    <section className="admin-card admin-card-wide" aria-labelledby="vault-requests-title">
+    <section className="admin-card vault-requests" aria-labelledby="vault-requests-title">
       <div className="admin-card-head"><span className={`dot ${rows.length ? 'dot-warn' : 'dot-muted'}`} /><h2 id="vault-requests-title">Requests for a vault</h2>{rows.length ? <span className="pill pill-warn">{rows.length}</span> : null}</div>
       <p className="muted small">People who created an account and asked for a vault, while registration is by invitation. Approving emails them; they then create the vault with their own master password.</p>
       {rows.length ? (
@@ -600,7 +601,7 @@ function VaultRequests({ canWrite }: { canWrite: boolean }) {
             </li>
           ))}
         </ul>
-      ) : <p className="muted small">No requests waiting.</p>}
+      ) : null}
     </section>
   )
 }
@@ -615,6 +616,7 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
   const [issued, setIssued] = useState<{ code: string; label: string; expiresAt: string; emailedTo?: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const [resending, setResending] = useState<{ invite: AdminInvite; email: string } | null>(null)
+  const [show, setShow] = useState<'all' | 'active' | 'used' | 'expired'>('all')
 
   async function create(e: React.FormEvent) {
     e.preventDefault()
@@ -639,20 +641,24 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
     <Section title="Invitations" sub="Single-use codes. Registration must be set to “Invite only” or “Open” for them to work.">
       <ErrorBox error={error} />
 
-      {canWrite ? <form className="admin-card invite-form" onSubmit={create}>
+      <VaultRequests canWrite={canWrite} />
+
+      {canWrite ? <form className="admin-card invite-card" onSubmit={create} aria-labelledby="inv-title">
+        <div className="admin-card-head"><IconPlus size={16} /><h2 id="inv-title">Invite someone</h2></div>
+        <div className="invite-grid">
         <div className="field">
           <label htmlFor="inv-label">Who is it for?</label>
           <input id="inv-label" required maxLength={80} placeholder="e.g. Rahul — personal laptop" value={label} onChange={(e) => setLabel(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="inv-email">Email it to <span className="muted">(optional)</span></label>
+          <input id="inv-email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="inv-days">Expires after</label>
           <select id="inv-days" value={days} onChange={(e) => setDays(Number(e.target.value))}>
             {[1, 3, 7, 14, 30].map((d) => <option key={d} value={d}>{d} day{d > 1 ? 's' : ''}</option>)}
           </select>
-        </div>
-        <div className="field">
-          <label htmlFor="inv-email">Email it to <span className="muted">(optional)</span></label>
-          <input id="inv-email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
         </div>
         {canRoles ? (
           <div className="field">
@@ -662,7 +668,11 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
             </select>
           </div>
         ) : null}
-        <button className="btn btn-primary" type="submit" disabled={busy || !label.trim()}><IconPlus size={16} />Create invitation</button>
+        </div>
+        <div className="invite-foot">
+          <span className="muted small">A single-use code, emailed with a link if you give an address.</span>
+          <button className="btn btn-primary" type="submit" disabled={busy || !label.trim()}>{busy ? <span className="spinner" /> : <IconPlus size={16} />}Create invitation</button>
+        </div>
       </form> : null}
 
       {canWrite ? <BulkInvite canRoles={canRoles} onDone={reload} /> : null}
@@ -675,12 +685,23 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
         </div>
       ) : null}
 
-      {!data ? null : data.invites.length === 0 ? <p className="muted">No invitations yet.</p> : (
+      {!data ? <div className="skeletons"><div className="skeleton" /></div> : data.invites.length === 0 ? (
+        <EmptyState icon={<IconKey size={26} />} title="No invitations yet">
+          {canWrite ? 'Create one above. Each code works once, and only its fingerprint is kept here.' : 'Invitations staff create appear here.'}
+        </EmptyState>
+      ) : <>
+        <div className="filter-chips invite-filter" role="group" aria-label="Show invitations">
+          {(['all', 'active', 'used', 'expired'] as const).map((f) => (
+            <button key={f} className={`chip ${show === f ? 'chip-active' : ''}`} aria-pressed={show === f} onClick={() => setShow(f)}>
+              {f === 'all' ? 'All' : f[0]!.toUpperCase() + f.slice(1)} <span className="chip-count">{f === 'all' ? data.invites.length : data.invites.filter((i) => i.status === f).length}</span>
+            </button>
+          ))}
+        </div>
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>For</th><th>Role</th><th>Created</th><th>Expires</th><th>Status</th><th aria-label="Actions" /></tr></thead>
             <tbody>
-              {data.invites.map((i: AdminInvite) => (
+              {data.invites.filter((i) => show === 'all' || i.status === show).map((i: AdminInvite) => (
                 <tr key={i.id}>
                   <td className="strong">{i.label}</td>
                   <td>{ROLE_LABELS[i.role] ?? 'User'}</td>
@@ -703,7 +724,7 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
             </tbody>
           </table>
         </div>
-      )}
+      </>}
       {resending ? (
         <form className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="rs-title" onSubmit={async (e) => {
           e.preventDefault()
