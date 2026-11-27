@@ -73,6 +73,10 @@ export interface EntryContent {
   /** Passkeys for this login's site (decisions/0035), kept by the browser
    *  extension. Each private key is encrypted with the rest of the entry.
    *  Typed loosely here; packages/core's StoredPasskey is the shape. */
+  /** Other items this one goes with (a server and its SSH key), by id, in the
+   *  same place: personal items link to personal ones, a shared item to items
+   *  of its collection. Ids that no longer resolve are ignored. */
+  related?: string[]
   passkeys?: { credentialId: string; rpId: string; userHandle: string; userName: string; userDisplayName?: string; privateKey: string; publicKey: string; cosePublicKey: string; alg: -7; createdAt: string }[]
 }
 

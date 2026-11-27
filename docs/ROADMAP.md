@@ -429,7 +429,10 @@ Built one at a time, each its own pull request with tests.
   first, masked until shown, kept in the preferences blob (sealed under the vault key, so the
   server sees only its size) and cleared from Preferences. Shown in the generator and in
   Preferences → Password generator.
-- [ ] Related items: link an item to others (a server and its SSH key).
+- [x] **Related items**: link an item to others from the editor (search and pick); the item page
+  lists them both ways and opens them. Ids are kept inside the sealed item (`related`), and links
+  stay within one place: personal items to personal ones, a shared item to items of its
+  collection, so no collection learns about another's items.
 - [ ] Custom item templates.
 - [ ] Several vaults (Personal, Work, Family) — design first.
 - [ ] Travel mode — after several vaults.
