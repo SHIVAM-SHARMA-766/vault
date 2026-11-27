@@ -13,10 +13,10 @@ import { checkBreaches } from '../../lib/breach.js'
 import { deleteAttachments } from '../../lib/attachments.js'
 import { useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
-import { IconAlert, IconInbox, IconPlus, IconRows, IconSearch, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconGlobe, IconInbox, IconPlus, IconRows, IconSearch, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, TYPES, copySecret, typeInfo, useToast } from '../../ui/kit.js'
 import * as prefs from '../../lib/prefs.js'
-import { navigate } from '../../lib/router.js'
+import { href, navigate } from '../../lib/router.js'
 import { CommandPalette, type PaletteAction, ShortcutsDialog } from './CommandPalette.js'
 import { Shell } from '../../ui/Shell.js'
 import { EntryDetail } from './EntryDetail.js'
@@ -410,6 +410,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
               </button>
             </div>
           </div>
+          {vault.travel.on ? (
+            <p className="travel-banner" role="status"><IconGlobe size={14} /><span><strong>Travel mode is on.</strong> Only vaults safe for travel are here.</span> <Link to={href({ name: 'settings', tab: 'security' })} className="link">Change</Link></p>
+          ) : null}
           {picked ? (
             <div className="bulk-bar" role="toolbar" aria-label="Selected items">
               <label className="check bulk-all">

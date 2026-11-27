@@ -208,6 +208,9 @@ export interface BackupState {
   cloud?: Record<CloudDrive, boolean>
 }
 
+/** Travel mode: on or off, and the vaults safe for travel ('personal' for Personal). */
+export interface TravelState { on: boolean; safe: string[] }
+
 export const api = {
   health: () => request<{ status: string }>('GET', '/api/health'),
 
@@ -357,7 +360,11 @@ export const api = {
       entries: { id: string; blob: string; createdAt: string; updatedAt: string; vaultId?: string }[]
       folders: { id: string; blob: string; createdAt: string; updatedAt: string }[]
       vaults?: { id: string; key: string; blob: string; createdAt: string; updatedAt: string }[]
+      travel?: TravelState
     }>('GET', '/api/vault', { token }),
+
+  travel: (token: string) => request<TravelState>('GET', '/api/vault/travel', { token }),
+  setTravel: (token: string, body: { on?: boolean; safe?: string[] }) => request<TravelState>('PUT', '/api/vault/travel', { token, body }),
 
   /** `vaultId` names the vault that sealed it; none is Personal. */
   putEntry: (token: string, id: string, blob: string, vaultId?: string | null) =>

@@ -4276,6 +4276,62 @@
         }
       }
     },
+    "/api/vault/travel": {
+      "get": {
+        "summary": "Travel mode: on or off, and the vaults safe for travel",
+        "operationId": "getVaultTravel",
+        "tags": [
+          "vault"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Turn travel mode on or off, or mark vaults safe; revealing a vault needs the master password again",
+        "operationId": "putVaultTravel",
+        "tags": [
+          "vault"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/vault/folders/{id}": {
       "put": {
         "summary": "Create or replace a sealed folder",

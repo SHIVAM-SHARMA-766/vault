@@ -1,6 +1,7 @@
 // Routing table. Kept separate from the Lambda entry point so that tests can
 // drive the same routes against an in-memory store, with no AWS involved.
 
+import * as travel from './travel.js'
 import { refuseIfGated } from './edition.js'
 import { randomUUID } from 'node:crypto'
 
@@ -195,6 +196,8 @@ export function buildRouter(app: App): Router {
   router.delete('/api/vault/entries/:id', authed((u, _e, id) => vault.deleteEntry(app, u, id)), 'Delete an entry and its history')
   router.post('/api/vault/entries/:id/move', authed((u, e, id) => vault.moveEntry(app, u, e, id)), 'Move an entry and its history to another vault, re-sealed')
   router.put('/api/vault/vaults/:id', authed((u, e, id) => vault.putVault(app, u, e, id)), 'Create or rename one of the account\'s vaults')
+  router.get('/api/vault/travel', authed((u) => travel.readTravel(app, u)), 'Travel mode: on or off, and the vaults safe for travel')
+  router.put('/api/vault/travel', authed((u, e) => travel.writeTravel(app, u, e)), 'Turn travel mode on or off, or mark vaults safe; revealing a vault needs the master password again')
   router.delete('/api/vault/vaults/:id', authed((u, _e, id) => vault.deleteVault(app, u, id)), 'Delete an empty vault')
   router.put('/api/vault/folders/:id', authed((u, e, id) => vault.putFolder(app, u, e, id)), 'Create or replace a sealed folder')
   router.delete('/api/vault/folders/:id', authed((u, _e, id) => vault.deleteFolder(app, u, id)), 'Delete a folder')
