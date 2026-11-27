@@ -44,7 +44,7 @@ test('only a sealed blob is accepted, and only a small one', async () => {
   const { h, a } = await twoPeople()
   assert.equal((await h.request('PUT', '/api/prefs', { token: a, body: { blob: '{"theme":"dark"}' } })).status, 400)
   assert.equal((await h.request('PUT', '/api/prefs', { token: a, body: {} })).status, 400)
-  const big = sealedBlob('big').replace(/\.([^.]*)$/, (_m, tail: string) => '.' + tail + 'A'.repeat(9000))
+  const big = sealedBlob('big').replace(/\.([^.]*)$/, (_m, tail: string) => '.' + tail + 'A'.repeat(50_000))
   assert.equal((await h.request('PUT', '/api/prefs', { token: a, body: { blob: big } })).status, 413)
 })
 

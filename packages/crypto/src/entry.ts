@@ -77,6 +77,8 @@ export interface EntryContent {
    *  same place: personal items link to personal ones, a shared item to items
    *  of its collection. Ids that no longer resolve are ignored. */
   related?: string[]
+  /** The id of the person's own template this item was made from, if any. */
+  template?: string
   passkeys?: { credentialId: string; rpId: string; userHandle: string; userName: string; userDisplayName?: string; privateKey: string; publicKey: string; cosePublicKey: string; alg: -7; createdAt: string }[]
 }
 

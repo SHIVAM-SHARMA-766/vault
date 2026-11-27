@@ -19,6 +19,7 @@ import * as session from '../../lib/session.js'
 import { IconClock, IconCopy, IconEye, IconGlobe, IconFolder, IconInbox, IconKey, IconSun } from '../../ui/icons.js'
 import { Check, GeneratedHistory, useToast } from '../../ui/kit.js'
 import { LOCALE_NAMES, t } from '../../lib/i18n.js'
+import { Templates } from './Templates.js'
 
 const THEME_LABELS: Record<Theme, string> = { system: 'Match system', light: 'Light', dark: 'Dark' }
 
@@ -154,6 +155,8 @@ export function Preferences({ state }: { state: session.Unlocked }) {
       <EmailAlerts />
 
       <GeneratorDefaults p={p} saving={saving} change={change} />
+
+      <Templates p={p} saving={saving} change={change} />
     </>
   )
 }

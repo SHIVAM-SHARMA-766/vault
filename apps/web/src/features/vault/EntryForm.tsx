@@ -5,7 +5,7 @@
 import { useMemo, useRef, useState } from 'react'
 
 import type { CustomField, EntryContent, EntryType } from '@vault/crypto'
-import { RELATED_MAX, cleanRelated, flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField } from '@vault/core'
+import { RELATED_MAX, applyTemplate, cleanRelated, flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField } from '@vault/core'
 
 import { IconEye, IconEyeOff, IconPlus, IconX } from '../../ui/icons.js'
 import { FieldInput } from './fields.js'
@@ -15,6 +15,7 @@ import { IconUpload } from '../../ui/icons.js'
 import type { Folder } from './model.js'
 import { t } from '../../lib/i18n.js'
 import { Monogram } from '../../ui/kit.js'
+import { usePrefs } from '../../lib/prefs.js'
 
 /** An item that can be linked from the editor: enough to find and show it. */
 export interface LinkCandidate { id: string; name: string; type: EntryType; username?: string | undefined; url?: string | undefined }
@@ -45,6 +46,14 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
   const folderOptions = useMemo(() => flattenTree(folderTree(folders)), [folders])
 
   const set = <K extends keyof EntryContent>(k: K, v: EntryContent[K]) => setDraft((d) => ({ ...d, [k]: v }))
+  // The person's own templates, offered first in the type list.
+  const templates = usePrefs().templates
+  const template = draft.template ? templates.find((x) => x.id === draft.template) : undefined
+  const chooseType = (value: string) => {
+    const tp = value.startsWith('tpl:') ? templates.find((x) => x.id === value.slice(4)) : undefined
+    if (tp) { setDraft((d) => applyTemplate(d, tp)); return }
+    setDraft((d) => { const { template: _gone, ...rest } = d; return { ...rest, type: value as EntryType } })
+  }
   const setCustom = (i: number, patch: Partial<CustomField>) =>
     set('customFields', draft.customFields.map((c, j) => (j === i ? { ...c, ...patch } : c)))
 
@@ -74,7 +83,12 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
         <div className="grid-2">
           <div className="field">
             <label htmlFor="f-type">{t('Type')}</label>
-            <select id="f-type" value={draft.type} onChange={(e) => set('type', e.target.value as EntryType)}>
+            <select id="f-type" value={template ? `tpl:${template.id}` : draft.type} onChange={(e) => chooseType(e.target.value)}>
+              {templates.length ? (
+                <optgroup label="My templates">
+                  {templates.map((tp) => <option key={tp.id} value={`tpl:${tp.id}`}>{tp.name}</option>)}
+                </optgroup>
+              ) : null}
               {typesByGroup().map(({ group, types }) => (
                 <optgroup key={group} label={group}>
                   {types.map((ty) => <option key={ty.type} value={ty.type}>{t(ty.label)}</option>)}

@@ -10,7 +10,7 @@ test('nothing, or not an object, gives the defaults', () => {
 })
 
 test('valid values are kept', () => {
-  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', maskLength: 'actual', autoHideSeconds: 0, defaultFolderId: 'abc-1', dateStyle: 'dmy', clock: '12h', language: 'hi', siteIcons: false, generatorHistory: [{ value: 'k9#Vt2!mQz', at: '2026-11-27T10:00:00.000Z' }], generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
+  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', maskLength: 'actual', autoHideSeconds: 0, defaultFolderId: 'abc-1', dateStyle: 'dmy', clock: '12h', language: 'hi', siteIcons: false, generatorHistory: [{ value: 'k9#Vt2!mQz', at: '2026-11-27T10:00:00.000Z' }], templates: [{ id: 'laptop', name: 'Office laptop', base: 'note', fields: [{ label: 'Serial', hidden: false }] }], generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
   assert.deepEqual(normalizePrefs(p), p)
 })
 

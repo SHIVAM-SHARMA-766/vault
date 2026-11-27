@@ -8,8 +8,10 @@ import { type LambdaEvent, type LambdaResponse, json, parseJsonBody } from '../h
 import { PREFS_SK, userPk } from '../keys.js'
 import { requireSealed } from '../validate.js'
 
-/** Preferences are a handful of settings; anything bigger is not one. */
-export const PREFS_MAX_BYTES = 8 * 1024
+/** Settings, the generator history and a person's item templates (twenty
+ *  templates of twenty fields fit with room to spare); anything bigger is not
+ *  preferences. */
+export const PREFS_MAX_BYTES = 48 * 1024
 
 export async function getPrefs(app: App, userId: string): Promise<LambdaResponse> {
   const item = await app.store.get(userPk(userId), PREFS_SK)
