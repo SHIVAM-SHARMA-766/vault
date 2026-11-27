@@ -420,6 +420,17 @@ someone is. It never holds or releases a key.
   lock the server's operators out.
 - **Provisioning**, when on, lets the provider decide who may create an account. Turn it on
   only for a provider whose addresses are all yours.
+- **SAML 2.0** (instead of OIDC) ends in the same ticket.
+  - **Who checks the signature:** the XML signature is checked by a maintained library
+    (`@node-saml/node-saml` with xml-crypto, which guards against signature wrapping), never
+    by Vault's own code.
+  - **What must hold:** the assertion must be signed by the configured certificate, for this
+    server's audience, within its time window (one minute of clock skew), answering a request
+    this server made. That request's id is used once, and a replayed assertion is refused.
+  - **Where that state lives:** request ids and seen assertions are kept in the database, so
+    several servers agree.
+  - **Tested refusals:** a response signed with another key, altered after signing, for
+    another audience, out of date, unsolicited, or replayed.
 
 ### A22 — The organization recovery key
 

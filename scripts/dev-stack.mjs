@@ -72,6 +72,7 @@ const app = {
       endpoints: { googleAuth: `${process.env.CLOUD_MOCK}/g/auth`, googleToken: `${process.env.CLOUD_MOCK}/g/token`, googleApi: `${process.env.CLOUD_MOCK}/gapi`, msAuth: `${process.env.CLOUD_MOCK}/m/auth`, msToken: `${process.env.CLOUD_MOCK}/m/token`, msGraph: `${process.env.CLOUD_MOCK}/graph` },
     } : { google: null, microsoft: null },
     oidc: process.env.OIDC_ISSUER ? { issuer: process.env.OIDC_ISSUER.replace(/\/+$/, ''), clientId: process.env.OIDC_CLIENT_ID ?? '', clientSecret: process.env.OIDC_CLIENT_SECRET ?? '', name: process.env.OIDC_NAME || 'SSO', provision: process.env.OIDC_PROVISION === 'true', requireVerifiedEmail: process.env.OIDC_REQUIRE_VERIFIED_EMAIL !== 'false' } : null,
+    saml: process.env.SAML_IDP_SSO_URL ? { ssoUrl: process.env.SAML_IDP_SSO_URL, cert: (process.env.SAML_IDP_CERT ?? '').replace(/\\n/g, '\n'), entityId: process.env.SAML_SP_ENTITY_ID || `http://localhost:${PORT}/api/auth/sso/saml/metadata`, name: process.env.SAML_NAME || 'SSO', provision: process.env.SAML_PROVISION === 'true', emailAttribute: process.env.SAML_EMAIL_ATTRIBUTE ?? '' } : null,
     mail: { host: '', port: 587, user: '', password: '', from: '', signInNotices: true },
     db: { driver: 'mysql', host: 'memory', user: 'dev', password: 'dev', database: 'dev', port: 0, ssl: false, path: '' },
     pepper: PEPPER, tokenKey: 'dev-stack-token-key-not-a-secret-000000',

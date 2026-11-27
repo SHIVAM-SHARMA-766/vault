@@ -21,6 +21,7 @@ import { OidcError, discover, exchangeCode, pkceChallenge, randomToken, redirect
 import { SSO_LIMIT, enforce } from '../ratelimit.js'
 import { roleFromDigest } from '../roles.js'
 import { AlreadyExists } from '../store.js'
+import { SamlRefused, authorizeUrl, metadata, verifiedEmail } from '../saml.js'
 import { getRegistry, getSettings } from '../system.js'
 
 const PK = 'SSO'
@@ -43,12 +44,59 @@ function requireOidc(app: App) {
   if (!app.config.oidc) throw notFound()
 }
 
+/** The identity provider this server uses, OIDC or SAML (one at most). */
+export function ssoOf(app: App): { name: string; provision: boolean; kind: 'oidc' | 'saml' } | null {
+  if (app.config.oidc) return { name: app.config.oidc.name, provision: app.config.oidc.provision, kind: 'oidc' }
+  if (app.config.saml) return { name: app.config.saml.name, provision: app.config.saml.provision, kind: 'saml' }
+  return null
+}
+
+function requireSso(app: App) {
+  if (!ssoOf(app)) throw notFound()
+}
+
+/** After the provider vouched for an address: a ticket, as for OIDC. */
+async function issueTicket(app: App, email: string, provision: boolean): Promise<LambdaResponse> {
+  const digest = emailDigest(email, app.config.pepper)
+  const pointer = await app.store.get(emailPk(digest), EMAIL_SK)
+  const userId = typeof pointer?.['userId'] === 'string' ? pointer['userId'] : undefined
+  if (!userId && !provision) return back(app, 'sso-error=no_account')
+  const ticket = randomToken()
+  const record: Ticket = { emailDigest: digest, email, ...(userId ? { userId } : { provision: true }) }
+  await app.store.put({ pk: PK, sk: `T#${hash(ticket)}`, ...record, expiresAt: seconds(app) + TICKET_SECONDS })
+  return back(app, `sso=${ticket}`)
+}
+
+/** SAML: the provider posts its signed response here (HTTP-POST binding). */
+export async function samlAcs(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  if (!app.config.saml) throw notFound()
+  await enforce(app.store, 'sso-ip', event.requestContext.http.sourceIp, SSO_LIMIT, app.now())
+  const raw = event.isBase64Encoded && event.body ? Buffer.from(event.body, 'base64').toString('utf8') : event.body ?? ''
+  const samlResponse = new URLSearchParams(raw).get('SAMLResponse') ?? ''
+  if (!samlResponse || samlResponse.length > 500_000) return back(app, 'sso-error=provider_error')
+  let email: string
+  try { email = await verifiedEmail(app, samlResponse) } catch (err) {
+    if (err instanceof SamlRefused) console.error(JSON.stringify({ level: 'warn', msg: 'SAML response refused', reason: err.message.slice(0, 200) }))
+    return back(app, 'sso-error=provider_error')
+  }
+  return issueTicket(app, email, app.config.saml.provision)
+}
+
+/** SAML: this server's service provider metadata, for the provider. */
+export async function samlMetadata(app: App): Promise<LambdaResponse> {
+  if (!app.config.saml) throw notFound()
+  return { statusCode: 200, headers: { 'content-type': 'application/samlmetadata+xml; charset=utf-8', 'cache-control': 'no-store' }, body: metadata(app) }
+}
+
 const back = (app: App, fragment: string) => redirect(`${app.config.origin}/app/#${fragment}`)
 
 /** Step 1: off to the provider. */
 export async function start(app: App, event: LambdaEvent): Promise<LambdaResponse> {
-  requireOidc(app)
+  requireSso(app)
   await enforce(app.store, 'sso-ip', event.requestContext.http.sourceIp, SSO_LIMIT, app.now())
+  if (app.config.saml) {
+    try { return redirect(await authorizeUrl(app)) } catch { return back(app, 'sso-error=provider_unavailable') }
+  }
   let doc
   try { doc = await discover(app) } catch (err) { return back(app, `sso-error=${err instanceof OidcError ? err.code : 'provider_unavailable'}`) }
   const state = randomToken(), nonce = randomToken(), verifier = randomToken()
@@ -82,14 +130,7 @@ export async function callback(app: App, event: LambdaEvent): Promise<LambdaResp
     return back(app, `sso-error=${err instanceof OidcError ? err.code : 'provider_unavailable'}`)
   }
 
-  const digest = emailDigest(email, app.config.pepper)
-  const pointer = await app.store.get(emailPk(digest), EMAIL_SK)
-  const userId = typeof pointer?.['userId'] === 'string' ? pointer['userId'] : undefined
-  if (!userId && !app.config.oidc!.provision) return back(app, 'sso-error=no_account')
-  const ticket = randomToken()
-  const record: Ticket = { emailDigest: digest, email, ...(userId ? { userId } : { provision: true }) }
-  await app.store.put({ pk: PK, sk: `T#${hash(ticket)}`, ...record, expiresAt: seconds(app) + TICKET_SECONDS })
-  return back(app, `sso=${ticket}`)
+  return issueTicket(app, email, app.config.oidc!.provision)
 }
 
 /** The ticket, if it is current and unused; it is not used up here. */
@@ -116,7 +157,7 @@ export async function useTicket(app: App, ticket: string): Promise<boolean> {
 /** Step 3: who the ticket is for, so the app can ask for the right master
  *  password (or offer to create the account). */
 export async function ticketInfo(app: App, event: LambdaEvent): Promise<LambdaResponse> {
-  requireOidc(app)
+  requireSso(app)
   await enforce(app.store, 'sso-ip', event.requestContext.http.sourceIp, SSO_LIMIT, app.now())
   const t = await readTicket(app, parseJsonBody<{ ticket?: unknown }>(event).ticket)
   if (!t) throw new HttpError(401, 'sso_invalid', 'That single sign-on has expired. Sign in again.')
@@ -134,10 +175,11 @@ export async function ssoGate(app: App, profile: { userId: string; emailDigest: 
     if (!t || t.userId !== profile.userId) throw new HttpError(401, 'sso_invalid', 'That single sign-on has expired or is for another account. Sign in again.')
     return ticket as string
   }
-  if (!app.config.oidc || !(await getSettings(app)).policy.requireSso) return null
+  const provider = ssoOf(app)
+  if (!provider || !(await getSettings(app)).policy.requireSso) return null
   const role = roleFromDigest(app, profile.emailDigest, (await getRegistry(app, profile.userId))?.role)
   if (role === 'owner') return null
-  throw new HttpError(403, 'sso_required', `This server requires signing in with ${app.config.oidc.name} first.`)
+  throw new HttpError(403, 'sso_required', `This server requires signing in with ${provider.name} first.`)
 }
 
 /** For registration: a provisioning ticket for exactly this address. */

@@ -545,6 +545,56 @@
         }
       }
     },
+    "/api/auth/sso/saml/acs": {
+      "post": {
+        "summary": "SAML single sign-on: the identity provider posts its signed response; redirects to the app with a ticket",
+        "operationId": "postAuthSsoSamlAcs",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sso/saml/metadata": {
+      "get": {
+        "summary": "SAML single sign-on: this server's service provider metadata",
+        "operationId": "getAuthSsoSamlMetadata",
+        "tags": [
+          "auth"
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/sso/ticket": {
       "post": {
         "summary": "Which account a single sign-on ticket is for",

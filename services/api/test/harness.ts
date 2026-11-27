@@ -33,15 +33,19 @@ export interface RequestOptions {
   /** Headers set verbatim, for asserting what the service does with a header
    *  it should ignore. */
   rawHeaders?: Record<string, string>
+  /** A body sent as is (a form post), instead of `body` as JSON. */
+  rawBody?: string
 }
 
 export interface Parsed {
   status: number
   headers: Record<string, string>
   body: Record<string, unknown>
+  /** The body as text, for answers that are not JSON (XML, CSV). */
+  raw: string
 }
 
-export function harness(options: { edition?: 'personal' | 'business' | 'hosted'; allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string; metricsToken?: string; auditWebhook?: string; auditSecret?: string; oidc?: Config['oidc']; cloudDrive?: Config['cloudDrive'] } = {}): Harness {
+export function harness(options: { edition?: 'personal' | 'business' | 'hosted'; allowRegistration?: boolean; adminEmails?: string[]; siteOutput?: string; mail?: boolean; allowPrivate?: boolean; remoteBackups?: boolean; version?: string; updateUrl?: string; breachUrl?: string; metricsToken?: string; auditWebhook?: string; auditSecret?: string; oidc?: Config['oidc']; saml?: Config['saml']; cloudDrive?: Config['cloudDrive'] } = {}): Harness {
   const store = new MemoryStore()
   const outbox: Message[] = []
   let now = Date.UTC(2026, 8, 22, 12, 0, 0)
@@ -69,6 +73,7 @@ export function harness(options: { edition?: 'personal' | 'business' | 'hosted';
       metricsToken: options.metricsToken ?? '',
       auditWebhook: { url: options.auditWebhook ?? '', secret: options.auditSecret ?? '' },
       oidc: options.oidc ?? null,
+      saml: options.saml ?? null,
       cloudDrive: options.cloudDrive ?? { google: null, microsoft: null },
       mail: { host: options.mail ? 'smtp.test' : '', port: 587, user: '', password: '', from: 'Vault <vault@vault.test>', signInNotices: true },
       db: {
@@ -106,14 +111,12 @@ export function harness(options: { edition?: 'personal' | 'business' | 'hosted';
       requestContext: {
         http: { method, sourceIp: opts.ip ?? '203.0.113.7', userAgent: 'test-agent' },
       },
-      ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
+      ...(opts.rawBody !== undefined ? { body: opts.rawBody } : opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
     }
     const res: LambdaResponse = await dispatch(app, event)
-    return {
-      status: res.statusCode,
-      headers: res.headers,
-      body: res.body ? (JSON.parse(res.body) as Record<string, unknown>) : {},
-    }
+    let body: Record<string, unknown> = {}
+    try { body = res.body ? (JSON.parse(res.body) as Record<string, unknown>) : {} } catch { /* not JSON: see raw */ }
+    return { status: res.statusCode, headers: res.headers, body, raw: res.body ?? '' }
   }
 
   return { app, store, outbox, request, setNow: (ms) => { now = ms } }
