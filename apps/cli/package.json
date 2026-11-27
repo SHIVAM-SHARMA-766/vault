@@ -1,0 +1,20 @@
+{
+  "name": "@vault/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vault on the command line: read secrets and run commands with them, decrypted on this machine only.",
+  "type": "module",
+  "bin": { "vault": "./dist/src/main.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test dist/test/"
+  },
+  "dependencies": {
+    "@vault/crypto": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^7.0.2"
+  }
+}

@@ -407,7 +407,8 @@ pull requests with tests.
   - [x] SCIM 2.0 Users at `/api/scim/v2`: create emails an invitation, active false disables,
     delete offboards (the vault is kept); filters `userName` / `externalId` `eq`; Entra ID's
     string booleans accepted.
-  - [ ] CLI for developers (`vault read`, `vault run`), zero-knowledge on the developer's machine.
+  - [x] CLI for developers (`apps/cli`): `vault login`, `list`, `read vault://item/field`,
+    `run --env-file … -- cmd`; decrypted on the developer's machine, nothing secret on disk.
   - [ ] SAML 2.0 sign-in (OIDC already works with most identity providers).
 
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))

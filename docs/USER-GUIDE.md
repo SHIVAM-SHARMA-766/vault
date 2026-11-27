@@ -801,6 +801,23 @@ On a hosted server, Admin console → **Tenants** lists the companies. **Manage*
 </details>
 
 <details>
+<summary>Developers: the command line (vault read, vault run)</summary>
+
+The `vault` command reads secrets from your own vault, decrypted on your machine, for scripts
+and local development. See [apps/cli/README.md](../apps/cli/README.md).
+
+```sh
+vault login --server https://your-server --email you@example.com
+vault read vault://GitHub/password
+vault run --env-file .env.vault -- npm start   # STRIPE_KEY=vault://Stripe/password
+```
+
+It signs in to your account once. After that it asks for the master password each time a secret
+is needed, or reads it from `VAULT_MASTER_PASSWORD` in CI. Only the server, your address and the
+account sign-in are kept on disk, never a key or a secret.
+</details>
+
+<details>
 <summary>API tokens and SCIM provisioning (Entra ID, Okta, JumpCloud)</summary>
 
 Admin console → **System** → **API tokens and SCIM** (owners only). A token is for a script or
