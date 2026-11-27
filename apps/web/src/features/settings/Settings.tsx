@@ -30,6 +30,7 @@ import { AccountPassword } from './AccountPassword.js'
 import { KdfUpgrade } from './KdfUpgrade.js'
 import { PasskeyUnlock, type UnlockPasskey } from './PasskeyUnlock.js'
 import { SecurityKeys } from './SecurityKeys.js'
+import { Travel } from './Travel.js'
 import { Preferences } from './Preferences.js'
 import { TwoFactor, type TwoFactorStatus } from './TwoFactor.js'
 import { day } from '../../lib/format.js'
@@ -124,6 +125,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
             <TwoFactor state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
             <SecurityKeys state={state} status={me?.twoFactor ?? null} reload={() => setVersion((v) => v + 1)} />
             <Devices />
+            <Travel state={state} />
             <ShareLinks vaultKey={state.vaultKey} />
             <Activity />
           </> : null}

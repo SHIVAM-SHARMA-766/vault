@@ -1543,3 +1543,12 @@ a.btn, a.btn:hover { text-decoration: none; }
 label.badge-vault { cursor: pointer; }
 label.badge-vault::after { content: '▾'; font-size: 10px; margin-left: 2px; color: var(--muted); }
 .vault-switch .side-item { width: 100%; }
+
+/* Travel mode. */
+.travel-vaults { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.travel-vaults li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.travel-vaults .check { margin: 0; }
+.travel-name { font-weight: 600; }
+.travel-card.travel-on { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.travel-banner { display: flex; align-items: center; gap: 8px; margin: 0 10px 8px; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; }
+.travel-banner > span { flex: 1; }

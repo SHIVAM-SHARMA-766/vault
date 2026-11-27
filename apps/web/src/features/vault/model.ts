@@ -72,13 +72,15 @@ export function useVault(vaultKey: Uint8Array) {
   // Each vault's wrapped key exactly as stored: a rename sends it back
   // unchanged (wrapping again would give different bytes for the same key).
   const [wrapped, setWrapped] = useState<Map<string, string>>(new Map())
+  const [travel, setTravel] = useState<{ on: boolean; safe: string[] }>({ on: false, safe: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setError('')
     try {
-      const { entries: sealed, folders: sealedFolders, vaults: sealedVaults = [] } = await api.vault(await session.token())
+      const { entries: sealed, folders: sealedFolders, vaults: sealedVaults = [], travel: travelNow } = await api.vault(await session.token())
+      setTravel(travelNow ?? { on: false, safe: [] })
       // One request returns the whole vault; everything after this is local.
       // The server cannot search or sort it, because it cannot read it.
       const openedVaults = (await openVaults(sealedVaults, vaultKey)).sort((a, b) => a.name.localeCompare(b.name))
@@ -222,5 +224,5 @@ export function useVault(vaultKey: Uint8Array) {
     await load()
   }
 
-  return { entries, folders, vaults, ring, loading, error, load, saveEntry, deleteEntry, saveFolder, deleteFolder, history, moveEntry, createVault, renameVault, deleteVault }
+  return { entries, folders, vaults, ring, travel, loading, error, load, saveEntry, deleteEntry, saveFolder, deleteFolder, history, moveEntry, createVault, renameVault, deleteVault }
 }

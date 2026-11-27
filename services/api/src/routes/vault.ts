@@ -22,6 +22,7 @@ import {
 import { describeDevice } from '../device.js'
 import { AlreadyExists, type Item } from '../store.js'
 import { requireSealed } from '../validate.js'
+import { getTravel, isServed, travelView } from '../travel.js'
 
 /** Older versions of an entry, so a mistaken edit is recoverable. Capped
  *  client-side; the cap is enforced here too, because the client is the thing
@@ -50,10 +51,13 @@ export const MAX_VAULTS = 20
 /** A vault id a request names: absent or null for Personal; otherwise one of
  *  this account's vaults, or the request is refused. */
 async function vaultIdFrom(app: App, userId: string, raw: unknown): Promise<string | null> {
-  if (raw === undefined || raw === null || raw === '') return null
-  if (!isValidId(raw)) throw badRequest('Invalid vault identifier.')
-  if (!(await app.store.get(userPk(userId), vaultSk(raw)))) throw badRequest('No such vault.')
-  return raw
+  const id = raw === undefined || raw === null || raw === '' ? null : raw
+  if (id !== null) {
+    if (!isValidId(id)) throw badRequest('Invalid vault identifier.')
+    if (!(await app.store.get(userPk(userId), vaultSk(id)))) throw badRequest('No such vault.')
+  }
+  if (!isServed(await getTravel(app, userId), id)) throw badRequest('That vault is away while travel mode is on.')
+  return id
 }
 
 /** One query returns the whole vault. There is no server-side search, sort, or
@@ -61,10 +65,20 @@ async function vaultIdFrom(app: App, userId: string, raw: unknown): Promise<stri
  *  filtering on. */
 export async function getVault(app: App, userId: string): Promise<LambdaResponse> {
   const items = await app.store.query(userPk(userId))
-  const entries = items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).map(view)
+  // In travel mode, vaults not marked safe are left out entirely.
+  const travel = await getTravel(app, userId)
+  const entries = items.filter((i) => i.sk.startsWith(ENTRY_PREFIX) && isServed(travel, i['vaultId'] as string | undefined)).map(view)
   const folders = items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).map(view)
-  const vaults = items.filter((i) => i.sk.startsWith(VAULT_PREFIX)).map(vaultView)
-  return json(200, { entries, folders, vaults })
+  const vaults = items.filter((i) => i.sk.startsWith(VAULT_PREFIX) && isServed(travel, String(i['id']))).map(vaultView)
+  return json(200, { entries, folders, vaults, travel: travelView(travel) })
+}
+
+/** An existing entry, unless travel mode is keeping its vault away: then it
+ *  is as if it did not exist. */
+async function servedEntry(app: App, userId: string, id: string) {
+  const row = await app.store.get(userPk(userId), entrySk(id))
+  if (!row) return null
+  return isServed(await getTravel(app, userId), row['vaultId'] as string | undefined) ? row : null
 }
 
 async function upsert(
@@ -84,6 +98,8 @@ async function upsert(
 
   const at = new Date(app.now()).toISOString()
   const existing = await app.store.get(userPk(userId), sk(id))
+  // An entry in a vault away for travel cannot be overwritten from here.
+  if (withVault && existing && !isServed(await getTravel(app, userId), existing['vaultId'] as string | undefined)) throw notFound()
 
   await app.store.put({
     pk: userPk(userId),
@@ -108,7 +124,7 @@ export async function moveEntry(app: App, userId: string, event: LambdaEvent, id
   const body = parseJsonBody<{ blob?: unknown; vaultId?: unknown; history?: unknown }>(event)
   const blob = requireSealed(body.blob, 'blob')
   const vaultId = await vaultIdFrom(app, userId, body.vaultId)
-  const current = await app.store.get(userPk(userId), entrySk(id))
+  const current = await servedEntry(app, userId, id)
   if (!current) throw notFound()
   const versions = await app.store.query(userPk(userId), historyPrefix(id))
   const given = new Map<string, string>()
@@ -135,6 +151,7 @@ export async function putVault(app: App, userId: string, event: LambdaEvent, id:
   const key = requireSealed(body.key, 'key')
   const blob = requireSealed(body.blob, 'blob')
   const existing = await app.store.get(userPk(userId), vaultSk(id))
+  if (existing && !isServed(await getTravel(app, userId), id)) throw notFound()
   if (existing && String(existing['key']) !== key) throw conflict('A vault keeps its key; create a new vault instead.')
   if (!existing) {
     const count = (await app.store.query(userPk(userId), VAULT_PREFIX)).length
@@ -149,6 +166,7 @@ export async function putVault(app: App, userId: string, event: LambdaEvent, id:
  *  server will not orphan entries sealed under a key that is about to go. */
 export async function deleteVault(app: App, userId: string, id: string): Promise<LambdaResponse> {
   if (!isValidId(id)) throw badRequest('Invalid identifier.')
+  if (!isServed(await getTravel(app, userId), id)) throw notFound()
   const entries = await app.store.query(userPk(userId), ENTRY_PREFIX)
   if (entries.some((e) => e['vaultId'] === id)) throw conflict('Move or delete the items in this vault first.')
   await app.store.delete(userPk(userId), vaultSk(id))
@@ -160,6 +178,8 @@ export const putFolder = (app: App, userId: string, event: LambdaEvent, id: stri
 
 export async function deleteEntry(app: App, userId: string, id: string): Promise<LambdaResponse> {
   if (!isValidId(id)) throw badRequest('Invalid identifier.')
+  const row = await app.store.get(userPk(userId), entrySk(id))
+  if (row && !isServed(await getTravel(app, userId), row['vaultId'] as string | undefined)) throw notFound()
   await app.store.delete(userPk(userId), entrySk(id))
   // History belongs to the entry and goes with it.
   for (const h of await app.store.query(userPk(userId), historyPrefix(id))) {
@@ -179,6 +199,7 @@ export async function deleteFolder(app: App, userId: string, id: string): Promis
 
 export async function getHistory(app: App, userId: string, entryId: string): Promise<LambdaResponse> {
   if (!isValidId(entryId)) throw badRequest('Invalid identifier.')
+  if (!(await servedEntry(app, userId, entryId))) return json(200, { versions: [] })
   const items = await app.store.query(userPk(userId), historyPrefix(entryId))
   return json(200, {
     versions: items
@@ -194,7 +215,7 @@ export async function addHistory(
   const body = parseJsonBody<{ blob?: unknown }>(event)
   const blob = requireSealed(body.blob, 'blob')
 
-  const current = await app.store.get(userPk(userId), entrySk(entryId))
+  const current = await servedEntry(app, userId, entryId)
   if (!current) throw notFound()
 
   const at = new Date(app.now()).toISOString()

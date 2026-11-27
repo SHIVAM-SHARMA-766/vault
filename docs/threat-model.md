@@ -424,6 +424,20 @@ and when one is renamed. It still learns no names or contents.
 A write without a vault id is Personal, so an older client cannot strand an item under a key it
 does not hold.
 
+
+### A21a9 — Travel mode ([0039](../decisions/0039-travel-mode.md), 2026-11-27)
+
+While travel mode is on, the server leaves vaults not marked safe out of every vault read, and
+refuses writes, deletes and moves that touch them.
+
+- **Who can undo it:** turning it off, or marking another vault safe, needs the master password
+  within ten minutes. Someone holding an unlocked, signed-in device cannot undo it once that grace
+  has passed.
+- **What it does not protect against:** someone who obtains the master password. Folder names,
+  which are account-wide, stay visible.
+- **What the server learns:** that travel mode is on and which vault ids are safe. It learns no
+  names.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

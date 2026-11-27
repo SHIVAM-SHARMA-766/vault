@@ -443,7 +443,10 @@ Built one at a time, each its own pull request with tests.
   An item can move between vaults from its page or in bulk, re-sealed together with its history.
   Imports can target a vault, and deleting a vault first moves its items to Personal. The
   extension, CLI, offline copy, personal backups and emergency access all read every vault.
-- [ ] Travel mode — after several vaults.
+- [x] **Travel mode** ([0039](../decisions/0039-travel-mode.md)): mark vaults safe for travel and
+  turn it on in Settings → Security. Every other vault stops being served to any device (web,
+  extension, CLI, offline copy) and cannot be changed, until it is turned off with the master
+  password. Nothing is deleted.
 
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
