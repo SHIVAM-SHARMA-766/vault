@@ -22,7 +22,7 @@ import { Shell } from '../../ui/Shell.js'
 import { EntryDetail } from './EntryDetail.js'
 import { EntryForm } from './EntryForm.js'
 import { FolderDialog } from './FolderDialog.js'
-import { GettingStarted } from './GettingStarted.js'
+import { VaultHome, rememberOpened } from './Home.js'
 import { type Decrypted, type Folder, emptyEntry, stripMeta, useVault } from './model.js'
 import { type SharedEntry, canEdit, useTeams } from '../orgs/model.js'
 import { type Filter, Sidebar, sameFilter } from './Sidebar.js'
@@ -46,6 +46,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>({ kind: 'view' })
   const [filter, setFilter] = useState<Filter>({ kind: 'all' })
+  // Opened items, for "Opened lately" on the home pane.
+  useEffect(() => { if (selectedId && state.userId) rememberOpened(state.userId, selectedId) }, [selectedId, state.userId])
   const [query, setQuery] = useState('')
   const [dialog, setDialog] = useState<Dialog>(null)
   const [palette, setPalette] = useState(false)
@@ -456,7 +458,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                   ) : null}
                   <button className={`row-item ${e.id === selectedId ? 'row-active' : ''} ${picked?.has(e.id) ? 'row-picked' : ''}`}
                           onClick={() => { if (picked) { if (pickable(e)) togglePick(e.id); return } setSelectedId(e.id); setMode({ kind: 'view' }) }}>
-                    <Monogram name={e.name} />
+                    <Monogram name={e.name} url={e.url} />
                     <span className="row-text">
                       <span className="row-name">{e.name || 'Untitled'}{e.favorite ? <span className="row-star"><IconStar size={12} filled /></span> : null}</span>
                       <span className="row-meta">{e.unreadable ? 'This entry could not be decrypted' : filter.kind === 'health'
@@ -512,7 +514,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          loadHistory={() => vault.history(selected.id)}
                          onRestore={async (content) => { await vault.saveEntry({ ...content, favorite: selected.favorite, ...(selected.folderId ? { folderId: selected.folderId } : {}) }, selected.id) }} />
           ) : (
-            state.userId ? <GettingStarted userId={state.userId} hasItems={entries.length > 0} onNew={startNew} /> : null
+            state.userId ? <VaultHome userId={state.userId} entries={active} health={health} sharedCount={active.filter((e) => !!sharedOf(e)).length}
+                                       onOpen={(id) => { setSelectedId(id); setMode({ kind: 'view' }) }} onNew={startNew} onReview={() => setFilter({ kind: 'health' })} /> : null
           )}
         </section>
       </div>

@@ -1260,3 +1260,131 @@ table.data thead th { position: sticky; top: 0; background: var(--surface); z-in
 .api-tokens .scim-url, .api-tokens .issued, .api-tokens .token-form { margin: 12px 0; }
 .api-tokens .token-form { display: grid; gap: 4px; max-width: 640px; }
 .api-tokens .check span code { font-size: 12px; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Design refresh (2026-11-27): a calmer, richer surface. Tokens first, then
+   the shell, list, detail and the vault's home. Motion only when the person
+   has not asked for less.
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg: #f4f5fa;
+  --surface-2: #f2f3f8;
+  --line: #e5e7ef;
+  --line-strong: #d2d6e0;
+  --text: #0f1222;
+  --text-2: #444a60;
+  --accent-grad: linear-gradient(135deg, #5b5bf0 0%, #7c4dff 100%);
+  --shadow: 0 1px 2px rgb(15 18 34 / .04), 0 2px 6px rgb(15 18 34 / .04);
+  --shadow-md: 0 4px 16px -4px rgb(15 18 34 / .10), 0 1px 3px rgb(15 18 34 / .05);
+  --shadow-lg: 0 24px 56px -16px rgb(15 18 34 / .22);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0a0b10; --surface: #11131a; --surface-2: #181b24; --line: #222633; --line-strong: #2e3342;
+    --accent-grad: linear-gradient(135deg, #7c74ff 0%, #a07cff 100%);
+    --shadow-md: 0 6px 20px -6px rgb(0 0 0 / .6); --shadow-lg: 0 28px 64px -16px rgb(0 0 0 / .7);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0a0b10; --surface: #11131a; --surface-2: #181b24; --line: #222633; --line-strong: #2e3342;
+  --accent-grad: linear-gradient(135deg, #7c74ff 0%, #a07cff 100%);
+  --shadow-md: 0 6px 20px -6px rgb(0 0 0 / .6); --shadow-lg: 0 28px 64px -16px rgb(0 0 0 / .7);
+}
+
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+h1, h2, h3 { letter-spacing: -.015em; }
+
+/* Buttons: the primary one carries the brand. */
+.btn { border-radius: var(--radius-sm); }
+.btn-primary { background: var(--accent-grad); box-shadow: 0 1px 2px rgb(79 70 229 / .25), 0 4px 12px -2px rgb(99 80 240 / .35); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-grad); filter: brightness(1.06); }
+.btn-primary:active:not(:disabled) { filter: brightness(.96); }
+
+/* The shell: a frosted bar over the content. */
+.topbar { background: color-mix(in srgb, var(--surface) 82%, transparent); backdrop-filter: saturate(1.6) blur(12px); -webkit-backdrop-filter: saturate(1.6) blur(12px); position: relative; z-index: 5; }
+.search input { border-radius: 10px; }
+.sidebar { background: linear-gradient(180deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 92%, var(--accent-soft)) 100%); }
+.side-item { border-radius: 9px; position: relative; }
+.side-item[aria-current="page"], .side-item.side-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.side-item[aria-current="page"]::before, .side-item.side-active::before { content: ''; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent-grad); }
+
+/* The list: rows as quiet cards. */
+.rows { padding: 0 10px 16px; }
+.row-item { border-radius: 12px; border: 1px solid transparent; }
+.row-item:hover { background: var(--surface); border-color: var(--line); }
+.row-active, .row-active:hover { background: var(--surface); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); box-shadow: var(--shadow-md); }
+.row-name { font-weight: 600; }
+
+/* Item tiles: a site's icon on white, or a coloured initial. */
+.monogram { border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .12); }
+.monogram-lg { width: 64px; height: 64px; border-radius: 16px; font-size: 26px; }
+.monogram-sm { width: 28px; height: 28px; border-radius: 7px; font-size: 12px; }
+.monogram-icon { background: #fff; box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+.monogram-icon img { width: 66%; height: 66%; object-fit: contain; image-rendering: auto; }
+.monogram-lg.monogram-icon { box-shadow: inset 0 0 0 1px var(--line), var(--shadow); }
+
+/* The detail: a header with the site, and the actions people use most. */
+.pane { background: var(--surface); }
+.detail-head { gap: 18px; margin-bottom: 14px; }
+.detail-head h2 { font-size: 26px; font-weight: 750; letter-spacing: -.02em; }
+.detail-host { margin: 2px 0 2px; color: var(--muted); font-size: 13.5px; }
+.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px; }
+.quick-actions .btn { height: 34px; }
+.fields { border-radius: 14px; box-shadow: var(--shadow); }
+.badge { background: var(--surface-2); border: 1px solid var(--line); }
+
+/* The vault's home. */
+.home { max-width: 860px; margin: 0 auto; padding: 28px 32px 48px; display: grid; gap: 20px; }
+.home-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.home-head h2 { font-size: 28px; font-weight: 750; letter-spacing: -.025em; }
+.home-head p { margin-top: 4px; }
+.home-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+.home-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; box-shadow: var(--shadow); }
+.score-card { display: flex; align-items: center; gap: 18px; background: linear-gradient(135deg, var(--surface) 55%, color-mix(in srgb, var(--surface) 80%, var(--accent-soft)) 100%); }
+.score-ring { width: 92px; height: 92px; flex: none; transform: rotate(-90deg); }
+.score-ring .ring-track { fill: none; stroke: var(--surface-2); stroke-width: 8; }
+.score-ring .ring-value { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .9s var(--ease); }
+.score-ring .ring-text { transform: rotate(90deg); transform-origin: 42px 42px; font-size: 22px; font-weight: 750; fill: var(--text); }
+.score-ok .ring-value { stroke: #16a34a; } .score-good .ring-value { stroke: #4f46e5; } .score-warn .ring-value { stroke: #d97706; } .score-bad .ring-value { stroke: #dc2626; } .score-none .ring-value { stroke: transparent; }
+.score-text h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 650; }
+.score-grade { font-size: 22px; font-weight: 750; margin: 2px 0 4px; }
+.score-text .btn { margin-top: 10px; }
+.stat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-items: center; }
+.stat-tiles div { display: grid; gap: 2px; padding: 8px 4px; text-align: center; }
+.stat-tiles strong { font-size: 26px; font-weight: 750; letter-spacing: -.02em; }
+.stat-tiles span { color: var(--muted); font-size: 12.5px; }
+.home-strip h3 { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 650; }
+.home-strip h3 svg { color: #f5a524; }
+.home-strip ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.tile { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; box-shadow: var(--shadow); }
+.tile:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); box-shadow: var(--shadow-md); }
+.tile > svg { margin-left: auto; color: var(--muted); flex: none; }
+.tile-text { display: grid; min-width: 0; }
+.tile-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-meta { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-compact { padding: 18px 20px; }
+.gs-compact h2 { font-size: 16px; }
+
+@media (max-width: 1100px) { .home-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .home { padding: 20px 16px 40px; }
+  .home-head { align-items: flex-start; flex-direction: column; }
+  .home-strip ul { grid-template-columns: 1fr; }
+  .detail-head h2 { font-size: 22px; }
+}
+
+/* Motion, for those who have not asked for less. */
+@media (prefers-reduced-motion: no-preference) {
+  .btn, .row-item, .tile, .side-item, .chip, .home-card { transition: background-color .15s var(--ease), border-color .15s var(--ease), box-shadow .2s var(--ease), transform .15s var(--ease), filter .15s var(--ease); }
+  .tile:hover { transform: translateY(-1px); }
+  .detail, .home { animation: rise .22s var(--ease); }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+.getting-started.gs-compact { max-width: none; margin: 0; padding: 18px 20px; }
+.gs-compact ol { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1100px) { .gs-compact ol { grid-template-columns: 1fr; } }
+a.btn, a.btn:hover { text-decoration: none; }

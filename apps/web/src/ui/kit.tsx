@@ -12,6 +12,7 @@ import {
   IconBadge, IconCode, IconDatabase, IconIdCard, IconPassport, IconServer, IconTicket, IconWallet,
 } from './icons.js'
 import * as prefs from '../lib/prefs.js'
+import { usePrefs } from '../lib/prefs.js'
 
 // ── Toasts ────────────────────────────────────────────────────────────────
 
@@ -229,11 +230,36 @@ export const TYPES: { type: EntryType; label: string; plural: string; Icon: (p: 
 
 export const typeInfo = (t: EntryType) => TYPES.find((x) => x.type === t) ?? TYPES[0]!
 
-/** A coloured initial in place of a site favicon, which would have to be
- *  fetched from somewhere and would say which sites the vault holds. */
-export function Monogram({ name, size = 'md' }: { name: string; size?: 'md' | 'lg' }) {
+/** The host an icon is asked for: a real domain, without "www.", or null
+ *  (an address, localhost, no URL). */
+export function iconHost(url: string | undefined): string | null {
+  if (!url) return null
+  let host: string
+  try { host = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase() } catch { return null }
+  host = host.replace(/^www\./, '')
+  if (!/^(?=.{3,253}$)(?:[a-z0-9-]{1,63}\.)+[a-z]{2,63}$/.test(host)) return null
+  return host
+}
+
+const failedIcons = new Set<string>()
+
+/** The item's website icon, from this Vault server (routes/icons.ts: by host
+ *  name, no sign-in sent), on a tile; a coloured initial when there is no
+ *  icon, it fails to load, or the person turned icons off in Preferences. */
+export function Monogram({ name, url, size = 'md' }: { name: string; url?: string | undefined; size?: 'md' | 'lg' | 'sm' }) {
+  const { siteIcons } = usePrefs()
+  const host = siteIcons ? iconHost(url) : null
+  const [broken, setBroken] = useState(() => host !== null && failedIcons.has(host))
   const letter = (name.trim()[0] ?? '?').toUpperCase()
   let h = 0
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  if (host && !broken) {
+    return (
+      <span className={`monogram monogram-${size} monogram-icon`} aria-hidden="true">
+        <img src={`/api/icons/${host}`} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer"
+             onError={() => { failedIcons.add(host); setBroken(true) }} />
+      </span>
+    )
+  }
   return <span className={`monogram monogram-${size} av-${h % 8}`} aria-hidden="true">{letter}</span>
 }

@@ -66,6 +66,9 @@ export interface Prefs {
   dateStyle: DateStyle
   clock: Clock
   language: Language
+  /** Show each item's website icon, fetched by this Vault server by host name
+   *  (no sign-in sent); off shows a coloured initial instead. */
+  siteIcons: boolean
 }
 
 export const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -81,6 +84,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   dateStyle: 'system',
   clock: 'system',
   language: 'system',
+  siteIcons: true,
   generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
@@ -108,6 +112,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     dateStyle: pick(r['dateStyle'], DATE_STYLES, d.dateStyle),
     clock: pick(r['clock'], CLOCKS, d.clock),
     language: pick(r['language'], LANGUAGES, d.language),
+    siteIcons: bool(r['siteIcons'], d.siteIcons),
     generator: {
       mode: pick(g['mode'], ['password', 'passphrase'] as const, d.generator.mode),
       length,

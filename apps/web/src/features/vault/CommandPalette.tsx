@@ -70,7 +70,7 @@ export function CommandPalette({ items, actions, onOpenItem, onCopyPassword, onC
                 className={`palette-row ${i === index ? 'is-active' : ''}`} onMouseEnter={() => setIndex(i)} onMouseDown={(e) => { e.preventDefault(); choose(row) }}>
               {row.kind === 'item' ? (
                 <>
-                  <Monogram name={row.item.name} />
+                  <Monogram name={row.item.name} url={row.item.url} />
                   <span className="palette-text"><span className="truncate">{row.item.name || 'Untitled'}</span><span className="muted small truncate">{subtitle(row.item)}</span></span>
                   {row.item.password && i === index ? <span className="palette-keys muted small"><kbd>⇧</kbd><kbd>Enter</kbd> copy password</span> : null}
                 </>

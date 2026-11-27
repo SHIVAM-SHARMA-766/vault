@@ -334,6 +334,19 @@ The sign-in page has two tabs, **Sign in** and **Create an account**. Choose
      an invitation code. You get an email when the request is approved; sign in again and create
      your vault.
 
+### Your vault's home
+
+With no item open, the right-hand side shows your vault's home:
+- a **security score** from the password health check, with *Review issues*;
+- counts of items, favourites and items shared with you;
+- the items you **opened lately**, and your **favourites**;
+- the getting-started steps, while any are left.
+
+It is all worked out in your browser from your decrypted vault. Each item shows its
+**website's icon**, fetched by your Vault server by the site's name only; Preferences → *Show
+website icons* turns them off. An item's page also has **Copy username**, **Copy password** and
+**Open site** at the top.
+
 ### Which emails Vault sends
 
 Only the ones you need:

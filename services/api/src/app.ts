@@ -31,6 +31,7 @@ import * as attachments from './routes/attachments.js'
 import * as webauthn from './routes/webauthn.js'
 import * as passkeys from './routes/passkeys.js'
 import * as sso from './routes/sso.js'
+import * as icons from './routes/icons.js'
 import * as accounts from './routes/accounts.js'
 import * as signup from './routes/signup.js'
 import { breachRange } from './breach.js'
@@ -69,6 +70,8 @@ export function buildRouter(app: App): Router {
   router.get('/api/auth/sso/callback', ({ event }) => sso.callback(app, event), 'Single sign-on: the identity provider\'s answer; redirects to the app with a ticket')
   router.post('/api/auth/sso/saml/acs', ({ event }) => sso.samlAcs(app, event), 'SAML single sign-on: the identity provider posts its signed response; redirects to the app with a ticket')
   router.get('/api/auth/sso/saml/metadata', () => sso.samlMetadata(app), 'SAML single sign-on: this server\'s service provider metadata')
+  // Website icons for items (design refresh): no sign-in, by host name only.
+  router.get('/api/icons/:host', ({ event, param }) => icons.icon(app, event, param), 'A website\'s icon (PNG, ICO, JPEG, GIF or WebP), fetched and cached by the server; no sign-in')
   router.post('/api/auth/sso/ticket', ({ event }) => sso.ticketInfo(app, event), 'Which account a single sign-on ticket is for')
   router.post('/api/auth/passkey-login/options', ({ event }) => passkeys.loginOptions(app, event), 'Start signing in with a passkey (no account named)')
   router.post('/api/auth/passkey-login', ({ event }) => passkeys.login(app, event), 'Sign in with a passkey; returns the passkey-wrapped vault key')

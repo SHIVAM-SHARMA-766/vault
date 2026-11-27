@@ -23,6 +23,8 @@
 		# img-src omits remote hosts deliberately. Fetching site favicons from
 		# a third party would tell that third party which services the vault
 		# holds accounts for, which is most of what the encryption protects.
+		# Website icons come from this server instead (/api/icons/<host>, no
+		# sign-in sent), and can be turned off in Preferences.
 		Content-Security-Policy "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
 		Strict-Transport-Security "max-age=63072000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
