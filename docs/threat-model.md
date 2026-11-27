@@ -369,6 +369,24 @@ than open registration for that domain. It never gives anyone the company's keys
 company still takes an invitation from its admins and a fingerprint check. A domain is held by
 one company at a time, and the server checks it in DNS, not on the company's word.
 
+### A21a6 — Admin API tokens and SCIM (admin console phase 5)
+
+An admin API token is a long-lived secret held by a script or a directory. Several things
+bound it:
+
+- **Its secret:** 256 random bits, kept only as a SHA-256 hash and compared in constant time.
+  It is shown once.
+- **Its scopes:** chosen by an owner. Scopes never include `roles.write` or `settings.write`,
+  so a token cannot change roles or settings, make tokens, or reach admins and owners (it acts
+  with an admin's reach and the console's checks).
+- **What it can never reach:** vault contents, because nothing on the server can open them.
+- **Its lifetime:** expiry at 30, 90 or 365 days, or never. It is revoked at once from the
+  console, and is rate-limited per token.
+
+A stolen token with `users.write` could disable or offboard accounts, which is disruptive but
+does not read anything and is in the audit log under the token's name. Through SCIM, a
+directory can only invite, disable, enable and offboard. It cannot delete a vault.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

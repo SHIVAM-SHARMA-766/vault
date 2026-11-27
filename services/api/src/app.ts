@@ -10,6 +10,9 @@ import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './ht
 import { API_LIMIT, enforce } from './ratelimit.js'
 import { countedSignIn } from './stats.js'
 import { reauth, requireSudo } from './sudo.js'
+import * as apiTokens from './apitokens.js'
+import * as scim from './routes/scim.js'
+import { authenticateToken, requireScope, usesApiToken } from './apitokens.js'
 import * as tenants from './routes/tenants.js'
 import * as insights from './routes/insights.js'
 import { Router } from './router.js'
@@ -221,30 +224,65 @@ export function buildRouter(app: App): Router {
   // The operator's routes. Same sign-in as everything else; each names the
   // permission it needs, and the caller's role is re-read on every request.
   // See roles.ts and routes/admin.ts.
+  // Staff routes take a staff session, or an admin API token with the
+  // route's permission as a scope (phase 5): the token acts as "token:<id>"
+  // with an admin's reach (never over admins or owners).
   const admined =
     (permission: Permission,
-     handler: (userId: string, event: LambdaEvent, param: string, role: Role) => Promise<LambdaResponse>) =>
-    Object.assign(authed(async (userId, event, param) => {
-      const role = await admin.guard(app, userId, permission)
-      return handler(userId, event, param, role)
-    }), { permission })
+     handler: (userId: string, event: LambdaEvent, param: string, role: Role) => Promise<LambdaResponse>) => {
+      const bySession = authed(async (userId, event, param) => {
+        const role = await admin.guard(app, userId, permission)
+        return handler(userId, event, param, role)
+      })
+      return Object.assign(async (ctx: { event: LambdaEvent; param: string }) => {
+        if (!usesApiToken(ctx.event)) return bySession(ctx)
+        const token = await authenticateToken(app, ctx.event)
+        requireScope(token, permission)
+        return handler(`token:${token.id}`, ctx.event, ctx.param, 'admin')
+      }, { auth: 'access' as const, permission })
+    }
 
   // The same, for admin routes with several path parameters.
   const adminedP =
     (permission: Permission,
-     handler: (userId: string, event: LambdaEvent, params: string[], role: Role) => Promise<LambdaResponse>) =>
-    Object.assign(authedP(async (userId, event, params) => {
-      const role = await admin.guard(app, userId, permission)
-      return handler(userId, event, params, role)
-    }), { permission })
+     handler: (userId: string, event: LambdaEvent, params: string[], role: Role) => Promise<LambdaResponse>) => {
+      const bySession = authedP(async (userId, event, params) => {
+        const role = await admin.guard(app, userId, permission)
+        return handler(userId, event, params, role)
+      })
+      return Object.assign(async (ctx: { event: LambdaEvent; params: string[] }) => {
+        if (!usesApiToken(ctx.event)) return bySession(ctx)
+        const token = await authenticateToken(app, ctx.event)
+        requireScope(token, permission)
+        return handler(`token:${token.id}`, ctx.event, ctx.params, 'admin')
+      }, { auth: 'access' as const, permission })
+    }
 
   // Sensitive admin actions also need a recent sign-in or the master password
   // typed again (phase 3, sudo.ts).
   const sensitive =
     (permission: Permission,
      handler: (userId: string, event: LambdaEvent, param: string, role: Role) => Promise<LambdaResponse>) =>
-    admined(permission, async (userId, event, param, role) => { await requireSudo(app, event); return handler(userId, event, param, role) })
+    // A token was granted its scope on purpose and cannot type a password.
+    admined(permission, async (userId, event, param, role) => { if (!usesApiToken(event)) await requireSudo(app, event); return handler(userId, event, param, role) })
 
+  // Admin API tokens: owners only, and making or revoking one needs the
+  // master password recently. A token can never manage tokens (roles.write
+  // is not a scope).
+  router.get('/api/admin/tokens', admined('roles.write', () => apiTokens.listTokens(app)), 'Admin API tokens: names, scopes, expiry, last use (never the secret)')
+  router.post('/api/admin/tokens', sensitive('roles.write', (u, e) => apiTokens.createToken(app, u, e)), 'Make an admin API token; it is shown once')
+  router.delete('/api/admin/tokens/:id', sensitive('roles.write', (u, _e, id) => apiTokens.revokeToken(app, u, id)), 'Revoke an admin API token')
+  // SCIM 2.0 provisioning (phase 5), for an admin API token with the scim scope.
+  router.get('/api/scim/v2/ServiceProviderConfig', scim.scimRoute(app, () => scim.serviceProviderConfig(app)), 'SCIM: what this server supports')
+  router.get('/api/scim/v2/ResourceTypes', scim.scimRoute(app, () => scim.resourceTypes(app)), 'SCIM: resource types (User)')
+  router.get('/api/scim/v2/Schemas', scim.scimRoute(app, () => scim.schemas()), 'SCIM: the User schema as used here')
+  router.get('/api/scim/v2/Users', scim.scimRoute(app, (t, e) => scim.listUsers(app, t, e)), 'SCIM: list users, with userName / externalId eq filters')
+  router.post('/api/scim/v2/Users', scim.scimRoute(app, (t, e) => scim.createUser(app, t, e)), 'SCIM: provision a user (an emailed invitation)')
+  router.get('/api/scim/v2/Users/:id', scim.scimRoute(app, (t, e, p) => scim.getUser(app, t, e, p)), 'SCIM: one user')
+  router.patch('/api/scim/v2/Users/:id', scim.scimRoute(app, (t, e, p) => scim.patchUser(app, t, e, p)), 'SCIM: activate or deactivate a user')
+  router.put('/api/scim/v2/Users/:id', scim.scimRoute(app, (t, e, p) => scim.putUser(app, t, e, p)), 'SCIM: replace a user (active only)')
+  router.delete('/api/scim/v2/Users/:id', scim.scimRoute(app, (t, e, p) => scim.deleteUser(app, t, e, p)), 'SCIM: deprovision a user (offboard; the vault is kept)')
+  router.get('/api/scim/v2/Groups', scim.scimRoute(app, () => scim.groups()), 'SCIM: groups are not provisioned (always empty)')
   router.post('/api/auth/reauth', authed((u, e) => reauth(app, u, e)), 'Confirm the master password again, for sensitive admin actions (ten minutes)')
   router.get('/api/admin/overview', admined('overview.read', () => admin.overview(app)), 'Instance counts and health')
   router.get('/api/admin/users', admined('users.read', (_u, e) => admin.listUsers(app, e)), 'Accounts on this server: searched, filtered, sorted and paged')

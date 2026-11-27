@@ -2,6 +2,7 @@
 // (G5). Backup settings live on the host; this shows them and can ask for a
 // backup now.
 
+import { ApiTokensCard } from './ApiTokens.js'
 import { useEffect, useState } from 'react'
 
 import { type BackupStatus, type TemplateKind, type Templates, api } from '../../lib/api.js'
@@ -11,12 +12,13 @@ import { IconAlert, IconRefresh } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
 import { Section, ago, run } from './common.js'
 
-export function System({ canWrite }: { canWrite: boolean }) {
+export function System({ canWrite, canTokens = false }: { canWrite: boolean; canTokens?: boolean }) {
   return (
     <Section title="System" sub="Server backups, the emails Vault sends, and the limits that protect sign-in.">
       <div className="admin-grid">
         <BackupCard canWrite={canWrite} />
         <TemplatesCard canWrite={canWrite} />
+        {canTokens ? <ApiTokensCard /> : null}
         <LimitsCard />
       </div>
     </Section>

@@ -84,7 +84,7 @@ export function ServerSection({ state, tab, onGo }: { state: session.Unlocked; t
       {tab === 'invites' && perms.has('invites.read') ? <><VaultRequests canWrite={perms.has('invites.write')} /><Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /></> : null}
       {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
       {tab === 'reports' && perms.has('audit.read') ? <Reports /> : null}
-      {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
+      {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} canTokens={perms.has('roles.write')} /> : null}
     </>
   )
 }
