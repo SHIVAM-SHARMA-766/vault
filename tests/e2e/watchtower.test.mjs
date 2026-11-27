@@ -63,3 +63,34 @@ test('a breached password is found on request; expiry shows beside it; only pref
     hibp.close()
   }
 })
+
+test('a login at a site that offers authenticator codes is pointed out, and the hint opens the editor', async () => {
+  const s = await start()
+  try {
+    const page = await s.person()
+    await s.register(page, 'tfa@example.test')
+    for (const [name, url] of [['GitHub', 'https://github.com'], ['Intranet', 'https://intranet.example']]) {
+      await page.click('.topbar .btn-primary')
+      await page.fill('#f-name', name)
+      await page.fill('#f-url', url)
+      await page.fill('#f-password', 'violet-Tractor-Mango-Lantern-41' + name)
+      await page.click('.editor-foot .btn-primary')
+      await page.waitForSelector(`.detail h2:has-text("${name}")`)
+    }
+    // The item page: an invitation, with a way straight to the field.
+    await page.locator('.row-item', { hasText: 'GitHub' }).click()
+    await page.waitForSelector('.twofactor-hint >> text=2FA available')
+    assert.equal(await page.locator('.health-issues').count(), 0, 'not shown as a problem')
+    await page.getByRole('button', { name: 'Add one-time code' }).click()
+    await page.waitForSelector('#f-totpSecret')
+    await page.keyboard.press('Escape')
+
+    await page.getByRole('button', { name: /^Password health/ }).click()
+    await page.getByRole('button', { name: '2FA available 1' }).click()
+    await page.waitForSelector('.row-item:has-text("GitHub")')
+    assert.equal(await page.locator('.row-item').count(), 1, 'an unknown site gets no hint')
+    assert.deepEqual(s.errors, [])
+  } finally {
+    await s.stop()
+  }
+})

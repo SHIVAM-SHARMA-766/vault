@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconAlert, IconArrowLeft, IconClock, IconCopy, IconExternal, IconKey, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconCopy, IconExternal, IconKey, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, copySecret, iconHost, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import { ShareLinkDialog } from './ShareLink.js'
@@ -131,10 +131,17 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
         </div>
       ) : null}
 
-      {issues.length ? (
+      {issues.some((i) => i !== 'twofactor') ? (
         <div className="alert alert-warn health-issues" role="note">
           <IconAlert size={16} />
-          <ul>{issues.map((i) => { const x = ISSUES.find((y) => y.issue === i)!; return <li key={i}><strong>{x.label}.</strong> {x.advice}</li> })}</ul>
+          <ul>{issues.filter((i) => i !== 'twofactor').map((i) => { const x = ISSUES.find((y) => y.issue === i)!; return <li key={i}><strong>{x.label}.</strong> {x.advice}</li> })}</ul>
+        </div>
+      ) : null}
+      {issues.includes('twofactor') ? (
+        <div className="alert alert-info twofactor-hint" role="note">
+          <IconShield size={16} />
+          <span><strong>2FA available.</strong> {ISSUES.find((y) => y.issue === 'twofactor')!.advice}</span>
+          {onEdit ? <button className="btn btn-secondary btn-sm" onClick={onEdit}>Add one-time code</button> : null}
         </div>
       ) : null}
 
