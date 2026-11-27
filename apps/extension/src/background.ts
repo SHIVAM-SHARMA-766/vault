@@ -20,7 +20,10 @@ import {
   generateTotp,
   openCollectionKey,
   openCollectionMeta,
+  Keyring,
+  type SealedVault,
   openEntry,
+  openVaults,
   openOrgKey,
   openOrgMeta,
   openSharedItem,
@@ -58,7 +61,17 @@ interface Unlocked {
 interface Shared { orgId: string; collectionId: string; where: string; hidePasswords: boolean; fill: boolean; sensitive: boolean }
 /** `key` is unique across the vault and shared collections; `id` is the
  *  item's own id where it lives. */
-type Item = EntryContent & { id: string; key: string; shared?: Shared }
+type Item = EntryContent & { id: string; key: string; shared?: Shared; vaultId?: string }
+
+/** The account's other vaults as last loaded, still sealed: opened again with
+ *  the vault key when an item in one is saved. */
+let sealedVaults: SealedVault[] = []
+
+/** The keys for the account's vaults, from the vault key. */
+const keyring = async (accountKey: Uint8Array) => new Keyring(accountKey, await openVaults(sealedVaults, accountKey))
+
+/** An item's content, without what this extension adds about where it sits. */
+const contentOf = (item: Item): EntryContent => { const { id: _i, key: _k, shared: _s, vaultId: _v, ...content } = item; return content }
 
 const DEFAULT_IDLE_MINUTES = 15
 
@@ -133,8 +146,11 @@ async function items(): Promise<Item[]> {
   const key = fromBase64Url(u.vaultKey)
   try {
     const vault = await a.vault(token1)
+    sealedVaults = vault.vaults ?? []
+    const ring = await keyring(key)
     const own = (await Promise.all(vault.entries.map(async (e) => {
-      try { return { ...(await openEntry(e.id, e.blob, key)), id: e.id, key: e.id } } catch { return null }
+      const k = ring.keyFor(e.vaultId)
+      try { return k ? { ...(await openEntry(e.id, e.blob, k)), id: e.id, key: e.id, ...(e.vaultId ? { vaultId: e.vaultId } : {}) } : null } catch { return null }
     }))).filter((x): x is Item => x !== null && !x.archived)
     // Shared collections are best effort: a problem there must not hide the
     // person's own vault.
@@ -482,11 +498,15 @@ async function answer(p: Pending): Promise<void> {
     if (p.kind === 'update' && p.key) {
       const prev = (await items()).find((e) => e.key === p.key && !e.shared)
       if (!prev) return
-      const { id, key: _k, shared: _s, ...before } = prev
+      const id = prev.id
+      const before = contentOf(prev)
       const after: EntryContent = { ...before, password: p.password, passwordChangedAt: now }
+      // Sealed for the vault it is in, and saved there.
+      const itemKey = (await keyring(key)).keyFor(prev.vaultId)
+      if (!itemKey) return
       const t = await token()
-      await a.addHistory(t, id, await sealHistory(id, before, key))
-      await a.putEntry(t, id, await sealEntry(id, after, key))
+      await a.addHistory(t, id, await sealHistory(id, before, itemKey))
+      await a.putEntry(t, id, await sealEntry(id, after, itemKey), prev.vaultId)
     } else {
       const id = crypto.randomUUID()
       let origin = p.url
@@ -619,11 +639,13 @@ async function passkeyFinish(req: { requestId?: unknown; credentialId?: unknown 
     const same = mine.find((e) => e.passkeys?.some((k) => k.rpId === p.rpId && k.userHandle === p.user!.id))
       ?? mine.find((e) => matchSite(e.url, p.origin) && (e.username ?? '').toLowerCase() === p.user!.name.toLowerCase())
     const t = await token()
-    if (same) {
-      const { id, key: _k, shared: _s, ...before } = same
+    const sameKey = same ? (await keyring(key)).keyFor(same.vaultId) : null
+    if (same && sameKey) {
+      const id = same.id
+      const before = contentOf(same)
       const kept = (before.passkeys ?? []).filter((k) => !(k.rpId === p.rpId && k.userHandle === p.user!.id))
-      await a.addHistory(t, id, await sealHistory(id, before, key))
-      await a.putEntry(t, id, await sealEntry(id, { ...before, passkeys: [...kept, stored] }, key))
+      await a.addHistory(t, id, await sealHistory(id, before, sameKey))
+      await a.putEntry(t, id, await sealEntry(id, { ...before, passkeys: [...kept, stored] }, sameKey), same.vaultId)
     } else {
       const id = crypto.randomUUID()
       const entry: EntryContent = { name: p.rpId, type: 'login', username: p.user!.name, url: p.origin, tags: [], customFields: [], favorite: false, passkeys: [stored] }

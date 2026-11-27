@@ -437,7 +437,12 @@ Built one at a time, each its own pull request with tests.
   labelled fields, each optionally hidden), made in Preferences, offered first in New item and
   listed in the sidebar with their items. Kept in the sealed preferences (limit raised to 48 KB);
   items remember the template id inside their blob.
-- [ ] Several vaults (Personal, Work, Family) — design first.
+- [x] **Several vaults** ([0038](../decisions/0038-several-vaults.md)): Personal (the account key,
+  so nothing existing moved) plus up to 20 more, each with its own key wrapped under the account
+  key. A sidebar switcher (all vaults, or one) is provided. New items go into the vault in view.
+  An item can move between vaults from its page or in bulk, re-sealed together with its history.
+  Imports can target a vault, and deleting a vault first moves its items to Personal. The
+  extension, CLI, offline copy, personal backups and emergency access all read every vault.
 - [ ] Travel mode — after several vaults.
 
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))

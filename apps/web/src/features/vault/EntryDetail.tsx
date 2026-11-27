@@ -7,7 +7,7 @@ import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, looksLikeMarkdown, readField, typeSpec } from '@vault/core'
 import { Markdown } from '../../ui/Markdown.js'
 
-import { IconAlert, IconArrowLeft, IconClock, IconCopy, IconExternal, IconKey, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconClock, IconCopy, IconExternal, IconKey, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconLock, IconRefresh, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, copySecret, iconHost, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import { ShareLinkDialog } from './ShareLink.js'
@@ -18,13 +18,17 @@ import { t } from '../../lib/i18n.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean; canExport?: boolean; sensitive?: boolean; onSensitive?: (v: boolean) => Promise<void> }
 
-export function EntryDetail({ entry, folders, related = [], onOpenItem, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, related = [], onOpenItem, vaultName, vaultTargets, onMoveVault, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
   /** Items linked to this one, either way (packages/core relatedItems). */
   related?: Decrypted[]
   onOpenItem?: (id: string) => void
+  /** With several vaults: where it is, and where it can move. */
+  vaultName?: string
+  vaultTargets?: { id: string; name: string }[]
+  onMoveVault?: (to: string) => Promise<void>
   /** Personal items only: lets the item be shared by link. */
   vaultKey?: Uint8Array | undefined
   /** The server's longest allowed share link, in days. */
@@ -112,6 +116,17 @@ export function EntryDetail({ entry, folders, related = [], onOpenItem, issues, 
             {path && !shared ? <span className="badge badge-folder">{path}</span> : null}
             {shared ? <span className="badge badge-shared"><IconUsers size={13} />{shared.where}</span> : null}
             {readOnly ? <span className="badge">View only</span> : null}
+            {vaultName ? (
+              onMoveVault && vaultTargets?.length ? (
+                <label className="badge badge-vault" title="Move to another vault">
+                  <IconLock size={12} />{vaultName}
+                  <select aria-label="Move to vault" value="" onChange={(e) => { const v = e.target.value; if (v) void onMoveVault(v === '-' ? '' : v) }}>
+                    <option value="">Move to…</option>
+                    {vaultTargets.map((v) => <option key={v.id || '-'} value={v.id || '-'}>{v.name}</option>)}
+                  </select>
+                </label>
+              ) : <span className="badge badge-vault"><IconLock size={12} />{vaultName}</span>
+            ) : null}
             {shared?.sensitive ? <span className="badge badge-sensitive" title="The organization's admins are told when this is opened">Sensitive</span> : null}
           </div>
         </div>

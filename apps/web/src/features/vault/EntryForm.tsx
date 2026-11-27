@@ -20,7 +20,9 @@ import { usePrefs } from '../../lib/prefs.js'
 /** An item that can be linked from the editor: enough to find and show it. */
 export interface LinkCandidate { id: string; name: string; type: EntryType; username?: string | undefined; url?: string | undefined }
 
-export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false, candidates = [] }: {
+export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false, candidates = [], vaultChoice }: {
+  /** For a new personal item when the account has several vaults: where it goes. */
+  vaultChoice?: { value: string; options: { id: string; name: string }[]; onChange: (id: string) => void } | undefined
   initial: EntryContent
   id?: string | undefined
   /** Items this one may be linked to: the same place (personal, or the same collection). */
@@ -96,6 +98,14 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
               ))}
             </select>
           </div>
+          {vaultChoice ? (
+            <div className="field">
+              <label htmlFor="f-vault">Vault</label>
+              <select id="f-vault" value={vaultChoice.value} onChange={(e) => vaultChoice.onChange(e.target.value)}>
+                {vaultChoice.options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            </div>
+          ) : null}
           <div className="field">
             <label htmlFor="f-name">{t('Name')}</label>
             <input id="f-name" required autoFocus placeholder={spec.type === 'card' ? 'e.g. HDFC Millennia' : 'e.g. GitHub'}

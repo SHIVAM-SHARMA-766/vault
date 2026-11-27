@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 
-import { type EntryContent, fromBase64Url, openEmergencyKey, openEntry, sealEmergencyKey } from '@vault/crypto'
+import { type EntryContent, Keyring, fromBase64Url, openEmergencyKey, openEntry, openVaults, sealEmergencyKey } from '@vault/crypto'
 
 import { type EmergencyGrant, type EmergencyTrust, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
@@ -45,7 +45,12 @@ export function Emergency({ state }: { state: session.Unlocked }) {
       const me = await myIdentity(state.vaultKey)
       const v = await api.emergency.vault(await session.token(), g.id)
       const key = await openEmergencyKey(me.privateKey, me.publicKey, v.keyBlob, g.id)
-      const entries = await Promise.all(v.entries.map(async (e) => ({ ...(await openEntry(e.id, e.blob, key)), id: e.id })))
+      // Their other vaults open with their vault key, which is what was handed over.
+      const ring = new Keyring(key, await openVaults(v.vaults ?? [], key))
+      const entries = (await Promise.all(v.entries.map(async (e) => {
+        const k = ring.keyFor(e.vaultId)
+        try { return k ? { ...(await openEntry(e.id, e.blob, k)), id: e.id } : null } catch { return null }
+      }))).filter((e): e is EntryContent & { id: string } => e !== null)
       entries.sort((a, b) => a.name.localeCompare(b.name))
       setViewing({ from: g.fromName, entries })
     } catch (err) { toast(err instanceof Error ? err.message : 'Could not open it.', 'error') }

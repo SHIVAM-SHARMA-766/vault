@@ -13,7 +13,7 @@ import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:cr
 
 import type { App } from './context.js'
 import { EgressRefused, checkDestinationUrl, guardedRequest } from './egress.js'
-import { ATTACHMENT_PREFIX, ENTRY_PREFIX, FOLDER_PREFIX, PREFS_SK, PROFILE_SK, SYSTEM_PK, userPk } from './keys.js'
+import { ATTACHMENT_PREFIX, ENTRY_PREFIX, FOLDER_PREFIX, PREFS_SK, PROFILE_SK, SYSTEM_PK, VAULT_PREFIX, userPk } from './keys.js'
 import { type S3Target, type Transport, s3Object } from './s3.js'
 import { addNote } from './inbox.js'
 import { type CloudProvider, type Connected, accessToken, download as cloudDownload, remove as cloudRemove, upload as cloudUpload } from './cloud-drive.js'
@@ -189,7 +189,9 @@ export interface PersonalBackupFile {
   kdf: unknown
   wrappedVaultKey: string
   recovery: { wrappedVaultKey: string } | null
-  entries: { id: string; blob: string }[]
+  entries: { id: string; blob: string; vaultId?: string }[]
+  /** The account's other vaults (keys wrapped under the vault key above). */
+  vaults?: { id: string; key: string; blob: string }[]
   folders: { id: string; blob: string }[]
   prefs: string | null
   /** Encrypted attachments (D2); their keys are inside the entries above. */
@@ -207,7 +209,8 @@ export async function buildFile(app: App, userId: string): Promise<{ name: strin
     format: 'vault-personal-backup', version: 1, createdAt: at.toISOString(),
     kdf: profile['kdf'], wrappedVaultKey: String(profile['wrappedVaultKey']),
     recovery: profile['wrappedVaultKeyForRecovery'] ? { wrappedVaultKey: String(profile['wrappedVaultKeyForRecovery']) } : null,
-    entries: rows.filter((r) => r.sk.startsWith(ENTRY_PREFIX)).map((r) => ({ id: String(r['id']), blob: String(r['blob']) })),
+    entries: rows.filter((r) => r.sk.startsWith(ENTRY_PREFIX)).map((r) => ({ id: String(r['id']), blob: String(r['blob']), ...(r['vaultId'] ? { vaultId: String(r['vaultId']) } : {}) })),
+    vaults: rows.filter((r) => r.sk.startsWith(VAULT_PREFIX)).map((r) => ({ id: String(r['id']), key: String(r['key']), blob: String(r['blob']) })),
     folders: rows.filter((r) => r.sk.startsWith(FOLDER_PREFIX)).map((r) => ({ id: String(r['id']), blob: String(r['blob']) })),
     prefs: (rows.find((r) => r.sk === PREFS_SK)?.['blob'] as string | undefined) ?? null,
     attachments: rows.filter((r) => r.sk.startsWith(ATTACHMENT_PREFIX)).map((r) => ({ id: r.sk.slice(ATTACHMENT_PREFIX.length), blob: String(r['blob']) })),

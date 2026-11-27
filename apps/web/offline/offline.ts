@@ -3,7 +3,7 @@
 // network. Built from the same crypto and item packages as the app, so it
 // decrypts exactly as the app does. The page's own policy allows no requests.
 
-import { fromBase64Url, kdfProblem, openEntry, openFolder, parseSecretKey, unlock, wipe, type EntryContent, type KdfParams } from '@vault/crypto'
+import { Keyring, type SealedVault, fromBase64Url, kdfProblem, openEntry, openFolder, openVaults, parseSecretKey, unlock, wipe, type EntryContent, type KdfParams } from '@vault/crypto'
 import { folderPath, readField, typeSpec } from '@vault/core'
 
 interface OfflineFile {
@@ -13,7 +13,8 @@ interface OfflineFile {
   email: string
   kdf: KdfParams & { salt: string }
   wrappedVaultKey: string
-  entries: { id: string; blob: string }[]
+  entries: { id: string; blob: string; vaultId?: string }[]
+  vaults?: SealedVault[]
   folders: { id: string; blob: string }[]
 }
 
@@ -44,9 +45,10 @@ $('#unlock').addEventListener('submit', async (ev) => {
     const sk = data.kdf.version === 2 ? await parseSecretKey(($('#sk') as HTMLInputElement).value) : undefined
     const { vaultKey } = await unlock(pw, data.kdf, data.wrappedVaultKey, fromBase64Url(data.kdf.salt), sk)
     try {
+      const ring = new Keyring(vaultKey, await openVaults(data.vaults ?? [], vaultKey))
       const folders = (await Promise.all(data.folders.map(async (f) => { try { return { ...(await openFolder(f.id, f.blob, vaultKey)), id: f.id } } catch { return null } }))).filter((f) => f !== null)
       items = (await Promise.all(data.entries.map(async (e) => {
-        try { const c = await openEntry(e.id, e.blob, vaultKey); return { ...c, id: e.id, path: folderPath(folders as never, c.folderId) } } catch { return null }
+        try { const k = ring.keyFor(e.vaultId); if (!k) return null; const c = await openEntry(e.id, e.blob, k); return { ...c, id: e.id, path: folderPath(folders as never, c.folderId) } } catch { return null }
       }))).filter((x): x is EntryContent & { id: string; path: string } => x !== null && !x.archived)
       items.sort((a, b) => a.name.localeCompare(b.name))
     } finally { wipe(vaultKey) }

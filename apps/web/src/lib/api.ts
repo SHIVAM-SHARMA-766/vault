@@ -354,14 +354,25 @@ export const api = {
 
   vault: (token: string) =>
     request<{
-      entries: { id: string; blob: string; createdAt: string; updatedAt: string }[]
+      entries: { id: string; blob: string; createdAt: string; updatedAt: string; vaultId?: string }[]
       folders: { id: string; blob: string; createdAt: string; updatedAt: string }[]
+      vaults?: { id: string; key: string; blob: string; createdAt: string; updatedAt: string }[]
     }>('GET', '/api/vault', { token }),
 
-  putEntry: (token: string, id: string, blob: string) =>
+  /** `vaultId` names the vault that sealed it; none is Personal. */
+  putEntry: (token: string, id: string, blob: string, vaultId?: string | null) =>
     request<{ id: string }>('PUT', `/api/vault/entries/${encodeURIComponent(id)}`, {
-      token, body: { blob },
+      token, body: { blob, ...(vaultId ? { vaultId } : {}) },
     }),
+
+  moveEntry: (token: string, id: string, body: { blob: string; vaultId: string | null; history: { at: string; blob: string }[] }) =>
+    request<{ id: string }>('POST', `/api/vault/entries/${encodeURIComponent(id)}/move`, { token, body }),
+
+  putVault: (token: string, id: string, body: { key: string; blob: string }) =>
+    request<{ id: string }>('PUT', `/api/vault/vaults/${encodeURIComponent(id)}`, { token, body }),
+
+  deleteVault: (token: string, id: string) =>
+    request<{ ok: true }>('DELETE', `/api/vault/vaults/${encodeURIComponent(id)}`, { token }),
 
   deleteEntry: (token: string, id: string) =>
     request<{ ok: true }>('DELETE', `/api/vault/entries/${encodeURIComponent(id)}`, { token }),
@@ -397,7 +408,7 @@ export const api = {
     approve: (token: string, id: string) => request<{ ok: true }>('POST', `/api/emergency/${id}/approve`, { token }),
     reject: (token: string, id: string) => request<{ ok: true }>('POST', `/api/emergency/${id}/reject`, { token }),
     revoke: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/emergency/${id}`, { token }),
-    vault: (token: string, id: string) => request<{ keyBlob: string; entries: { id: string; blob: string }[]; folders: { id: string; blob: string }[] }>('GET', `/api/emergency/${id}/vault`, { token }),
+    vault: (token: string, id: string) => request<{ keyBlob: string; entries: { id: string; blob: string; vaultId?: string }[]; folders: { id: string; blob: string }[]; vaults?: { id: string; key: string; blob: string }[] }>('GET', `/api/emergency/${id}/vault`, { token }),
   },
 
   orgs: {
@@ -531,7 +542,7 @@ export const api = {
 
   /** Creates many sealed items at once; never overwrites. At most 100
    *  entries and 50 folders per call. */
-  importBulk: (token: string, body: { folders: { id: string; blob: string }[]; entries: { id: string; blob: string }[] }) =>
+  importBulk: (token: string, body: { folders: { id: string; blob: string }[]; entries: { id: string; blob: string }[]; vaultId?: string }) =>
     request<{ folders: number; entries: number }>('POST', '/api/vault/import', { token, body }),
 
   addHistory: (token: string, id: string, blob: string) =>

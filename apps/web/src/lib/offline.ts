@@ -20,7 +20,8 @@ export async function buildOfflineCopy(email: string): Promise<string> {
   const data = {
     format: 'vault-offline', version: 1, createdAt: new Date().toISOString(), email,
     kdf: me.kdf, wrappedVaultKey: me.wrappedVaultKey,
-    entries: vault.entries.map((e) => ({ id: e.id, blob: e.blob })),
+    entries: vault.entries.map((e) => ({ id: e.id, blob: e.blob, ...(e.vaultId ? { vaultId: e.vaultId } : {}) })),
+    vaults: (vault.vaults ?? []).map((v) => ({ id: v.id, key: v.key, blob: v.blob })),
     folders: vault.folders.map((f) => ({ id: f.id, blob: f.blob })),
   }
   // Inside <script type="application/json">, only "</" could end the element early.

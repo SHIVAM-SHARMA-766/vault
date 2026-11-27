@@ -11,7 +11,10 @@ import {
   isExportFile,
   kdfProblem,
   isWithinSizeLimit,
+  Keyring,
+  type SealedVault,
   openEntry,
+  openVaults,
   openExport,
   openFolder,
   sealEntry,
@@ -117,7 +120,7 @@ export interface OpenedBackup {
  *  recovery key — that was current when it was made. Nothing is sent
  *  anywhere. Throws UnsealError when the secret is wrong. */
 export async function openPersonalBackup(text: string, secret: string, how: 'password' | 'recovery', email?: string): Promise<OpenedBackup> {
-  let file: { format?: string; version?: number; createdAt?: string; kdf?: KdfParams; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string }[]; folders?: { id: string; blob: string }[]; attachments?: { id: string; blob: string }[] }
+  let file: { format?: string; version?: number; createdAt?: string; kdf?: KdfParams; wrappedVaultKey?: string; recovery?: { wrappedVaultKey: string } | null; entries?: { id: string; blob: string; vaultId?: string }[]; vaults?: SealedVault[]; folders?: { id: string; blob: string }[]; attachments?: { id: string; blob: string }[] }
   try { file = JSON.parse(text) } catch { throw new Error('This backup file is damaged: it is not valid JSON.') }
   if (file.format !== 'vault-personal-backup' || file.version !== 1) throw new Error('This is not a Vault personal backup, or it is from a newer version.')
   let key: Uint8Array
@@ -144,8 +147,10 @@ export async function openPersonalBackup(text: string, secret: string, how: 'pas
     const folders = (await Promise.all((file.folders ?? []).map(async (f) => {
       try { return { ...(await openFolder(f.id, f.blob, key)), id: f.id } } catch { failed++; return null }
     }))).filter((f): f is Folder => f !== null)
+    // Items from every vault in the backup, each opened with its vault's key.
+    const ring = new Keyring(key, await openVaults(Array.isArray(file.vaults) ? file.vaults : [], key))
     const entries = (await Promise.all((file.entries ?? []).map(async (e) => {
-      try { return { ...(await openEntry(e.id, e.blob, key)), id: e.id } } catch { failed++; return null }
+      try { const k = ring.keyFor(e.vaultId); if (!k) throw new Error('no key'); return { ...(await openEntry(e.id, e.blob, k)), id: e.id } } catch { failed++; return null }
     }))).filter((e): e is EntryContent & { id: string } => e !== null)
     const attachments = (file.attachments ?? []).filter((a) => typeof a?.id === 'string' && typeof a?.blob === 'string')
     return { createdAt: file.createdAt ?? '', entries, folders, failed, attachments }
@@ -212,7 +217,9 @@ export function plan(source: Candidate[], existing: { entries: Decrypted[]; fold
 
 /** Encrypts and uploads a plan in batches. Returns how many entries were
  *  created and the names of any too large to store. */
-export async function runImport(p: Plan, vaultKey: Uint8Array, onProgress: (done: number, total: number) => void): Promise<{ created: number; tooLarge: string[] }> {
+export async function runImport(p: Plan, vaultKey: Uint8Array, onProgress: (done: number, total: number) => void, into?: { vaultId: string; key: Uint8Array }): Promise<{ created: number; tooLarge: string[] }> {
+  // Folders are the account's; entries are sealed for the vault they go into.
+  const entryKey = into?.key ?? vaultKey
   // Attachment files from a backup go back first, under their own ids (the
   // keys are in the entries). One already here — the same account — is kept.
   const wanted = new Set(p.entries.flatMap((e) => (e.attachments ?? []).map((a) => a.id)))
@@ -225,7 +232,7 @@ export async function runImport(p: Plan, vaultKey: Uint8Array, onProgress: (done
   const sealed: { id: string; blob: string }[] = []
   for (const content of p.entries) {
     const id = crypto.randomUUID()
-    const blob = await sealEntry(id, content, vaultKey)
+    const blob = await sealEntry(id, content, entryKey)
     if (isWithinSizeLimit(blob)) sealed.push({ id, blob })
     else tooLarge.push(content.name)
   }
@@ -240,7 +247,7 @@ export async function runImport(p: Plan, vaultKey: Uint8Array, onProgress: (done
   let bytes = 0
   const flush = async () => {
     if (!batch.length) return
-    await api.importBulk(await session.token(), { folders: [], entries: batch })
+    await api.importBulk(await session.token(), { folders: [], entries: batch, ...(into ? { vaultId: into.vaultId } : {}) })
     done += batch.length
     onProgress(done, total)
     batch = []; bytes = 0

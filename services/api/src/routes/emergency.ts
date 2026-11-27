@@ -20,7 +20,7 @@ import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, conflict, json, notFound, parseJsonBody } from '../http.js'
 import { emailDigest } from '../identity.js'
 import {
-  EMERGENCY_INVITE_PREFIX, EMERGENCY_PREFIX, EMERGENCY_TRUST_PREFIX, ENTRY_PREFIX, FOLDER_PREFIX, PROFILE_SK,
+  EMERGENCY_INVITE_PREFIX, EMERGENCY_PREFIX, EMERGENCY_TRUST_PREFIX, ENTRY_PREFIX, FOLDER_PREFIX, PROFILE_SK, VAULT_PREFIX,
   emailPk, emergencyInviteSk, emergencySk, emergencyTrustSk, isValidId, userPk,
 } from '../keys.js'
 import type { Item } from '../store.js'
@@ -195,7 +195,8 @@ export async function vault(app: App, userId: string, event: LambdaEvent, id: st
   if (!isOpen(app, g) || !g.keyBlob) throw new HttpError(403, 'forbidden', g.status === 'requested' ? `Access opens ${opensAt(g)} unless they reject it.` : 'Access is not open.')
   await recordActivity(app, g.grantorId, 'emergency-access', event)
   const rows = await app.store.query(userPk(g.grantorId))
-  const pick = (prefix: string) => rows.filter((r) => r.sk.startsWith(prefix)).map((r) => ({ id: r['id'], blob: r['blob'] }))
-  return json(200, { keyBlob: g.keyBlob, entries: pick(ENTRY_PREFIX), folders: pick(FOLDER_PREFIX) })
+  const pick = (prefix: string) => rows.filter((r) => r.sk.startsWith(prefix)).map((r) => ({ id: r['id'], blob: r['blob'], ...(r['vaultId'] ? { vaultId: r['vaultId'] } : {}) }))
+  const vaults = rows.filter((r) => r.sk.startsWith(VAULT_PREFIX)).map((r) => ({ id: r['id'], key: r['key'], blob: r['blob'] }))
+  return json(200, { keyBlob: g.keyBlob, entries: pick(ENTRY_PREFIX), folders: pick(FOLDER_PREFIX), vaults })
 }
 

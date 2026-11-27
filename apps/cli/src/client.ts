@@ -12,7 +12,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 import {
-  type KdfParams, costOf, deriveAccountProof, deriveLoginKeys, fromBase64Url, generateTotp, kdfProblem, openEntry,
+  type KdfParams, Keyring, type SealedVault, costOf, deriveAccountProof, deriveLoginKeys, fromBase64Url, generateTotp, kdfProblem, openEntry, openVaults,
   parseSecretKey, unwrapVaultKey, wipe,
 } from '@vault/crypto'
 
@@ -102,11 +102,15 @@ export async function unlock(c: Config, masterPassword: string, secretKeyText?: 
   const vaultKey = await unwrapVaultKey(res.wrappedVaultKey, keys.kek, 'master')
   wipe(keys.kek)
   try {
-    const vault = await call<{ entries: { id: string; blob: string }[] }>(c.server, 'GET', '/api/vault', { token: res.accessToken })
+    const vault = await call<{ entries: { id: string; blob: string; vaultId?: string }[]; vaults?: SealedVault[] }>(c.server, 'GET', '/api/vault', { token: res.accessToken })
+    // Items in every vault of the account, each with its vault's key.
+    const ring = new Keyring(vaultKey, await openVaults(vault.vaults ?? [], vaultKey))
     const items: Item[] = []
     for (const e of vault.entries) {
       try {
-        const content = await openEntry(e.id, e.blob, vaultKey)
+        const key = ring.keyFor(e.vaultId)
+        if (!key) continue
+        const content = await openEntry(e.id, e.blob, key)
         if (content.archived) continue
         items.push({
           id: e.id, name: content.name, ...(content.username ? { username: content.username } : {}), ...(content.password ? { password: content.password } : {}),

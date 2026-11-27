@@ -4,8 +4,9 @@ import { useState } from 'react'
 
 import { IconAlert } from '../../ui/icons.js'
 
-export function FolderDialog({ title, initial = '', parentPath, onCancel, onSave }: {
+export function FolderDialog({ title, label = 'Folder name', initial = '', parentPath, onCancel, onSave }: {
   title: string
+  label?: string
   initial?: string
   parentPath?: string
   onCancel: () => void
@@ -24,7 +25,7 @@ export function FolderDialog({ title, initial = '', parentPath, onCancel, onSave
       }}>
         <h2 id="fd-title">{title}</h2>
         {parentPath ? <p className="muted">Inside <strong>{parentPath}</strong></p> : null}
-        <label htmlFor="fd-name" className="field-label">Folder name</label>
+        <label htmlFor="fd-name" className="field-label">{label}</label>
         <input id="fd-name" autoFocus maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
         {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
         <div className="modal-actions">

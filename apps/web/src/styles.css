@@ -1532,3 +1532,14 @@ a.btn, a.btn:hover { text-decoration: none; }
 .template-fields .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .template-fields .check input { margin: 0; }
 .template-editor .link { display: inline-flex; align-items: center; gap: 4px; font-size: 13.5px; }
+
+/* Vaults: a switcher at the top of the sidebar; actions on hover. */
+.vault-switch { margin-bottom: 4px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.vault-row { position: relative; }
+.vault-actions { position: absolute; right: 34px; top: 50%; transform: translateY(-50%); display: none; gap: 2px; }
+.vault-row:hover .vault-actions, .vault-row:focus-within .vault-actions { display: inline-flex; }
+.badge-vault { position: relative; gap: 5px; cursor: default; }
+.badge-vault select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+label.badge-vault { cursor: pointer; }
+label.badge-vault::after { content: '▾'; font-size: 10px; margin-left: 2px; color: var(--muted); }
+.vault-switch .side-item { width: 100%; }

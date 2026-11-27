@@ -57,6 +57,7 @@ someone who would otherwise assume it was an oversight.
 | [0035](0035-passkeys-in-the-extension.md) | Passkeys for other sites kept in Vault, answered by the extension; origin from the browser, rpId checked, the person confirms |
 | [0036](0036-account-then-master-password.md) | Sign in to the account (account password, two-factor), then unlock with the master password; both checked by the server |
 | [0037](0037-account-first.md) | An account first (email code), a vault later (open, invitation or approved request); the email address is the username |
+| [0038](0038-several-vaults.md) | Several vaults in one account: Personal is the account key; others have their own keys wrapped under it; the server sees an opaque vault id per entry |
 
 ## A note on the numbering
 
