@@ -164,7 +164,7 @@ export function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite
                       <button type="button" className="acct-button acct-with-avatar" onClick={(e) => { e.stopPropagation(); setOpen(u.userId) }} aria-label={`Open ${nameOf(u)}`}>
                         <span className={`acct-avatar av-${hueOf(u.userId)}`} aria-hidden="true">{(u.email || u.label || '?')[0]!.toUpperCase()}</span>
                         <span className="acct">
-                          <span className="acct-name">{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
+                          <span className="acct-name" title={u.email || u.label || undefined}>{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
                             {self ? <span className="pill">You</span> : null}</span>
                           {u.email && u.label ? <span className="muted small">{u.label}</span> : null}
                         </span>

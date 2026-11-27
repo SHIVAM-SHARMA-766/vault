@@ -1589,3 +1589,16 @@ label.badge-vault::after { content: '▾'; font-size: 10px; margin-left: 2px; co
 .report-card .action-list { margin-top: 6px; }
 .report-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
 .report-view { scroll-margin-top: 16px; }
+
+/* Admin console UX: phones. The users table keeps who, role and status; the
+   side panel has the rest. Section tabs sit two by two. */
+@media (max-width: 760px) {
+  .users-table th:nth-last-child(-n+4):not(:last-child), .users-table td:nth-last-child(-n+4):not(:last-child) { display: none; }
+  .users-table td, .users-table th { padding: 8px 7px; }
+  .users-table td:first-child, .users-table th:first-child { padding-left: 12px; }
+  .users-table .acct-with-avatar { gap: 9px; }
+  .users-table .check-col { display: none; }
+  .users-table .acct-name { max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .users-table .acct-name .pill { display: none; }
+  .section-tabs { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: row; width: 100%; }
+}
