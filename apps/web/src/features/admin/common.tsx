@@ -32,7 +32,7 @@ export function Section({ title, sub, actions, children }: { title: string; sub?
         <div>
           <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
             <li><Link to="/app/console">Admin console</Link></li>
-            <li>Server</li>
+            <li><Link to="/app/console/server">Server</Link></li>
             <li aria-current="page">{title}</li>
           </ol>
           <h1>{title}</h1>

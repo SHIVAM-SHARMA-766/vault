@@ -35,7 +35,7 @@ import { applyBranding, refresh as refreshInstance, useEdition, useInstance } fr
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
-  IconPlus, IconPulse, IconRefresh, IconSliders, IconTrash, IconUser,
+  IconPlus, IconPulse, IconRefresh, IconSliders, IconTrash, IconUser, IconUsers,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Link, href } from '../../lib/router.js'
@@ -795,7 +795,7 @@ function AdminOrgs({ canWrite, canInvite }: { canWrite: boolean; canInvite: bool
           ) : null}
         </form>
       ) : null}
-      {!data ? <div className="skeletons"><div className="skeleton" /></div> : orgs.length === 0 ? <div className="empty"><h3>{hosted ? 'No tenants yet' : 'No organizations yet'}</h3><p>{hosted ? 'Invite a company above.' : 'Members create them from Account menu → My organizations.'}</p></div> : (
+      {!data ? <div className="skeletons"><div className="skeleton" /></div> : orgs.length === 0 ? <EmptyState icon={<IconUsers size={26} />} title={hosted ? 'No tenants yet' : 'No organizations yet'}>{hosted ? 'Invite a company above.' : 'Members create them from Account menu → My organizations. They show here by counts; their contents stay encrypted.'}</EmptyState> : (
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>Name (as typed by its creator)</th><th className="num">Members</th>{hosted ? <th>Seats</th> : null}<th className="num">Collections</th><th className="num">Items</th><th>Policies</th><th>Created</th>{canWrite || hosted ? <th aria-label="Actions" /> : null}</tr></thead>

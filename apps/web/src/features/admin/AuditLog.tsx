@@ -6,9 +6,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { type AdminAudit, type AdminAuditQuery, api } from '../../lib/api.js'
 import { download } from '../../lib/download.js'
 import * as session from '../../lib/session.js'
-import { IconDownload, IconRefresh, IconSearch } from '../../ui/icons.js'
+import { IconDownload, IconNote, IconRefresh, IconSearch } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
-import { ErrorBox, Section, when } from './common.js'
+import { EmptyState, ErrorBox, Section, when } from './common.js'
 
 export const ACTIONS: Record<string, string> = {
   'settings.registration': 'Changed registration',
@@ -80,7 +80,7 @@ export function Audit() {
       </div>
       <ErrorBox error={error} />
       {!page ? <div className="skeletons">{[0, 1, 2].map((i) => <div key={i} className="skeleton" />)}</div>
-        : page.total === 0 ? <div className="empty"><h3>{filtered ? 'Nothing matches' : 'No admin actions yet'}</h3></div> : (
+        : page.total === 0 ? <EmptyState icon={<IconNote size={26} />} title={filtered ? 'Nothing matches' : 'No admin actions yet'}>{filtered ? 'Try another search, action or date range.' : 'Every change staff make (roles, invitations, settings) is written here before it runs.'}</EmptyState> : (
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>When</th><th>Action</th><th>Detail</th><th>By</th></tr></thead>

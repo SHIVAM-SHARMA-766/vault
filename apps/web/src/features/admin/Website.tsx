@@ -177,9 +177,10 @@ export function Website({ canWrite, canPublish }: { canWrite: boolean; canPublis
       <div className="admin-head">
         <div>
           <ol className="crumbs crumbs-admin" aria-label="Breadcrumb">
-            <li><Link to="/app/">Vault</Link></li>
-            <li>Admin</li>
-            <li aria-current="page">Website{view.kind === 'section' ? ` · ${state.schema.sections.find((s) => s.id === view.id)?.label ?? ''}` : view.kind === 'images' ? ' · Images' : ' · History'}</li>
+            <li><Link to="/app/console">Admin console</Link></li>
+            <li><Link to="/app/console/server">Server</Link></li>
+            <li>Website</li>
+            <li aria-current="page">{view.kind === 'section' ? state.schema.sections.find((s) => s.id === view.id)?.label ?? '' : view.kind === 'images' ? 'Images' : 'History'}</li>
           </ol>
           <h1>Website</h1>
           <p className="muted">
