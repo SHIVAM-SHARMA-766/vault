@@ -1251,3 +1251,8 @@ table.data thead th { position: sticky; top: 0; background: var(--surface); z-in
 .report-active { border-color: var(--accent); }
 .report-view { margin-top: 4px; }
 .reauth-backdrop { z-index: 60; }
+.domain-row { display: grid; gap: 8px; }
+.dns-record .recovery-key code { font-size: 12px; word-break: break-all; }
+.inline-form input[type=number] { width: 140px; }
+.pill-plain { text-transform: none; }
+.drawer-body .plain-list + .inline-form, .drawer-body .muted + .inline-form { margin-top: 10px; }

@@ -114,6 +114,15 @@ function MemberCard({ org, teams }: { org: OrgView; teams: Teams }) {
   const others = colls.filter((c) => !c.permission)
   const { sets } = usePermissionSets(org.status === 'confirmed' ? org.id : undefined)
 
+  // Suspended by the server's operator (hosted, admin console phase 4).
+  if (org.suspended) {
+    return (
+      <section className="settings-card org-card" aria-label={org.name}>
+        <div className="settings-card-head"><IconUser size={18} /><h2>{org.name}</h2><span className="pill pill-danger">Suspended</span></div>
+        <p className="muted small">This company is suspended by the people who run this server. Your own vault still works; its shared collections come back when it is resumed. Ask them, or your company admin.</p>
+      </section>
+    )
+  }
   // A guest whose time is up (2d).
   if (org.ended) {
     return (

@@ -360,6 +360,15 @@ Sign-ins, failed sign-ins and new vaults are counted per day, as bare numbers, k
 They name no account, address or network address, so they add nothing to what a database dump
 reveals beyond the activity level of the server.
 
+### A21a5 — Verified domains (admin console phase 4)
+
+A company that verifies a domain by DNS gets its sign-ups approved for a vault at once. That is
+only about getting an empty vault of one's own on this server. Someone who controls the
+domain's DNS could make that happen for addresses they also control by email, which is no more
+than open registration for that domain. It never gives anyone the company's keys: joining the
+company still takes an invitation from its admins and a fingerprint check. A domain is held by
+one company at a time, and the server checks it in DNS, not on the company's word.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

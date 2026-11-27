@@ -620,6 +620,15 @@ export const api = {
       if (!res.ok) throw new ApiError(res.status, 'export_failed', 'Could not export the audit log.')
       return res.text()
     },
+    tenant: (token: string, id: string) => request<AdminTenant>('GET', `/api/admin/orgs/${encodeURIComponent(id)}`, { token }),
+    updateTenant: (token: string, id: string, body: { seatLimit?: number | null; suspended?: boolean }) =>
+      request<{ ok: true }>('PUT', `/api/admin/orgs/${encodeURIComponent(id)}`, { token, body }),
+    claimDomain: (token: string, id: string, domain: string) =>
+      request<{ domain: unknown }>('POST', `/api/admin/orgs/${encodeURIComponent(id)}/domains`, { token, body: { domain } }),
+    verifyDomain: (token: string, id: string, domain: string) =>
+      request<{ domain: unknown }>('POST', `/api/admin/orgs/${encodeURIComponent(id)}/domains/${encodeURIComponent(domain)}/verify`, { token }),
+    releaseDomain: (token: string, id: string, domain: string) =>
+      request<{ ok: true }>('DELETE', `/api/admin/orgs/${encodeURIComponent(id)}/domains/${encodeURIComponent(domain)}`, { token }),
     insights: (token: string) => request<AdminInsights>('GET', '/api/admin/insights', { token }),
     reports: (token: string) => request<{ reports: { kind: string; title: string }[] }>('GET', '/api/admin/reports', { token }),
     report: (token: string, kind: string) => request<AdminReport>('GET', `/api/admin/reports/${encodeURIComponent(kind)}`, { token }),
@@ -653,12 +662,13 @@ export interface EmergencyTrust { id: string; fromName: string; waitDays: number
 export interface AdminOrg {
   id: string; hint: string; kind?: 'team' | 'direct'; createdAt: string; ownerId: string | null; members: number; awaiting: number; pending: number
   collections: number; items: number; rotationDue: number; policies: OrgPolicies
+  seatLimit?: number | null; suspended?: boolean; domains?: { domain: string; verifiedAt?: string }[]
 }
 /** 'guest' (decisions/0032, 2d): only the collections given, maybe until a date. */
 export type OrgRole = 'owner' | 'admin' | 'member' | 'guest'
 export type SharePermission = 'view' | 'edit' | 'manage'
 export interface OrgPolicies { requireTwoFactor: boolean; minPasswordScore: number; maxIdleMinutes: number | null }
-export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; recovery?: { createdAt: string; publicKey: string } | null; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null; until?: string; ended?: boolean }
+export interface OrgRow { id: string; nameBlob: string; hint: string; kind?: 'team' | 'direct'; recovery?: { createdAt: string; publicKey: string } | null; role: OrgRole; status: 'accepted' | 'confirmed'; orgKeyBlob?: string; policies: OrgPolicies; policyGap: string | null; until?: string; ended?: boolean; suspended?: boolean }
 export interface OrgInvitation { orgId: string; hint: string; role: OrgRole; invitedAt: string }
 export interface OrgMember { userId: string; role: OrgRole; status: 'accepted' | 'confirmed'; label: string; publicKey: string; joinedAt: string; confirmedAt: string | null; pendingGroups?: string[]; signingPublicKey?: string | null; currentSigningKey?: string | null; endorsement?: string | null; until?: string; ended?: boolean }
 export interface OrgPending { id: string; label: string; role: OrgRole; invitedAt: string; groups?: string[]; until?: string }
@@ -771,6 +781,12 @@ export interface AdminInsights {
   daily: { day: string; signin: number; 'signin-failed': number; signup: number }[]
   twoFactor: { on: number; off: number }
   roles: Record<string, number>
+}
+
+export interface AdminTenant {
+  id: string; hint: string; createdAt: string | null; seatsUsed: number; seatLimit: number | null; suspended: boolean
+  domains: { domain: string; token: string; claimedAt: string; verifiedAt?: string; record: { name: string; value: string } }[]
+  atDomains: { userId: string; email: string }[]
 }
 
 export interface AdminReport { kind: string; title: string; columns: string[]; rows: (string | number | boolean | null)[][] }

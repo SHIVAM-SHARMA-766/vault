@@ -175,12 +175,31 @@ async function requireMember(app: App, orgId: string, userId: string, opts: { co
   if (!isValidId(orgId)) throw notFound()
   const m = await member(app, orgId, userId)
   if (!m) throw notFound()
+  // A company the operator suspended (hosted tenants, admin console phase 4).
+  if ((await app.store.get(orgPk(orgId), ORG_META_SK))?.['suspended'] === true) {
+    throw new HttpError(403, 'forbidden', 'This company is suspended by the people who run this server. Your own vault still works; ask them, or your company admin.')
+  }
   // A guest whose time is up gets nothing more from the organization.
   if (guestEnded(app, m)) throw new HttpError(403, 'forbidden', 'Your guest access to this organization has ended.')
   if ((opts.confirmed || opts.admin || opts.owner) && m.status !== 'confirmed') throw forbidden()
   if (opts.admin && !isStaff(m.role)) throw forbidden()
   if (opts.owner && m.role !== 'owner') throw forbidden()
   return m
+}
+
+/** People who hold or are offered a seat: members and open invitations. */
+export async function seatsUsed(app: App, orgId: string, exceptDigest?: string): Promise<number> {
+  const rows = await app.store.query(orgPk(orgId))
+  return rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX) || (r.sk.startsWith(ORG_PENDING_PREFIX) && r['digest'] !== exceptDigest)).length
+}
+
+/** Refuses a new seat when the operator set a limit and it is reached. */
+async function requireSeat(app: App, orgId: string, meta: Item | null, exceptDigest?: string): Promise<void> {
+  const limit = meta?.['seatLimit']
+  if (typeof limit !== 'number') return
+  if ((await seatsUsed(app, orgId, exceptDigest)) >= limit) {
+    throw conflict(`This company has used all ${limit} of its seats. Remove someone or withdraw an invitation, or ask the people who run this server for more.`)
+  }
 }
 
 async function access(app: App, orgId: string, collectionId: string, userId: string): Promise<Access | null> {
@@ -396,6 +415,7 @@ export async function myOrgs(app: App, userId: string): Promise<LambdaResponse> 
     const policies = { ...DEFAULT_POLICIES, ...((meta['policies'] as Partial<Policies>) ?? {}) }
     orgs.push({
       id: orgId, nameBlob: meta['nameBlob'], hint: meta['hint'] ?? '', kind: meta['kind'] === 'direct' ? 'direct' : 'team', role: m.role, status: m.status, policies,
+      ...(meta['suspended'] === true ? { suspended: true } : {}),
       recovery: meta['recovery'] ? { createdAt: (meta['recovery'] as Record<string, unknown>)['createdAt'], publicKey: (meta['recovery'] as Record<string, unknown>)['publicKey'] } : null,
       policyGap: m.status === 'confirmed' ? await policyGap(app, orgId, userId) : null,
       // A guest whose time is up sees the organization, and that it ended (2d).
@@ -445,6 +465,9 @@ export async function adminList(app: App): Promise<LambdaResponse> {
       pending: rows.filter((r) => r.sk.startsWith(ORG_PENDING_PREFIX)).length, collections: colls.length, items,
       rotationDue: colls.filter((c) => c.rotationNeeded).length,
       policies: { ...DEFAULT_POLICIES, ...((meta['policies'] as Partial<Policies>) ?? {}) },
+      seatLimit: typeof meta['seatLimit'] === 'number' ? meta['seatLimit'] : null,
+      suspended: meta['suspended'] === true,
+      domains: Array.isArray(meta['domains']) ? (meta['domains'] as { domain: string; token: string; verifiedAt?: string }[]) : [],
     })
   }
   out.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
@@ -521,6 +544,8 @@ export async function invite(app: App, userId: string, event: LambdaEvent, orgId
   const groups = [...new Set(raw.map((g) => String(g)))]
   if (groups.some((g) => !known.has(g))) throw badRequest('groups must be groups of this organization.')
   const meta = await app.store.get(orgPk(orgId), ORG_META_SK)
+  // Inviting again (a new role or label) keeps the seat it already has.
+  await requireSeat(app, orgId, meta, digest)
   const at = now(app)
   // Both rows are written whether or not the address has an account: the
   // response is the same, and the invitation waits for them to sign in.
@@ -573,6 +598,7 @@ export async function acceptInvite(app: App, userId: string, orgId: string): Pro
   const digest = await digestOf(app, userId)
   const inv = await app.store.get(emailPk(digest), orgInviteSk(orgId))
   if (!inv) throw notFound()
+  if ((await app.store.get(orgPk(orgId), ORG_META_SK))?.['suspended'] === true) throw new HttpError(403, 'forbidden', 'This company is suspended by the people who run this server, so it takes no one new for now.')
   const publicKey = await publicKeyOf(app, userId)
   const pendingRow = await app.store.get(orgPk(orgId), orgPendingSk(digest))
   const pendingGroups = Array.isArray(pendingRow?.['groups']) ? (pendingRow!['groups'] as string[]) : []
