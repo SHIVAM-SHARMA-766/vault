@@ -3,6 +3,8 @@
 // therefore never trusts the shape it decrypts and falls back, field by
 // field, to the defaults below.
 
+import { type ItemTemplate, normalizeTemplates } from './templates.js'
+
 export type Theme = 'system' | 'light' | 'dark'
 export const THEMES: readonly Theme[] = ['system', 'light', 'dark']
 
@@ -73,6 +75,8 @@ export interface Prefs {
    *  first, so one lost before it was saved can be found again. Sealed with
    *  the rest of the preferences; cleared from Preferences. */
   generatorHistory: GeneratedPassword[]
+  /** The person's own item templates (packages/core/src/templates.ts). */
+  templates: ItemTemplate[]
 }
 
 export interface GeneratedPassword { value: string; at: string }
@@ -103,6 +107,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   language: 'system',
   siteIcons: true,
   generatorHistory: Object.freeze([]) as unknown as GeneratedPassword[],
+  templates: Object.freeze([]) as unknown as ItemTemplate[],
   generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
@@ -131,6 +136,7 @@ export function normalizePrefs(raw: unknown): Prefs {
     clock: pick(r['clock'], CLOCKS, d.clock),
     language: pick(r['language'], LANGUAGES, d.language),
     siteIcons: bool(r['siteIcons'], d.siteIcons),
+    templates: normalizeTemplates(r['templates']),
     generatorHistory: Array.isArray(r['generatorHistory'])
       ? (r['generatorHistory'] as unknown[]).filter((h): h is GeneratedPassword => !!h && typeof h === 'object'
           && typeof (h as GeneratedPassword).value === 'string' && (h as GeneratedPassword).value.length > 0 && (h as GeneratedPassword).value.length <= GENERATED_MAX_LENGTH

@@ -433,7 +433,10 @@ Built one at a time, each its own pull request with tests.
   lists them both ways and opens them. Ids are kept inside the sealed item (`related`), and links
   stay within one place: personal items to personal ones, a shared item to items of its
   collection, so no collection learns about another's items.
-- [ ] Custom item templates.
+- [x] **Item templates**: a person's own kinds of item (a name, a built-in type to start from,
+  labelled fields, each optionally hidden), made in Preferences, offered first in New item and
+  listed in the sidebar with their items. Kept in the sealed preferences (limit raised to 48 KB);
+  items remember the template id inside their blob.
 - [ ] Several vaults (Personal, Work, Family) — design first.
 - [ ] Travel mode — after several vaults.
 

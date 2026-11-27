@@ -7,12 +7,12 @@ import { MAX_FOLDER_DEPTH, type FolderNode, type Issue, describeMinutes, folderT
 import { usePrefs } from '../../lib/prefs.js'
 import { idleMinutes } from '../../lib/session.js'
 
-import { IconEdit, IconFolder, IconGrid, IconInbox, IconLock, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
+import { IconEdit, IconFolder, IconGrid, IconInbox, IconLock, IconNote, IconPlus, IconPulse, IconStar, IconTrash, IconUsers } from '../../ui/icons.js'
 import { TYPES } from '../../ui/kit.js'
 import type { Folder } from './model.js'
 import { t } from '../../lib/i18n.js'
 
-export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; id: string } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' } | { kind: 'archive' }
+export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; id: string } | { kind: 'all' } | { kind: 'favorites' } | { kind: 'type'; type: string } | { kind: 'folder'; id: string } | { kind: 'unfiled' } | { kind: 'archive' } | { kind: 'template'; id: string }
 
 export const sameFilter = (a: Filter, b: Filter) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -27,7 +27,7 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
   onRenameFolder: (folder: Folder) => void
   onDeleteFolder: (folder: Folder) => void
 }) {
-  usePrefs() // redraws when the idle lock changes
+  const { templates } = usePrefs() // also redraws when the idle lock changes
   const tree = folderTree(folders)
   return (
     <nav className="sidebar" aria-label="Filter">
@@ -60,6 +60,10 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
       <div className="sidebar-heading">{t('Types')}</div>
       {/* Only the types this vault holds (and the one being viewed), so
           fifteen types do not push folders off the screen. */}
+      {templates.filter((tp) => counts[`tpl:${tp.id}`] || (filter.kind === 'template' && filter.id === tp.id)).map((tp) => (
+        <SideItem key={tp.id} active={filter.kind === 'template' && filter.id === tp.id} onClick={() => setFilter({ kind: 'template', id: tp.id })}
+                  icon={<IconNote size={16} />} label={tp.name} count={counts[`tpl:${tp.id}`]} />
+      ))}
       {TYPES.filter(({ type }) => counts[type] || (filter.kind === 'type' && filter.type === type)).map(({ type, plural, Icon }) => (
         <SideItem key={type} active={filter.kind === 'type' && filter.type === type} onClick={() => setFilter({ kind: 'type', type })}
                   icon={<Icon size={16} />} label={t(plural)} count={counts[type]} />

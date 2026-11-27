@@ -5,7 +5,7 @@
 import { useEdition } from '../../lib/instance.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ISSUES, type ListSort, analyse, relatedItems, descendants, flattenTree, folderTree, folderPath, matches, subtitle, typeSpec } from '@vault/core'
+import { ISSUES, type ListSort, analyse, applyTemplate, relatedItems, descendants, flattenTree, folderTree, folderPath, matches, subtitle, typeSpec } from '@vault/core'
 
 import { Link } from '../../lib/router.js'
 import { api } from '../../lib/api.js'
@@ -135,6 +135,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const c: Record<string, number> = { all: active.length, favorites: 0, unfiled: 0, health: [...health.issues.values()].filter((l) => l.some((i) => i !== 'twofactor')).length, archive: entries.length - active.length }
     for (const e of active) {
       c[e.type] = (c[e.type] ?? 0) + 1
+      if (e.template) c[`tpl:${e.template}`] = (c[`tpl:${e.template}`] ?? 0) + 1
       const sh = sharedOf(e)
       if (sh) c[`coll:${sh.collectionId}`] = (c[`coll:${sh.collectionId}`] ?? 0) + 1
       if (e.favorite) c['favorites']! += 1
@@ -164,6 +165,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
         if (!found || (filter.issue && !found.includes(filter.issue))) return false
       }
       if (filter.kind === 'type' && e.type !== filter.type) return false
+      if (filter.kind === 'template' && e.template !== filter.id) return false
       if (filter.kind === 'unfiled' && (inFolder(e) || sharedOf(e))) return false
       if (scope && !(e.folderId && scope.has(e.folderId))) return false
       return matches(e, query, folderPath(folders, inFolder(e)))
@@ -308,13 +310,17 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const collectionId = filter.kind === 'collection' && canEdit(openCollections.find((c) => c.id === filter.id)?.permission) ? filter.id : undefined
     // The open folder, else the person's default folder (F6) if it still exists.
     const fallback = folders.some((f) => f.id === view.defaultFolderId) ? view.defaultFolderId : undefined
-    setMode({ kind: 'edit', draft: emptyEntry(type, filter.kind === 'folder' ? filter.id : collectionId ? undefined : fallback), ...(collectionId ? { collectionId } : {}) })
+    const blankDraft = emptyEntry(type, filter.kind === 'folder' ? filter.id : collectionId ? undefined : fallback)
+    // Under one of the person's templates, a new item starts from it.
+    const tpl = filter.kind === 'template' ? view.templates.find((x) => x.id === filter.id) : undefined
+    setMode({ kind: 'edit', draft: tpl ? applyTemplate(blankDraft, tpl) : blankDraft, ...(collectionId ? { collectionId } : {}) })
   }
 
   const title = filter.kind === 'all' ? t('All items') : filter.kind === 'favorites' ? t('Favorites') : filter.kind === 'archive' ? t('Archive')
     : filter.kind === 'health' ? t('Password health')
     : filter.kind === 'collection' ? (() => { const c = openCollections.find((x) => x.id === filter.id); return c ? (c.direct ? c.name : `${c.orgName} / ${c.name}`) : 'Collection' })()
     : filter.kind === 'unfiled' ? t('No folder') : filter.kind === 'type' ? t(typeInfo(filter.type as EntryType).plural)
+    : filter.kind === 'template' ? (view.templates.find((x) => x.id === filter.id)?.name ?? 'Template')
     : folderPath(folders, filter.id) || 'Folder'
   const paneOpen = mode.kind === 'edit' || selected !== null
   const chips: { f: Filter; label: string }[] = [
