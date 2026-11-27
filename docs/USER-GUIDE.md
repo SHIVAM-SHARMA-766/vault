@@ -742,6 +742,27 @@ staff actions; vault contents never appear, because the server cannot read them.
 </details>
 
 <details>
+<summary>Admin safety: confirming it is you, staff two-factor, change alerts</summary>
+
+- **Confirm it is you.** Some actions ask for your master password before they run:
+  - changing a role;
+  - deleting or offboarding an account;
+  - resetting someone's two-factor sign-in or account password;
+  - bulk changes;
+  - changing server settings;
+  - deleting an organization.
+
+  A sign-in counts for ten minutes, and so does confirming. After that the console asks again
+  and then carries on with what you were doing.
+- **Staff must use two-factor sign-in** (Overview → Policies). Staff accounts without it
+  cannot open the admin console until they turn it on in Settings → Security; their own vault
+  still works. You can only turn it on once your own account has two-factor sign-in.
+- **Change alerts.** When someone changes a role, the policies or registration, or deletes an
+  account, every other owner and admin gets an email. Check the audit log if it was not
+  expected.
+</details>
+
+<details>
 <summary>Users: finding people and acting on many at once</summary>
 
 Admin console → **Users** lists every account, a page at a time (25 to 200 rows), so it stays

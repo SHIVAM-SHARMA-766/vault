@@ -15,6 +15,7 @@ import { Shell } from '../../ui/Shell.js'
 import { type ServerTab, ServerSection, serverTabs } from '../admin/Admin.js'
 import { useTeams } from '../orgs/model.js'
 import { TeamHealth } from './TeamHealth.js'
+import { ReauthPrompt } from '../admin/Reauth.js'
 import { Activity, Groups, OrgBackup, OrgCollections, OrgMembers, OrgRecovery, PermissionSets, PoliciesForm, useOrgPeople } from '../orgs/Orgs.js'
 
 type ConsoleRoute = Extract<Route, { name: 'console' }>
@@ -71,6 +72,7 @@ export function Console({ state, route }: { state: session.Unlocked; route: Cons
 
   return (
     <Shell state={state}>
+      <ReauthPrompt />
       <div className="admin-layout console-layout">
         <nav className="sidebar" aria-label="Admin console">
           <ScopePicker id="scope" scopes={scopes} current={current} serverName={serverName} onChoose={choose} />

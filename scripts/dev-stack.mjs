@@ -38,9 +38,14 @@ const PORT = Number(process.env.PORT ?? 8080)
 const OWNER = process.env.OWNER_EMAIL ?? 'owner@example.test'
 const PEPPER = 'dev-stack-pepper-not-a-secret-0000000000'
 
+// POST /__dev/clock?skip=<minutes> moves the server's clock on, so a test can
+// see what happens after a time limit (the ten-minute sudo window) without
+// waiting for it.
+let clockSkew = 0
+
 const app = {
   store: new MemoryStore(),
-  now: () => Date.now(),
+  now: () => Date.now() + clockSkew,
   // Open so the first account can be made; the admin panel can close it, and
   // POST /__dev/registration?open=0 does the same from a test.
   allowRegistration: OWNER !== '' && process.env.REGISTRATION !== 'closed',
@@ -94,6 +99,11 @@ createServer((req, res) => {
     if (p === '/__dev/outbox' && process.env.DEV_MAIL) {
       res.setHeader('content-type', 'application/json')
       return res.end(JSON.stringify(outbox))
+    }
+
+    if (p === '/__dev/clock' && req.method === 'POST') {
+      clockSkew += Number(url.searchParams.get('skip') ?? 0) * 60_000
+      return res.end(JSON.stringify({ skewMinutes: clockSkew / 60_000 }))
     }
 
     if (p === '/__dev/registration' && req.method === 'POST') {

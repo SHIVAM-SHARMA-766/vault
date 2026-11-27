@@ -47,6 +47,8 @@ export const ERROR_CODES = {
   rate_limited: 'Too many requests; wait `retry-after` seconds.',
   unavailable: 'The feature is not configured on this server.',
   not_in_edition: 'This server\'s edition (personal, business, hosted) does not include the feature (decisions/0030).',
+  reauth_required: 'A sensitive admin action: confirm the master password again (POST /api/auth/reauth), then retry. A sign-in counts for ten minutes.',
+  staff_two_factor_required: 'This server requires staff to sign in with two-factor before using the admin console; turn it on in Settings → Security.',
   policy_required: 'An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.',
   internal: 'An unexpected error. Quote `requestId` when reporting it.',
 } as const

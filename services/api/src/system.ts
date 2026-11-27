@@ -77,6 +77,8 @@ export interface ServerPolicy {
   requireSso: boolean
   /** A summary emailed to owners and admins once a week (admin console phase 2). */
   weeklyDigest: boolean
+  /** Staff (every role but user) must sign in with two-factor to use the admin console (phase 3). */
+  requireStaffTwoFactor: boolean
 }
 
 export const POLICY_CHOICES = {
@@ -89,7 +91,7 @@ export const POLICY_CHOICES = {
 } as const
 
 export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
-  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false, weeklyDigest: true,
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false, weeklyDigest: true, requireStaffTwoFactor: false,
 })
 
 /** A stored policy, with anything missing or out of range taken from the
@@ -110,6 +112,7 @@ export function readPolicy(value: unknown): ServerPolicy {
     allowedNetworks: Array.isArray(v['allowedNetworks']) ? (v['allowedNetworks'] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 50) : [],
     requireSso: v['requireSso'] === true,
     weeklyDigest: v['weeklyDigest'] !== false,
+    requireStaffTwoFactor: v['requireStaffTwoFactor'] === true,
   }
 }
 

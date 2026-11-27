@@ -47,10 +47,12 @@
               "rate_limited",
               "unavailable",
               "not_in_edition",
+              "reauth_required",
+              "staff_two_factor_required",
               "policy_required",
               "internal"
             ],
-            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnetwork_not_allowed: The server's sign-in allow-list does not include this address.\naccount_password_required: This account signs in with its account password first (decisions/0036); the master password alone is not enough.\nsso_required: This server requires single sign-on (decisions/0021): sign in with the identity provider first and send its ticket.\nsso_invalid: The single sign-on ticket is unknown, expired, used, or for another account.\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\nnot_in_edition: This server's edition (personal, business, hosted) does not include the feature (decisions/0030).\npolicy_required: An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.\ninternal: An unexpected error. Quote `requestId` when reporting it."
+            "description": "bad_request: The request is malformed or a field is invalid; `details` may say which.\ninvalid_content: Website content failed validation; `details` lists each field.\nunauthorized: No valid access token.\ninvalid_credentials: Sign-in failed. Deliberately does not say why.\ntwo_factor_required: The password was right; a TOTP or recovery code is needed too.\ninvalid_two_factor: The TOTP or recovery code is wrong or already used.\nforbidden: Signed in, but not permitted (role, disabled account, closed registration).\nnetwork_not_allowed: The server's sign-in allow-list does not include this address.\naccount_password_required: This account signs in with its account password first (decisions/0036); the master password alone is not enough.\nsso_required: This server requires single sign-on (decisions/0021): sign in with the identity provider first and send its ticket.\nsso_invalid: The single sign-on ticket is unknown, expired, used, or for another account.\nnot_found: No such route or item.\nconflict: The item already exists, or the change conflicts with the current state.\ntoo_large: The body or a stored item exceeds its size limit.\nrate_limited: Too many requests; wait `retry-after` seconds.\nunavailable: The feature is not configured on this server.\nnot_in_edition: This server's edition (personal, business, hosted) does not include the feature (decisions/0030).\nreauth_required: A sensitive admin action: confirm the master password again (POST /api/auth/reauth), then retry. A sign-in counts for ten minutes.\nstaff_two_factor_required: This server requires staff to sign in with two-factor before using the admin console; turn it on in Settings → Security.\npolicy_required: An organization policy is not met (two-factor sign-in, or master password strength); `message` says which.\ninternal: An unexpected error. Quote `requestId` when reporting it."
           },
           "message": {
             "type": "string",
@@ -5163,6 +5165,35 @@
         "operationId": "getActivity",
         "tags": [
           "activity"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/reauth": {
+      "post": {
+        "summary": "Confirm the master password again, for sensitive admin actions (ten minutes)",
+        "operationId": "postAuthReauth",
+        "tags": [
+          "auth"
         ],
         "security": [
           {

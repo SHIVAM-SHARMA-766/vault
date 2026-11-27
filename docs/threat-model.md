@@ -337,6 +337,29 @@ outside the database. A database dump alone does not reveal addresses; the dump 
 does. Before 0037 only a keyed digest was stored. Vault contents are untouched by this: they
 remain readable only with each person's master password.
 
+### A21a3 — A stolen staff session (admin console phase 3)
+
+An access token taken from an administrator's browser lets the thief act as that administrator
+until the session ends. Three things limit what it can do:
+
+- **Sensitive actions need the master password recently.** These are role changes, deleting or
+  offboarding accounts, resetting someone's two-factor or account password, bulk changes,
+  server settings and deleting an organization. They need the master password's proof from
+  that device in the last ten minutes. A sign-in counts; a refresh does not. The proof is
+  checked like a sign-in and is rate-limited per account.
+- **`requireStaffTwoFactor`** keeps any staff account without two-factor sign-in out of the
+  console, so a phished password alone does not reach it.
+- **Changes are announced.** A role change, a policy or registration change and a deletion are
+  emailed to the other owners and admins, so a quiet takeover is noticed.
+
+The audit log remains the record. Admins still cannot read vault contents with any of this.
+
+### A21a4 — Dashboard counters (admin console phase 2)
+
+Sign-ins, failed sign-ins and new vaults are counted per day, as bare numbers, kept 400 days.
+They name no account, address or network address, so they add nothing to what a database dump
+reveals beyond the activity level of the server.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

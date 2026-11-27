@@ -177,11 +177,13 @@ export async function start({ owner = 'owner@example.test', edition, env = {} } 
   }
 
   const setRegistration = (open) => fetch(`${base}/__dev/registration?open=${open ? 1 : 0}`, { method: 'POST' })
+  /** Moves the server's clock on (dev stack only), to pass a time limit. */
+  const skipMinutes = (minutes) => fetch(`${base}/__dev/clock?skip=${minutes}`, { method: 'POST' })
 
   async function stop() {
     await browser.close()
     stack.kill()
   }
 
-  return { base, person, register, unlock, codeFor, signupThenVault, menu, manage, settings, setRegistration, errors, stop, log: () => log }
+  return { base, person, register, unlock, codeFor, signupThenVault, menu, manage, settings, setRegistration, skipMinutes, errors, stop, log: () => log }
 }
