@@ -1572,3 +1572,10 @@ label.badge-vault::after { content: '▾'; font-size: 10px; margin-left: 2px; co
 .section-tabs button { padding: 0 16px; }
 .admin-grid { gap: 16px; }
 @media (max-width: 600px) { .section-tabs { display: grid; grid-auto-flow: row; width: 100%; } }
+
+/* Admin console UX: a denser, calmer users table. */
+.users-table td { padding: 9px 14px; }
+.users-table .acct-avatar { width: 30px; height: 30px; font-size: 13px; }
+.users-table tbody tr.row-link { cursor: pointer; }
+.users-table tbody tr.row-link:hover td { background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
+.users-table td .pill + .pill { margin-left: 4px; }
