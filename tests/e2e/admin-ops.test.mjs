@@ -16,6 +16,7 @@ test('System tab: backup status, an email template previewed and saved, the rate
     await owner.waitForSelector('#sys-backup')
     assert.match(await owner.textContent('.admin-main'), /Backups are off|Every/)
 
+    await owner.getByRole('tab', { name: 'Emails' }).click()
     await owner.selectOption('#tpl-kind', 'invite')
     await owner.fill('#tpl-subject', 'Welcome to {server}')
     await owner.fill('#tpl-message', 'Hello from the IT desk.')
@@ -29,6 +30,7 @@ test('System tab: backup status, an email template previewed and saved, the rate
     await owner.getByRole('button', { name: 'Use the standard email' }).click()
     await owner.waitForSelector('text=Back to the standard email', { state: 'attached' })
 
+    await owner.getByRole('tab', { name: 'Sign-in limits' }).click()
     await owner.waitForSelector('.limits td:has-text("Sign-in attempts")')
     assert.match(await owner.textContent('.limits'), /10 per 15 minutes/)
     assert.deepEqual(s.errors, [])
