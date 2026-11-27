@@ -403,6 +403,27 @@ The server then fetches the icon itself through the same guard as backups (egres
 Neither the person's browser nor a third party contacts the site. Preferences → *Show website
 icons* turns it off, and then the server is never asked.
 
+
+### A21a8 — Several vaults ([0038](../decisions/0038-several-vaults.md), 2026-11-27)
+
+An account can have vaults besides Personal. Each vault's key is wrapped under the account's vault
+key, bound to the vault id. Its name is sealed under its own key. Each entry row carries an opaque
+`vaultId`.
+
+**What the server newly learns:** which entries are in the same vault, how many vaults there are,
+and when one is renamed. It still learns no names or contents.
+
+**What the server could try:**
+- **Point an entry at another vault:** its ciphertext then does not open under that vault's key.
+  The app shows it as unreadable and nothing is disclosed.
+- **Swap two vaults' wrapped keys:** each key is bound to its id by its AAD, so a swapped key does
+  not open.
+- **Keep an old version under the old key during a move:** a move must re-seal every saved version
+  in one request, and the server refuses a move that leaves one out.
+
+A write without a vault id is Personal, so an older client cannot strand an item under a key it
+does not hold.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the

@@ -30,12 +30,15 @@ export const EMAIL_SK = 'EMAIL'
 
 export const entrySk = (entryId: string) => `ENTRY#${entryId}`
 export const folderSk = (folderId: string) => `FOLDER#${folderId}`
+/** One of an account's own vaults besides Personal (routes/vault.ts). */
+export const vaultSk = (vaultId: string) => `VAULT#${vaultId}`
 export const sessionSk = (tokenId: string) => `SESSION#${tokenId}`
 export const historySk = (entryId: string, at: string) => `HIST#${entryId}#${at}`
 export const activitySk = (at: string, nonce: string) => `ACT#${at}#${nonce}`
 
 export const ENTRY_PREFIX = 'ENTRY#'
 export const FOLDER_PREFIX = 'FOLDER#'
+export const VAULT_PREFIX = 'VAULT#'
 export const SESSION_PREFIX = 'SESSION#'
 export const HISTORY_PREFIX = 'HIST#'
 export const ACTIVITY_PREFIX = 'ACT#'

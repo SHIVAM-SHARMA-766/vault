@@ -209,3 +209,14 @@ export {
 export { type Argon2Params, argon2Supported, argon2id, blake2b } from './argon2.js'
 
 export { ACCOUNT_KDF, type AccountParams, deriveAccountProof, newAccountParams } from './account.js'
+
+export {
+  Keyring,
+  type OpenVault,
+  type SealedVault,
+  VAULT_KEY_BYTES,
+  type VaultContent,
+  createVault,
+  openVaults,
+  sealVault,
+} from './vaults.js'

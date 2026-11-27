@@ -16,7 +16,16 @@ export type Filter = { kind: 'health'; issue?: Issue } | { kind: 'collection'; i
 
 export const sameFilter = (a: Filter, b: Filter) => JSON.stringify(a) === JSON.stringify(b)
 
-export function Sidebar({ filter, setFilter, counts, folders, folderCounts, collections, onNewFolder, onRenameFolder, onDeleteFolder }: {
+export function Sidebar({ filter, setFilter, counts, folders, folderCounts, collections, onNewFolder, onRenameFolder, onDeleteFolder,
+  vaults = [], scope = null, setScope, vaultCounts, onNewVault, onRenameVault, onDeleteVault }: {
+  /** The account's vaults besides Personal; scope is the one shown (null: all, '': Personal). */
+  vaults?: { id: string; name: string }[]
+  scope?: string | null
+  setScope?: (scope: string | null) => void
+  vaultCounts?: Map<string, number>
+  onNewVault?: () => void
+  onRenameVault?: (id: string, name: string) => void
+  onDeleteVault?: (id: string, name: string) => void
   collections: { id: string; label: string; group: string }[]
   filter: Filter
   setFilter: (f: Filter) => void
@@ -31,6 +40,27 @@ export function Sidebar({ filter, setFilter, counts, folders, folderCounts, coll
   const tree = folderTree(folders)
   return (
     <nav className="sidebar" aria-label="Filter">
+      {setScope ? (
+        <div className="vault-switch" aria-label="Vaults">
+          <div className="sidebar-heading sidebar-heading-row">
+            <span>Vaults</span>
+            {onNewVault ? <button className="icon-btn icon-sm" title="New vault" aria-label="New vault" onClick={onNewVault}><IconPlus size={14} /></button> : null}
+          </div>
+          {vaults.length ? <>
+            <SideItem active={scope === null} onClick={() => setScope(null)} icon={<IconGrid size={16} />} label="All vaults" count={undefined} />
+            <SideItem active={scope === ''} onClick={() => setScope('')} icon={<IconLock size={16} />} label="Personal" count={vaultCounts?.get('')} />
+            {vaults.map((v) => (
+              <div key={v.id} className="vault-row">
+                <SideItem active={scope === v.id} onClick={() => setScope(v.id)} icon={<IconFolder size={16} />} label={v.name} count={vaultCounts?.get(v.id)} />
+                <span className="vault-actions">
+                  {onRenameVault ? <button className="icon-btn icon-sm" title={`Rename ${v.name}`} aria-label={`Rename vault ${v.name}`} onClick={() => onRenameVault(v.id, v.name)}><IconEdit size={13} /></button> : null}
+                  {onDeleteVault ? <button className="icon-btn icon-sm icon-danger" title={`Delete ${v.name}`} aria-label={`Delete vault ${v.name}`} onClick={() => onDeleteVault(v.id, v.name)}><IconTrash size={13} /></button> : null}
+                </span>
+              </div>
+            ))}
+          </> : <p className="sidebar-empty">Only Personal. Add one for work or family.</p>}
+        </div>
+      ) : null}
       <SideItem active={filter.kind === 'all'} onClick={() => setFilter({ kind: 'all' })} icon={<IconGrid size={16} />} label={t('All items')} count={counts['all']} />
       <SideItem active={filter.kind === 'favorites'} onClick={() => setFilter({ kind: 'favorites' })} icon={<IconStar size={16} />} label={t('Favorites')} count={counts['favorites']} />
       <SideItem active={filter.kind === 'health'} onClick={() => setFilter({ kind: 'health' })} icon={<IconPulse size={16} />} label={t('Password health')} count={counts['health']} warn />

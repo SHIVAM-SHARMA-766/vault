@@ -58,6 +58,8 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
   const [useRecovery, setUseRecovery] = useState(false)
   const [skipDuplicates, setSkipDuplicates] = useState(true)
   const [intoFolder, setIntoFolder] = useState(false)
+  // Which vault an import goes into ('' for Personal).
+  const [intoVault, setIntoVault] = useState('')
   const folderName = `Imported ${today()}`
 
   const preview = useMemo(() => step.kind === 'review'
@@ -112,7 +114,8 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
     setError('')
     setStep({ kind: 'running', done: 0, total: preview.entries.length })
     try {
-      const r = await runImport(preview, state.vaultKey, (done, total) => setStep({ kind: 'running', done, total }))
+      const key = intoVault ? vault.ring.keyFor(intoVault) : null
+      const r = await runImport(preview, state.vaultKey, (done, total) => setStep({ kind: 'running', done, total }), intoVault && key ? { vaultId: intoVault, key } : undefined)
       await vault.load()
       setStep({ kind: 'done', created: r.created, duplicates, tooLarge: r.tooLarge })
     } catch (err) {
@@ -176,6 +179,15 @@ function Import({ state, vault }: { state: session.Unlocked; vault: Vault }) {
             Skip items already in the vault (same name, username and website){preview.duplicates ? ` — ${preview.duplicates} found` : ''}
           </Check>
           <Check checked={intoFolder} onChange={setIntoFolder}>Put everything in a new folder, “{folderName}”</Check>
+          {vault.vaults.length ? (
+            <div className="field">
+              <label htmlFor="tr-vault">Import into</label>
+              <select id="tr-vault" value={intoVault} onChange={(e) => setIntoVault(e.target.value)}>
+                <option value="">Personal</option>
+                {vault.vaults.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </div>
+          ) : null}
           <div className="settings-actions">
             <button className="btn btn-secondary" onClick={reset}>Cancel</button>
             <button className="btn btn-primary" onClick={() => void start()} disabled={!preview.entries.length}>

@@ -23,14 +23,21 @@ import { EntryDetail } from './EntryDetail.js'
 import { EntryForm } from './EntryForm.js'
 import { FolderDialog } from './FolderDialog.js'
 import { VaultHome, rememberOpened } from './Home.js'
-import { type Decrypted, type Folder, emptyEntry, stripMeta, useVault } from './model.js'
+import { type Decrypted, PERSONAL, type Folder, emptyEntry, stripMeta, useVault } from './model.js'
 import { type SharedEntry, canEdit, useTeams } from '../orgs/model.js'
 import { type Filter, Sidebar, sameFilter } from './Sidebar.js'
 import type { EntryContent, EntryType } from '@vault/crypto'
 import { t } from '../../lib/i18n.js'
 
-type Mode = { kind: 'view' } | { kind: 'edit'; draft: EntryContent; id?: string; collectionId?: string }
-type Dialog = { kind: 'new'; parentId?: string } | { kind: 'rename'; folder: Folder } | { kind: 'delete'; folder: Folder } | null
+type Mode = { kind: 'view' } | { kind: 'edit'; draft: EntryContent; id?: string; collectionId?: string; vaultId?: string }
+type Dialog = { kind: 'new'; parentId?: string } | { kind: 'rename'; folder: Folder } | { kind: 'delete'; folder: Folder }
+  | { kind: 'vault-new' } | { kind: 'vault-rename'; id: string; name: string } | { kind: 'vault-delete'; id: string; name: string } | null
+
+/** Which vault the screen shows: null for all of them, '' for Personal. */
+const scopeKey = (userId: string | undefined) => `vault.scope.${userId ?? ''}`
+function readScope(userId: string | undefined): string | null {
+  try { const v = localStorage.getItem(scopeKey(userId)); return v === null ? null : v } catch { return null }
+}
 
 export function Vault({ state }: { state: session.Unlocked }) {
   const toast = useToast()
@@ -39,8 +46,26 @@ export function Vault({ state }: { state: session.Unlocked }) {
   // Sharing with a person needs a second account (decisions/0030).
   const { features } = useEdition()
   const { folders } = vault
-  // Personal entries and the shared items this account can open, together.
-  const entries: (Decrypted | SharedEntry)[] = useMemo(() => [...vault.entries, ...teams.shared].sort((a, b) => a.name.localeCompare(b.name)), [vault.entries, teams.shared])
+  // The vault being looked at: all of them, Personal (''), or one by id. Kept
+  // per account on this device; one that no longer exists means all.
+  const [scopeRaw, setScopeRaw] = useState<string | null>(() => readScope(state.userId))
+  const scope = scopeRaw === null || scopeRaw === '' || vault.vaults.some((v) => v.id === scopeRaw) ? scopeRaw : null
+  const setScope = (next: string | null) => {
+    setScopeRaw(next)
+    try { if (next === null) localStorage.removeItem(scopeKey(state.userId)); else localStorage.setItem(scopeKey(state.userId), next) } catch { /* storage blocked */ }
+  }
+  const vaultName = (id: string | undefined) => (id ? vault.vaults.find((v) => v.id === id)?.name ?? 'Vault' : PERSONAL)
+  // Personal entries and the shared items this account can open, together;
+  // inside one vault, only that vault's own items.
+  const entries: (Decrypted | SharedEntry)[] = useMemo(() => {
+    const all = [...vault.entries, ...teams.shared].sort((a, b) => a.name.localeCompare(b.name))
+    return scope === null ? all : all.filter((e) => !('collectionId' in e) && (e.vaultId ?? '') === scope)
+  }, [vault.entries, teams.shared, scope])
+  const vaultCounts = useMemo(() => {
+    const c = new Map<string, number>()
+    for (const e of vault.entries) if (!e.archived) c.set(e.vaultId ?? '', (c.get(e.vaultId ?? '') ?? 0) + 1)
+    return c
+  }, [vault.entries])
   const openCollections = useMemo(() => teams.collections.filter((c) => c.key), [teams.collections])
   const sharedOf = (e: Decrypted | null | undefined): SharedEntry | null => (e && 'collectionId' in e ? (e as SharedEntry) : null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -198,7 +223,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
   async function save(content: EntryContent, id?: string, collectionId?: string): Promise<boolean> {
     try {
       const target = collectionId ?? sharedOf(entries.find((e) => e.id === id))?.collectionId
-      const entryId = target ? await teams.saveShared(target, content, id) : await vault.saveEntry(content, id)
+      const entryId = target ? await teams.saveShared(target, content, id) : await vault.saveEntry(content, id, { vaultId: mode.kind === 'edit' ? mode.vaultId : undefined })
       setSelectedId(entryId)
       setMode({ kind: 'view' })
       return true
@@ -278,6 +303,16 @@ export function Vault({ state }: { state: session.Unlocked }) {
     } finally { await vault.load(); setBulkBusy(false); setBulkConfirm(false) }
   }
   const plural = (n: number) => `${n} ${n === 1 ? 'item' : 'items'}`
+  async function bulkMoveVault(to: string | undefined) {
+    setBulkBusy(true)
+    try {
+      for (const e of pickedItems) await vault.moveEntry(e.id, to, { reload: false })
+      toast(`${plural(pickedItems.length)} moved to ${vaultName(to)}`)
+      setPicked(null)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not move them all.', 'error')
+    } finally { await vault.load(); setBulkBusy(false) }
+  }
 
   // ── Command palette actions (E4).
   const go = (f: Filter) => { setFilter(f); setSelectedId(null); setMode({ kind: 'view' }) }
@@ -313,7 +348,8 @@ export function Vault({ state }: { state: session.Unlocked }) {
     const blankDraft = emptyEntry(type, filter.kind === 'folder' ? filter.id : collectionId ? undefined : fallback)
     // Under one of the person's templates, a new item starts from it.
     const tpl = filter.kind === 'template' ? view.templates.find((x) => x.id === filter.id) : undefined
-    setMode({ kind: 'edit', draft: tpl ? applyTemplate(blankDraft, tpl) : blankDraft, ...(collectionId ? { collectionId } : {}) })
+    // Inside one vault, a new item goes there.
+    setMode({ kind: 'edit', draft: tpl ? applyTemplate(blankDraft, tpl) : blankDraft, ...(collectionId ? { collectionId } : scope ? { vaultId: scope } : {}) })
   }
 
   const title = filter.kind === 'all' ? t('All items') : filter.kind === 'favorites' ? t('Favorites') : filter.kind === 'archive' ? t('Archive')
@@ -346,6 +382,10 @@ export function Vault({ state }: { state: session.Unlocked }) {
     >
       <div className={`layout ${paneOpen ? 'pane-open' : ''}`}>
         <Sidebar filter={filter} setFilter={setFilter} counts={counts} folders={folders} folderCounts={folderCounts}
+                 vaults={vault.vaults.map((v) => ({ id: v.id, name: v.name }))} scope={scope} setScope={(sc) => { setScope(sc); setSelectedId(null); setMode({ kind: 'view' }) }} vaultCounts={vaultCounts}
+                 onNewVault={() => setDialog({ kind: 'vault-new' })}
+                 onRenameVault={(id, name) => setDialog({ kind: 'vault-rename', id, name })}
+                 onDeleteVault={(id, name) => setDialog({ kind: 'vault-delete', id, name })}
                  collections={openCollections.map((c) => ({ id: c.id, label: c.name, group: c.orgName }))}
                  onNewFolder={(parentId) => setDialog({ kind: 'new', ...(parentId ? { parentId } : {}) })}
                  onRenameFolder={(folder) => setDialog({ kind: 'rename', folder })}
@@ -401,6 +441,14 @@ export function Vault({ state }: { state: session.Unlocked }) {
                     <option value="-">No folder</option>
                     {flattenTree(folderTree(folders)).map((n) => <option key={n.folder.id} value={n.folder.id}>{'\u00a0\u00a0'.repeat(n.depth)}{n.folder.name}</option>)}
                   </select>
+                  {vault.vaults.length ? (
+                    <select aria-label="Move to vault" className="select-sm" disabled={!pickedItems.length || bulkBusy} value=""
+                            onChange={(e) => { const to = e.target.value; if (to) void bulkMoveVault(to === '-' ? undefined : to) }}>
+                      <option value="">Move to vault…</option>
+                      <option value="-">{PERSONAL}</option>
+                      {vault.vaults.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  ) : null}
                   <button className="btn btn-secondary btn-sm" disabled={!pickedItems.length || bulkBusy}
                           onClick={() => void bulk((c) => { const { archived: _a, ...rest } = c; return filter.kind === 'archive' ? rest : { ...rest, archived: true } }, (n) => filter.kind === 'archive' ? `${plural(n)} restored` : `${plural(n)} archived`)}>
                     <IconInbox size={14} />{filter.kind === 'archive' ? 'Restore' : 'Archive'}
@@ -486,12 +534,24 @@ export function Vault({ state }: { state: session.Unlocked }) {
           {mode.kind === 'edit' ? (
             <EntryForm key={mode.id ?? 'new'} initial={mode.draft} id={mode.id} folders={folders}
                        shared={!!(mode.collectionId ?? sharedOf(entries.find((e) => e.id === mode.id)))}
+                       vaultChoice={!mode.id && !mode.collectionId && vault.vaults.length ? {
+                         value: mode.vaultId ?? '', options: [{ id: '', name: PERSONAL }, ...vault.vaults.map((v) => ({ id: v.id, name: v.name }))],
+                         onChange: (v: string) => setMode({ ...mode, ...(v ? { vaultId: v } : { vaultId: undefined }) } as Mode),
+                       } : undefined}
                        candidates={samePlace(mode.id ? placeOf(entries.find((e) => e.id === mode.id)) : mode.collectionId ?? '').filter((e) => !e.archived)
                          .map((e) => ({ id: e.id, name: e.name, type: e.type, username: e.username, url: e.url }))}
                        onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
             <EntryDetail key={selected.id} entry={selected} folders={folders}
-                         related={relatedItems(selected.id, samePlace(placeOf(selected)))} onOpenItem={(rid) => { setSelectedId(rid); setMode({ kind: 'view' }) }}
+                         related={relatedItems(selected.id, samePlace(placeOf(selected)))}
+                         {...(!sharedOf(selected) && vault.vaults.length ? {
+                           vaultName: vaultName(selected.vaultId),
+                           vaultTargets: [{ id: '', name: PERSONAL }, ...vault.vaults.map((v) => ({ id: v.id, name: v.name }))].filter((v) => v.id !== (selected.vaultId ?? '')),
+                           onMoveVault: async (to: string) => {
+                             try { await vault.moveEntry(selected.id, to || undefined); toast(`Moved to ${vaultName(to || undefined)}`) }
+                             catch (err) { toast(err instanceof Error ? err.message : 'Could not move it.', 'error') }
+                           },
+                         } : {})} onOpenItem={(rid) => { setSelectedId(rid); setMode({ kind: 'view' }) }}
                          issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
                          shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? {
                            where: (c.direct ? c.name : `${c.orgName} / ${c.name}`), permission: sh.permission, hidePasswords: sh.hidePasswords, sensitive: !!sh.sensitive,
@@ -553,6 +613,38 @@ export function Vault({ state }: { state: session.Unlocked }) {
                         setDialog(null)
                         toast('Folder renamed')
                       }} />
+      ) : null}
+      {dialog?.kind === 'vault-new' ? (
+        <FolderDialog title="New vault" label="Vault name" onCancel={() => setDialog(null)}
+                      onSave={async (name) => {
+                        if (vault.vaults.some((v) => v.name.toLowerCase() === name.toLowerCase()) || name.toLowerCase() === PERSONAL.toLowerCase()) throw new Error('A vault with that name already exists.')
+                        const id = await vault.createVault({ name })
+                        setDialog(null); setScope(id); setSelectedId(null)
+                        toast(`Vault “${name}” created`)
+                      }} />
+      ) : null}
+      {dialog?.kind === 'vault-rename' ? (
+        <FolderDialog title="Rename vault" label="Vault name" initial={dialog.name} onCancel={() => setDialog(null)}
+                      onSave={async (name) => { await vault.renameVault(dialog.id, { name }); setDialog(null); toast('Vault renamed') }} />
+      ) : null}
+      {dialog?.kind === 'vault-delete' ? (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="del-vault">
+          <div className="modal">
+            <h2 id="del-vault">Delete the vault “{dialog.name}”?</h2>
+            <p className="muted">{(vaultCounts.get(dialog.id) ?? 0) ? `Its ${plural(vault.entries.filter((e) => e.vaultId === dialog.id).length)} move to ${PERSONAL} first, re-encrypted with its key.` : 'It is empty.'} Nothing is deleted but the vault.</p>
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setDialog(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={async () => {
+                try {
+                  await vault.deleteVault(dialog.id)
+                  if (scope === dialog.id) setScope(null)
+                  setDialog(null)
+                  toast('Vault deleted')
+                } catch (err) { toast(err instanceof Error ? err.message : 'Could not delete the vault.', 'error') }
+              }}>Delete vault</button>
+            </div>
+          </div>
+        </div>
       ) : null}
       {dialog?.kind === 'delete' ? (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="del-folder">
