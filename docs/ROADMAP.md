@@ -421,7 +421,10 @@ Built one at a time, each its own pull request with tests.
   saved, are pointed out in Password health and on the item ("Add one-time code"). The list of
   sites ships with the app (`packages/core/src/twofactor-sites.ts`); nothing is fetched. Not
   counted in the score.
-- [ ] Markdown in secure notes (headings, lists, checklists).
+- [x] **Markdown in notes**: headings, lists, checklists, quotes, code and links, on the item,
+  in the editor's preview and on a shared link. Read into a tree by `packages/core/src/markdown.ts`
+  and drawn with ordinary elements, never as HTML; links open only for http(s). Notes without
+  Markdown stay plain text; "Show plain text" shows the raw note.
 - [ ] Generator history: recent generated passwords, encrypted, on this account.
 - [ ] Related items: link an item to others (a server and its SSH key).
 - [ ] Custom item templates.

@@ -4,13 +4,14 @@
 
 import { useState } from 'react'
 
-import { readField, typeSpec } from '@vault/core'
+import { looksLikeMarkdown, readField, typeSpec } from '@vault/core'
 
 import { ApiError, api } from '../../lib/api.js'
 import { type SharedItem, openShareBlob, parseLink } from '../../lib/share.js'
 import { BrandMark } from '../../lib/instance.js'
 import { IconAlert, IconLock } from '../../ui/icons.js'
 import { typeInfo } from '../../ui/kit.js'
+import { Markdown } from '../../ui/Markdown.js'
 import { FieldView, SecretRow, TextRow } from '../vault/fields.js'
 import { when } from '../../lib/format.js'
 
@@ -70,7 +71,7 @@ function Shared({ item, sharedAt, viewsLeft, expiresAt }: { item: SharedItem; sh
           ? <SecretRow key={i} label={c.label || 'Hidden field'} value={c.value} />
           : <TextRow key={i} label={c.label || 'Field'} value={c.value} />)}
       </div>
-      {item.notes ? <div className="notes"><span className="field-label">Notes</span><pre>{item.notes}</pre></div> : null}
+      {item.notes ? <div className="notes"><span className="field-label">Notes</span>{looksLikeMarkdown(item.notes) ? <Markdown source={item.notes} /> : <pre>{item.notes}</pre>}</div> : null}
       <p className="alert alert-warn"><IconAlert size={16} /><span>
         {viewsLeft === 0 ? 'This was the last view: the link no longer works. Save what you need now.'
           : `The link works until ${when(expiresAt)}${viewsLeft !== null ? ` for ${viewsLeft} more ${viewsLeft === 1 ? 'view' : 'views'}` : ''}.`}

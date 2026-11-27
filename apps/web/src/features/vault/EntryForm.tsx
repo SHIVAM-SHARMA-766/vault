@@ -9,6 +9,7 @@ import { flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField 
 
 import { IconEye, IconEyeOff, IconPlus, IconX } from '../../ui/icons.js'
 import { FieldInput } from './fields.js'
+import { Markdown } from '../../ui/Markdown.js'
 import { ATTACHMENT_MAX_BYTES, deleteAttachments, describeSize, uploadAttachment } from '../../lib/attachments.js'
 import { IconUpload } from '../../ui/icons.js'
 import type { Folder } from './model.js'
@@ -25,6 +26,7 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
 }) {
   const [draft, setDraft] = useState<EntryContent>(initial)
   const [saving, setSaving] = useState(false)
+  const [preview, setPreview] = useState(false)
   const [tagText, setTagText] = useState(initial.tags.join(', '))
   // Attachments (D2): uploaded as soon as they are picked; on cancel, the new
   // ones are deleted again, and on save, the ones removed from the list.
@@ -106,9 +108,15 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
         ) : null}
 
         <div className="field">
-          <label htmlFor="f-notes">{t('Notes')}</label>
-          <textarea id="f-notes" rows={spec.type === 'note' ? 10 : 3} value={draft.notes ?? ''}
-                    onChange={(e) => set('notes', e.target.value)} />
+          <div className="label-row">
+            <label htmlFor="f-notes">{t('Notes')}</label>
+            {draft.notes?.trim() ? <button type="button" className="link" onClick={() => setPreview((v) => !v)}>{preview ? 'Edit' : 'Preview'}</button> : null}
+          </div>
+          {preview && draft.notes?.trim()
+            ? <Markdown source={draft.notes} className="notes-preview" />
+            : <textarea id="f-notes" rows={spec.type === 'note' ? 10 : 3} value={draft.notes ?? ''} aria-describedby="f-notes-hint"
+                        onChange={(e) => set('notes', e.target.value)} />}
+          <p id="f-notes-hint" className="hint">Markdown works: <code># heading</code> <code>**bold**</code> <code>- list</code> <code>- [ ] checklist</code> <code>[link](https://…)</code></p>
         </div>
 
         <div className="field custom-fields">
