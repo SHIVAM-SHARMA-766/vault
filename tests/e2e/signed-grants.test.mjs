@@ -77,6 +77,9 @@ test('a swapped or unsigned grant is refused after signing; honest grants open',
     await bob.route('**/api/orgs/*/collections', async (route) => {
       const res = await route.fetch()
       const body = await res.json()
+      // Before the account is unlocked again the server answers with an error,
+      // which has no collections: pass it on as it is.
+      if (!Array.isArray(body.collections)) return route.fulfill({ response: res })
       for (const c of body.collections) if (c.access) { delete c.access.signature; delete c.access.signedBy }
       await route.fulfill({ response: res, json: body })
     })
