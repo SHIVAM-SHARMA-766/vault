@@ -28,6 +28,7 @@ import { backupsEnabled, runBackup } from './backup.js'
 import { serveStatic } from './web.js'
 import { openStore } from './storage/index.js'
 import type { ManagedStore } from './store.js'
+import { tickDigest } from './routes/insights.js'
 
 const HOST = 'localhost'
 
@@ -115,6 +116,12 @@ export async function start(): Promise<void> {
     .catch((err: unknown) => console.error('retention pass failed:', (err as Error).message))
   void retention()
   setInterval(retention, 6 * 3_600_000).unref()
+
+  // The weekly summary to owners and admins (admin console phase 2): checked
+  // every hour, sent when a week has passed since the last.
+  const digest = () => tickDigest(app)
+    .catch((err: unknown) => console.error('weekly digest failed:', (err as Error).message))
+  setInterval(digest, 3_600_000).unref()
 
   // Personal backups that have fallen due (decisions/0017).
   const personal = () => tickPersonalBackups(app)

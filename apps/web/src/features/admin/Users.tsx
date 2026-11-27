@@ -22,11 +22,16 @@ const STATUS_CHIPS: { id: Status; label: string; count: keyof AdminUserPage['cou
 ]
 const ROLES: Role[] = ['owner', 'admin', 'support', 'marketing', 'viewer', 'user']
 
+/** A filter for the next time the list opens: "Review" on the overview's
+ *  Needs attention sets it, then opens Users. */
+let preset: Partial<AdminUserQuery> | null = null
+export function presetUsersFilter(q: Partial<AdminUserQuery>): void { preset = q }
+
 export const nameOf = (u: Pick<AdminUser, 'email' | 'label'>) => u.email || u.label || 'Unnamed account'
 
 export function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boolean; canRoles: boolean }) {
   const toast = useToast()
-  const [query, setQuery] = useState<AdminUserQuery>({ sort: 'created', dir: 'desc', limit: 50, offset: 0 })
+  const [query, setQuery] = useState<AdminUserQuery>(() => { const q = { sort: 'created' as const, dir: 'desc' as const, limit: 50, offset: 0, ...preset }; preset = null; return q })
   const [text, setText] = useState('')
   const [page, setPage] = useState<AdminUserPage | null>(null)
   const [error, setError] = useState('')

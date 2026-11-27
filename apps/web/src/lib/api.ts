@@ -151,6 +151,8 @@ export interface ServerPolicy {
   allowedNetworks: string[]
   /** Every sign-in needs the identity provider first (decisions/0021); owners exempt. */
   requireSso?: boolean
+  /** A summary emailed to owners and admins once a week. */
+  weeklyDigest?: boolean
 }
 
 export type TemplateKind = 'invite' | 'signIn' | 'verify' | 'vaultApproved' | 'accountReset'
@@ -601,6 +603,15 @@ export const api = {
       if (!res.ok) throw new ApiError(res.status, 'export_failed', 'Could not export the audit log.')
       return res.text()
     },
+    insights: (token: string) => request<AdminInsights>('GET', '/api/admin/insights', { token }),
+    reports: (token: string) => request<{ reports: { kind: string; title: string }[] }>('GET', '/api/admin/reports', { token }),
+    report: (token: string, kind: string) => request<AdminReport>('GET', `/api/admin/reports/${encodeURIComponent(kind)}`, { token }),
+    reportCsv: async (token: string, kind: string): Promise<string> => {
+      const res = await fetch(`/api/admin/reports/${encodeURIComponent(kind)}?format=csv`, { headers: { [AUTH_HEADER]: `Bearer ${token}` }, credentials: 'omit', cache: 'no-store' })
+      if (!res.ok) throw new ApiError(res.status, 'export_failed', 'Could not download the report.')
+      return res.text()
+    },
+    sendDigest: (token: string) => request<{ sent: number }>('POST', '/api/admin/digest', { token }),
     audit: (token: string, query: AdminAuditQuery = {}) =>
       request<{ records: AdminAudit[]; total: number; offset: number; limit: number; actions: string[] }>('GET', `/api/admin/audit${qs(query)}`, { token }),
     site: (token: string) => request<SiteState>('GET', '/api/admin/site', { token }),
@@ -737,6 +748,15 @@ export interface AdminUserDetail {
   orgs: { orgId: string; name: string; role: string; kind: string }[]
   activity: { at: string; action: string; actor: string; actorLabel: string | null; detail: string | null }[]
 }
+
+export interface AdminInsights {
+  attention: { id: string; level: 'high' | 'medium' | 'low'; count: number; title: string; detail: string; go: { tab: string; status?: string; twoFactor?: string; role?: string } }[]
+  daily: { day: string; signin: number; 'signin-failed': number; signup: number }[]
+  twoFactor: { on: number; off: number }
+  roles: Record<string, number>
+}
+
+export interface AdminReport { kind: string; title: string; columns: string[]; rows: (string | number | boolean | null)[][] }
 
 export interface AdminAuditQuery { actor?: string; action?: string; q?: string; from?: string; to?: string; offset?: number; limit?: number }
 

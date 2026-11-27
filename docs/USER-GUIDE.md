@@ -707,6 +707,41 @@ Overview checklist opens it again.
 </details>
 
 <details>
+<summary>Overview: needs attention, sign-ins, and the weekly summary</summary>
+
+The **Overview** opens with **Needs attention**, most urgent first:
+- staff without two-factor sign-in;
+- more failed sign-ins than usual today;
+- accounts that miss the policy or have no two-factor sign-in;
+- accounts not signed in for 90 days, or never;
+- vault requests waiting;
+- open service desk tickets.
+
+**Review** opens the accounts behind an item, already filtered. When nothing needs attention,
+it says so.
+
+**Sign-ins, last 30 days** charts sign-ins and failed sign-ins per day. Hover a day for its
+numbers, or open **Show as a table**. The server counts these per day only: no names, no
+addresses.
+
+**Weekly summary:** once a week, owners and admins with an address on file get an email with
+the week's sign-ins and what needs attention. Turn it off under *Policies*, or use *Send one
+now*. It needs mail set up.
+
+**Reports** (in the console sidebar) has seven reports:
+- two-factor sign-in per account;
+- inactive accounts;
+- staff roles;
+- accounts that miss the policy, and why;
+- sign-ins per day (90 days);
+- staff actions in the last 30 days;
+- organizations by members and roles.
+
+**View** shows a report on the page and **CSV** downloads it. Reports are about accounts and
+staff actions; vault contents never appear, because the server cannot read them.
+</details>
+
+<details>
 <summary>Users: finding people and acting on many at once</summary>
 
 Admin console → **Users** lists every account, a page at a time (25 to 200 rows), so it stays

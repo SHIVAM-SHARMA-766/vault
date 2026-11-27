@@ -75,6 +75,8 @@ export interface ServerPolicy {
   allowedNetworks: string[]
   /** Every sign-in needs the identity provider first (decisions/0021). Owners are exempt. */
   requireSso: boolean
+  /** A summary emailed to owners and admins once a week (admin console phase 2). */
+  weeklyDigest: boolean
 }
 
 export const POLICY_CHOICES = {
@@ -87,7 +89,7 @@ export const POLICY_CHOICES = {
 } as const
 
 export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
-  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false,
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false, weeklyDigest: true,
 })
 
 /** A stored policy, with anything missing or out of range taken from the
@@ -107,6 +109,7 @@ export function readPolicy(value: unknown): ServerPolicy {
     shareLinkMaxDays: pick('shareLinkMaxDays'),
     allowedNetworks: Array.isArray(v['allowedNetworks']) ? (v['allowedNetworks'] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 50) : [],
     requireSso: v['requireSso'] === true,
+    weeklyDigest: v['weeklyDigest'] !== false,
   }
 }
 

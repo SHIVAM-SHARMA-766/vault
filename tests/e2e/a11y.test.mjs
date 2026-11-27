@@ -75,7 +75,7 @@ test('every screen passes axe-core WCAG 2.1 AA, light and dark', async () => {
       if (scheme === 'light') {
         await s.menu(page, 'Admin panel')
         await page.waitForSelector('.admin-section')
-        for (const tab of ['Overview', 'Service desk', 'Website', 'Users', 'Organizations', 'Invitations', 'Audit log']) {
+        for (const tab of ['Overview', 'Service desk', 'Website', 'Users', 'Organizations', 'Invitations', 'Audit log', 'Reports']) {
           await page.locator('.sidebar .side-item', { hasText: tab }).click()
           await page.waitForTimeout(400)
           await audit(page, `admin ${tab}`, found)

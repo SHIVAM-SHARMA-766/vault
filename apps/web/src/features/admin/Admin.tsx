@@ -26,6 +26,7 @@ import { ErrorBox, ROLE_LABELS, Section, ago, run, useAdminData, when } from './
 import { Desk } from './Desk.js'
 import { Users } from './Users.js'
 import { Audit } from './AuditLog.js'
+import { NeedsAttention, Reports } from './Insights.js'
 import { Website } from './Website.js'
 import { System } from './System.js'
 import { SetupWizard, wizardDone } from './SetupWizard.js'
@@ -33,12 +34,12 @@ import { applyBranding, refresh as refreshInstance, useEdition, useInstance } fr
 import * as session from '../../lib/session.js'
 import {
   IconAlert, IconCheck, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
-  IconPlus, IconRefresh, IconSliders, IconTrash, IconUser,
+  IconPlus, IconPulse, IconRefresh, IconSliders, IconTrash, IconUser,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Link, href } from '../../lib/router.js'
 
-type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit' | 'system'
+type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'audit' | 'reports' | 'system'
 
 /** `feature`: the edition feature a tab needs (decisions/0030). A personal
  *  Vault has one account, so no users list, invitations or organizations. */
@@ -50,6 +51,7 @@ const TABS: { id: Tab; label: string; needs: Permission; feature?: keyof Feature
   { id: 'orgs', label: 'Organizations', needs: 'users.read', feature: 'organizations', Icon: IconGrid },
   { id: 'invites', label: 'Invitations', needs: 'invites.read', feature: 'invitations', Icon: IconKey },
   { id: 'audit', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
+  { id: 'reports', label: 'Reports', needs: 'audit.read', feature: 'invitations', Icon: IconPulse },
   { id: 'system', label: 'System', needs: 'overview.read', Icon: IconSliders },
 ]
 
@@ -80,6 +82,7 @@ export function ServerSection({ state, tab, onGo }: { state: session.Unlocked; t
       {tab === 'orgs' && perms.has('users.read') ? <AdminOrgs canWrite={perms.has('users.write')} canInvite={perms.has('invites.write')} /> : null}
       {tab === 'invites' && perms.has('invites.read') ? <><VaultRequests canWrite={perms.has('invites.write')} /><Invites canWrite={perms.has('invites.write')} canRoles={perms.has('roles.write')} /></> : null}
       {tab === 'audit' && perms.has('audit.read') ? <Audit /> : null}
+      {tab === 'reports' && perms.has('audit.read') ? <Reports /> : null}
       {tab === 'system' && perms.has('overview.read') ? <System canWrite={perms.has('settings.write')} /> : null}
     </>
   )
@@ -115,6 +118,7 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
       {!data ? <div className="skeletons">{[0, 1].map((i) => <div key={i} className="skeleton" />)}</div> : (
         <>
           <SetupChecklist data={data} onGo={onGo} onWizard={canWrite ? () => setWizard(true) : undefined} />
+          {features.invitations ? <NeedsAttention onGo={onGo} /> : null}
           {wizard ? <SetupWizard data={data} onClose={() => { setWizard(false); setEpoch((n) => n + 1); void reload() }} onInvite={() => onGo('invites')} /> : null}
           <div className="stats">
             {features.invitations ? <Stat label="Accounts" value={data.users} note={data.disabledUsers ? `${data.disabledUsers} disabled` : 'all active'} onClick={() => onGo('users')} /> : null}
@@ -373,6 +377,13 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
       <label className="check">
         <input type="checkbox" disabled={!canWrite} checked={form.requireTwoFactor} onChange={(e) => setForm({ ...form, requireTwoFactor: e.target.checked })} />
         <span>Require two-factor sign-in</span>
+      </label>
+      <label className="check">
+        <input type="checkbox" disabled={!canWrite} checked={form.weeklyDigest !== false} onChange={(e) => setForm({ ...form, weeklyDigest: e.target.checked })} />
+        <span>Email owners and admins a weekly summary (sign-ins, and what needs attention){instance?.mail ? <> · <button type="button" className="link" disabled={!canWrite} onClick={async () => {
+          try { const r = await api.admin.sendDigest(await session.token()); toast(r.sent ? `Summary sent to ${r.sent} address(es)` : 'Nobody to send it to: owners and admins need an address on file') }
+          catch (err) { toast(err instanceof Error ? err.message : 'Could not send it.', 'error') }
+        }}>Send one now</button></> : <span className="muted"> (needs mail set up)</span>}</span>
       </label>
       {instance?.sso ? (
         <label className="check">

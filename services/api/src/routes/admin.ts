@@ -565,7 +565,7 @@ export function requirePolicy(value: unknown): ServerPolicy {
     const choices = POLICY_CHOICES[k] as readonly unknown[]
     if (!choices.includes(v[k])) throw badRequest(`policy.${k} must be one of: ${choices.map((c) => c ?? 'null').join(', ')}.`)
   }
-  if (v['requireSso'] !== undefined && typeof v['requireSso'] !== 'boolean') throw badRequest('policy.requireSso must be true or false.')
+  for (const k of ['requireSso', 'weeklyDigest']) if (v[k] !== undefined && typeof v[k] !== 'boolean') throw badRequest(`policy.${k} must be true or false.`)
   return { ...readPolicy(v), allowedNetworks: requireNetworks(v['allowedNetworks'] ?? []) }
 }
 
@@ -580,6 +580,7 @@ function describePolicy(p: ServerPolicy): string {
     p.shareLinks ? `links<=${p.shareLinkMaxDays}d` : 'no-links',
     p.allowedNetworks.length ? `networks=${p.allowedNetworks.join(',')}` : null,
     p.requireSso ? 'sso' : null,
+    p.weeklyDigest ? null : 'no-digest',
   ].filter(Boolean).join(' ')
 }
 

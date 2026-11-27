@@ -8,6 +8,8 @@ import type { App } from './context.js'
 import { requireLiveSession } from './context.js'
 import { type LambdaEvent, type LambdaResponse, errorResponse, json } from './http.js'
 import { API_LIMIT, enforce } from './ratelimit.js'
+import { countedSignIn } from './stats.js'
+import * as insights from './routes/insights.js'
 import { Router } from './router.js'
 import { openapi } from './openapi.js'
 import * as account from './routes/account.js'
@@ -45,10 +47,10 @@ export function buildRouter(app: App): Router {
   router.get('/api/openapi.json', async () => json(200, openapi(router)), 'This document')
 
   router.post('/api/auth/prelogin', ({ event }) => auth.prelogin(app, event), 'KDF parameters for an address (a decoy for unknown ones)')
-  router.post('/api/auth/register', ({ event }) => auth.register(app, event), 'Create an account')
-  router.post('/api/auth/login', ({ event }) => auth.login(app, event), 'Sign in with the auth key (and second factor)')
+  router.post('/api/auth/register', ({ event }) => countedSignIn(app, () => auth.register(app, event), 'signup'), 'Create an account')
+  router.post('/api/auth/login', ({ event }) => countedSignIn(app, () => auth.login(app, event)), 'Sign in with the auth key (and second factor)')
   router.post('/api/auth/account/prelogin', ({ event }) => accounts.prelogin(app, event), 'The account password\'s settings (a decoy for an unknown address)')
-  router.post('/api/auth/account/login', ({ event }) => accounts.login(app, event), 'Sign in to the account (account password, second factor): an account token')
+  router.post('/api/auth/account/login', ({ event }) => countedSignIn(app, () => accounts.login(app, event), null), 'Sign in to the account (account password, second factor): an account token')
   router.post('/api/auth/account/session', ({ event }) => accounts.session(app, event), 'Check an account sign-in; returns its replacement and the KDF settings')
   router.post('/api/auth/account/signout', ({ event }) => accounts.signOut(app, event), 'End an account sign-in')
   router.post('/api/auth/account/forgot', ({ event }) => accounts.forgot(app, event), 'Email a link to reset the account password')
@@ -57,7 +59,7 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/account/signup/verify', ({ event }) => signup.verify(app, event), 'Finish creating an account with the emailed code; no vault yet')
   router.post('/api/auth/vault/status', ({ event }) => signup.status(app, event), 'For an account with no vault: approved, requested, and the registration setting')
   router.post('/api/auth/vault/request', ({ event }) => signup.requestVault(app, event), 'Ask the operator for a vault')
-  router.post('/api/auth/unlock', ({ event }) => accounts.unlock(app, event), 'Unlock with the master password\'s proof and an account token: a vault session')
+  router.post('/api/auth/unlock', ({ event }) => countedSignIn(app, () => accounts.unlock(app, event)), 'Unlock with the master password\'s proof and an account token: a vault session')
   router.get('/api/auth/sso/start', ({ event }) => sso.start(app, event), 'Single sign-on: redirect to the identity provider (decisions/0021)')
   router.get('/api/auth/sso/callback', ({ event }) => sso.callback(app, event), 'Single sign-on: the identity provider\'s answer; redirects to the app with a ticket')
   router.post('/api/auth/sso/ticket', ({ event }) => sso.ticketInfo(app, event), 'Which account a single sign-on ticket is for')
@@ -256,6 +258,10 @@ export function buildRouter(app: App): Router {
   router.get('/api/admin/orgs', admined('users.read', () => orgs.adminList(app)), 'Every organization, by counts (operator view)')
   router.delete('/api/admin/orgs/:org', admined('users.write', (u, _e, o) => admin.deleteOrgAsOperator(app, u, o)), 'Delete an organization and everything in it (operator, audited)')
   router.get('/api/admin/update', admined('overview.read', (_u, e) => admin.updateRoute(app, e)), 'This version, and whether a newer release is out')
+  router.get('/api/admin/insights', admined('overview.read', () => insights.insights(app)), 'What needs attention, and sign-ins per day')
+  router.get('/api/admin/reports', admined('audit.read', () => insights.reportList()), 'The reports on offer')
+  router.get('/api/admin/reports/:kind', admined('audit.read', (_u, e, kind) => insights.report(app, kind, e)), 'One report, as JSON or CSV (format=csv)')
+  router.post('/api/admin/digest', admined('settings.write', () => insights.sendDigestNow(app)), 'Send the weekly summary now')
   router.get('/api/admin/audit', admined('audit.read', (_u, e) => admin.auditRoute(app, e)), 'Staff audit log, filtered and paged')
   router.get('/api/admin/audit/export', admined('audit.read', (_u, e) => admin.auditExport(app, e)), 'Download the audit log as CSV or JSON')
 
