@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react'
 
 import type { EntryContent } from '@vault/crypto'
-import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
+import { ISSUES, type Issue, folderPath, looksLikeMarkdown, readField, typeSpec } from '@vault/core'
+import { Markdown } from '../../ui/Markdown.js'
 
 import { IconAlert, IconArrowLeft, IconClock, IconCopy, IconExternal, IconKey, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconShield, IconStar, IconTrash } from '../../ui/icons.js'
 import { Monogram, copySecret, iconHost, typeInfo, useToast } from '../../ui/kit.js'
@@ -222,12 +223,7 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
         </div>
       ) : null}
 
-      {entry.notes ? (
-        <div className="notes">
-          <span className="field-label">{t('Notes')}</span>
-          <pre>{entry.notes}</pre>
-        </div>
-      ) : null}
+      {entry.notes ? <Notes text={entry.notes} /> : null}
 
       {entry.tags.length ? (
         <div className="tags">{entry.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>
@@ -308,6 +304,21 @@ function History({ entry, load, onRestore }: { entry: Decrypted; load: () => Pro
 
 /** The site's host for the header, shown as the person typed it (no www.). */
 const siteHost = (url: string | undefined) => iconHost(url)
+
+/** Notes, drawn as Markdown when they use it, with a switch to the raw text. */
+function Notes({ text }: { text: string }) {
+  const formatted = looksLikeMarkdown(text)
+  const [plain, setPlain] = useState(false)
+  return (
+    <div className="notes">
+      <span className="field-label notes-label">
+        {t('Notes')}
+        {formatted ? <button type="button" className="link notes-toggle" onClick={() => setPlain((v) => !v)}>{plain ? 'Show formatted' : 'Show plain text'}</button> : null}
+      </span>
+      {formatted && !plain ? <Markdown source={text} /> : <pre>{text}</pre>}
+    </div>
+  )
+}
 
 /** Only http(s) links open; anything else (javascript:, data:) does not. */
 function safeUrl(url: string | undefined): string | null {

@@ -84,3 +84,4 @@ export {
 export { type SiteMatch, matchSite, rankForPage, registrableDomain } from './sitematch.js'
 export { generateFromPrefs, generatePassword } from './generate.js'
 export { type AssertionJSON, type AttestationJSON, FLAGS as PASSKEY_FLAGS, type StoredPasskey, assertPasskey, attestationObject, authenticatorData, cbor, clientDataJSON, coseEs256, createPasskey, p1363ToDer, rpIdAllowed } from './passkey.js'
+export { type Block, type Inline, type ListItem, looksLikeMarkdown, parseInline, parseMarkdown } from './markdown.js'
