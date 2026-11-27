@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react'
 import type { EntryContent } from '@vault/crypto'
 import { ISSUES, type Issue, folderPath, readField, typeSpec } from '@vault/core'
 
-import { IconAlert, IconArrowLeft, IconClock, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
-import { Monogram, typeInfo, useToast } from '../../ui/kit.js'
+import { IconAlert, IconArrowLeft, IconClock, IconCopy, IconExternal, IconKey, IconDownload, IconLink, IconUsers, IconEdit, IconInbox, IconRefresh, IconStar, IconTrash } from '../../ui/icons.js'
+import { Monogram, copySecret, iconHost, typeInfo, useToast } from '../../ui/kit.js'
 import { FieldView, SecretRow, TextRow } from './fields.js'
 import { ShareLinkDialog } from './ShareLink.js'
 import { describeSize, saveAttachment } from '../../lib/attachments.js'
@@ -43,6 +43,11 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
   onRestore: (content: EntryContent) => Promise<void>
 }) {
   const toast = useToast()
+  // The same clipboard rules as each field (cleared after a while) and the
+  // same report for a shared item.
+  async function quickCopy(value: string, label: string) {
+    try { await copySecret(value); toast(`${label} copied`); if (shared) onAudit?.('copy') } catch { toast('Could not copy.', 'error') }
+  }
   const [confirming, setConfirming] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -94,9 +99,10 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
       </div>
 
       <header className="detail-head">
-        <Monogram name={entry.name} size="lg" />
+        <Monogram name={entry.name} url={entry.url} size="lg" />
         <div>
           <h2>{entry.name || 'Untitled'}</h2>
+          {siteHost(entry.url) ? <p className="detail-host">{siteHost(entry.url)}</p> : null}
           <div className="detail-meta">
             <span className="badge"><info.Icon size={13} />{t(info.label)}</span>
             {path && !shared ? <span className="badge badge-folder">{path}</span> : null}
@@ -106,6 +112,14 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
           </div>
         </div>
       </header>
+
+      {!entry.unreadable && (entry.username || entry.password || safeUrl(entry.url)) ? (
+        <div className="quick-actions" role="group" aria-label="Quick actions">
+          {entry.username ? <button className="btn btn-secondary btn-sm" onClick={() => void quickCopy(entry.username!, 'Username')}><IconCopy size={15} />Copy username</button> : null}
+          {entry.password && !shared?.hidePasswords ? <button className="btn btn-primary btn-sm" onClick={() => void quickCopy(entry.password!, 'Password')}><IconKey size={15} />Copy password</button> : null}
+          {safeUrl(entry.url) ? <a className="btn btn-secondary btn-sm" href={safeUrl(entry.url)!} target="_blank" rel="noopener noreferrer"><IconExternal size={15} />Open site</a> : null}
+        </div>
+      ) : null}
 
       {confirming ? (
         <div className="confirm">
@@ -283,4 +297,13 @@ function History({ entry, load, onRestore }: { entry: Decrypted; load: () => Pro
       )}
     </section>
   )
+}
+
+/** The site's host for the header, shown as the person typed it (no www.). */
+const siteHost = (url: string | undefined) => iconHost(url)
+
+/** Only http(s) links open; anything else (javascript:, data:) does not. */
+function safeUrl(url: string | undefined): string | null {
+  if (!url) return null
+  try { const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`); return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : null } catch { return null }
 }

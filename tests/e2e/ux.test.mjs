@@ -51,10 +51,11 @@ test('a new vault shows a getting-started checklist that ticks itself off, and c
     await s.menu(page, 'Vault')
     await page.waitForSelector('.getting-started:has-text("1 of 4 steps left")')
 
+    // Hidden, the vault's home stays, without the checklist.
     await page.getByRole('button', { name: 'Hide this' }).click()
-    await page.waitForSelector('.pane-empty')
+    await page.waitForSelector('.home .score-card')
     await page.reload(); await s.unlock(page, 'gina@example.test')
-    await page.waitForSelector('.pane-empty')
+    await page.waitForSelector('.home .score-card')
     assert.equal(await page.locator('.getting-started').count(), 0)
     assert.deepEqual(s.errors, [])
   } finally {

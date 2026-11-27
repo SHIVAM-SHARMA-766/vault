@@ -197,7 +197,7 @@ export async function start(): Promise<void> {
 
         const result = await handleRequest(router, event, { log: true })
         res.writeHead(result.statusCode, result.headers)
-        res.end(result.body)
+        res.end(result.isBase64Encoded ? Buffer.from(result.body, 'base64') : result.body)
       })()
     })
   })

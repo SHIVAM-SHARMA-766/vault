@@ -24,6 +24,8 @@ export interface LambdaResponse {
   statusCode: number
   headers: Record<string, string>
   body: string
+  /** The body is base64 of bytes (an image), to be sent as bytes. */
+  isBase64Encoded?: boolean
 }
 
 /** Every error code the API returns, and what it means. Clients branch on the

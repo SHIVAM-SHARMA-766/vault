@@ -595,6 +595,41 @@
         }
       }
     },
+    "/api/icons/{host}": {
+      "get": {
+        "summary": "A website's icon (PNG, ICO, JPEG, GIF or WebP), fetched and cached by the server; no sign-in",
+        "operationId": "getIconsHost",
+        "tags": [
+          "icons"
+        ],
+        "parameters": [
+          {
+            "name": "host",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/sso/ticket": {
       "post": {
         "summary": "Which account a single sign-on ticket is for",

@@ -122,7 +122,7 @@ createServer((req, res) => {
         requestContext: { http: { method: req.method ?? 'GET', sourceIp: String(req.headers['x-forwarded-for'] ?? '127.0.0.1').split(',')[0].trim(), userAgent: String(req.headers['user-agent'] ?? '') } },
       })
       res.writeHead(r.statusCode, r.headers)
-      return res.end(r.body)
+      return res.end(r.isBase64Encoded ? Buffer.from(r.body, 'base64') : r.body)
     }
 
     // Everything else exactly as the self-hosted server serves it (src/web.ts).

@@ -13,7 +13,7 @@ const key = (userId: string, what: string) => `vault.onboarding.${userId}.${what
 const read = (k: string) => { try { return localStorage.getItem(k) === '1' } catch { return false } }
 const write = (k: string) => { try { localStorage.setItem(k, '1') } catch { /* storage blocked: shown again next time */ } }
 
-export function GettingStarted({ userId, hasItems, onNew }: { userId: string; hasItems: boolean; onNew: () => void }) {
+export function GettingStarted({ userId, hasItems, onNew, compact = false }: { userId: string; hasItems: boolean; onNew: () => void; compact?: boolean }) {
   const [twoFactor, setTwoFactor] = useState<boolean | null>(null)
   const [backups, setBackups] = useState<boolean | null>(null)
   const [recoverySaved, setRecoverySaved] = useState(false)
@@ -47,11 +47,11 @@ export function GettingStarted({ userId, hasItems, onNew }: { userId: string; ha
   ]
   const left = steps.filter((s) => !s.done).length
   if (hidden || left === 0) {
-    return <div className="pane-empty"><IconShield size={40} /><p>Select an item to see its details</p></div>
+    return compact ? null : <div className="pane-empty"><IconShield size={40} /><p>Select an item to see its details</p></div>
   }
 
   return (
-    <section className="getting-started" aria-labelledby="gs-title">
+    <section className={`getting-started ${compact ? 'gs-compact home-card' : ''}`} aria-labelledby="gs-title">
       <h2 id="gs-title">Get started</h2>
       <p className="muted">{left} of {steps.length} steps left to make this vault safe to rely on.</p>
       <ol>

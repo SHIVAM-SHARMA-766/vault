@@ -53,6 +53,8 @@ export function Preferences({ state }: { state: session.Unlocked }) {
             </button>
           ))}
         </div>
+        <Check checked={p.siteIcons} onChange={(v) => void change({ siteIcons: v })}>Show website icons</Check>
+        <p className="hint">Each item's website icon comes from this Vault server, asked for by the site's name only, never with your sign-in. Off shows a coloured initial instead, and the server is never asked.</p>
       </section>
 
       <section className="settings-card" aria-labelledby="p-lock">

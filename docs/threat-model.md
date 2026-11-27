@@ -387,6 +387,22 @@ A stolen token with `users.write` could disable or offboard accounts, which is d
 does not read anything and is in the audit log under the token's name. Through SCIM, a
 directory can only invite, disable, enable and offboard. It cannot delete a vault.
 
+### A21a7 — Website icons (design refresh, 2026-11-27)
+
+Items show their website's icon. The app asks this Vault server for it by host name
+(`/api/icons/<host>`), with no sign-in, so the server cannot tie a host to an account by token.
+It does see the network address that asks, so an operator who logs requests could guess which
+sites a person from that address uses.
+
+The server then fetches the icon itself through the same guard as backups (egress.ts):
+- https only, public addresses only, the resolved address pinned;
+- redirects checked hop by hop, size-capped;
+- only raster images (judged by their bytes, never SVG), served with `nosniff` and a
+  `default-src 'none'` policy.
+
+Neither the person's browser nor a third party contacts the site. Preferences → *Show website
+icons* turns it off, and then the server is never asked.
+
 ### A21b — Unlocking with a passkey
 
 A passkey enrolled to unlock ([0034](../decisions/0034-passkey-unlock.md)) is equivalent to the
