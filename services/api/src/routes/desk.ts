@@ -17,6 +17,7 @@
 // after seven days (closeStaleTickets). Public requests are rate-limited and
 // answer identically whether or not an address has an account (threat A7).
 
+import { mapLimit } from '../limit.js'
 import { randomUUID } from 'node:crypto'
 
 import type { App } from '../context.js'
@@ -179,7 +180,7 @@ export async function publicRequest(app: App, event: LambdaEvent): Promise<Lambd
 
 export async function myTickets(app: App, userId: string): Promise<LambdaResponse> {
   const pointers = await app.store.query(userPk(userId), TICKET_PREFIX)
-  const tickets = (await Promise.all(pointers.map((p) => app.store.get(DESK_PK, p.sk)))).filter((t): t is Ticket => !!t)
+  const tickets = (await mapLimit(pointers, (p) => app.store.get(DESK_PK, p.sk))).filter((t): t is Ticket => !!t)
   tickets.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   return json(200, { tickets: tickets.map(forRequester) })
 }

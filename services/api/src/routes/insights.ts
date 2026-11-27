@@ -9,6 +9,7 @@
 // Everything here is about accounts and staff actions. Nothing reads vault
 // contents: the server cannot, and the reports say so by what they hold.
 
+import { mapLimit } from '../limit.js'
 import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, json, notFound } from '../http.js'
 import { SYSTEM_PK, userPk, PROFILE_SK } from '../keys.js'
@@ -37,14 +38,14 @@ interface Row {
 }
 
 async function rows(app: App, registry: RegistryEntry[], policy: ServerPolicy): Promise<Row[]> {
-  return Promise.all(registry.map(async (r) => {
+  return mapLimit(registry, async (r) => {
     const profile = await app.store.get(userPk(r.userId), PROFILE_SK)
     return {
       userId: r.userId, email: emailOf(app, r), label: r.label ?? null, role: roleFromDigest(app, r.emailDigest, r.role),
       disabled: r.disabled === true, createdAt: r.createdAt, lastLoginAt: r.lastLoginAt ?? null,
       twoFactor: hasSecondFactor(profile), policyGap: serverPolicyGap(policy, profile ?? null),
     }
-  }))
+  })
 }
 
 export interface Attention {

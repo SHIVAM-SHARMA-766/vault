@@ -8,6 +8,7 @@
 // the permission it needs; roles.ts maps roles to permissions. See
 // decisions/0006-admin-panel.md and 0007-roles-and-site-editing.md.
 
+import { mapLimit } from '../limit.js'
 import { emailDigest } from '../identity.js'
 import { featuresOf } from '../edition.js'
 import type { App } from '../context.js'
@@ -186,11 +187,11 @@ async function heavyStats(app: App, registry: RegistryEntry[]): Promise<HeavySta
 
 async function profileStats(app: App, registry: RegistryEntry[], policy: ServerPolicy) {
   let twoFactorUsers = 0, policyGapUsers = 0
-  await Promise.all(registry.filter((r) => !r.disabled).map(async (r) => {
+  await mapLimit(registry.filter((r) => !r.disabled), async (r) => {
     const profile = await app.store.get(userPk(r.userId), PROFILE_SK)
     if (hasSecondFactor(profile)) twoFactorUsers++
     if (serverPolicyGap(policy, profile ?? null) !== null) policyGapUsers++
-  }))
+  })
   return { twoFactorUsers, policyGapUsers }
 }
 
@@ -299,13 +300,13 @@ export async function listUsers(app: App, event: LambdaEvent): Promise<LambdaRes
   let users: UserSummary[]
   let total: number
   if (twoFactor) {
-    const all = await Promise.all(matched.map((x) => summarize(app, x.r, policy)))
+    const all = await mapLimit(matched, (x) => summarize(app, x.r, policy))
     const kept = all.filter((u) => u.twoFactor === (twoFactor === 'on'))
     total = kept.length
     users = kept.slice(offset, offset + limit)
   } else {
     total = matched.length
-    users = await Promise.all(matched.slice(offset, offset + limit).map((x) => summarize(app, x.r, policy)))
+    users = await mapLimit(matched.slice(offset, offset + limit), (x) => summarize(app, x.r, policy))
   }
   return json(200, { users, total, offset, limit, counts })
 }
