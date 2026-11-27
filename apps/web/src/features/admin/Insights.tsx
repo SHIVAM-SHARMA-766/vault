@@ -1,12 +1,12 @@
 // The security dashboard and reports (admin console phase 2): what needs
 // attention, sign-ins over 30 days, and reports to read or download.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 
 import { type AdminInsights, type AdminReport, api } from '../../lib/api.js'
 import { download } from '../../lib/download.js'
 import * as session from '../../lib/session.js'
-import { IconAlert, IconCheck, IconDownload } from '../../ui/icons.js'
+import { IconAlert, IconCheck, IconClock, IconDownload, IconKey, IconNote, IconPulse, IconShield, IconUsers } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
 import { ErrorBox, Section, useAdminData, when } from './common.js'
 import { presetUsersFilter } from './Users.js'
@@ -140,12 +140,28 @@ function niceStep(max: number): number {
 
 const loadReports = (t: string) => api.admin.reports(t)
 
+const REPORT_GROUPS = ['Security', 'People', 'Activity'] as const
+
+/** What each report is for, so the right one is easy to pick. */
+const REPORT_INFO: Record<string, { group: (typeof REPORT_GROUPS)[number]; icon: ReactNode; use: string }> = {
+  'two-factor': { group: 'Security', icon: <IconShield size={18} />, use: 'Who signs in with a password alone. Start here before requiring two-factor.' },
+  policy: { group: 'Security', icon: <IconAlert size={18} />, use: 'Who would be blocked if a policy applied today, and which rule they miss.' },
+  staff: { group: 'Security', icon: <IconKey size={18} />, use: 'Everyone who can change this server. Review it every quarter.' },
+  inactive: { group: 'People', icon: <IconClock size={18} />, use: 'Likely leavers and unused accounts, to offboard or follow up.' },
+  organizations: { group: 'People', icon: <IconUsers size={18} />, use: 'Each organization’s members and their roles, by counts.' },
+  signins: { group: 'Activity', icon: <IconPulse size={18} />, use: 'Daily sign-ins, failures and new accounts: spot spikes and growth.' },
+  'admin-actions': { group: 'Activity', icon: <IconNote size={18} />, use: 'What staff did this month, per person: for audits and handovers.' },
+}
+
 export function Reports() {
   const toast = useToast()
   const { data, error } = useAdminData(loadReports)
   const [kind, setKind] = useState<string | null>(null)
   const [report, setReport] = useState<AdminReport | null>(null)
   const [loading, setLoading] = useState(false)
+  const viewRef = useRef<HTMLDivElement>(null)
+  // Opening a report brings it into view: it draws below every card.
+  useEffect(() => { if (kind) viewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [kind, report])
   useEffect(() => {
     if (!kind) return
     let live = true
@@ -160,10 +176,17 @@ export function Reports() {
     <Section title="Reports" sub="About accounts and staff actions, never vault contents: the server cannot read those. Download any of them as CSV for a spreadsheet or an audit.">
       <ErrorBox error={error} />
       {!data ? <div className="skeletons">{[0, 1].map((i) => <div key={i} className="skeleton" />)}</div> : (
+        <>{REPORT_GROUPS.map((g) => {
+          const reports = data.reports.filter((r) => (REPORT_INFO[r.kind]?.group ?? 'Activity') === g)
+          return reports.length ? (
+        <section key={g} className="report-group" aria-label={g}>
+        <h2 className="report-group-title">{g}</h2>
         <div className="report-grid">
-          {data.reports.map((r) => (
+          {reports.map((r) => (
             <div key={r.kind} className={`admin-card report-card ${kind === r.kind ? 'report-active' : ''}`}>
-              <h2>{r.title}</h2>
+              <div className="report-icon" aria-hidden="true">{REPORT_INFO[r.kind]?.icon ?? <IconNote size={18} />}</div>
+              <h3>{r.title}</h3>
+              {REPORT_INFO[r.kind]?.use ? <p className="muted small">{REPORT_INFO[r.kind]!.use}</p> : null}
               <div className="action-list">
                 <button className="btn btn-secondary btn-sm" aria-pressed={kind === r.kind} onClick={() => setKind(kind === r.kind ? null : r.kind)}>{kind === r.kind ? 'Hide' : 'View'}</button>
                 <button className="btn btn-secondary btn-sm" onClick={async () => {
@@ -174,9 +197,12 @@ export function Reports() {
             </div>
           ))}
         </div>
+        </section>
+          ) : null
+        })}</>
       )}
       {kind ? (
-        <div className="admin-card report-view">
+        <div className="admin-card report-view" ref={viewRef}>
           <div className="admin-card-head"><h2>{report?.title ?? 'Loading…'}</h2>{report ? <span className="muted small">{report.rows.length} row(s)</span> : null}</div>
           {loading || !report ? <div className="skeleton" /> : report.rows.length === 0 ? <p className="muted">Nothing to report.</p> : (
             <div className="table-wrap">
