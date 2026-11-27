@@ -15,6 +15,7 @@
 // answers the same whether or not the address has an account (threat A7), and
 // the invitation appears when that person signs in.
 
+import { mapLimit } from '../limit.js'
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 
 import type { App } from '../context.js'
@@ -632,7 +633,7 @@ export async function members(app: App, userId: string, orgId: string): Promise<
   // A guest sees only the owner and admins, and themselves (2d).
   const memberRows = (rows.filter((r) => r.sk.startsWith(ORG_MEMBER_PREFIX)) as Member[])
     .filter((m) => me.role !== 'guest' || isStaff(m.role) || m.userId === userId)
-  const current = new Map(await Promise.all(memberRows.map(async (m) => [m.userId, await signingKeyOf(app, m.userId)] as const)))
+  const current = new Map(await mapLimit(memberRows, async (m) => [m.userId, await signingKeyOf(app, m.userId)] as const))
   const list = memberRows.map((m) => ({
     userId: m.userId, role: m.role, status: m.status, label: m.label, publicKey: m.publicKey, joinedAt: m.joinedAt, confirmedAt: m.confirmedAt ?? null,
     signingPublicKey: m.signingPublicKey ?? null, currentSigningKey: current.get(m.userId) ?? null, endorsement: m.endorsement ?? null,

@@ -68,7 +68,10 @@ export class MysqlStore implements ManagedStore {
       // hold connections the database counts against its own limits.
       connectionLimit: 4,
       waitForConnections: true,
-      queueLimit: 32,
+      // Requests fan out (one read per account in the admin console), so a
+      // short queue turned a busy moment into errors. Waiting is bounded by
+      // the timeouts below; this only stops a runaway from queueing forever.
+      queueLimit: 1000,
 
       // Without these a database that stops answering turns every request into
       // one that hangs rather than one that fails, and on a single-core host a
