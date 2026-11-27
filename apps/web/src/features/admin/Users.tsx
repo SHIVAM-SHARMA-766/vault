@@ -9,6 +9,7 @@ import { download } from '../../lib/download.js'
 import * as session from '../../lib/session.js'
 import { IconDownload, IconRefresh, IconSearch, IconUser, IconX } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
+import { day } from '../../lib/format.js'
 import { EmptyState, ErrorBox, ROLE_HELP, ROLE_LABELS, Section, ago, run, when } from './common.js'
 
 const PAGE_SIZES = [25, 50, 100, 200]
@@ -165,13 +166,13 @@ export function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite
                         <span className="acct">
                           <span className="acct-name">{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
                             {self ? <span className="pill">You</span> : null}</span>
-                          <span className="muted small">{u.email && u.label ? u.label : <code className="acct-id">{u.userId.slice(0, 8)}…</code>}</span>
+                          {u.email && u.label ? <span className="muted small">{u.label}</span> : null}
                         </span>
                       </button>
                     </td>
                     <td><span className={`pill ${u.role === 'user' ? '' : 'pill-accent'}`} title={ROLE_HELP[u.role]}>{ROLE_LABELS[u.role]}</span></td>
                     <td title={when(u.lastLoginAt)}>{ago(u.lastLoginAt)}</td>
-                    <td>{when(u.createdAt)}</td>
+                    <td title={when(u.createdAt)}>{day(u.createdAt)}</td>
                     <td>
                       {u.twoFactor ? <span className="pill pill-ok" title="Two-factor sign-in is on">2FA</span> : <span className="pill" title="Two-factor sign-in is off">No 2FA</span>}
                       {u.policyGap && !u.disabled ? <span className="pill pill-warn" title="Does not meet the server policies yet"> Misses policy</span> : null}
