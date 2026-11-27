@@ -29,14 +29,16 @@ function greeting(): string {
   return h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
 
-export function VaultHome({ userId, entries, health, sharedCount, onOpen, onNew, onReview }: {
+export function VaultHome({ userId, entries, health, sharedCount, onOpen, onNew, onReview, onTwoFactor }: {
   userId: string
   entries: Decrypted[]
-  health: { checked: number; failing: number }
+  health: { checked: number; failing: number; counts?: { twofactor?: number } }
   sharedCount: number
   onOpen: (id: string) => void
   onNew: () => void
   onReview: () => void
+  /** Opens the logins that could have a one-time code. */
+  onTwoFactor?: () => void
 }) {
   const [recent, setRecent] = useState<string[]>([])
   useEffect(() => { setRecent(readRecent(userId)) }, [userId, entries.length])
@@ -70,6 +72,12 @@ export function VaultHome({ userId, entries, health, sharedCount, onOpen, onNew,
             <p className="score-grade">{grade ?? 'Nothing to check yet'}</p>
             <p className="muted small">{score === null ? 'Passwords are checked as you add them.' : health.failing ? `${health.failing} of ${health.checked} passwords need attention.` : `All ${health.checked} passwords are strong, unique and recent.`}</p>
             {health.failing ? <button className="btn btn-secondary btn-sm" onClick={onReview}>Review issues</button> : null}
+            {health.counts?.twofactor ? (
+              <button className="twofactor-nudge" onClick={onTwoFactor}>
+                {health.counts.twofactor} login{health.counts.twofactor === 1 ? '' : 's'} could use two-factor codes
+                <IconChevron size={13} />
+              </button>
+            ) : null}
           </div>
         </section>
 

@@ -129,7 +129,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
   }
 
   const counts = useMemo(() => {
-    const c: Record<string, number> = { all: active.length, favorites: 0, unfiled: 0, health: health.issues.size, archive: entries.length - active.length }
+    const c: Record<string, number> = { all: active.length, favorites: 0, unfiled: 0, health: [...health.issues.values()].filter((l) => l.some((i) => i !== 'twofactor')).length, archive: entries.length - active.length }
     for (const e of active) {
       c[e.type] = (c[e.type] ?? 0) + 1
       const sh = sharedOf(e)
@@ -515,7 +515,7 @@ export function Vault({ state }: { state: session.Unlocked }) {
                          onRestore={async (content) => { await vault.saveEntry({ ...content, favorite: selected.favorite, ...(selected.folderId ? { folderId: selected.folderId } : {}) }, selected.id) }} />
           ) : (
             state.userId ? <VaultHome userId={state.userId} entries={active} health={health} sharedCount={active.filter((e) => !!sharedOf(e)).length}
-                                       onOpen={(id) => { setSelectedId(id); setMode({ kind: 'view' }) }} onNew={startNew} onReview={() => setFilter({ kind: 'health' })} /> : null
+                                       onOpen={(id) => { setSelectedId(id); setMode({ kind: 'view' }) }} onNew={startNew} onReview={() => setFilter({ kind: 'health' })} onTwoFactor={() => setFilter({ kind: 'health', issue: 'twofactor' })} /> : null
           )}
         </section>
       </div>

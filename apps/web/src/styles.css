@@ -1458,3 +1458,11 @@ a.btn, a.btn:hover { text-decoration: none; }
 .acct-avatar { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 700; font-size: 14px; }
 .pager label { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-weight: 500; }
 .pager select { width: auto; padding: 0 8px; }
+
+/* Two-factor available (watchtower): an invitation, not a warning. */
+.twofactor-hint { display: flex; align-items: center; gap: 10px; }
+.twofactor-hint > span { flex: 1; }
+.twofactor-hint .btn { flex: none; }
+.twofactor-nudge { display: flex; align-items: center; gap: 4px; margin-top: 8px; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.twofactor-nudge:hover { text-decoration: underline; }
+@media (max-width: 760px) { .twofactor-hint { flex-wrap: wrap; } }

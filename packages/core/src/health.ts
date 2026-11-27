@@ -4,6 +4,9 @@
 // and never learns the result. Nothing here sends a password anywhere — a
 // breach check against a public corpus is a separate, undecided feature.
 
+import { registrableDomain } from './sitematch.js'
+import { TWO_FACTOR_SITES } from './twofactor-sites.js'
+
 /** Passwords so common that their length is irrelevant. Lower-cased; the
  *  check also strips trailing digits and symbols ("Password123!" is here). */
 const COMMON = new Set([
@@ -68,10 +71,10 @@ export function passwordStrength(password: string): Strength {
   return { score: 4, label: 'Excellent' }
 }
 
-export type Issue = 'breached' | 'exposed' | 'due' | 'weak' | 'reused' | 'old' | 'insecure' | 'expired' | 'expiring'
+export type Issue = 'breached' | 'exposed' | 'due' | 'weak' | 'reused' | 'old' | 'insecure' | 'expired' | 'expiring' | 'twofactor'
 
-/** Issues about a password, which the score counts. Expiry is about the
- *  item, shown beside them but not scored. */
+/** Issues about a password, which the score counts. Expiry and a missing
+ *  one-time code are shown beside them but not scored. */
 export const PASSWORD_ISSUES: readonly Issue[] = ['breached', 'exposed', 'due', 'weak', 'reused', 'old', 'insecure']
 
 /** How far ahead "expiring soon" looks. */
@@ -87,6 +90,7 @@ export const ISSUES: readonly { issue: Issue; label: string; advice: string }[] 
   { issue: 'insecure', label: 'Unencrypted site', advice: 'The saved website uses http://, so the password crosses the network in the clear.' },
   { issue: 'expired', label: 'Expired', advice: 'Its expiry date has passed. Renew it, or update the date.' },
   { issue: 'expiring', label: 'Expiring soon', advice: `It expires within ${EXPIRING_DAYS} days.` },
+  { issue: 'twofactor', label: '2FA available', advice: 'This site offers sign-in codes from an authenticator app. Turn it on at the site and save the key here: Vault then shows the code next to the password.' },
 ]
 
 export interface HealthInput {
@@ -101,6 +105,8 @@ export interface HealthInput {
   rotateDays?: number | undefined
   /** Type-specific fields, read for expiry dates. */
   fields?: Record<string, string> | undefined
+  /** A saved one-time code key: a login with one has two-factor in place. */
+  totpSecret?: string | undefined
 }
 
 export interface HealthReport {
@@ -138,7 +144,7 @@ export function analyse(entries: readonly HealthInput[], now = Date.now(), breac
   for (const e of withPassword) uses.set(e.password!, (uses.get(e.password!) ?? 0) + 1)
 
   const issues = new Map<string, Issue[]>()
-  const counts: Record<Issue, number> = { breached: 0, exposed: 0, due: 0, weak: 0, reused: 0, old: 0, insecure: 0, expired: 0, expiring: 0 }
+  const counts: Record<Issue, number> = { breached: 0, exposed: 0, due: 0, weak: 0, reused: 0, old: 0, insecure: 0, expired: 0, expiring: 0, twofactor: 0 }
   let failing = 0
   for (const e of withPassword) {
     const found: Issue[] = []
@@ -164,8 +170,25 @@ export function analyse(entries: readonly HealthInput[], now = Date.now(), breac
     issues.set(e.id, [...(issues.get(e.id) ?? []), issue])
     counts[issue]++
   }
+  for (const e of withPassword) {
+    if (e.type !== 'login' || e.totpSecret?.trim() || !twoFactorAvailable(e.url)) continue
+    issues.set(e.id, [...(issues.get(e.id) ?? []), 'twofactor'])
+    counts.twofactor++
+  }
   const score = withPassword.length ? Math.round(100 * (withPassword.length - failing) / withPassword.length) : 100
   return { checked: withPassword.length, failing, issues, counts, score }
+}
+
+/** Whether a saved website is one known to offer authenticator-app codes,
+ *  by its registrable domain or a parent of it listed as is (aws.amazon.com). */
+export function twoFactorAvailable(url: string | undefined): boolean {
+  if (!url) return false
+  let host: string
+  try { host = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `https://${url}`).hostname.toLowerCase().replace(/^www\./, '') } catch { return false }
+  const labels = host.split('.')
+  for (let i = 0; i < labels.length - 1; i++) if (TWO_FACTOR_SITES.has(labels.slice(i).join('.'))) return true
+  const site = registrableDomain(host)
+  return site !== null && TWO_FACTOR_SITES.has(site)
 }
 
 /** How many breaches a Pwned Passwords range response says a password's

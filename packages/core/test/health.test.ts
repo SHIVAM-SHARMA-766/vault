@@ -3,7 +3,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { STRENGTH_LABELS, analyse, belowMinimum, breachCount, expiryOf, passwordStrength } from '../src/index.js'
+import { STRENGTH_LABELS, analyse, belowMinimum, breachCount, expiryOf, passwordStrength, twoFactorAvailable } from '../src/index.js'
 
 test('common, short, repeated and sequential passwords are weak', () => {
   for (const pw of ['password', 'Password123!', 'qwerty', '12345678', 'aaaaaaaaaaaa', 'abcdef123', 'letmein2024', 'summer2024', 'Pune@123', 'Rahul1990!']) {
@@ -39,7 +39,7 @@ test('reuse, age and http are found; notes and cards are not checked', () => {
   assert.deepEqual(r.issues.get('d'), ['old'], 'the password age wins over the last edit')
   assert.deepEqual(r.issues.get('e'), ['weak'])
   assert.equal(r.issues.has('f'), false, 'a local address over http is not flagged; a recent change is not old')
-  assert.deepEqual(r.counts, { breached: 0, exposed: 0, due: 0, weak: 1, reused: 2, old: 1, insecure: 1, expired: 0, expiring: 0 })
+  assert.deepEqual(r.counts, { breached: 0, exposed: 0, due: 0, weak: 1, reused: 2, old: 1, insecure: 1, expired: 0, expiring: 0, twofactor: 0 })
   assert.equal(r.score, 17)
 })
 
@@ -114,4 +114,32 @@ test('a rotation reminder falls due after the chosen days since the password cha
   assert.deepEqual(r.issues.get('due'), ['due'])
   assert.equal(r.issues.has('ok'), false)
   assert.equal(r.issues.has('none'), false, 'no reminder asked, none given (old is a year)')
+})
+
+test('a login at a site that offers authenticator codes, with none saved, is pointed out but not scored', () => {
+  const pw = (n: number) => `k9#Vt2!mQz@Lr8&w${n}`
+  const r = analyse([
+    { id: 'gh', type: 'login', password: pw(1), url: 'https://github.com/login', updatedAt: iso(1) },
+    { id: 'gh-totp', type: 'login', password: pw(2), url: 'github.com', totpSecret: 'JBSWY3DPEHPK3PXP', updatedAt: iso(1) },
+    { id: 'aws', type: 'login', password: pw(3), url: 'https://eu-west-1.console.aws.amazon.com/', updatedAt: iso(1) },
+    { id: 'none', type: 'login', password: pw(4), url: 'https://unknown-site.example', updatedAt: iso(1) },
+    { id: 'wifi', type: 'wifi', password: pw(5), updatedAt: iso(1) },
+  ], NOW)
+  assert.deepEqual(r.issues.get('gh'), ['twofactor'])
+  assert.equal(r.issues.has('gh-totp'), false, 'a saved key means two-factor is on')
+  assert.deepEqual(r.issues.get('aws'), ['twofactor'], 'a subdomain of a listed site counts')
+  assert.equal(r.issues.has('none'), false)
+  assert.equal(r.issues.has('wifi'), false)
+  assert.equal(r.counts.twofactor, 2)
+  assert.equal(r.failing, 0)
+  assert.equal(r.score, 100, 'a missing code does not lower the score')
+})
+
+test('twoFactorAvailable reads hosts, bare domains and nothing else', () => {
+  assert.equal(twoFactorAvailable('https://www.dropbox.com/home'), true)
+  assert.equal(twoFactorAvailable('mail.google.com'), true)
+  assert.equal(twoFactorAvailable('https://notgithub.com'), false)
+  assert.equal(twoFactorAvailable('http://192.168.1.1'), false)
+  assert.equal(twoFactorAvailable(''), false)
+  assert.equal(twoFactorAvailable(undefined), false)
 })

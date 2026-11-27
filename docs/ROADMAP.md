@@ -413,6 +413,21 @@ pull requests with tests.
     `@node-saml/node-saml`, request ids used once, replays refused; metadata at
     `/api/auth/sso/saml/metadata`. Same ticket and master password as OIDC.
 
+### End-user features, against Zoho Vault and 1Password (asked for 2026-11-27)
+
+Built one at a time, each its own pull request with tests.
+
+- [x] **2FA available**: logins at sites known to offer authenticator-app codes, with no key
+  saved, are pointed out in Password health and on the item ("Add one-time code"). The list of
+  sites ships with the app (`packages/core/src/twofactor-sites.ts`); nothing is fetched. Not
+  counted in the score.
+- [ ] Markdown in secure notes (headings, lists, checklists).
+- [ ] Generator history: recent generated passwords, encrypted, on this account.
+- [ ] Related items: link an item to others (a server and its SSH key).
+- [ ] Custom item templates.
+- [ ] Several vaults (Personal, Work, Family) — design first.
+- [ ] Travel mode — after several vaults.
+
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
 Started 2026-11-21, after the operator chose three editions. Each stage makes one edition fit its
