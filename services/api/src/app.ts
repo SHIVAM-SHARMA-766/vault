@@ -67,6 +67,8 @@ export function buildRouter(app: App): Router {
   router.post('/api/auth/unlock', ({ event }) => countedSignIn(app, () => accounts.unlock(app, event)), 'Unlock with the master password\'s proof and an account token: a vault session')
   router.get('/api/auth/sso/start', ({ event }) => sso.start(app, event), 'Single sign-on: redirect to the identity provider (decisions/0021)')
   router.get('/api/auth/sso/callback', ({ event }) => sso.callback(app, event), 'Single sign-on: the identity provider\'s answer; redirects to the app with a ticket')
+  router.post('/api/auth/sso/saml/acs', ({ event }) => sso.samlAcs(app, event), 'SAML single sign-on: the identity provider posts its signed response; redirects to the app with a ticket')
+  router.get('/api/auth/sso/saml/metadata', () => sso.samlMetadata(app), 'SAML single sign-on: this server\'s service provider metadata')
   router.post('/api/auth/sso/ticket', ({ event }) => sso.ticketInfo(app, event), 'Which account a single sign-on ticket is for')
   router.post('/api/auth/passkey-login/options', ({ event }) => passkeys.loginOptions(app, event), 'Start signing in with a passkey (no account named)')
   router.post('/api/auth/passkey-login', ({ event }) => passkeys.login(app, event), 'Sign in with a passkey; returns the passkey-wrapped vault key')

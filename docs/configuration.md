@@ -120,6 +120,22 @@ as the redirect URI. Ask for the `openid email profile` scopes, with a confident
 | `OIDC_PROVISION` | `false` | | `true` lets someone the provider signs in, who has no account here yet, create one without an invitation (they still choose a master password) |
 | `OIDC_REQUIRE_VERIFIED_EMAIL` | `true` | | `false` accepts an email without `email_verified`, for providers that never send it (Entra ID). Only for a provider whose addresses are all yours |
 
+### SAML 2.0 instead of OIDC
+
+For a provider that only speaks SAML: set these instead of `OIDC_*` (one provider per server).
+Give the provider this server's metadata at `https://<host>/api/auth/sso/saml/metadata`. It
+expects responses at `https://<host>/api/auth/sso/saml/acs` (HTTP-POST binding), with **signed
+assertions** and the address in the NameID (email format) or in `SAML_EMAIL_ATTRIBUTE`.
+
+| Variable | Default | Secret | Purpose |
+|---|---|---|---|
+| `SAML_IDP_SSO_URL` | | | The provider's single sign-on URL (https, HTTP-Redirect binding) |
+| `SAML_IDP_CERT` | | | The provider's signing certificate, PEM or base64 (`\n` for newlines in `.env`) |
+| `SAML_SP_ENTITY_ID` | `https://<host>/api/auth/sso/saml/metadata` | | This server's entity id at the provider |
+| `SAML_NAME` | `SSO` | | The button says "Sign in with <name>" |
+| `SAML_PROVISION` | `false` | | `true` lets someone the provider signs in, with no account here yet, create one without an invitation |
+| `SAML_EMAIL_ATTRIBUTE` | | | The attribute that holds the address when the NameID is not one, e.g. `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` |
+
 ## Where they live on the reference instance
 
 | File | Holds | Written by |

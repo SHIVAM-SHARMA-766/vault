@@ -88,6 +88,9 @@ export interface Config {
   /** Single sign-on with an OpenID Connect provider (decisions/0021). The
    *  provider proves who someone is; the master password still unlocks. */
   oidc: { issuer: string; clientId: string; clientSecret: string; name: string; provision: boolean; requireVerifiedEmail: boolean } | null
+  /** SAML 2.0 single sign-on (admin console phase 5): the identity provider's
+   *  sign-in URL and signing certificate; this server is the service provider. */
+  saml: { ssoUrl: string; cert: string; entityId: string; name: string; provision: boolean; emailAttribute: string } | null
   /** Personal backups to Google Drive and OneDrive (decisions/0024): the
    *  operator's OAuth apps; null when not registered. `endpoints` is for tests. */
   cloudDrive: {
@@ -159,6 +162,12 @@ export const VARIABLES: readonly Variable[] = [
   { name: 'OIDC_NAME', required: false, default: 'SSO', description: 'What the sign-in button says: "Sign in with <name>", e.g. Okta, Microsoft, Google.' },
   { name: 'OIDC_PROVISION', required: false, default: 'false', description: '"true" lets someone the provider signs in, with no account here yet, create one without an invitation (they still choose a master password).' },
   { name: 'OIDC_REQUIRE_VERIFIED_EMAIL', required: false, default: 'true', description: '"false" accepts an email claim without email_verified, for providers that never send it (Microsoft Entra ID). Only for a provider whose addresses are all yours.' },
+  { name: 'SAML_IDP_SSO_URL', required: false, description: 'SAML 2.0 single sign-on: the identity provider\'s sign-in URL (HTTP-Redirect binding). Instead of OIDC_ISSUER, not with it.' },
+  { name: 'SAML_IDP_CERT', required: false, description: 'The identity provider\'s signing certificate, PEM or base64 (\\n for newlines). Assertions must be signed with it.' },
+  { name: 'SAML_SP_ENTITY_ID', required: false, description: 'This server\'s entity id at the provider. Default: https://<host>/api/auth/sso/saml/metadata, which also serves the metadata.' },
+  { name: 'SAML_NAME', required: false, default: 'SSO', description: 'The provider\'s name on the sign-in button.' },
+  { name: 'SAML_PROVISION', required: false, default: 'false', description: '"true" lets someone the provider signs in, with no account here yet, create one without an invitation.' },
+  { name: 'SAML_EMAIL_ATTRIBUTE', required: false, description: 'The attribute that holds the address, when the NameID is not one (e.g. http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress).' },
   { name: 'GOOGLE_OAUTH_CLIENT_ID', required: false, default: '', description: 'Personal backups to Google Drive (decisions/0024): the OAuth client id of a Google Cloud project with the Drive API on (Web application; redirect URI https://<your address>/api/backups/oauth/callback; scope drive.file). The option appears when it is set.' },
   { name: 'GOOGLE_OAUTH_CLIENT_SECRET', required: false, default: '', secret: true, description: 'Its client secret. Required with GOOGLE_OAUTH_CLIENT_ID.' },
   { name: 'MS_OAUTH_CLIENT_ID', required: false, default: '', description: 'Personal backups to OneDrive (decisions/0024): the application (client) id of a Microsoft Entra app registration (personal and work accounts; redirect URI https://<your address>/api/backups/oauth/callback; delegated Files.ReadWrite.AppFolder and offline_access).' },
@@ -236,6 +245,7 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     metricsToken: get('METRICS_TOKEN'),
     auditWebhook: { url: get('AUDIT_WEBHOOK_URL'), secret: get('AUDIT_WEBHOOK_SECRET') },
     oidc: null,
+    saml: null,
     cloudDrive: { google: null, microsoft: null },
   }
   for (const [prefix, key] of [['GOOGLE', 'google'], ['MS', 'microsoft']] as const) {
@@ -252,6 +262,20 @@ export function parseConfig(env: Record<string, string | undefined>, here = dirn
     config.oidc = {
       issuer, clientId: get('OIDC_CLIENT_ID'), clientSecret: get('OIDC_CLIENT_SECRET'), name: get('OIDC_NAME') || 'SSO',
       provision: get('OIDC_PROVISION') === 'true', requireVerifiedEmail: get('OIDC_REQUIRE_VERIFIED_EMAIL') !== 'false',
+    }
+  }
+  const samlUrl = get('SAML_IDP_SSO_URL')
+  if (samlUrl) {
+    if (issuer) problems.push('Set OIDC_ISSUER or SAML_IDP_SSO_URL, not both: one identity provider per server')
+    let ok = false
+    try { const u = new URL(samlUrl); ok = u.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(u.hostname) } catch { /* below */ }
+    if (!ok) problems.push(`SAML_IDP_SSO_URL must be an https:// URL: ${samlUrl}`)
+    // The certificate as PEM or bare base64, newlines as \n allowed in .env files.
+    const cert = get('SAML_IDP_CERT').replace(/\\n/g, '\n').trim()
+    if (!/^(-----BEGIN CERTIFICATE-----)?[\sA-Za-z0-9+/=]+(-----END CERTIFICATE-----)?$/.test(cert) || cert.length < 200) problems.push('SAML_IDP_CERT must be the identity provider\'s signing certificate (PEM or base64)')
+    config.saml = {
+      ssoUrl: samlUrl, cert, entityId: get('SAML_SP_ENTITY_ID') || `${config.origin}/api/auth/sso/saml/metadata`,
+      name: get('SAML_NAME') || 'SSO', provision: get('SAML_PROVISION') === 'true', emailAttribute: get('SAML_EMAIL_ATTRIBUTE'),
     }
   }
   const smtpHost = get('SMTP_HOST')

@@ -14,6 +14,7 @@ import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { type TemplateKind, TEMPLATE_KINDS, accountResetMessage, applyTemplate, inviteMessage, notify, signInNotice, vaultApprovedMessage, verifyMessage } from '../mail.js'
 import { clearPassword } from './accounts.js'
+import { ssoOf } from './sso.js'
 import { tokenLabels } from '../apitokens.js'
 import { openEmail } from '../identity.js'
 import { openTicketCount } from './desk.js'
@@ -582,7 +583,7 @@ export async function putSettingsRoute(app: App, actor: string, event: LambdaEve
     // A list that shuts out the person saving it would lock them out at their next refresh.
     const ip = event.requestContext.http.sourceIp
     if (!allowedFrom(policy.allowedNetworks, ip)) throw badRequest(`Your own address (${ip}) is not in the sign-in list. Add it first, or you would be signed out.`)
-    if (policy.requireSso && !app.config.oidc) throw badRequest('Single sign-on is not set up on this server (OIDC_ISSUER), so it cannot be required.')
+    if (policy.requireSso && !ssoOf(app)) throw badRequest('Single sign-on is not set up on this server (OIDC_ISSUER or SAML_IDP_SSO_URL), so it cannot be required.')
     if (policy.requireStaffTwoFactor && !current.policy.requireStaffTwoFactor && !hasSecondFactor(await app.store.get(userPk(actor), PROFILE_SK))) {
       throw badRequest('Turn on two-factor sign-in for your own account first (Settings → Security), or this policy would shut you out of the admin console.')
     }
@@ -693,7 +694,7 @@ export async function instanceRoute(app: App): Promise<LambdaResponse> {
     // A new server waiting for its owner: the sign-in screen offers the setup code.
     firstRun,
     // Single sign-on (decisions/0021): the button's label, and whether it is required.
-    sso: app.config.oidc ? { name: app.config.oidc.name, required: policy.requireSso, provision: app.config.oidc.provision } : null,
+    sso: ssoOf(app) ? { name: ssoOf(app)!.name, required: policy.requireSso, provision: ssoOf(app)!.provision } : null,
   })
 }
 

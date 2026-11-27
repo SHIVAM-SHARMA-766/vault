@@ -71,7 +71,7 @@ import {
 } from '../system.js'
 import { assertNetwork } from '../networks.js'
 import { loginOptions, verifyLogin } from './webauthn.js'
-import { provisionTicket, readTicket, ssoGate, useTicket } from './sso.js'
+import { provisionTicket, readTicket, ssoGate, ssoOf, useTicket } from './sso.js'
 import { accountStatus, issueAccountToken, registerAccount, requireAccountInput } from './accounts.js'
 import { dropPending, pendingForVault } from './signup.js'
 import { sealEmail } from '../identity.js'
@@ -225,7 +225,7 @@ export async function register(app: App, event: LambdaEvent): Promise<LambdaResp
   // Someone the identity provider just signed in, with no account here, when
   // the operator lets the provider's people join (decisions/0021).
   const ssoTicket = body['ssoTicket']
-  const viaSso = !open && !setup && app.config.oidc?.provision === true && typeof body['email'] === 'string'
+  const viaSso = !open && !setup && ssoOf(app)?.provision === true && typeof body['email'] === 'string'
     && (await readTicket(app, ssoTicket))?.emailDigest === emailDigest(requireEmail(body['email']), app.config.pepper)
   if (!open && !setup && mode !== 'invite' && !viaSso && !approved) throw registrationRefused()
   if (!open && !usable && !viaSso && !approved) throw registrationRefused()

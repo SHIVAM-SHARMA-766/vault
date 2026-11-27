@@ -110,8 +110,8 @@ where it lands.
 | Passkeys | ◐ | ✓ | — | 4–5 |
 | Mobile apps with autofill and biometrics | ✓ | ✓ | — | 5 |
 | Offline access | ✓ | ✓ | — | 4–5 |
-| SSO (OIDC/SAML), SCIM provisioning | ✓ | ✓ | — | 6 |
-| CLI and secrets for developers | ◐ | ✓ | — | 6 |
+| SSO (OIDC/SAML), SCIM provisioning | ✓ | ✓ | ✓ | 6 (admin console phase 5) |
+| CLI and secrets for developers | ◐ | ✓ | ✓ | 6 (admin console phase 5) |
 
 ## Principles every phase keeps
 
@@ -401,7 +401,7 @@ pull requests with tests.
     company's: sign-ups at it are approved for a vault at once and listed for its admins to
     invite. Joining still takes an invitation and a fingerprint check.
 
-- [ ] **Phase 5: integrations** (asked for 2026-11-27).
+- [x] **Phase 5: integrations** (asked for 2026-11-27).
   - [x] Admin API tokens: owner-made, scoped, hashed, shown once, expiring, revocable,
     audited under their name.
   - [x] SCIM 2.0 Users at `/api/scim/v2`: create emails an invitation, active false disables,
@@ -409,7 +409,9 @@ pull requests with tests.
     string booleans accepted.
   - [x] CLI for developers (`apps/cli`): `vault login`, `list`, `read vault://item/field`,
     `run --env-file … -- cmd`; decrypted on the developer's machine, nothing secret on disk.
-  - [ ] SAML 2.0 sign-in (OIDC already works with most identity providers).
+  - [x] SAML 2.0 sign-in (`SAML_IDP_SSO_URL`, `SAML_IDP_CERT`): signed assertions checked by
+    `@node-saml/node-saml`, request ids used once, replays refused; metadata at
+    `/api/auth/sso/saml/metadata`. Same ticket and master password as OIDC.
 
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
