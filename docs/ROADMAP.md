@@ -425,7 +425,10 @@ Built one at a time, each its own pull request with tests.
   in the editor's preview and on a shared link. Read into a tree by `packages/core/src/markdown.ts`
   and drawn with ordinary elements, never as HTML; links open only for http(s). Notes without
   Markdown stay plain text; "Show plain text" shows the raw note.
-- [ ] Generator history: recent generated passwords, encrypted, on this account.
+- [x] **Generator history**: the last 20 generated passwords that were used or copied, newest
+  first, masked until shown, kept in the preferences blob (sealed under the vault key, so the
+  server sees only its size) and cleared from Preferences. Shown in the generator and in
+  Preferences → Password generator.
 - [ ] Related items: link an item to others (a server and its SSH key).
 - [ ] Custom item templates.
 - [ ] Several vaults (Personal, Work, Family) — design first.

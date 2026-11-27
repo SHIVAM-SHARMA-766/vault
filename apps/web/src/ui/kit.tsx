@@ -68,7 +68,7 @@ export async function copySecret(value: string): Promise<void> {
   }, seconds * 1000)
 }
 
-export function CopyButton({ value, label }: { value: string | undefined; label: string }) {
+export function CopyButton({ value, label, onCopied }: { value: string | undefined; label: string; onCopied?: () => void }) {
   const toast = useToast()
   const [done, setDone] = useState(false)
   if (!value) return null
@@ -78,6 +78,7 @@ export function CopyButton({ value, label }: { value: string | undefined; label:
             onClick={async () => {
               try {
                 await copySecret(value)
+                onCopied?.()
                 setDone(true)
                 setTimeout(() => setDone(false), 1200)
                 const seconds = prefs.get().clipboardSeconds
@@ -152,6 +153,8 @@ export function Generator({ onUse }: { onUse: (password: string) => void }) {
   const [capitalize, setCapitalize] = useState(defaults.capitalize)
   const [digit, setDigit] = useState(defaults.digit)
   const [value, setValue] = useState('')
+  const [showHistory, setShowHistory] = useState(false)
+  const history = usePrefs().generatorHistory
 
   const regenerate = useCallback(() => {
     if (mode === 'password') { setValue(generatePassword(length, { upper, digits, symbols })); return }
@@ -170,6 +173,7 @@ export function Generator({ onUse }: { onUse: (password: string) => void }) {
       </div>
       <div className="generator-out">
         <code>{value}</code>
+        <CopyButton value={value} label="Password" onCopied={() => prefs.recordGenerated(value)} />
         <button type="button" className="icon-btn" onClick={regenerate} title="Regenerate" aria-label="Regenerate">
           <IconRefresh size={16} />
         </button>
@@ -194,9 +198,42 @@ export function Generator({ onUse }: { onUse: (password: string) => void }) {
           <Check checked={digit} onChange={setDigit}>A digit</Check>
         </div>
       )}
-      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onUse(value)}>Use this {mode}</button>
+      <div className="generator-actions">
+        <button type="button" className="btn btn-secondary btn-sm" onClick={() => { prefs.recordGenerated(value); onUse(value) }}>Use this {mode}</button>
+        {history.length ? <button type="button" className="link" aria-expanded={showHistory} onClick={() => setShowHistory((v) => !v)}>{showHistory ? 'Hide history' : `History (${history.length})`}</button> : null}
+      </div>
+      {showHistory ? <GeneratedHistory items={history} onUse={(v) => { prefs.recordGenerated(v); onUse(v) }} /> : null}
     </div>
   )
+}
+
+/** Passwords the generator made and the person used or copied, newest first.
+ *  Masked until asked for; each can be copied or used again. */
+export function GeneratedHistory({ items, onUse }: { items: readonly { value: string; at: string }[]; onUse?: (value: string) => void }) {
+  const [shown, setShown] = useState<string | null>(null)
+  return (
+    <ul className="gen-history" aria-label="Generated passwords">
+      {items.map((h) => (
+        <li key={h.value + h.at}>
+          <code className={shown === h.value ? '' : 'masked'}>{shown === h.value ? h.value : '•'.repeat(Math.min(h.value.length, 16))}</code>
+          <span className="muted small" title={new Date(h.at).toLocaleString()}>{formatAgo(h.at)}</span>
+          <button type="button" className="icon-btn" aria-label={shown === h.value ? 'Hide' : 'Show'} title={shown === h.value ? 'Hide' : 'Show'} onClick={() => setShown(shown === h.value ? null : h.value)}>
+            {shown === h.value ? <IconEyeOff size={15} /> : <IconEye size={15} />}
+          </button>
+          <CopyButton value={h.value} label="Password" />
+          {onUse ? <button type="button" className="link" onClick={() => onUse(h.value)}>Use</button> : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function formatAgo(iso: string): string {
+  const s = Math.max(0, (Date.now() - Date.parse(iso)) / 1000)
+  if (s < 60) return 'just now'
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
+  return `${Math.floor(s / 86400)} d ago`
 }
 
 export function Check({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {

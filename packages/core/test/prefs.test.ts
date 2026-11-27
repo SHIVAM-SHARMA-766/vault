@@ -3,14 +3,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEFAULT_PREFS, describeMinutes, describeSeconds, effectiveLockMinutes, normalizePrefs, formatWhen } from '../src/index.js'
+import { DEFAULT_PREFS, describeMinutes, describeSeconds, effectiveLockMinutes, normalizePrefs, formatWhen, GENERATOR_HISTORY_MAX, rememberGenerated } from '../src/index.js'
 
 test('nothing, or not an object, gives the defaults', () => {
   for (const raw of [undefined, null, 42, 'dark', [], {}]) assert.deepEqual(normalizePrefs(raw), DEFAULT_PREFS)
 })
 
 test('valid values are kept', () => {
-  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', maskLength: 'actual', autoHideSeconds: 0, defaultFolderId: 'abc-1', dateStyle: 'dmy', clock: '12h', language: 'hi', siteIcons: false, generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
+  const p = { theme: 'dark', lockMinutes: 5, lockOnHide: true, clipboardSeconds: 0, listSort: 'type', density: 'compact', maskLength: 'actual', autoHideSeconds: 0, defaultFolderId: 'abc-1', dateStyle: 'dmy', clock: '12h', language: 'hi', siteIcons: false, generatorHistory: [{ value: 'k9#Vt2!mQz', at: '2026-11-27T10:00:00.000Z' }], generator: { mode: 'passphrase', length: 32, upper: false, digits: true, symbols: false, words: 7, separator: '.', capitalize: true, digit: true } }
   assert.deepEqual(normalizePrefs(p), p)
 })
 
@@ -86,4 +86,21 @@ test('dates follow the chosen style and clock; calendar dates never shift by zon
   assert.equal(formatWhen(at, { dateStyle: 'ymd', clock: '12h' }, { ...opts, time: true }).replace(/\s/g, ' '), '2026-03-04, 5:05 pm')
   assert.equal(formatWhen('2026-03-04', { dateStyle: 'dmy', clock: '24h' }, { locale: 'en-GB', timeZone: 'Pacific/Kiritimati', time: true }), '04/03/2026')
   assert.equal(formatWhen('not a date', { dateStyle: 'dmy', clock: '24h' }), 'not a date')
+})
+
+test('generator history: newest first, no repeats, capped, and junk dropped on read', () => {
+  let h = rememberGenerated([], 'first', new Date('2026-11-27T10:00:00Z'))
+  h = rememberGenerated(h, 'second', new Date('2026-11-27T10:01:00Z'))
+  h = rememberGenerated(h, 'first', new Date('2026-11-27T10:02:00Z'))
+  assert.deepEqual(h.map((x) => x.value), ['first', 'second'])
+  assert.equal(h[0]!.at, '2026-11-27T10:02:00.000Z')
+  for (let i = 0; i < 30; i++) h = rememberGenerated(h, `p${i}`)
+  assert.equal(h.length, GENERATOR_HISTORY_MAX)
+  assert.equal(h[0]!.value, 'p29')
+  assert.deepEqual(rememberGenerated([], ''), [])
+  assert.deepEqual(rememberGenerated([], 'x'.repeat(500)), [], 'nothing absurdly long')
+
+  const read = normalizePrefs({ generatorHistory: [{ value: 'ok', at: '2026-11-27T10:00:00Z' }, { value: 5 }, null, { value: 'bad-date', at: 'never' }, 'str'] })
+  assert.deepEqual(read.generatorHistory, [{ value: 'ok', at: '2026-11-27T10:00:00Z' }])
+  assert.deepEqual(normalizePrefs({}).generatorHistory, [])
 })

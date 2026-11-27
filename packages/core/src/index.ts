@@ -65,12 +65,15 @@ export {
   SEPARATORS,
   THEMES,
   type GeneratorPrefs,
+  type GeneratedPassword,
+  GENERATOR_HISTORY_MAX,
   type Prefs,
   type Theme,
   describeMinutes,
   describeSeconds,
   effectiveLockMinutes,
   normalizePrefs,
+  rememberGenerated,
 } from './prefs.js'
 export { type Failure, friendlyError } from './errors.js'
 export {

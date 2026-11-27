@@ -44,3 +44,38 @@ test('Preferences make the passphrase the default, with its own shape', async ()
     await s.stop()
   }
 })
+
+test('a used password lands in the generator history, survives a fresh unlock, and can be cleared', async () => {
+  const s = await start()
+  try {
+    const page = await s.person()
+    await s.register(page, 'hist@example.test')
+    await page.click('.topbar .btn-primary')
+    await page.getByRole('button', { name: 'Generate' }).click()
+    await page.waitForFunction(() => (document.querySelector('.generator-out code')?.textContent ?? '').length >= 20)
+    const used = await page.textContent('.generator-out code')
+    await page.getByRole('button', { name: 'Use this password' }).click()
+    assert.equal(await page.inputValue('#f-password'), used)
+
+    // Back in the generator: the history holds it, masked until shown.
+    await page.getByRole('button', { name: 'Generate' }).click()
+    await page.getByRole('button', { name: 'History (1)' }).click()
+    const row = page.locator('.generator .gen-history li').first()
+    assert.ok(!(await row.locator('code').textContent()).includes(used), 'masked')
+    await row.getByRole('button', { name: 'Show' }).click()
+    assert.equal(await row.locator('code').textContent(), used)
+
+    // Sealed with the preferences: a new unlock reads it back.
+    await page.goto(`${s.base}/app/settings/preferences`)
+    await s.unlock(page, 'hist@example.test')
+    const block = page.locator('.gen-history-block')
+    await block.locator('.gen-history li').first().waitFor()
+    await block.getByRole('button', { name: 'Show' }).click()
+    assert.equal(await block.locator('.gen-history code').textContent(), used)
+    await block.getByRole('button', { name: 'Clear history' }).click()
+    await block.locator('text=Nothing yet.').waitFor()
+    assert.deepEqual(s.errors, [])
+  } finally {
+    await s.stop()
+  }
+})
