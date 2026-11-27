@@ -5,7 +5,7 @@
 import { useEdition } from '../../lib/instance.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { ISSUES, type ListSort, analyse, descendants, flattenTree, folderTree, folderPath, matches, subtitle, typeSpec } from '@vault/core'
+import { ISSUES, type ListSort, analyse, relatedItems, descendants, flattenTree, folderTree, folderPath, matches, subtitle, typeSpec } from '@vault/core'
 
 import { Link } from '../../lib/router.js'
 import { api } from '../../lib/api.js'
@@ -105,6 +105,9 @@ export function Vault({ state }: { state: session.Unlocked }) {
 
   // Archived items stay out of every list, count and check but the Archive.
   const active = useMemo(() => entries.filter((e) => !e.archived), [entries])
+  // Links stay within one place: personal items, or one collection's.
+  const placeOf = (e: Decrypted | null | undefined) => sharedOf(e)?.collectionId ?? ''
+  const samePlace = (place: string) => entries.filter((e) => !e.unreadable && placeOf(e) === place)
   // Breach results, by password, for this unlock only (lib/breach.ts).
   const [breaches, setBreaches] = useState<Map<string, number> | null>(null)
   const [breachProgress, setBreachProgress] = useState<string | null>(null)
@@ -477,9 +480,13 @@ export function Vault({ state }: { state: session.Unlocked }) {
           {mode.kind === 'edit' ? (
             <EntryForm key={mode.id ?? 'new'} initial={mode.draft} id={mode.id} folders={folders}
                        shared={!!(mode.collectionId ?? sharedOf(entries.find((e) => e.id === mode.id)))}
+                       candidates={samePlace(mode.id ? placeOf(entries.find((e) => e.id === mode.id)) : mode.collectionId ?? '').filter((e) => !e.archived)
+                         .map((e) => ({ id: e.id, name: e.name, type: e.type, username: e.username, url: e.url }))}
                        onCancel={() => setMode({ kind: 'view' })} onSave={(c, id) => save(c, id, mode.collectionId)} />
           ) : selected ? (
-            <EntryDetail key={selected.id} entry={selected} folders={folders} issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
+            <EntryDetail key={selected.id} entry={selected} folders={folders}
+                         related={relatedItems(selected.id, samePlace(placeOf(selected)))} onOpenItem={(rid) => { setSelectedId(rid); setMode({ kind: 'view' }) }}
+                         issues={health.issues.get(selected.id) ?? []} vaultKey={sharedOf(selected) || state.shareLinks?.allowed === false ? undefined : state.vaultKey} linkMaxDays={state.shareLinks?.maxDays ?? 30}
                          shared={(() => { const sh = sharedOf(selected); const c = sh && openCollections.find((x) => x.id === sh.collectionId); return sh && c ? {
                            where: (c.direct ? c.name : `${c.orgName} / ${c.name}`), permission: sh.permission, hidePasswords: sh.hidePasswords, sensitive: !!sh.sensitive,
                            // Taking an item out of the organization is an export (2b).

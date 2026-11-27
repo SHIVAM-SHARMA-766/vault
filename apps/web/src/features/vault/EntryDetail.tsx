@@ -18,10 +18,13 @@ import { t } from '../../lib/i18n.js'
 
 export interface SharedInfo { where: string; permission: 'view' | 'edit' | 'manage'; hidePasswords: boolean; canExport?: boolean; sensitive?: boolean; onSensitive?: (v: boolean) => Promise<void> }
 
-export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
+export function EntryDetail({ entry, folders, related = [], onOpenItem, issues, vaultKey, linkMaxDays = 30, shared = null, shareTargets = [], onShare, onShareWithPerson, onUnshare, onAudit, onBack, onEdit, onToggleFavorite, onToggleArchive, onDelete, loadHistory, onRestore }: {
   entry: Decrypted
   folders: Folder[]
   issues: Issue[]
+  /** Items linked to this one, either way (packages/core relatedItems). */
+  related?: Decrypted[]
+  onOpenItem?: (id: string) => void
   /** Personal items only: lets the item be shared by link. */
   vaultKey?: Uint8Array | undefined
   /** The server's longest allowed share link, in days. */
@@ -224,6 +227,22 @@ export function EntryDetail({ entry, folders, issues, vaultKey, linkMaxDays = 30
       ) : null}
 
       {entry.notes ? <Notes text={entry.notes} /> : null}
+
+      {related.length ? (
+        <section className="related" aria-labelledby="related-title">
+          <span className="field-label" id="related-title">Related items</span>
+          <ul>
+            {related.map((r) => (
+              <li key={r.id}>
+                <button type="button" className="tile" onClick={() => onOpenItem?.(r.id)}>
+                  <Monogram name={r.name} url={r.url} size="sm" />
+                  <span className="tile-text"><span className="tile-name">{r.name || 'Untitled'}</span><span className="tile-meta">{typeSpec(r.type).label}{r.username ? ` · ${r.username}` : ''}</span></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {entry.tags.length ? (
         <div className="tags">{entry.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>

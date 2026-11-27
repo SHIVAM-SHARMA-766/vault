@@ -5,7 +5,7 @@
 import { useMemo, useRef, useState } from 'react'
 
 import type { CustomField, EntryContent, EntryType } from '@vault/crypto'
-import { flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField } from '@vault/core'
+import { RELATED_MAX, cleanRelated, flattenTree, typesByGroup, folderTree, readField, typeSpec, writeField } from '@vault/core'
 
 import { IconEye, IconEyeOff, IconPlus, IconX } from '../../ui/icons.js'
 import { FieldInput } from './fields.js'
@@ -14,10 +14,16 @@ import { ATTACHMENT_MAX_BYTES, deleteAttachments, describeSize, uploadAttachment
 import { IconUpload } from '../../ui/icons.js'
 import type { Folder } from './model.js'
 import { t } from '../../lib/i18n.js'
+import { Monogram } from '../../ui/kit.js'
 
-export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false }: {
+/** An item that can be linked from the editor: enough to find and show it. */
+export interface LinkCandidate { id: string; name: string; type: EntryType; username?: string | undefined; url?: string | undefined }
+
+export function EntryForm({ initial, id, folders, onCancel, onSave, shared = false, candidates = [] }: {
   initial: EntryContent
   id?: string | undefined
+  /** Items this one may be linked to: the same place (personal, or the same collection). */
+  candidates?: LinkCandidate[]
   /** A shared item: no personal folder; encrypted under its collection's key. */
   shared?: boolean
   folders: Folder[]
@@ -49,8 +55,9 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
     // Drop empty type fields and nameless custom fields rather than storing noise.
     const fields = Object.fromEntries(Object.entries(draft.fields ?? {}).filter(([, v]) => v.trim() !== ''))
     const customFields = draft.customFields.filter((c) => c.label.trim() || c.value.trim())
-    const { folderId, ...rest } = draft
-    const ok = await onSave({ ...rest, ...(folderId ? { folderId } : {}), tags, fields, customFields }, id)
+    const { folderId, related: rawRelated, ...rest } = draft
+    const related = cleanRelated(id, rawRelated)
+    const ok = await onSave({ ...rest, ...(folderId ? { folderId } : {}), ...(related.length ? { related } : {}), tags, fields, customFields }, id)
     if (!ok) { setSaving(false); return }
     const kept = new Set((draft.attachments ?? []).map((a) => a.id))
     void deleteAttachments(original.current.filter((x) => !kept.has(x)))
@@ -118,6 +125,10 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
                         onChange={(e) => set('notes', e.target.value)} />}
           <p id="f-notes-hint" className="hint">Markdown works: <code># heading</code> <code>**bold**</code> <code>- list</code> <code>- [ ] checklist</code> <code>[link](https://…)</code></p>
         </div>
+
+        {candidates.length || draft.related?.length ? (
+          <RelatedPicker selfId={id} value={draft.related ?? []} candidates={candidates} onChange={(related) => set('related', related)} />
+        ) : null}
 
         <div className="field custom-fields">
           <div className="label-row"><label>Custom fields</label></div>
@@ -221,5 +232,53 @@ export function EntryForm({ initial, id, folders, onCancel, onSave, shared = fal
         </button>
       </div>
     </form>
+  )
+}
+
+/** Links to other items: the chosen ones as chips, and a search to add more. */
+function RelatedPicker({ selfId, value, candidates, onChange }: { selfId?: string | undefined; value: string[]; candidates: LinkCandidate[]; onChange: (ids: string[]) => void }) {
+  const [query, setQuery] = useState('')
+  const byId = new Map(candidates.map((c) => [c.id, c]))
+  const chosen = value.filter((v) => byId.has(v))
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? candidates.filter((c) => c.id !== selfId && !value.includes(c.id) && [c.name, c.username, c.url].some((x) => x?.toLowerCase().includes(q))).slice(0, 6)
+    : []
+  const add = (cid: string) => { onChange([...value, cid]); setQuery('') }
+  return (
+    <div className="field related-picker">
+      <label htmlFor="f-related">Related items</label>
+      {chosen.length ? (
+        <ul className="related-chips" aria-label="Linked items">
+          {chosen.map((cid) => (
+            <li key={cid}>
+              <Monogram name={byId.get(cid)!.name} url={byId.get(cid)!.url} size="sm" />
+              <span>{byId.get(cid)!.name || 'Untitled'}</span>
+              <button type="button" className="icon-btn" aria-label={`Unlink ${byId.get(cid)!.name}`} onClick={() => onChange(value.filter((v) => v !== cid))}><IconX size={13} /></button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {chosen.length < RELATED_MAX ? (
+        <div className="related-search">
+          <input id="f-related" type="search" autoComplete="off" placeholder="Search items to link (a server and its SSH key, say)" value={query}
+                 role="combobox" aria-expanded={matches.length > 0} aria-controls="f-related-list" aria-autocomplete="list"
+                 onChange={(e) => setQuery(e.target.value)}
+                 onKeyDown={(e) => { if (e.key === 'Enter' && matches[0]) { e.preventDefault(); add(matches[0].id) } }} />
+          {matches.length ? (
+            <ul id="f-related-list" className="related-matches" role="listbox">
+              {matches.map((m) => (
+                <li key={m.id} role="option" aria-selected={false}>
+                  <button type="button" onClick={() => add(m.id)}>
+                    <Monogram name={m.name} url={m.url} size="sm" />
+                    <span className="tile-text"><span className="tile-name">{m.name || 'Untitled'}</span><span className="tile-meta">{m.username || m.url || typeSpec(m.type).label}</span></span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : q ? <p className="hint">No matching item.</p> : null}
+        </div>
+      ) : null}
+    </div>
   )
 }
