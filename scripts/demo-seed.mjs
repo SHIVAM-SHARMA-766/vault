@@ -555,7 +555,10 @@ try {
     for (const c of t.collections) {
       if (done.coll[c.name]) continue
       for (const it of c.items) {
-        if (await inCollection(admin, it[0], `${t.org} / ${c.name}`)) continue
+        // Already in one of this company's collections counts: a company set
+        // up by an earlier version of this script has a different layout, and
+        // moving such an item again would fail.
+        if (await inCollection(admin, it[0], `${t.org} / `)) continue
         if (!(await inVault(admin, it[0]))) await addItem(admin, it)
         await moveTo(admin, it[0], `${t.org} / ${c.name}`)
       }
