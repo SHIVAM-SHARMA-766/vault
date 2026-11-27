@@ -27,6 +27,7 @@ import {
   PROFILE_SK,
   SESSION_PREFIX,
   SYSTEM_PK,
+  USER_ORG_PREFIX,
   emailPk,
   isValidId,
   registrySk,
@@ -103,15 +104,13 @@ interface UserSummary {
   twoFactor: boolean
   /** Misses the server policy (two-factor or password strength). */
   policyGap: boolean
-  entries: number
-  folders: number
-  sessions: number
 }
 
+/** One row of the users list: the registry entry and the profile, two reads.
+ *  Counting items and sessions reads a whole vault, so that waits for the
+ *  person's own page (userDetail). */
 async function summarize(app: App, reg: RegistryEntry, policy: ServerPolicy): Promise<UserSummary> {
-  const items = await app.store.query(userPk(reg.userId))
-  const profile = items.find((i) => i.sk === PROFILE_SK)
-  const now = Math.floor(app.now() / 1000)
+  const profile = await app.store.get(userPk(reg.userId), PROFILE_SK)
   return {
     userId: reg.userId,
     // The username (decisions/0037); null for an account not signed in since.
@@ -124,12 +123,51 @@ async function summarize(app: App, reg: RegistryEntry, policy: ServerPolicy): Pr
     role: roleFromDigest(app, reg.emailDigest, reg.role),
     twoFactor: hasSecondFactor(profile),
     policyGap: serverPolicyGap(policy, profile ?? null) !== null,
-    entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
-    folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
-    sessions: items.filter((i) => i.sk.startsWith(SESSION_PREFIX)
-      && (typeof i['expiresAt'] !== 'number' || i['expiresAt'] > now)).length,
   }
 }
+
+/** Not signed in for this long: "inactive" in the list and the overview. */
+export const INACTIVE_DAYS = 90
+
+/** Counts that read every vault (items and sessions): kept for a few
+ *  minutes, so opening the overview is cheap. Policy and two-factor counts
+ *  read only each profile and are always current. */
+const HEAVY_TTL_MS = 5 * 60_000
+const heavyCache = new WeakMap<App, { at: number; value: Promise<HeavyStats> }>()
+interface HeavyStats { entries: number; activeSessions: number }
+
+async function heavyStats(app: App, registry: RegistryEntry[]): Promise<HeavyStats> {
+  const hit = heavyCache.get(app)
+  if (hit && app.now() - hit.at < HEAVY_TTL_MS) return hit.value
+  const value = (async () => {
+    const now = Math.floor(app.now() / 1000)
+    let entries = 0, activeSessions = 0
+    for (const reg of registry) {
+      const items = await app.store.query(userPk(reg.userId))
+      entries += items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length
+      activeSessions += items.filter((i) => i.sk.startsWith(SESSION_PREFIX) && (typeof i['expiresAt'] !== 'number' || i['expiresAt'] > now)).length
+    }
+    return { entries, activeSessions }
+  })()
+  heavyCache.set(app, { at: app.now(), value })
+  value.catch(() => heavyCache.delete(app))
+  return value
+}
+
+async function profileStats(app: App, registry: RegistryEntry[], policy: ServerPolicy) {
+  let twoFactorUsers = 0, policyGapUsers = 0
+  await Promise.all(registry.filter((r) => !r.disabled).map(async (r) => {
+    const profile = await app.store.get(userPk(r.userId), PROFILE_SK)
+    if (hasSecondFactor(profile)) twoFactorUsers++
+    if (serverPolicyGap(policy, profile ?? null) !== null) policyGapUsers++
+  }))
+  return { twoFactorUsers, policyGapUsers }
+}
+
+/** After an action that changes those counts, the next overview recounts. */
+export function forgetHeavyStats(app: App): void { heavyCache.delete(app) }
+
+const inactiveSince = (app: App) => app.now() - INACTIVE_DAYS * 86_400_000
 
 export async function overview(app: App): Promise<LambdaResponse> {
   const [registry, settings, invites, backup] = await Promise.all([
@@ -138,14 +176,18 @@ export async function overview(app: App): Promise<LambdaResponse> {
     listInvites(app),
     app.store.get(SYSTEM_PK, BACKUP_SK),
   ])
-  const users = await Promise.all(registry.map((r) => summarize(app, r, settings.policy)))
+  const [heavy, prof] = await Promise.all([heavyStats(app, registry), profileStats(app, registry, settings.policy)])
   const now = app.now()
+  const since = inactiveSince(app)
+  const active = registry.filter((r) => !r.disabled)
   return json(200, {
-    users: users.length,
-    disabledUsers: users.filter((u) => u.disabled).length,
-    policyGapUsers: users.filter((u) => u.policyGap && !u.disabled).length,
-    entries: users.reduce((n, u) => n + u.entries, 0),
-    activeSessions: users.reduce((n, u) => n + u.sessions, 0),
+    users: registry.length,
+    disabledUsers: registry.length - active.length,
+    policyGapUsers: prof.policyGapUsers,
+    twoFactorUsers: prof.twoFactorUsers,
+    inactiveUsers: active.filter((r) => !r.lastLoginAt || Date.parse(r.lastLoginAt) < since).length,
+    entries: heavy.entries,
+    activeSessions: heavy.activeSessions,
     activeInvites: invites.filter((i) => !i.usedAt && Date.parse(i.expiresAt) > now).length,
     registration: settings.registration,
     registrationForcedOpen: app.allowRegistration,
@@ -182,11 +224,134 @@ export async function deleteOrgAsOperator(app: App, actor: string, orgId: string
   return json(200, { ok: true })
 }
 
-export async function listUsers(app: App): Promise<LambdaResponse> {
+const USER_SORTS = ['created', 'lastLogin', 'email'] as const
+const USER_STATUSES = ['active', 'disabled', 'inactive', 'never'] as const
+
+/** The users list (Phase 1 of the admin console): searched, filtered, sorted
+ *  and paged on the server, so a server with thousands of accounts sends one
+ *  page. Query: q, role, status, twoFactor (on|off), sort, dir, offset, limit. */
+export async function listUsers(app: App, event: LambdaEvent): Promise<LambdaResponse> {
+  const q = Object.fromEntries(new URLSearchParams(event.rawQueryString ?? '')) as Record<string, string>
+  const text = (q['q'] ?? '').trim().toLowerCase().slice(0, 200)
+  const role = q['role'] ?? ''
+  const status = (USER_STATUSES as readonly string[]).includes(q['status'] ?? '') ? q['status']! : ''
+  const twoFactor = q['twoFactor'] === 'on' || q['twoFactor'] === 'off' ? q['twoFactor'] : ''
+  const sort = (USER_SORTS as readonly string[]).includes(q['sort'] ?? '') ? q['sort']! : 'created'
+  const dir = q['dir'] === 'asc' ? 1 : -1
+  const offset = Math.max(0, Math.floor(Number(q['offset'] ?? 0)) || 0)
+  const limit = Math.min(200, Math.max(1, Math.floor(Number(q['limit'] ?? 50)) || 50))
+
   const [registry, { policy }] = await Promise.all([listRegistry(app), getSettings(app)])
-  const users = await Promise.all(registry.map((r) => summarize(app, r, policy)))
-  users.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  return json(200, { users })
+  const since = inactiveSince(app)
+  const inactive = (r: RegistryEntry) => !r.disabled && (!r.lastLoginAt || Date.parse(r.lastLoginAt) < since)
+  const counts = {
+    all: registry.length,
+    active: registry.filter((r) => !r.disabled).length,
+    disabled: registry.filter((r) => r.disabled).length,
+    inactive: registry.filter(inactive).length,
+    never: registry.filter((r) => !r.lastLoginAt).length,
+  }
+  const rows = registry.map((r) => ({ r, email: emailOf(app, r), role: roleFromDigest(app, r.emailDigest, r.role) }))
+  let matched = rows.filter(({ r, email, role: rr }) => {
+    if (text && !(email ?? '').toLowerCase().includes(text) && !(r.label ?? '').toLowerCase().includes(text) && !r.userId.startsWith(text)) return false
+    if (role && rr !== role) return false
+    if (status === 'active' && r.disabled) return false
+    if (status === 'disabled' && !r.disabled) return false
+    if (status === 'inactive' && !inactive(r)) return false
+    if (status === 'never' && r.lastLoginAt) return false
+    return true
+  })
+  const key = (x: (typeof rows)[number]) => sort === 'email' ? (x.email ?? x.r.label ?? '~').toLowerCase() : sort === 'lastLogin' ? x.r.lastLoginAt ?? '' : x.r.createdAt
+  matched.sort((a, b) => dir * key(a).localeCompare(key(b)) || a.r.userId.localeCompare(b.r.userId))
+
+  // Two-factor lives in each profile: a filter on it reads the matched
+  // profiles (one read each), a page reads only its own.
+  let users: UserSummary[]
+  let total: number
+  if (twoFactor) {
+    const all = await Promise.all(matched.map((x) => summarize(app, x.r, policy)))
+    const kept = all.filter((u) => u.twoFactor === (twoFactor === 'on'))
+    total = kept.length
+    users = kept.slice(offset, offset + limit)
+  } else {
+    total = matched.length
+    users = await Promise.all(matched.slice(offset, offset + limit).map((x) => summarize(app, x.r, policy)))
+  }
+  return json(200, { users, total, offset, limit, counts })
+}
+
+/** One account in full, for its page in the console: the row, what its vault
+ *  holds (by count), its devices, its organizations and the staff actions
+ *  that touched it. */
+export async function userDetail(app: App, id: string): Promise<LambdaResponse> {
+  if (!isValidId(id)) throw badRequest('Invalid user id.')
+  const reg = await getRegistry(app, id)
+  if (!reg) throw notFound()
+  const { policy } = await getSettings(app)
+  const items = await app.store.query(userPk(id))
+  const profile = items.find((i) => i.sk === PROFILE_SK)
+  const now = Math.floor(app.now() / 1000)
+  const sessions = items.filter((i) => i.sk.startsWith(SESSION_PREFIX) && (typeof i['expiresAt'] !== 'number' || i['expiresAt'] > now))
+    .map((r) => ({ device: String(r['name'] ?? r['device'] ?? 'Unknown device'), ip: String(r['ip'] ?? ''), createdAt: String(r['createdAt'] ?? ''), lastUsedAt: String(r['lastUsedAt'] ?? r['createdAt'] ?? '') }))
+    .sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt))
+  const orgs = []
+  for (const ref of items.filter((i) => i.sk.startsWith(USER_ORG_PREFIX))) {
+    const orgId = String(ref['orgId'] ?? '')
+    if (!isValidId(orgId)) continue
+    const [meta, m] = await Promise.all([app.store.get(`ORG#${orgId}`, 'META'), app.store.get(`ORG#${orgId}`, `MEMBER#${id}`)])
+    if (!meta || !m) continue
+    orgs.push({ orgId, name: String(meta['hint'] ?? ''), role: String(m['role'] ?? 'member'), kind: String(meta['kind'] ?? 'team') })
+  }
+  const labels = new Map((await listRegistry(app)).map((r) => [r.userId, r.label ?? emailOf(app, r)]))
+  const activity = (await listAudit(app, 2000)).filter((r) => r.target === id || r.actor === id).slice(0, 25)
+    .map((r) => ({ at: r.at, action: r.action, actor: r.actor, actorLabel: labels.get(r.actor) ?? null, detail: r.detail ?? null }))
+  return json(200, {
+    user: await summarize(app, reg, policy),
+    entries: items.filter((i) => i.sk.startsWith(ENTRY_PREFIX)).length,
+    folders: items.filter((i) => i.sk.startsWith(FOLDER_PREFIX)).length,
+    accountPassword: !!profile?.['account'],
+    sessions,
+    orgs,
+    activity,
+  })
+}
+
+const BULK_ACTIONS = ['disable', 'enable', 'signout', 'reset-2fa'] as const
+type BulkAction = (typeof BULK_ACTIONS)[number]
+
+/** One action on many accounts (at most 200): each is checked and recorded
+ *  as if done alone, and the answer says which ones failed and why. */
+export async function bulkUsers(app: App, actor: string, actorRole: Role, event: LambdaEvent): Promise<LambdaResponse> {
+  const body = parseJsonBody<{ ids?: unknown; action?: unknown }>(event)
+  if (!(BULK_ACTIONS as readonly unknown[]).includes(body.action)) throw badRequest(`action must be one of: ${BULK_ACTIONS.join(', ')}.`)
+  if (!Array.isArray(body.ids) || body.ids.length === 0 || body.ids.length > 200 || !body.ids.every((x) => typeof x === 'string')) {
+    throw badRequest('ids must be a list of 1 to 200 account ids.')
+  }
+  const action = body.action as BulkAction
+  const results: { id: string; ok: boolean; error?: string }[] = []
+  for (const id of new Set(body.ids as string[])) {
+    try {
+      if (action === 'disable' || action === 'enable') {
+        const reg = await targetUser(app, actor, actorRole, id, false)
+        if ((action === 'disable') !== (reg.disabled === true)) {
+          await audit(app, actor, action === 'disable' ? 'user.disable' : 'user.enable', id, 'bulk')
+          await putRegistry(app, { ...fieldsOf(reg), disabled: action === 'disable' })
+          if (action === 'disable') await revokeAllSessions(app, id)
+        }
+      } else if (action === 'signout') {
+        await targetUser(app, actor, actorRole, id, false)
+        await audit(app, actor, 'user.revoke-sessions', id, 'bulk')
+        await revokeAllSessions(app, id)
+      } else {
+        await resetTwoFactor(app, actor, actorRole, id)
+      }
+      results.push({ id, ok: true })
+    } catch (err) {
+      results.push({ id, ok: false, error: err instanceof HttpError ? err.message : 'Could not be done.' })
+    }
+  }
+  forgetHeavyStats(app)
+  return json(200, { results, done: results.filter((r) => r.ok).length })
 }
 
 function fieldsOf(reg: RegistryEntry): RegistryFields {
@@ -200,6 +365,9 @@ function fieldsOf(reg: RegistryEntry): RegistryFields {
     ...(reg.inviteId ? { inviteId: reg.inviteId } : {}),
     ...(reg.role ? { role: reg.role } : {}),
     ...(reg.emailSealed ? { emailSealed: reg.emailSealed } : {}),
+    // Kept through a label, role or status change: dropping it would take a
+    // company admin's right to create their company away (decisions/0033).
+    ...(reg.companyGrant ? { companyGrant: true } : {}),
   }
 }
 
@@ -614,16 +782,37 @@ export async function deleteInviteRoute(app: App, actor: string, id: string): Pr
   return json(200, { ok: true })
 }
 
-export async function auditRoute(app: App): Promise<LambdaResponse> {
-  // Ids mean nothing to a person reading the log; labels do. Deleted accounts
-  // keep their id, and their label survives in the delete record's detail.
-  const labels = new Map((await listRegistry(app)).map((r) => [r.userId, r.label ?? null]))
-  const records = (await listAudit(app)).map((r) => ({
+/** The staff audit log, filtered and paged on the server. Query: actor (an
+ *  account id), action (a prefix such as "user." or "user.disable"), q (text
+ *  in a label, address or detail), from and to (dates), offset, limit. */
+export async function auditRoute(app: App, event?: LambdaEvent): Promise<LambdaResponse> {
+  const q = Object.fromEntries(new URLSearchParams(event?.rawQueryString ?? '')) as Record<string, string>
+  const actor = q['actor'] ?? ''
+  const action = (q['action'] ?? '').slice(0, 60)
+  const text = (q['q'] ?? '').trim().toLowerCase().slice(0, 200)
+  const from = q['from'] && !Number.isNaN(Date.parse(q['from'])) ? new Date(q['from']).toISOString() : ''
+  const to = q['to'] && !Number.isNaN(Date.parse(q['to'])) ? new Date(Date.parse(q['to']) + (q['to'].length <= 10 ? 86_400_000 : 0)).toISOString() : ''
+  const offset = Math.max(0, Math.floor(Number(q['offset'] ?? 0)) || 0)
+  const limit = Math.min(500, Math.max(1, Math.floor(Number(q['limit'] ?? 100)) || 100))
+  // Ids mean nothing to a person reading the log; labels and addresses do.
+  // Deleted accounts keep their id, and their label survives in the delete
+  // record's detail.
+  const labels = new Map((await listRegistry(app)).map((r) => [r.userId, r.label ?? emailOf(app, r)]))
+  const all = (await listAudit(app, 100_000)).map((r) => ({
     at: r.at, actor: r.actor, action: r.action, target: r.target ?? null, detail: r.detail ?? null,
     actorLabel: labels.get(r.actor) ?? null,
     targetLabel: r.target ? labels.get(r.target) ?? null : null,
   }))
-  return json(200, { records })
+  const records = all.filter((r) => {
+    if (actor && r.actor !== actor && r.target !== actor) return false
+    if (action && !r.action.startsWith(action)) return false
+    if (from && r.at < from) return false
+    if (to && r.at >= to) return false
+    if (text && ![r.actorLabel, r.targetLabel, r.detail, r.action].some((v) => (v ?? '').toLowerCase().includes(text))) return false
+    return true
+  })
+  const actions = [...new Set(all.map((r) => r.action))].sort()
+  return json(200, { records: records.slice(offset, offset + limit), total: records.length, offset, limit, actions })
 }
 
 // ── Server backups (C7) ─────────────────────────────────────────────────────

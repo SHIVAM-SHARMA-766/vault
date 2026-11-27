@@ -9,12 +9,10 @@
 import { type ReactElement, useEffect, useState } from 'react'
 
 import {
-  type AdminAudit,
   type AdminInvite,
   type Edition,
   type Features,
   type AdminOverview,
-  type AdminUser,
   type InstanceProfile,
   type UpdateStatus,
   type Permission,
@@ -24,17 +22,18 @@ import {
   api,
 } from '../../lib/api.js'
 import { STRENGTH_LABELS, describeMinutes } from '@vault/core'
-import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
+import { ErrorBox, ROLE_LABELS, Section, ago, run, useAdminData, when } from './common.js'
 import { Desk } from './Desk.js'
+import { Users } from './Users.js'
+import { Audit } from './AuditLog.js'
 import { Website } from './Website.js'
 import { System } from './System.js'
-import { download } from '../../lib/download.js'
 import { SetupWizard, wizardDone } from './SetupWizard.js'
 import { applyBranding, refresh as refreshInstance, useEdition, useInstance } from '../../lib/instance.js'
 import * as session from '../../lib/session.js'
 import {
-  IconAlert, IconCheck, IconEdit, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
-  IconDownload, IconPlus, IconRefresh, IconShield, IconSliders, IconTrash, IconUser, IconX,
+  IconAlert, IconCheck, IconGlobe, IconInbox, IconGrid, IconKey, IconNote,
+  IconPlus, IconRefresh, IconSliders, IconTrash, IconUser,
 } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
 import { Link, href } from '../../lib/router.js'
@@ -54,17 +53,7 @@ const TABS: { id: Tab; label: string; needs: Permission; feature?: keyof Feature
   { id: 'system', label: 'System', needs: 'overview.read', Icon: IconSliders },
 ]
 
-export const ROLE_LABELS: Record<Role, string> = {
-  owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer', user: 'User',
-}
-const ROLE_HELP: Record<Role, string> = {
-  owner: 'Everything, including roles. Set in the host configuration.',
-  admin: 'Users, invitations, registration and the website. Cannot change roles.',
-  support: 'The service desk and invitations. Escalates account changes to an admin.',
-  marketing: 'The website only: text, search details, images and the banner.',
-  viewer: 'Can see everything in this panel and change nothing.',
-  user: 'No admin access.',
-}
+export { ROLE_LABELS }
 
 export type ServerTab = Tab
 export const SERVER_TABS = TABS
@@ -479,152 +468,6 @@ function Stat({ label, value, note, onClick }: { label: string; value: number; n
 
 // ── Users ─────────────────────────────────────────────────────────────────
 
-const loadUsers = (t: string) => api.admin.users(t)
-
-function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite: boolean; canRoles: boolean }) {
-  const toast = useToast()
-  const { data, error, reload } = useAdminData(loadUsers)
-  const [editing, setEditing] = useState<string | null>(null)
-  const [label, setLabel] = useState('')
-  const [deleting, setDeleting] = useState<AdminUser | null>(null)
-  const [confirmText, setConfirmText] = useState('')
-
-  async function saveLabel(id: string) {
-    if (await run(toast, (t) => api.admin.setLabel(t, id, label), 'Label saved')) { setEditing(null); await reload() }
-  }
-
-  return (
-    <Section title="Users" sub="Accounts are identified by label. Addresses are stored only as keyed hashes and cannot be shown.">
-      <ErrorBox error={error} />
-      {!data ? <div className="skeletons">{[0, 1, 2].map((i) => <div key={i} className="skeleton" />)}</div>
-        : data.users.length === 0 ? <div className="empty"><h3>No accounts yet</h3></div> : (
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr><th>Account</th><th>Role</th><th>Created</th><th>Last sign-in</th><th className="num">Items</th><th className="num">Sessions</th><th>Status</th>{canWrite ? <th aria-label="Actions" /> : null}</tr>
-            </thead>
-            <tbody>
-              {data.users.map((u) => {
-                const self = u.userId === selfId
-                return (
-                  <tr key={u.userId} className={u.disabled ? 'row-disabled' : ''}>
-                    <td>
-                      {editing === u.userId ? (
-                        <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void saveLabel(u.userId) }}>
-                          <input autoFocus value={label} maxLength={80} onChange={(e) => setLabel(e.target.value)} aria-label="Label" />
-                          <button className="icon-btn" type="submit" aria-label="Save label"><IconCheck size={16} /></button>
-                          <button className="icon-btn" type="button" onClick={() => setEditing(null)} aria-label="Cancel"><IconX size={16} /></button>
-                        </form>
-                      ) : (
-                        <div className="acct">
-                          {/* The address is the username (decisions/0037); the label is a note beside it. */}
-                          <span className="acct-name">{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
-                            {u.email && u.label ? <span className="muted small"> · {u.label}</span> : null}
-                            {self ? <span className="pill">You</span> : null}
-                          </span>
-                          <code className="acct-id">{u.userId.slice(0, 8)}…</code>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      {canRoles && u.role !== 'owner' && !self ? (
-                        <select className="role-select" value={u.role} aria-label="Role" title={ROLE_HELP[u.role]}
-                                onChange={async (e) => { if (await run(toast, (t) => api.admin.setRole(t, u.userId, e.target.value as Role), `Role set to ${ROLE_LABELS[e.target.value as Role]}`)) await reload() }}>
-                          {(['admin', 'support', 'marketing', 'viewer', 'user'] as Role[]).map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-                        </select>
-                      ) : <span className={`pill ${u.role === 'user' ? '' : 'pill-accent'}`} title={ROLE_HELP[u.role]}>{ROLE_LABELS[u.role]}</span>}
-                    </td>
-                    <td>{when(u.createdAt)}</td>
-                    <td title={when(u.lastLoginAt)}>{ago(u.lastLoginAt)}</td>
-                    <td className="num">{u.entries}</td>
-                    <td className="num">{u.sessions}</td>
-                    <td>
-                      {u.disabled ? <span className="pill pill-danger">Disabled</span> : <span className="pill pill-ok">Active</span>}
-                      {u.twoFactor ? <span className="pill pill-accent" title="Two-factor sign-in is on"> 2FA</span> : null}
-                      {u.policyGap && !u.disabled ? <span className="pill pill-warn" title="Does not meet the server policies yet">Misses policy</span> : null}
-                    </td>
-                    {canWrite ? <td>
-                      <div className="row-actions">
-                        <button className="icon-btn" title="Edit label" aria-label="Edit label" onClick={() => { setEditing(u.userId); setLabel(u.label ?? '') }}><IconEdit size={15} /></button>
-                        <button className="icon-btn" title="Sign out everywhere" aria-label="Sign out everywhere" disabled={u.sessions === 0}
-                                onClick={async () => { if (await run(toast, (t) => api.admin.revokeSessions(t, u.userId), 'Sessions revoked')) await reload() }}>
-                          <IconRefresh size={15} />
-                        </button>
-                        {!self && u.twoFactor ? (
-                          <button className="icon-btn" title="Reset two-factor sign-in" aria-label="Reset two-factor sign-in"
-                                  onClick={async () => {
-                                    if (!window.confirm(`Turn off two-factor sign-in for ${u.label || 'this account'}? Use this only for someone who has lost both their phone and their recovery codes. It is recorded in the audit log.`)) return
-                                    if (await run(toast, (t) => api.admin.resetTwoFactor(t, u.userId), 'Two-factor sign-in reset')) await reload()
-                                  }}>
-                            <IconShield size={15} />
-                          </button>
-                        ) : null}
-                        {!self ? (
-                          <button className="icon-btn" title="Reset account password" aria-label="Reset account password"
-                                  onClick={async () => {
-                                    if (!window.confirm(`Clear the account password of ${u.label || 'this account'}? They then sign in once with their master password and choose a new one. Use this when they forgot it and this server sends no email. It is recorded in the audit log.`)) return
-                                    await run(toast, (t) => api.admin.resetAccountPassword(t, u.userId), 'Account password cleared')
-                                  }}>
-                            <IconUser size={15} />
-                          </button>
-                        ) : null}
-                        {!self ? (
-                          <>
-                            <button className="btn btn-secondary btn-sm"
-                                    onClick={async () => { if (await run(toast, (t) => api.admin.setDisabled(t, u.userId, !u.disabled), u.disabled ? 'Account enabled' : 'Account disabled')) await reload() }}>
-                              {u.disabled ? 'Enable' : 'Disable'}
-                            </button>
-                            {!u.disabled ? (
-                              <button className="btn btn-secondary btn-sm" aria-label={`Offboard ${u.label || 'this account'}`} onClick={async () => {
-                                if (!window.confirm(`Offboard ${u.label || 'this account'}? They are disabled, signed out everywhere, and removed from every organization. Shared passwords they could see are listed for their colleagues to change.`)) return
-                                if (await run(toast, (t) => api.admin.offboard(t, u.userId), 'Offboarded: disabled, signed out, removed from organizations')) await reload()
-                              }}>Offboard</button>
-                            ) : null}
-                            <button className="icon-btn icon-danger" title="Delete account" aria-label="Delete account"
-                                    onClick={() => { setDeleting(u); setConfirmText('') }}>
-                              <IconTrash size={15} />
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </td> : null}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {deleting ? (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="del-title">
-          <div className="modal">
-            <h2 id="del-title">Delete this account?</h2>
-            <p className="muted">
-              <strong>{deleting.label || 'This unlabelled account'}</strong> and its {deleting.entries} encrypted item(s)
-              will be removed permanently. Nobody can recover them — the server never held a key that opens them,
-              and the only other copy is the daily export.
-            </p>
-            <label htmlFor="del-confirm" className="field-label">Type <code>delete</code> to confirm</label>
-            <input id="del-confirm" autoFocus value={confirmText} onChange={(e) => setConfirmText(e.target.value)} />
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setDeleting(null)}>Cancel</button>
-              <button className="btn btn-danger" disabled={confirmText !== 'delete'}
-                      onClick={async () => {
-                        if (await run(toast, (t) => api.admin.deleteUser(t, deleting.userId), 'Account deleted')) { setDeleting(null); await reload() }
-                      }}>
-                Delete permanently
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </Section>
-  )
-}
-
-// ── Invitations ───────────────────────────────────────────────────────────
-
 const loadInvites = (t: string) => api.admin.invites(t)
 
 /** "email, name" per line — what a spreadsheet column pastes as. */
@@ -873,26 +716,6 @@ function Invites({ canWrite, canRoles }: { canWrite: boolean; canRoles: boolean 
 
 // ── Audit ─────────────────────────────────────────────────────────────────
 
-const loadAudit = (t: string) => api.admin.audit(t)
-
-const ACTIONS: Record<string, string> = {
-  'settings.registration': 'Changed registration',
-  'invite.create': 'Created invitation',
-  'invite.delete': 'Revoked invitation',
-  'user.label': 'Relabelled account',
-  'user.disable': 'Disabled account',
-  'user.enable': 'Enabled account',
-  'user.revoke-sessions': 'Signed account out everywhere',
-  'user.delete': 'Deleted account',
-  'user.role': 'Changed role',
-  'user.reset-2fa': 'Reset two-factor sign-in',
-  'site.publish': 'Published the website',
-  'site.rollback': 'Rolled the website back',
-  'site.discard-draft': 'Discarded the website draft',
-  'media.upload': 'Uploaded an image',
-  'media.delete': 'Deleted an image',
-}
-
 const loadOrgs = (t: string) => api.admin.orgs(t)
 
 function AdminOrgs({ canWrite, canInvite }: { canWrite: boolean; canInvite: boolean }) {
@@ -958,42 +781,6 @@ function AdminOrgs({ canWrite, canInvite }: { canWrite: boolean; canInvite: bool
         </div>
       )}
       {directs ? <p className="muted small">Not listed: {directs} private share{directs === 1 ? '' : 's'} between two people.</p> : null}
-    </Section>
-  )
-}
-
-function Audit() {
-  const toast = useToast()
-  const { data, error, reload } = useAdminData(loadAudit)
-  return (
-    <Section title="Audit log" sub="Every admin action, kept as long as the audit retention policy says. Written before the action runs, so nothing here happens unrecorded."
-             actions={<>
-               {(['csv', 'json'] as const).map((f) => (
-                 <button key={f} className="btn btn-secondary btn-sm" onClick={async () => {
-                   try { download(`vault-audit-${new Date().toISOString().slice(0, 10)}.${f}`, await api.admin.auditExport(await session.token(), f), f === 'csv' ? 'text/csv' : 'application/json') }
-                   catch (err) { toast(err instanceof Error ? err.message : 'Could not export.', 'error') }
-                 }}><IconDownload size={15} />{f.toUpperCase()}</button>
-               ))}
-               <button className="btn btn-secondary btn-sm" onClick={() => void reload()}><IconRefresh size={15} />Refresh</button>
-             </>}>
-      <ErrorBox error={error} />
-      {!data ? null : data.records.length === 0 ? <p className="muted">No admin actions yet.</p> : (
-        <div className="table-wrap">
-          <table className="data">
-            <thead><tr><th>When</th><th>Action</th><th>Detail</th><th>By</th></tr></thead>
-            <tbody>
-              {data.records.map((r: AdminAudit, i) => (
-                <tr key={`${r.at}-${i}`}>
-                  <td>{when(r.at)}</td>
-                  <td className="strong">{ACTIONS[r.action] ?? r.action}</td>
-                  <td>{[r.targetLabel ?? (r.target ? `${r.target.slice(0, 8)}…` : null), r.detail].filter(Boolean).join(' · ') || '—'}</td>
-                  <td>{r.actorLabel ?? <code className="acct-id">{r.actor.slice(0, 8)}…</code>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </Section>
   )
 }

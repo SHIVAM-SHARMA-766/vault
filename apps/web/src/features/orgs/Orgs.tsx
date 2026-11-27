@@ -227,7 +227,7 @@ export function OrgMembers({ org, teams, selfId, people, direct = false }: { org
   const seeAccounts = !direct && perms.has('users.read')
   const manageAccounts = !direct && perms.has('users.write')
   const [accounts, setAccounts] = useState<AdminUser[] | null>(null)
-  const loadAccounts = async () => { if (seeAccounts) setAccounts((await api.admin.users(await session.token())).users) }
+  const loadAccounts = async () => { if (seeAccounts) setAccounts((await api.admin.allUsers(await session.token())).users) }
   useEffect(() => { void loadAccounts().catch(() => setAccounts(null)) }, [seeAccounts, members.length])
   const accountOf = (id: string) => accounts?.find((a) => a.userId === id)
   const outside = edition === 'business' && accounts ? accounts.filter((a) => !members.some((m) => m.userId === a.userId)) : []

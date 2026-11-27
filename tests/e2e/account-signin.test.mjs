@@ -82,9 +82,9 @@ test('an administrator clears an account password; the person signs in once with
 
     await owner.goto(`${s.base}/app/console/server/users`)
     await s.unlock(owner, 'owner@example.test')
+    await owner.getByRole('button', { name: 'Open eve@example.test' }).click()
     owner.once('dialog', (d) => d.accept())
-    // The only account other than the owner's own (the list names no addresses).
-    await owner.getByRole('button', { name: 'Reset account password' }).first().click()
+    await owner.getByRole('button', { name: 'Reset account password' }).click()
     await owner.waitForSelector('text=Account password cleared', { state: 'attached' })
 
     await eve.getByRole('button', { name: 'Other ways to sign in' }).click()

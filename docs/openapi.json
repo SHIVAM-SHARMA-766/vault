@@ -5218,10 +5218,80 @@
     },
     "/api/admin/users": {
       "get": {
-        "summary": "Accounts on this server",
+        "summary": "Accounts on this server: searched, filtered, sorted and paged",
         "operationId": "getAdminUsers",
         "tags": [
           "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.read",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/bulk": {
+      "post": {
+        "summary": "One action (disable, enable, sign out, reset two-factor) on many accounts",
+        "operationId": "postAdminUsersBulk",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "x-permission": "users.write",
+        "responses": {
+          "2XX": {
+            "description": "Success. JSON."
+          },
+          "default": {
+            "description": "An error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{id}": {
+      "get": {
+        "summary": "One account in full: devices, organizations, activity",
+        "operationId": "getAdminUsersId",
+        "tags": [
+          "admin"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "security": [
           {
@@ -6184,7 +6254,7 @@
     },
     "/api/admin/audit": {
       "get": {
-        "summary": "Staff audit log",
+        "summary": "Staff audit log, filtered and paged",
         "operationId": "getAdminAudit",
         "tags": [
           "admin"

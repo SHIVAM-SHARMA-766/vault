@@ -8,6 +8,7 @@ import * as session from '../../lib/session.js'
 import { IconAlert } from '../../ui/icons.js'
 import type { useToast } from '../../ui/kit.js'
 import { when as fmtWhen } from '../../lib/format.js'
+import type { Role } from '../../lib/api.js'
 
 export function useAdminData<T>(load: (token: string) => Promise<T>) {
   const [data, setData] = useState<T | null>(null)
@@ -70,5 +71,18 @@ export async function run(toast: ReturnType<typeof useToast>, action: (token: st
     toast(err instanceof Error ? err.message : 'That did not work.', 'error')
     return false
   }
+}
+
+
+export const ROLE_LABELS: Record<Role, string> = {
+  owner: 'Owner', admin: 'Admin', support: 'Support', marketing: 'Marketing', viewer: 'Viewer', user: 'User',
+}
+export const ROLE_HELP: Record<Role, string> = {
+  owner: 'Everything, including roles. Set in the host configuration.',
+  admin: 'Users, invitations, registration and the website. Cannot change roles.',
+  support: 'The service desk and invitations. Escalates account changes to an admin.',
+  marketing: 'The website only: text, search details, images and the banner.',
+  viewer: 'Can see everything in this panel and change nothing.',
+  user: 'No admin access.',
 }
 
