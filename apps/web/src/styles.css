@@ -578,7 +578,7 @@ table.data .strong { color: var(--text); font-weight: 600; }
 
 /* ── Website editor ──────────────────────────────────────────────────── */
 
-.admin-section.site-editor { max-width: 1240px; }
+.admin-section.site-editor { max-width: 1120px; }
 .site-layout { display: grid; grid-template-columns: 200px 1fr; gap: 20px; align-items: start; }
 .site-nav { position: sticky; top: 0; display: flex; flex-direction: column; gap: 2px; }
 .site-nav .side-item span:first-of-type { flex: 1; }

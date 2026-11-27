@@ -6,9 +6,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { type Role, type StaffTicket, type TicketMessage, type TicketStatus, api } from '../../lib/api.js'
 import * as session from '../../lib/session.js'
-import { IconAlert, IconArrowLeft, IconCheck, IconShield } from '../../ui/icons.js'
+import { IconAlert, IconArrowLeft, IconCheck, IconInbox, IconShield } from '../../ui/icons.js'
 import { CopyButton, useToast } from '../../ui/kit.js'
-import { ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
+import { EmptyState, ErrorBox, Section, ago, run, useAdminData, when } from './common.js'
 
 const KIND_LABEL = { access: 'Access request', signin: 'Sign-in help', support: 'Support' } as const
 /** Staff wording; the requester sees "Waiting for you" for the same state. */
@@ -47,7 +47,7 @@ export function Desk({ selfId, canWrite, canApprove, canReset }: { selfId: strin
         ))}
       </div>
       {!data ? <div className="skeletons">{[0, 1, 2].map((i) => <div key={i} className="skeleton" />)}</div>
-        : visible.length === 0 ? <div className="empty"><h3>Nothing here</h3><p>No tickets in this view.</p></div> : (
+        : visible.length === 0 ? <EmptyState icon={<IconInbox size={26} />} title={filter === 'active' ? 'All caught up' : 'Nothing here'}>{filter === 'active' ? 'No ticket needs you right now. Requests from the sign-in page and members’ tickets arrive here.' : 'No tickets in this view.'}</EmptyState> : (
         <div className="table-wrap">
           <table className="data">
             <thead><tr><th>#</th><th>Subject</th><th>Kind</th><th>From</th><th>Status</th><th>Updated</th></tr></thead>

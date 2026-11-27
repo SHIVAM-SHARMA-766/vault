@@ -7,9 +7,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { type AdminUser, type AdminUserDetail, type AdminUserPage, type AdminUserQuery, type Role, api } from '../../lib/api.js'
 import { download } from '../../lib/download.js'
 import * as session from '../../lib/session.js'
-import { IconDownload, IconRefresh, IconSearch, IconX } from '../../ui/icons.js'
+import { IconDownload, IconRefresh, IconSearch, IconUser, IconX } from '../../ui/icons.js'
 import { useToast } from '../../ui/kit.js'
-import { ErrorBox, ROLE_HELP, ROLE_LABELS, Section, ago, run, when } from './common.js'
+import { EmptyState, ErrorBox, ROLE_HELP, ROLE_LABELS, Section, ago, run, when } from './common.js'
 
 const PAGE_SIZES = [25, 50, 100, 200]
 type Status = NonNullable<AdminUserQuery['status']>
@@ -141,7 +141,7 @@ export function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite
 
       <ErrorBox error={error} />
       {!page ? <div className="skeletons">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton" />)}</div>
-        : page.total === 0 ? <div className="empty"><h3>{page.counts.all === 0 ? 'No accounts yet' : 'No account matches'}</h3>{page.counts.all ? <p className="muted">Try another search or filter.</p> : null}</div> : (
+        : page.total === 0 ? <EmptyState icon={<IconUser size={26} />} title={page.counts.all === 0 ? 'No accounts yet' : 'No account matches'}>{page.counts.all ? 'Try another search or filter.' : 'Invite people from Invitations.'}</EmptyState> : (
         <div className={`table-wrap ${loading ? 'is-loading' : ''}`}>
           <table className="data users-table">
             <thead>
