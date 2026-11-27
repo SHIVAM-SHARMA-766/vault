@@ -16,7 +16,7 @@
     "@simplewebauthn/server": "14.0.3",
     "@vault/crypto": "*",
     "@vault/site": "*",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^13.2.0",
     "mysql2": "^3.24.6",
     "nodemailer": "^10.2.1",
     "pg": "^8.13.1"
