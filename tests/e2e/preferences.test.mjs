@@ -14,10 +14,10 @@ test('settings sections have their own addresses, and a deep link survives unloc
     await s.settings(page, 'Security')
     assert.ok(page.url().endsWith('/app/settings/security'))
     await page.waitForSelector('#s-sessions')
-    assert.equal(await page.locator('#cp-current').count(), 0, 'the master password form is on Account, not here')
+    assert.equal(await page.locator('#cp-open').count(), 0, 'the master password form is on Account, not here')
     await s.settings(page, 'Account')
     assert.ok(page.url().endsWith('/app/settings'))
-    await page.waitForSelector('#cp-current')
+    await page.waitForSelector('#cp-open')
 
     await page.goto(`${s.base}/app/settings/preferences`)
     await s.unlock(page, 'mira@example.test')

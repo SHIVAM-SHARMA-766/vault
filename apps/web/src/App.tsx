@@ -146,6 +146,7 @@ function AuthScreen() {
             <li><IconLock size={16} /> Names, tags and folders are encrypted too</li>
           </ul>
         </div>
+        <AuthPreview />
         <p className="auth-foot">{instance && instance.name !== 'Vault' ? `${instance.name} · ` : ''}Zero-knowledge by design</p>
       </aside>
       <main className="auth-main">
@@ -153,11 +154,14 @@ function AuthScreen() {
           <a className="brand brand-compact" href="/" title="Go to the Vault website"><BrandMark /></a>
           <nav className="auth-nav" aria-label="Breadcrumb">
             <a className="auth-home" href="/"><IconArrowLeft size={15} />{t('Back to website')}</a>
-            <ol className="crumbs">
-              <li><a href="/">Home</a></li>
-              <li>{view !== 'unlock' ? <button type="button" className="crumb-link" onClick={() => setView('unlock')}>{place}</button> : place}</li>
-              <li aria-current="page">{step}</li>
-            </ol>
+            {/* On the first screen the page title says where you are; deeper ones show the way back. */}
+            {view !== 'unlock' ? (
+              <ol className="crumbs">
+                <li><a href="/">Home</a></li>
+                <li><button type="button" className="crumb-link" onClick={() => setView('unlock')}>{place}</button></li>
+                <li aria-current="page">{step}</li>
+              </ol>
+            ) : null}
           </nav>
           {view === 'unlock' ? (
             <Unlock forAdmin={forAdmin} onRegister={() => setView('register')} onRecover={() => setView('recover')}
@@ -176,6 +180,31 @@ function AuthScreen() {
           <SupportContact className="muted small auth-support" />
         </div>
       </main>
+    </div>
+  )
+}
+
+/** A drawing of an unlocked vault for the sign-in page's side: made-up items,
+ *  no real names or data. Decoration only. */
+function AuthPreview() {
+  const items = [
+    { name: 'Work email', meta: 'you@company.com', hue: 0 },
+    { name: 'Bank', meta: '•••• 4821', hue: 2 },
+    { name: 'Home Wi-Fi', meta: 'Network password', hue: 4 },
+  ]
+  return (
+    <div className="auth-preview" aria-hidden="true">
+      <div className="ap-card">
+        <div className="ap-head"><span className="ap-dot" /><span className="ap-dot" /><span className="ap-dot" /><span className="ap-search" /></div>
+        {items.map((i) => (
+          <div key={i.name} className="ap-row">
+            <span className={`ap-mono av-${i.hue}`}>{i.name[0]}</span>
+            <span className="ap-text"><strong>{i.name}</strong><small>{i.meta}</small></span>
+            <span className="ap-pill">Strong</span>
+          </div>
+        ))}
+      </div>
+      <div className="ap-badge"><IconLock size={14} /> Encrypted on this device</div>
     </div>
   )
 }

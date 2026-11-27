@@ -44,16 +44,16 @@ type Tab = 'overview' | 'desk' | 'website' | 'users' | 'orgs' | 'invites' | 'aud
 
 /** `feature`: the edition feature a tab needs (decisions/0030). A personal
  *  Vault has one account, so no users list, invitations or organizations. */
-const TABS: { id: Tab; label: string; needs: Permission; feature?: keyof Features; Icon: (p: { size?: number }) => ReactElement }[] = [
+const TABS: { id: Tab; label: string; needs: Permission; feature?: keyof Features; group?: string; Icon: (p: { size?: number }) => ReactElement }[] = [
   { id: 'overview', label: 'Overview', needs: 'overview.read', Icon: IconGrid },
-  { id: 'desk', label: 'Service desk', needs: 'desk.read', feature: 'serviceDesk', Icon: IconInbox },
-  { id: 'website', label: 'Website', needs: 'site.read', feature: 'website', Icon: IconGlobe },
-  { id: 'users', label: 'Users', needs: 'users.read', feature: 'invitations', Icon: IconUser },
-  { id: 'orgs', label: 'Organizations', needs: 'users.read', feature: 'organizations', Icon: IconGrid },
-  { id: 'invites', label: 'Invitations', needs: 'invites.read', feature: 'invitations', Icon: IconKey },
-  { id: 'audit', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
-  { id: 'reports', label: 'Reports', needs: 'audit.read', feature: 'invitations', Icon: IconPulse },
-  { id: 'system', label: 'System', needs: 'overview.read', Icon: IconSliders },
+  { id: 'users', group: 'People', label: 'Users', needs: 'users.read', feature: 'invitations', Icon: IconUser },
+  { id: 'orgs', group: 'People', label: 'Organizations', needs: 'users.read', feature: 'organizations', Icon: IconGrid },
+  { id: 'invites', group: 'People', label: 'Invitations', needs: 'invites.read', feature: 'invitations', Icon: IconKey },
+  { id: 'desk', group: 'People', label: 'Service desk', needs: 'desk.read', feature: 'serviceDesk', Icon: IconInbox },
+  { id: 'audit', group: 'Activity', label: 'Audit log', needs: 'audit.read', Icon: IconNote },
+  { id: 'reports', group: 'Activity', label: 'Reports', needs: 'audit.read', feature: 'invitations', Icon: IconPulse },
+  { id: 'website', group: 'Configure', label: 'Website', needs: 'site.read', feature: 'website', Icon: IconGlobe },
+  { id: 'system', group: 'Configure', label: 'System', needs: 'overview.read', Icon: IconSliders },
 ]
 
 export { ROLE_LABELS }
@@ -118,9 +118,6 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
       <ErrorBox error={error} />
       {!data ? <div className="skeletons">{[0, 1].map((i) => <div key={i} className="skeleton" />)}</div> : (
         <>
-          <SetupChecklist data={data} onGo={onGo} onWizard={canWrite ? () => setWizard(true) : undefined} />
-          {features.invitations ? <NeedsAttention onGo={onGo} /> : null}
-          {wizard ? <SetupWizard data={data} onClose={() => { setWizard(false); setEpoch((n) => n + 1); void reload() }} onInvite={() => onGo('invites')} /> : null}
           <div className="stats">
             {features.invitations ? <Stat label="Accounts" value={data.users} note={data.disabledUsers ? `${data.disabledUsers} disabled` : 'all active'} onClick={() => onGo('users')} /> : null}
             <Stat label="Encrypted items" value={data.entries} note="across every vault" />
@@ -128,6 +125,9 @@ function Overview({ onGo, canWrite }: { onGo: (t: Tab) => void; canWrite: boolea
             {features.invitations ? <Stat label="Open invitations" value={data.activeInvites} note="unused and unexpired" onClick={() => onGo('invites')} /> : null}
             {features.serviceDesk ? <Stat label="Open tickets" value={data.openTickets} note="in the service desk" onClick={() => onGo('desk')} /> : null}
           </div>
+          <SetupChecklist data={data} onGo={onGo} onWizard={canWrite ? () => setWizard(true) : undefined} />
+          {features.invitations ? <NeedsAttention onGo={onGo} /> : null}
+          {wizard ? <SetupWizard data={data} onClose={() => { setWizard(false); setEpoch((n) => n + 1); void reload() }} onInvite={() => onGo('invites')} /> : null}
 
           <div className="admin-cards">
             <div className={`admin-card ${backupStale ? 'card-warn' : ''}`}>

@@ -99,14 +99,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
           {me?.policyGap ? <p className="alert alert-warn"><IconAlert size={16} /><span>{me.policyGap}</span></p> : null}
 
           {tab === 'account' ? <>
-            <section className="settings-card" aria-labelledby="s-account">
-              <div className="settings-card-head"><IconUser size={18} /><h2 id="s-account">Account</h2></div>
-              <dl className="facts">
-                <div><dt>Email</dt><dd>{state.email}</dd></div>
-                <div><dt>Role</dt><dd>{state.role && state.role !== 'user' ? state.role[0]!.toUpperCase() + state.role.slice(1) : 'Member'}</dd></div>
-                <div><dt>Created</dt><dd>{me ? day(me.createdAt) : '—'}</dd></div>
-              </dl>
-            </section>
+            <ProfileCard state={state} me={me} />
             <ChangePassword state={state} minScore={me?.policy.minPasswordScore ?? 0} />
             <RotateRecovery state={state} />
             <SecretKey state={state} />
@@ -146,6 +139,7 @@ export function Settings({ state, tab: requested }: { state: session.Unlocked; t
 
 function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore: number }) {
   const toast = useToast()
+  const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -176,7 +170,7 @@ function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore
         accessExpiresAt: session.expiresAtFrom(res),
       })
       void api.passwordScore(res.accessToken, passwordStrength(next).score).catch(() => {})
-      setCurrent(''); setNext(''); setConfirm('')
+      setCurrent(''); setNext(''); setConfirm(''); setOpen(false)
       toast('Master password changed. Other devices have been signed out.')
     } catch (err) {
       setError(err instanceof ApiError && err.status === 401 ? 'The current master password is wrong.'
@@ -184,6 +178,20 @@ function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore
     } finally {
       setBusy(false)
     }
+  }
+
+  const cancel = () => { setOpen(false); setCurrent(''); setNext(''); setConfirm(''); setError('') }
+  if (!open) {
+    return (
+      <section className="settings-card setting-row" aria-labelledby="s-password">
+        <div className="setting-row-icon"><IconLock size={18} /></div>
+        <div className="setting-row-text">
+          <h2 id="s-password">Master password</h2>
+          <p className="muted small">Opens your vault. Only you know it: it cannot be reset by email, only replaced while you still know it.</p>
+        </div>
+        <button id="cp-open" className="btn btn-secondary" onClick={() => setOpen(true)}>Change</button>
+      </section>
+    )
   }
 
   return (
@@ -207,6 +215,7 @@ function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore
       </div>
       {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
       <div className="settings-actions">
+        <button className="btn btn-secondary" type="button" onClick={cancel}>Cancel</button>
         <button className="btn btn-primary" type="submit" disabled={busy || !current || !next || !confirm}>
           {busy ? <><span className="spinner" />Changing…</> : 'Change master password'}
         </button>
@@ -216,6 +225,7 @@ function ChangePassword({ state, minScore }: { state: session.Unlocked; minScore
 }
 
 function RotateRecovery({ state }: { state: session.Unlocked }) {
+  const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -250,8 +260,21 @@ function RotateRecovery({ state }: { state: session.Unlocked }) {
         <div className="recovery-key"><code>{issued}</code><CopyButton value={issued} label="Recovery key" /></div>
         <Check checked={saved} onChange={setSaved}>I have stored the new recovery key somewhere safe.</Check>
         <div className="settings-actions">
-          <button className="btn btn-primary" disabled={!saved} onClick={() => { setIssued(''); setSaved(false) }}><IconCheck size={16} />Done</button>
+          <button className="btn btn-primary" disabled={!saved} onClick={() => { setIssued(''); setSaved(false); setOpen(false) }}><IconCheck size={16} />Done</button>
         </div>
+      </section>
+    )
+  }
+
+  if (!open) {
+    return (
+      <section className="settings-card setting-row" aria-labelledby="s-recovery">
+        <div className="setting-row-icon"><IconKey size={18} /></div>
+        <div className="setting-row-text">
+          <h2 id="s-recovery">Recovery key</h2>
+          <p className="muted small">The only way back in if you forget your master password. Issue a new one if the old one may have been seen.</p>
+        </div>
+        <button id="rk-open" className="btn btn-secondary" onClick={() => setOpen(true)}>Issue new</button>
       </section>
     )
   }
@@ -269,10 +292,48 @@ function RotateRecovery({ state }: { state: session.Unlocked }) {
       </div>
       {error ? <p className="alert alert-error"><IconAlert size={16} />{error}</p> : null}
       <div className="settings-actions">
-        <button className="btn btn-secondary" type="submit" disabled={busy || !current}>
+        <button className="btn btn-secondary" type="button" onClick={() => { setOpen(false); setCurrent(''); setError('') }}>Cancel</button>
+        <button className="btn btn-primary" type="submit" disabled={busy || !current}>
           {busy ? <><span className="spinner" />Issuing…</> : 'Issue a new recovery key'}
         </button>
       </div>
     </form>
+  )
+}
+
+/** The account at a glance: who, since when, and a short security checkup
+ *  whose items link to where each is fixed. */
+function ProfileCard({ state, me }: { state: session.Unlocked; me: { createdAt: string; twoFactor: TwoFactorStatus; passkeys: UnlockPasskey[]; account: { set: boolean } } | null }) {
+  const role = state.role && state.role !== 'user' ? state.role[0]!.toUpperCase() + state.role.slice(1) : 'Member'
+  const checks = me ? [
+    { ok: me.account.set, label: 'Account password', fix: 'Set one' },
+    { ok: me.twoFactor.enabled, label: 'Two-factor sign-in', fix: 'Turn on' },
+    { ok: me.passkeys.length > 0, label: 'Passkey unlock', fix: 'Add one', optional: true },
+  ] : []
+  const done = checks.filter((c) => c.ok).length
+  return (
+    <section className="settings-card profile-card" aria-labelledby="s-account">
+      <div className="profile-main">
+        <span className="profile-avatar" aria-hidden="true">{(state.email[0] ?? '?').toUpperCase()}</span>
+        <div className="profile-id">
+          <h2 id="s-account">{state.email}</h2>
+          <p className="muted small"><span className="pill">{role}</span> Member since {me ? day(me.createdAt) : '…'}</p>
+        </div>
+      </div>
+      {me ? (
+        <div className="checkup" aria-label="Security checkup">
+          <p className="checkup-head"><strong>Security checkup</strong><span className="muted small">{done} of {checks.length} done</span></p>
+          <ul>
+            {checks.map((c) => (
+              <li key={c.label} className={c.ok ? 'is-ok' : c.optional ? 'is-optional' : 'is-todo'}>
+                <span className="checkup-dot" aria-hidden="true">{c.ok ? <IconCheck size={12} /> : null}</span>
+                <span>{c.label}</span>
+                {c.ok ? <span className="muted small">On</span> : <button className="link" onClick={() => navigate(href({ name: 'settings', tab: 'security' }))}>{c.fix}</button>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
   )
 }

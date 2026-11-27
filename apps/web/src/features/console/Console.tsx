@@ -122,13 +122,17 @@ function ScopePicker({ id, scopes, current, serverName, onChoose }: { id: string
   )
 }
 
-function NavList({ items, active, onGo }: { items: { id: string; label: string; Icon: (p: { size?: number }) => ReactElement }[]; active: string; onGo: (id: string) => void }) {
+function NavList({ items, active, onGo }: { items: { id: string; label: string; group?: string; Icon: (p: { size?: number }) => ReactElement }[]; active: string; onGo: (id: string) => void }) {
+  // Sections under quiet group headings (People, Activity, Configure) when they have one.
   return (
     <>
-      {items.map(({ id, label, Icon }) => (
-        <button key={id} className={`side-item ${active === id ? 'side-active' : ''}`} onClick={() => onGo(id)} aria-current={active === id ? 'page' : undefined}>
-          <Icon size={16} /><span>{label}</span>
-        </button>
+      {items.map(({ id, label, group, Icon }, i) => (
+        <span key={id} className="side-entry">
+          {group && group !== items[i - 1]?.group ? <span className="side-group" aria-hidden="true">{group}</span> : null}
+          <button className={`side-item ${active === id ? 'side-active' : ''}`} onClick={() => onGo(id)} aria-current={active === id ? 'page' : undefined}>
+            <Icon size={16} /><span>{label}</span>
+          </button>
+        </span>
       ))}
     </>
   )
