@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 
 import { openFolder } from '@vault/crypto'
 import {
-  AUTO_HIDE_CHOICES, CLIPBOARD_CHOICES, type Language, type Clock, type DateStyle, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
+  AUTO_HIDE_CHOICES, CLIPBOARD_CHOICES, type Language, type Clock, type DateStyle, GENERATOR_HISTORY_MAX, GENERATOR_MAX, GENERATOR_MIN, LOCK_CHOICES, SEPARATORS, type Prefs, type Theme,
   describeMinutes, describeSeconds, flattenTree, folderTree, formatWhen, passphraseBits,
 } from '@vault/core'
 
@@ -17,7 +17,7 @@ import type { Folder } from '../vault/model.js'
 import * as prefs from '../../lib/prefs.js'
 import * as session from '../../lib/session.js'
 import { IconClock, IconCopy, IconEye, IconGlobe, IconFolder, IconInbox, IconKey, IconSun } from '../../ui/icons.js'
-import { Check, useToast } from '../../ui/kit.js'
+import { Check, GeneratedHistory, useToast } from '../../ui/kit.js'
 import { LOCALE_NAMES, t } from '../../lib/i18n.js'
 
 const THEME_LABELS: Record<Theme, string> = { system: 'Match system', light: 'Light', dark: 'Dark' }
@@ -260,6 +260,14 @@ function GeneratorDefaults({ p, saving, change }: { p: Prefs; saving: boolean; c
         <Check checked={g.symbols} onChange={(v) => set({ symbols: v })}>!@#</Check>
       </div>
       )}
+      <div className="gen-history-block">
+        <div className="label-row">
+          <h3 id="p-gen-history">Recently generated</h3>
+          {p.generatorHistory.length ? <button type="button" className="link" disabled={saving} onClick={() => void change({ generatorHistory: [] })}>Clear history</button> : null}
+        </div>
+        <p className="muted small">The last {GENERATOR_HISTORY_MAX} passwords you used or copied from the generator, encrypted with your preferences, in case one was lost before it was saved.</p>
+        {p.generatorHistory.length ? <GeneratedHistory items={p.generatorHistory} /> : <p className="muted small gen-history-empty">Nothing yet.</p>}
+      </div>
     </section>
   )
 }

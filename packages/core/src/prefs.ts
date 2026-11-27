@@ -69,6 +69,23 @@ export interface Prefs {
   /** Show each item's website icon, fetched by this Vault server by host name
    *  (no sign-in sent); off shows a coloured initial instead. */
   siteIcons: boolean
+  /** Passwords the generator made and the person used or copied, newest
+   *  first, so one lost before it was saved can be found again. Sealed with
+   *  the rest of the preferences; cleared from Preferences. */
+  generatorHistory: GeneratedPassword[]
+}
+
+export interface GeneratedPassword { value: string; at: string }
+
+/** How many generated passwords are kept, and the longest kept. */
+export const GENERATOR_HISTORY_MAX = 20
+const GENERATED_MAX_LENGTH = 160
+
+/** The history with one more password at the front: no repeats, the oldest
+ *  dropped past the limit. */
+export function rememberGenerated(history: readonly GeneratedPassword[], value: string, now = new Date()): GeneratedPassword[] {
+  if (!value || value.length > GENERATED_MAX_LENGTH) return [...history]
+  return [{ value, at: now.toISOString() }, ...history.filter((h) => h.value !== value)].slice(0, GENERATOR_HISTORY_MAX)
 }
 
 export const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -85,6 +102,7 @@ export const DEFAULT_PREFS: Prefs = Object.freeze({
   clock: 'system',
   language: 'system',
   siteIcons: true,
+  generatorHistory: Object.freeze([]) as unknown as GeneratedPassword[],
   generator: Object.freeze({ mode: 'password', length: 20, upper: true, digits: true, symbols: true, words: 6, separator: '-', capitalize: false, digit: false }),
 }) as Prefs
 
@@ -113,6 +131,12 @@ export function normalizePrefs(raw: unknown): Prefs {
     clock: pick(r['clock'], CLOCKS, d.clock),
     language: pick(r['language'], LANGUAGES, d.language),
     siteIcons: bool(r['siteIcons'], d.siteIcons),
+    generatorHistory: Array.isArray(r['generatorHistory'])
+      ? (r['generatorHistory'] as unknown[]).filter((h): h is GeneratedPassword => !!h && typeof h === 'object'
+          && typeof (h as GeneratedPassword).value === 'string' && (h as GeneratedPassword).value.length > 0 && (h as GeneratedPassword).value.length <= GENERATED_MAX_LENGTH
+          && typeof (h as GeneratedPassword).at === 'string' && Number.isFinite(Date.parse((h as GeneratedPassword).at)))
+          .map((h) => ({ value: h.value, at: h.at })).slice(0, GENERATOR_HISTORY_MAX)
+      : [],
     generator: {
       mode: pick(g['mode'], ['password', 'passphrase'] as const, d.generator.mode),
       length,

@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 
-import { DEFAULT_PREFS, type Prefs, type Theme, normalizePrefs } from '@vault/core'
+import { DEFAULT_PREFS, type Prefs, type Theme, normalizePrefs, rememberGenerated } from '@vault/core'
 import { sealJson, unsealJson, utf8Encode } from '@vault/crypto'
 
 import { api } from './api.js'
@@ -83,6 +83,14 @@ export async function save(vaultKey: Uint8Array, change: Partial<Prefs>): Promis
   const next = normalizePrefs({ ...current, ...change })
   apply(next)
   await api.putPrefs(await session.token(), await sealJson(vaultKey, next, AAD))
+}
+
+/** Keeps a generated password the person used or copied in the sealed
+ *  generator history. Best effort: a failed save never blocks the form. */
+export function recordGenerated(value: string): void {
+  const vaultKey = session.get()?.vaultKey
+  if (!vaultKey || !value) return
+  void save(vaultKey, { generatorHistory: rememberGenerated(current.generatorHistory, value) }).catch(() => {})
 }
 
 /** On lock, the session-bound preferences return to their defaults; the theme
