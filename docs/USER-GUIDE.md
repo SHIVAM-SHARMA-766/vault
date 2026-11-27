@@ -784,6 +784,37 @@ On a hosted server, Admin console → **Tenants** lists the companies. **Manage*
 </details>
 
 <details>
+<summary>API tokens and SCIM provisioning (Entra ID, Okta, JumpCloud)</summary>
+
+Admin console → **System** → **API tokens and SCIM** (owners only). A token is for a script or
+for your directory. Pick a name, its **scopes** and when it expires, then **Make token**. Copy it
+then: it is shown once and only a fingerprint is kept.
+
+- **What a token can do:** it acts on accounts and invitations like staff do, within its scopes
+  (`users.read`, `users.write`, `invites.read`, `invites.write`, `audit.read`,
+  `overview.read`, `scim`).
+- **What it can never do:** change roles or settings, manage tokens, act on admins or owners,
+  or open a vault.
+- **Records:** everything it does is in the audit log under the token's name. **Revoke** stops
+  it at once. Making or revoking a token needs your master password if you have not confirmed
+  it in the last ten minutes.
+- **Calling the API:** send the token as `Authorization: Bearer vault_pat_…` to the admin API
+  (`/api/admin/…`, see `docs/openapi.json`).
+
+**SCIM 2.0:** in your directory's provisioning settings, use the **SCIM base URL** shown on the
+card (`https://<your server>/api/scim/v2`) and a token with the `scim` scope as the secret
+token. Vault cannot make a vault for anyone (only their master password can), so:
+
+- **A new user** gets an emailed invitation, and is the account once they sign up with it. The
+  username is the email address.
+- **Deactivated** (`active: false`) disables the account and signs it out everywhere;
+  reactivated enables it.
+- **Deleted** offboards the account: disabled, signed out, out of every organization. The vault
+  itself is kept; staff delete accounts in the console.
+- **Groups** are not provisioned. Joining an organization needs its admins' fingerprint check.
+</details>
+
+<details>
 <summary>Users: finding people and acting on many at once</summary>
 
 Admin console → **Users** lists every account, a page at a time (25 to 200 rows), so it stays

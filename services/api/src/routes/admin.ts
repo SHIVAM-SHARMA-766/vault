@@ -14,6 +14,7 @@ import type { App } from '../context.js'
 import { HttpError, type LambdaEvent, type LambdaResponse, badRequest, forbidden, json, notFound, parseJsonBody } from '../http.js'
 import { type TemplateKind, TEMPLATE_KINDS, accountResetMessage, applyTemplate, inviteMessage, notify, signInNotice, vaultApprovedMessage, verifyMessage } from '../mail.js'
 import { clearPassword } from './accounts.js'
+import { tokenLabels } from '../apitokens.js'
 import { openEmail } from '../identity.js'
 import { openTicketCount } from './desk.js'
 import { leaveAllOrgs, purgeOrg } from './orgs.js'
@@ -470,6 +471,16 @@ export async function offboard(app: App, actor: string, actorRole: Role, id: str
   return json(200, { ok: true })
 }
 
+/** Disables or enables an account, checked and audited as from the console
+ *  (for SCIM, phase 5). Disabling signs it out everywhere. */
+export async function setAccountDisabled(app: App, actor: string, actorRole: Role, id: string, disabled: boolean, detail?: string): Promise<void> {
+  const reg = await targetUser(app, actor, actorRole, id, false)
+  if ((reg.disabled === true) === disabled) return
+  await audit(app, actor, disabled ? 'user.disable' : 'user.enable', id, detail)
+  await putRegistry(app, { ...fieldsOf(reg), disabled })
+  if (disabled) await revokeAllSessions(app, id)
+}
+
 export async function revokeSessions(app: App, actor: string, actorRole: Role, id: string): Promise<LambdaResponse> {
   await targetUser(app, actor, actorRole, id, true)
   await audit(app, actor, 'user.revoke-sessions', id)
@@ -835,7 +846,7 @@ export async function auditRoute(app: App, event?: LambdaEvent): Promise<LambdaR
   // Ids mean nothing to a person reading the log; labels and addresses do.
   // Deleted accounts keep their id, and their label survives in the delete
   // record's detail.
-  const labels = new Map((await listRegistry(app)).map((r) => [r.userId, r.label ?? emailOf(app, r)]))
+  const labels = new Map<string, string | null>([...(await listRegistry(app)).map((r) => [r.userId, r.label ?? emailOf(app, r)] as [string, string | null]), ...(await tokenLabels(app))])
   const all = (await listAudit(app, 100_000)).map((r) => ({
     at: r.at, actor: r.actor, action: r.action, target: r.target ?? null, detail: r.detail ?? null,
     actorLabel: labels.get(r.actor) ?? null,

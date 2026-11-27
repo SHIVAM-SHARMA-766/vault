@@ -629,6 +629,10 @@ export const api = {
       request<{ domain: unknown }>('POST', `/api/admin/orgs/${encodeURIComponent(id)}/domains/${encodeURIComponent(domain)}/verify`, { token }),
     releaseDomain: (token: string, id: string, domain: string) =>
       request<{ ok: true }>('DELETE', `/api/admin/orgs/${encodeURIComponent(id)}/domains/${encodeURIComponent(domain)}`, { token }),
+    tokens: (token: string) => request<{ tokens: AdminApiToken[]; scopes: string[] }>('GET', '/api/admin/tokens', { token }),
+    createToken: (token: string, body: { name: string; scopes: string[]; days: number | null }) =>
+      request<{ token: string; info: AdminApiToken }>('POST', '/api/admin/tokens', { token, body }),
+    revokeToken: (token: string, id: string) => request<{ ok: true }>('DELETE', `/api/admin/tokens/${encodeURIComponent(id)}`, { token }),
     insights: (token: string) => request<AdminInsights>('GET', '/api/admin/insights', { token }),
     reports: (token: string) => request<{ reports: { kind: string; title: string }[] }>('GET', '/api/admin/reports', { token }),
     report: (token: string, kind: string) => request<AdminReport>('GET', `/api/admin/reports/${encodeURIComponent(kind)}`, { token }),
@@ -788,6 +792,8 @@ export interface AdminTenant {
   domains: { domain: string; token: string; claimedAt: string; verifiedAt?: string; record: { name: string; value: string } }[]
   atDomains: { userId: string; email: string }[]
 }
+
+export interface AdminApiToken { id: string; name: string; scopes: string[]; createdBy: string; createdAt: string; expiresAt: string | null; lastUsedAt?: string }
 
 export interface AdminReport { kind: string; title: string; columns: string[]; rows: (string | number | boolean | null)[][] }
 

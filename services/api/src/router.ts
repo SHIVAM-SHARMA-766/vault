@@ -50,6 +50,7 @@ export class Router {
   post = (path: string, handler: Handler, summary?: string) => this.add('POST', path, handler, summary)
   put = (path: string, handler: Handler, summary?: string) => this.add('PUT', path, handler, summary)
   delete = (path: string, handler: Handler, summary?: string) => this.add('DELETE', path, handler, summary)
+  patch = (path: string, handler: Handler, summary?: string) => this.add('PATCH', path, handler, summary)
 
   /** Every route, for the OpenAPI document. */
   list(): RouteInfo[] {

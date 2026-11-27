@@ -401,6 +401,15 @@ pull requests with tests.
     company's: sign-ups at it are approved for a vault at once and listed for its admins to
     invite. Joining still takes an invitation and a fingerprint check.
 
+- [ ] **Phase 5: integrations** (asked for 2026-11-27).
+  - [x] Admin API tokens: owner-made, scoped, hashed, shown once, expiring, revocable,
+    audited under their name.
+  - [x] SCIM 2.0 Users at `/api/scim/v2`: create emails an invitation, active false disables,
+    delete offboards (the vault is kept); filters `userName` / `externalId` `eq`; Entra ID's
+    string booleans accepted.
+  - [ ] CLI for developers (`vault read`, `vault run`), zero-knowledge on the developer's machine.
+  - [ ] SAML 2.0 sign-in (OIDC already works with most identity providers).
+
 ### Editions — user experience per edition ([0030](../decisions/0030-editions.md))
 
 Started 2026-11-21, after the operator chose three editions. Each stage makes one edition fit its
