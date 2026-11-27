@@ -125,6 +125,7 @@ test('a backup made before a password change opens with the old password, and wi
     await backUpNow(page)
 
     await s.settings(page, 'Account')
+    await page.click('#cp-open')
     await page.fill('#cp-current', PASSWORD)
     await page.fill('#cp-new', NEW_PASSWORD)
     await page.fill('#cp-confirm', NEW_PASSWORD)

@@ -160,10 +160,13 @@ export function Users({ selfId, canWrite, canRoles }: { selfId: string; canWrite
                       <input type="checkbox" aria-label={`Select ${nameOf(u)}`} checked={selected.has(u.userId)} disabled={self || u.role === 'owner'} onChange={() => toggle(u.userId)} />
                     </td> : null}
                     <td>
-                      <button type="button" className="acct acct-button" onClick={(e) => { e.stopPropagation(); setOpen(u.userId) }} aria-label={`Open ${nameOf(u)}`}>
-                        <span className="acct-name">{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
-                          {self ? <span className="pill">You</span> : null}</span>
-                        <span className="muted small">{u.email && u.label ? u.label : <code className="acct-id">{u.userId.slice(0, 8)}…</code>}</span>
+                      <button type="button" className="acct-button acct-with-avatar" onClick={(e) => { e.stopPropagation(); setOpen(u.userId) }} aria-label={`Open ${nameOf(u)}`}>
+                        <span className={`acct-avatar av-${hueOf(u.userId)}`} aria-hidden="true">{(u.email || u.label || '?')[0]!.toUpperCase()}</span>
+                        <span className="acct">
+                          <span className="acct-name">{u.email || u.label || <span className="muted">Not signed in since addresses were kept</span>}
+                            {self ? <span className="pill">You</span> : null}</span>
+                          <span className="muted small">{u.email && u.label ? u.label : <code className="acct-id">{u.userId.slice(0, 8)}…</code>}</span>
+                        </span>
                       </button>
                     </td>
                     <td><span className={`pill ${u.role === 'user' ? '' : 'pill-accent'}`} title={ROLE_HELP[u.role]}>{ROLE_LABELS[u.role]}</span></td>
@@ -329,4 +332,11 @@ function UserPanel({ id, selfId, canWrite, canRoles, onClose, onChanged }: {
       </aside>
     </div>
   )
+}
+
+/** A stable colour for an account's initial, from its id (six hues). */
+function hueOf(id: string): number {
+  let h = 0
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0
+  return h % 6
 }
