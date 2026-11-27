@@ -350,7 +350,7 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   await touchLogin(app, profile.userId, profile)
   // The person can turn the ordinary sign-in email off (F5). Signing in with
   // the recovery key always sends one.
-  if (app.config.mail.signInNotices && profile['signInAlerts'] !== false) sendSignInNotice(app, email, event, false)
+  if (app.config.mail.signInNotices && profile['signInAlerts'] === true) sendSignInNotice(app, email, event, false)
   await recordActivity(app, profile.userId, sso ? 'sso-login' : 'login', event)
   return json(200, {
     wrappedVaultKey: profile.wrappedVaultKey,

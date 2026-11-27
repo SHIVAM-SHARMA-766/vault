@@ -6,11 +6,16 @@ import assert from 'node:assert/strict'
 
 import { fixtureB64, harness, registration } from './harness.js'
 
-test('a sign-in sends a notice to the address that signed in, with the device', async () => {
+test('a sign-in sends a notice, once the person turned it on, to the address that signed in, with the device', async () => {
   const h = harness({ mail: true })
   const reg = registration({ email: 'ana@example.test' })
-  await h.request('POST', '/api/auth/register', { body: reg })
+  const token = String((await h.request('POST', '/api/auth/register', { body: reg })).body['accessToken'])
   assert.equal(h.outbox.length, 0, 'registering sends nothing')
+  // Opt-in since 2026-11-27: off until turned on.
+  await h.request('POST', '/api/auth/login', { ip: '198.51.100.3', body: { email: 'ana@example.test', authKey: fixtureB64('auth-key') } })
+  await new Promise((r) => setImmediate(r))
+  assert.equal(h.outbox.length, 0, 'nothing by default')
+  await h.request('PUT', '/api/account/alerts', { token, body: { signIn: true } })
   await h.request('POST', '/api/auth/login', { ip: '198.51.100.4', body: { email: 'ana@example.test', authKey: fixtureB64('auth-key') } })
   await new Promise((r) => setImmediate(r))
   assert.equal(h.outbox.length, 1)

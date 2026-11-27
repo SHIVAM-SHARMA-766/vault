@@ -91,7 +91,7 @@ export const POLICY_CHOICES = {
 } as const
 
 export const DEFAULT_POLICY: Readonly<ServerPolicy> = Object.freeze({
-  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false, weeklyDigest: true, requireStaffTwoFactor: false,
+  requireTwoFactor: false, minPasswordScore: 0, maxIdleMinutes: null, sessionDays: null, activityDays: 90, auditDays: 365, shareLinks: true, shareLinkMaxDays: 30, allowedNetworks: [], requireSso: false, weeklyDigest: false, requireStaffTwoFactor: false,
 })
 
 /** A stored policy, with anything missing or out of range taken from the
@@ -111,7 +111,7 @@ export function readPolicy(value: unknown): ServerPolicy {
     shareLinkMaxDays: pick('shareLinkMaxDays'),
     allowedNetworks: Array.isArray(v['allowedNetworks']) ? (v['allowedNetworks'] as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 50) : [],
     requireSso: v['requireSso'] === true,
-    weeklyDigest: v['weeklyDigest'] !== false,
+    weeklyDigest: v['weeklyDigest'] === true,
     requireStaffTwoFactor: v['requireStaffTwoFactor'] === true,
   }
 }

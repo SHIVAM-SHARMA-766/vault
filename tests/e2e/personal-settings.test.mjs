@@ -61,7 +61,12 @@ test('the default mask hides length, and the sign-in email can be turned off', a
     const alerts = page.locator('#p-alerts')
     if (await alerts.count()) {
       const box = page.getByLabel('Email me when my account signs in on a device')
-      if (await box.count()) { await box.uncheck(); await page.waitForSelector('text=Sign-in emails off', { state: 'attached' }) }
+      // Off by default (opt-in since 2026-11-27): turned on, then off again.
+      if (await box.count()) {
+        assert.equal(await box.isChecked(), false)
+        await box.check(); await page.waitForSelector('text=Sign-in emails on', { state: 'attached' })
+        await box.uncheck(); await page.waitForSelector('text=Sign-in emails off', { state: 'attached' })
+      }
     }
   } finally {
     await s.stop()

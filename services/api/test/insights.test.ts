@@ -65,6 +65,10 @@ test('the weekly digest goes to owners and admins once a week, and can be turned
   const { h, owner } = await setup()
   const users = (await h.request('GET', '/api/admin/users', { token: owner })).body['users'] as { userId: string; email: string }[]
   await h.request('PUT', `/api/admin/users/${users.find((u) => u.email === 'p0@example.com')!.userId}/role`, { token: owner, body: { role: 'admin' } })
+  // Off by default (opt-in); the owner turns it on.
+  assert.equal(await tickDigest(h.app), 0, 'off until turned on')
+  const before = (await h.request('GET', '/api/admin/settings', { token: owner })).body as { policy: Record<string, unknown> }
+  assert.equal((await h.request('PUT', '/api/admin/settings', { token: owner, body: { policy: { ...before.policy, weeklyDigest: true } } })).status, 200)
   assert.equal(await tickDigest(h.app), 2)
   await new Promise((r) => setTimeout(r, 10))
   const sent = h.outbox.filter((m) => /weekly summary/.test(m.subject))
