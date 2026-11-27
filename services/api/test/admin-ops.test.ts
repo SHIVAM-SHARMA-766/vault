@@ -88,7 +88,7 @@ test('an admin\'s subject and message go on invitations; the code and warnings s
 })
 
 test('templates are validated, previewed, and cleared back to the default', async () => {
-  const { h, owner } = await setup(true)
+  const { h, owner, user } = await setup(true)
   for (const bad of [{ nope: { subject: 'x', message: '' } }, { invite: { subject: 'two\nlines', message: '' } }, { invite: { subject: 'x'.repeat(121), message: '' } }, { signIn: { subject: '', message: 'y'.repeat(1001) } }]) {
     assert.equal((await h.request('PUT', '/api/admin/settings', { token: owner, body: { templates: bad } })).status, 400, JSON.stringify(bad).slice(0, 40))
   }
@@ -98,6 +98,8 @@ test('templates are validated, previewed, and cleared back to the default', asyn
   await h.request('PUT', '/api/admin/settings', { token: owner, body: { templates: { signIn: { subject: 'Custom', message: '' } } } })
   await h.request('PUT', '/api/admin/settings', { token: owner, body: { templates: { signIn: { subject: '', message: '' } } } })
   assert.deepEqual((await h.request('GET', '/api/admin/settings', { token: owner })).body['templates'], {})
+  // Sign-in notices are opt-in: this person turned them on.
+  await h.request('PUT', '/api/account/alerts', { token: user, body: { signIn: true } })
   await loginAs(h, 'user', '203.0.113.7')
   assert.match(h.outbox.at(-1)!.subject, /New sign-in/)
 })

@@ -149,7 +149,8 @@ export async function login(app: App, event: LambdaEvent): Promise<LambdaRespons
   await requireSecondFactor(app, profile, body, event)
   if (sso && !(await useTicket(app, sso))) throw new HttpError(401, 'sso_invalid', 'That single sign-on was already used. Sign in again.')
   await touchLogin(app, profile.userId, profile)
-  if (app.config.mail.signInNotices && profile['signInAlerts'] !== false) sendSignInNotice(app, email, event, false)
+  // Opt-in (2026-11-27): an email on every sign-in is noise; Settings turns it on.
+  if (app.config.mail.signInNotices && profile['signInAlerts'] === true) sendSignInNotice(app, email, event, false)
   await recordActivity(app, profile.userId, sso ? 'sso-login' : 'login', event)
   // The address is the username (decisions/0037): kept, sealed, for staff to see.
   await rememberEmail(app, profile.userId, email)

@@ -385,7 +385,7 @@ pull requests with tests.
     it), and sign-ins per day over 30 days.
   - Seven reports with CSV: two-factor adoption, inactive accounts, staff, policy
     compliance, sign-ins (90 days), staff actions (30 days), organizations.
-  - A weekly digest to owners and admins (policy `weeklyDigest`, on by default).
+  - A weekly digest to owners and admins (policy `weeklyDigest`; opt-in, off by default since 2026-11-27).
   - The server keeps daily counters only (sign-ins, failed sign-ins, new vaults), for 400 days.
 - [x] **Phase 3: admin safety.**
   - Sensitive actions need the master password in the last ten minutes on that device

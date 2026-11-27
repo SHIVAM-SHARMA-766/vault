@@ -43,7 +43,7 @@ export async function deleteOwnAccount(app: App, userId: string, event: LambdaEv
  *  sign-ins are always announced. */
 export async function getAlerts(app: App, userId: string): Promise<LambdaResponse> {
   const profile = await app.store.get(userPk(userId), PROFILE_SK)
-  return json(200, { signIn: profile?.['signInAlerts'] !== false, available: Boolean(app.mailer) && app.config.mail.signInNotices })
+  return json(200, { signIn: profile?.['signInAlerts'] === true, available: Boolean(app.mailer) && app.config.mail.signInNotices })
 }
 
 export async function putAlerts(app: App, userId: string, event: LambdaEvent): Promise<LambdaResponse> {

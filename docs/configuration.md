@@ -54,7 +54,7 @@ account, so the server can send sign-up codes, approvals and reset links.
 | `SMTP_USER` | — | | User name, if needed |
 | `SMTP_PASSWORD` | — | yes | Password |
 | `MAIL_FROM` | — | | Sender, e.g. `Vault <vault@example.com>`. Required with `SMTP_HOST` |
-| `MAIL_SIGNIN_NOTICES` | `true` | | `false` stops the per-sign-in email; recovery-key sign-ins are always notified |
+| `MAIL_SIGNIN_NOTICES` | `true` | | `false` stops the per-sign-in email for everyone. Even when `true`, it is opt-in: each person turns it on in Settings (off by default since 2026-11-27). Recovery-key sign-ins are always notified |
 
 ### Backups
 

@@ -334,6 +334,23 @@ The sign-in page has two tabs, **Sign in** and **Create an account**. Choose
      an invitation code. You get an email when the request is approved; sign in again and create
      your vault.
 
+### Which emails Vault sends
+
+Only the ones you need:
+- the sign-up code;
+- an invitation;
+- a reset link for a forgotten account password;
+- the note that a vault request was approved.
+
+These are always sent:
+- a warning when your **recovery key** was used to sign in;
+- to owners and admins, a note when someone changes a role, the policies or registration, or
+  deletes an account.
+
+An email on every sign-in is **off** unless you turn it on (Settings → Preferences → *Email me
+when my account signs in on a device*). The weekly admin summary is off unless an owner turns it
+on.
+
 ### Signing in: account password, then master password
 
 Signing in has two steps:
@@ -724,9 +741,9 @@ it says so.
 numbers, or open **Show as a table**. The server counts these per day only: no names, no
 addresses.
 
-**Weekly summary:** once a week, owners and admins with an address on file get an email with
-the week's sign-ins and what needs attention. Turn it off under *Policies*, or use *Send one
-now*. It needs mail set up.
+**Weekly summary:** off until you turn it on under *Policies*. Then once a week, owners and admins
+with an address on file get an email with the week's sign-ins and what needs attention. *Send one
+now* sends it straight away. It needs mail set up.
 
 **Reports** (in the console sidebar) has seven reports:
 - two-factor sign-in per account;

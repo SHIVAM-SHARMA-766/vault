@@ -384,7 +384,7 @@ function PolicyCard({ canWrite, missing, onGo }: { canWrite: boolean; missing: n
         <span>Staff (owners, admins, support, marketing, viewers) must use two-factor sign-in to open the admin console</span>
       </label>
       <label className="check">
-        <input type="checkbox" disabled={!canWrite} checked={form.weeklyDigest !== false} onChange={(e) => setForm({ ...form, weeklyDigest: e.target.checked })} />
+        <input type="checkbox" disabled={!canWrite} checked={form.weeklyDigest === true} onChange={(e) => setForm({ ...form, weeklyDigest: e.target.checked })} />
         <span>Email owners and admins a weekly summary (sign-ins, and what needs attention){instance?.mail ? <> · <button type="button" className="link" disabled={!canWrite} onClick={async () => {
           try { const r = await api.admin.sendDigest(await session.token()); toast(r.sent ? `Summary sent to ${r.sent} address(es)` : 'Nobody to send it to: owners and admins need an address on file') }
           catch (err) { toast(err instanceof Error ? err.message : 'Could not send it.', 'error') }
